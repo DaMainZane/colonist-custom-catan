@@ -46,9 +46,44 @@ svg#boardSvg:active { cursor: grabbing; }
   width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.18);
   border: 2px solid rgba(255,255,255,0.55); color: #fff; font-size: 18px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
-  backdrop-filter: blur(4px); transition: background 0.15s;
+  backdrop-filter: blur(4px); transition: background 0.15s; position: relative;
 }
 .nav-icon-btn:hover { background: rgba(255,255,255,0.32); }
+.speed-mini-badge {
+  position: absolute; bottom: -4px; right: -5px; background: #0288d1; color: #fff;
+  font-size: 9.5px; font-weight: 900; padding: 1px 4px; border-radius: 6px;
+  border: 1.5px solid #fff; line-height: 1.1;
+}
+
+/* Game Menu Popover (Game Speed Adjust + Quick Controls) */
+.game-settings-menu {
+  position: absolute; top: 14px; left: 64px; width: 255px;
+  background: rgba(245, 239, 230, 0.98); border: 2px solid #fff; border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.38); z-index: 65;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.game-menu-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 900; font-size: 13.5px; color: #01579b;
+  border-bottom: 1px solid #d4cbb8; padding-bottom: 5px;
+}
+.game-menu-close {
+  background: transparent; border: none; font-size: 14px; font-weight: 900;
+  color: #555; cursor: pointer; padding: 0 4px;
+}
+.game-menu-section {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.speed-preset-row {
+  display: flex; gap: 4px; justify-content: space-between;
+}
+.speed-preset-btn {
+  flex: 1; padding: 4px 0; border-radius: 6px; border: 1.5px solid #c9c0b1;
+  background: #e6dfd3; color: #222; font-weight: 800; font-size: 11px; cursor: pointer;
+}
+.speed-preset-btn.active {
+  background: #0288d1; color: #fff; border-color: #01579b;
+}
 
 /* Compact Tabbed Lobby Bar */
 #lobbyToolbar {

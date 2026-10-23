@@ -31,6 +31,11 @@ import {
   tryHardBotProposeTrade
 } from './strategy';
 
+function getBotDelay(room: Room, baseMs: number): number {
+  const speed = Math.max(0.25, Math.min(10, Number(room.settings?.gameSpeed) || 1));
+  return Math.max(35, Math.round(baseMs / speed));
+}
+
 export function scheduleBotAction(room: Room): void {
   if (!room || room.status === 'LOBBY' || room.status === 'GAMEOVER') return;
 
@@ -55,7 +60,7 @@ export function scheduleBotAction(room: Room): void {
             }
             broadcastRoom(room);
           } catch (e) { console.error(e); }
-        }, 450);
+        }, getBotDelay(room, 450));
         return;
       }
     }
@@ -70,10 +75,10 @@ export function scheduleBotAction(room: Room): void {
             room.activeTrade = null;
             broadcastRoom(room);
           }
-        }, 500);
+        }, getBotDelay(room, 500));
         return;
       }
-      // Wait up to 4.5 seconds for human to accept/decline bot's offer
+      // Wait up to 4.5 seconds (scaled by speed) for human to accept/decline bot's offer
       if (!trade.timeoutScheduled) {
         trade.timeoutScheduled = true;
         setTimeout(() => {
@@ -81,7 +86,7 @@ export function scheduleBotAction(room: Room): void {
             room.activeTrade = null;
             broadcastRoom(room);
           }
-        }, 4500);
+        }, Math.max(1200, getBotDelay(room, 4500)));
       }
       return;
     }
@@ -108,7 +113,7 @@ export function scheduleBotAction(room: Room): void {
           checkGoldPhaseTransition(room);
           broadcastRoom(room);
         } catch (e) { console.error(e); }
-      }, 400);
+      }, getBotDelay(room, 400));
       return;
     }
 
@@ -141,7 +146,7 @@ export function scheduleBotAction(room: Room): void {
           if (room.players.every(p => p.discardPending === 0)) room.phase = 'ROBBER';
           broadcastRoom(room);
         } catch (e) { console.error(e); }
-      }, 450);
+      }, getBotDelay(room, 450));
       return;
     }
   }
@@ -153,7 +158,7 @@ export function scheduleBotAction(room: Room): void {
   if (room.botTimer) clearTimeout(room.botTimer);
   room.botTimer = setTimeout(() => {
     try { runBotTurnStep(room, current); } catch (e) { console.error(e); }
-  }, 600);
+  }, getBotDelay(room, 600));
 }
 
 function runBotTurnStep(room: Room, bot: Player): void {

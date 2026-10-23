@@ -36,3 +36,8 @@ export function setIsPanning(v: boolean): void { isPanning = v; }
 export function clearRes(r: Resources): void {
   for (const k of Object.keys(r)) r[k] = 0;
 }
+
+export function getClientSpeed(): number {
+  const s = Number(state?.settings?.gameSpeed);
+  return Number.isFinite(s) && s > 0 ? Math.max(0.25, Math.min(10, s)) : 1;
+}

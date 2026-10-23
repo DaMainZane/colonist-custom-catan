@@ -34,8 +34,28 @@ export function switchLobbyTab(tab: string): void {
 }
 
 export function toggleLobbyToolbar(): void {
+  if (state && state.status !== 'LOBBY') {
+    toggleGameMenu();
+    return;
+  }
   const el = document.getElementById('lobbyToolbar')!;
   el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+export function toggleGameMenu(forceShow?: boolean): void {
+  const menu = document.getElementById('gameSettingsMenu');
+  if (!menu) return;
+  const shouldShow = typeof forceShow === 'boolean' ? forceShow : menu.style.display === 'none';
+  menu.style.display = shouldShow ? 'flex' : 'none';
+  playTone(500, 0.05);
+}
+
+export function setGameSpeedValue(speedVal: number | string): void {
+  if (!state) return;
+  const num = Math.max(0.25, Math.min(10, Number(speedVal) || 1));
+  if (state.settings) state.settings.gameSpeed = num;
+  socket.emit('setGameSpeed', { code: state.code, speed: num });
+  playTone(560, 0.05);
 }
 
 export function setBrush(type: string, value: string, btn?: HTMLElement): void {
@@ -72,7 +92,8 @@ export function pushSettings(): void {
       devMonopoly: val('setDevMono'),
       maxRoads: val('setMaxRoad'),
       maxSettlements: val('setMaxSettle'),
-      maxCities: val('setMaxCity')
+      maxCities: val('setMaxCity'),
+      gameSpeed: val('setGameSpeed')
     }
   });
 }

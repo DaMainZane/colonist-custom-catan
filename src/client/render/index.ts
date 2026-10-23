@@ -11,9 +11,28 @@ export function renderAll(): void {
   const current = state.players[state.turnIndex];
   const isMyTurn = !!current && current.id === socket.id;
 
+  const s = state.settings || {};
+  const curSpeed = Number(s.gameSpeed) || 1;
+  const speedBadge = document.getElementById('navSpeedBadge');
+  if (speedBadge) speedBadge.textContent = `${curSpeed}x`;
+  const speedSlider = document.getElementById('menuSpeedSlider') as HTMLInputElement | null;
+  if (speedSlider) speedSlider.value = String(curSpeed);
+  const speedLabel = document.getElementById('menuSpeedLabel');
+  if (speedLabel) {
+    const desc = curSpeed < 1 ? 'Slow' : curSpeed === 1 ? 'Normal' : curSpeed <= 2 ? 'Fast' : curSpeed <= 4 ? 'Faster' : 'Blitz';
+    speedLabel.textContent = `${curSpeed}x (${desc})`;
+  }
+  document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+    const bSpeed = Number((btn as HTMLElement).dataset.speed);
+    btn.classList.toggle('active', Math.abs(bSpeed - curSpeed) < 0.05);
+  });
+  const selHeader = document.getElementById('setGameSpeedHeader') as HTMLSelectElement | null;
+  if (selHeader) selHeader.value = String(curSpeed);
+  const selCards = document.getElementById('setGameSpeed') as HTMLSelectElement | null;
+  if (selCards) selCards.value = String(curSpeed);
+
   const lobbyBar = document.getElementById('lobbyToolbar')!;
   if (state.status === 'LOBBY') {
-    const s = state.settings;
     const setVal = (id: string, v: any) => { (document.getElementById(id) as HTMLInputElement).value = v; };
     setVal('setRadius', s.boardRadius);
     setVal('setVp', s.vpToWin);

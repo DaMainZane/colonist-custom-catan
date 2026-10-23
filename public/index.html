@@ -38,7 +38,39 @@
         <div class="nav-icon-btn" onclick="copyInviteLink()" title="Copy Invite Link">🔗</div>
         <div class="nav-icon-btn" id="btnToggleSound" onclick="toggleSound()" title="Toggle Sound">🔊</div>
         <div class="nav-icon-btn" onclick="resetCamera()" title="Reset Board Zoom/Pan">🔍</div>
-        <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Show/Hide Customizer Bar">⚙️</div>
+        <div class="nav-icon-btn" id="btnQuickSpeed" onclick="toggleGameMenu()" title="Adjust Game Speed">
+          <span>⚡</span>
+          <span class="speed-mini-badge" id="navSpeedBadge">1x</span>
+        </div>
+        <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Game Menu / Customizer Bar">⚙️</div>
+      </div>
+
+      <!-- In-Game & Lobby Game Menu Popover (Game Speed Adjust + Quick Controls) -->
+      <div id="gameSettingsMenu" class="game-settings-menu" style="display:none;">
+        <div class="game-menu-header">
+          <span>⚙️ Game Menu</span>
+          <button class="game-menu-close" onclick="toggleGameMenu(false)">✖</button>
+        </div>
+        <div class="game-menu-section">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:900; color:#222;">
+            <span>⚡ Game & Bot Speed</span>
+            <span id="menuSpeedLabel" style="color:#0288d1;">1x (Normal)</span>
+          </div>
+          <input id="menuSpeedSlider" type="range" min="0.5" max="8" step="0.25" value="1"
+            style="width:100%; accent-color:#0288d1; cursor:pointer;"
+            oninput="setGameSpeedValue(this.value)" />
+          <div class="speed-preset-row">
+            <button class="speed-preset-btn" data-speed="0.5" onclick="setGameSpeedValue(0.5)">0.5x</button>
+            <button class="speed-preset-btn active" data-speed="1" onclick="setGameSpeedValue(1)">1x</button>
+            <button class="speed-preset-btn" data-speed="2" onclick="setGameSpeedValue(2)">2x</button>
+            <button class="speed-preset-btn" data-speed="4" onclick="setGameSpeedValue(4)">4x</button>
+            <button class="speed-preset-btn" data-speed="8" onclick="setGameSpeedValue(8)">8x</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; border-top:1px solid #d4cbb8; padding-top:8px;">
+          <button class="brush-btn" style="flex:1; justify-content:center;" onclick="resetCamera()">🔍 Reset Zoom</button>
+          <button class="brush-btn" style="flex:1; justify-content:center;" onclick="rematchLobby()">🔄 Lobby</button>
+        </div>
       </div>
 
       <!-- Reopen Victory Stats Button (when inspecting map after game ends) -->
@@ -78,9 +110,19 @@
       <!-- Tabbed Lobby Customizer (Map Painter + Card/Resource Amounts) -->
       <div id="lobbyToolbar">
         <div class="toolbar-header">
-          <div style="display:flex; gap:6px; align-items:center;">
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
             <span class="tab-pill active" id="tabBtnMap" onclick="switchLobbyTab('map')">🎨 Map Painter</span>
             <span class="tab-pill" id="tabBtnCards" onclick="switchLobbyTab('cards')">🃏 Card & Resource Amounts</span>
+            <div class="setting-chip" style="background:#fff9c4; border-color:#d4c028;">
+              <span>⚡ Speed:</span>
+              <select id="setGameSpeedHeader" class="mini-input" style="width:86px;" onchange="setGameSpeedValue(this.value)">
+                <option value="0.5">0.5x Slow</option>
+                <option value="1" selected>1x Normal</option>
+                <option value="2">2x Fast</option>
+                <option value="4">4x Faster</option>
+                <option value="8">8x Blitz</option>
+              </select>
+            </div>
           </div>
           <div style="display:flex; gap:5px; align-items:center;">
             <button class="brush-btn" onclick="applyPreset('standard')">🎲 Standard</button>
@@ -136,6 +178,16 @@
         <!-- TAB 2: CUSTOM CARD & RESOURCE AMOUNTS -->
         <div id="lobbyTabCards" style="display:none; flex-direction:column; gap:6px;">
           <div class="toolbar-row">
+            <div class="setting-chip" style="background:#fff9c4">
+              <span>⚡ Game Speed:</span>
+              <select id="setGameSpeed" class="mini-input" style="width:92px;" onchange="setGameSpeedValue(this.value)">
+                <option value="0.5">0.5x Slow</option>
+                <option value="1" selected>1x Normal</option>
+                <option value="2">2x Fast</option>
+                <option value="4">4x Faster</option>
+                <option value="8">8x Blitz</option>
+              </select>
+            </div>
             <div class="setting-chip">
               <span>Map Size (Radius 1–50):</span>
               <input id="setRadius" type="number" class="mini-input" value="2" min="1" max="50" onchange="pushSettings()" />

@@ -82,6 +82,11 @@ export function registerSocketHandlers(io: Server): void {
       const oldDesert = room.settings.desertTiles;
       const oldFog = room.settings.fogTiles ?? 0;
 
+      const parsedSpeed = Number(newSettings.gameSpeed);
+      const nextGameSpeed = Number.isFinite(parsedSpeed) && parsedSpeed > 0
+        ? Math.max(0.25, Math.min(10, parsedSpeed))
+        : (room.settings.gameSpeed ?? 1);
+
       room.settings = {
         boardRadius: clamp(newSettings.boardRadius, 1, 50, room.settings.boardRadius),
         goldTiles: clamp(newSettings.goldTiles, 0, 500, room.settings.goldTiles),
@@ -98,7 +103,8 @@ export function registerSocketHandlers(io: Server): void {
         devMonopoly: clamp(newSettings.devMonopoly, 0, 50, room.settings.devMonopoly),
         maxSettlements: clamp(newSettings.maxSettlements, 2, 20, room.settings.maxSettlements),
         maxCities: clamp(newSettings.maxCities, 1, 20, room.settings.maxCities),
-        maxRoads: clamp(newSettings.maxRoads, 5, 50, room.settings.maxRoads)
+        maxRoads: clamp(newSettings.maxRoads, 5, 50, room.settings.maxRoads),
+        gameSpeed: nextGameSpeed
       };
 
       room.devDeck = createDevDeck(room.settings);
@@ -111,6 +117,15 @@ export function registerSocketHandlers(io: Server): void {
       ) {
         room.board = generateBoard(room.settings);
       }
+      broadcastRoom(room);
+    }));
+
+    socket.on('setGameSpeed', safe(({ code, speed }) => {
+      const room = rooms[code];
+      if (!room) return;
+      const num = Number(speed);
+      if (!Number.isFinite(num) || num <= 0) return;
+      room.settings.gameSpeed = Math.max(0.25, Math.min(10, num));
       broadcastRoom(room);
     }));
 

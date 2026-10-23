@@ -66,7 +66,8 @@ export function createRoom(hostId: string, hostName: string): Room {
     devMonopoly: 2,
     maxSettlements: 5,
     maxCities: 4,
-    maxRoads: 15
+    maxRoads: 15,
+    gameSpeed: 1
   };
 
   const room: Room = {

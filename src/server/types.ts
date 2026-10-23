@@ -18,6 +18,7 @@ export interface Settings {
   maxSettlements: number;
   maxCities: number;
   maxRoads: number;
+  gameSpeed?: number;
 }
 
 export interface Building {

@@ -14,7 +14,7 @@ import {
 import { socket } from '../socket';
 import {
   state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, setBuildModeValue,
-  setCamZoom, setCamPan
+  setCamZoom, setCamPan, getClientSpeed
 } from '../store';
 
 const knownRoads = new Set<number>();
@@ -458,6 +458,9 @@ export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): 
   const ctm = svg.getScreenCTM();
   if (!ctm) return;
 
+  const speed = getClientSpeed();
+  const flightMs = Math.max(140, Math.round(460 / Math.sqrt(speed)));
+
   const ptFrom = svg.createSVGPoint();
   ptFrom.x = fromHex.x + 28;
   ptFrom.y = fromHex.y - 16;
@@ -470,6 +473,7 @@ export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): 
 
   const robberEl = document.createElement('div');
   robberEl.className = 'flying-robber-piece';
+  robberEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity ${flightMs}ms ease`;
   robberEl.innerHTML = `
     <svg width="46" height="54" viewBox="-22 -28 44 52">
       <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.4)" />
@@ -493,7 +497,7 @@ export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): 
   setTimeout(() => {
     robberEl.style.opacity = '0';
     setTimeout(() => robberEl.remove(), 180);
-  }, 440);
+  }, flightMs);
 }
 
 function getTransferTargetEl(actorId: string, resource: string, kind: string): HTMLElement | null {
@@ -511,6 +515,10 @@ function getTransferTargetEl(actorId: string, resource: string, kind: string): H
 
 export function triggerCardTransferAnimations(transfers: any[]): void {
   if (!transfers || transfers.length === 0) return;
+
+  const speed = getClientSpeed();
+  const flightMs = Math.max(200, Math.round(720 / Math.sqrt(speed)));
+  const stepDelay = Math.max(25, Math.round(85 / speed));
 
   const hasSteal = transfers.some(t => t.kind === 'steal' || t.kind === 'monopoly');
   const iWasRobbed = transfers.some(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
@@ -565,11 +573,13 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
     const count = Math.min(tr.amount || 1, 4);
 
     // If bankTrade or buyDev receiving from bank, add a slight beat after the payment cards fly in
-    const baseGroupDelay = (tr.from === 'bank' && (tr.kind === 'bankTrade' || tr.kind === 'buyDev')) ? 170 : 0;
+    const baseGroupDelay = (tr.from === 'bank' && (tr.kind === 'bankTrade' || tr.kind === 'buyDev'))
+      ? Math.max(45, Math.round(170 / speed))
+      : 0;
 
     for (let i = 0; i < count; i++) {
       const d = delay + baseGroupDelay;
-      delay += 85;
+      delay += stepDelay;
       setTimeout(() => {
         const cardEl = document.createElement('div');
         const isSteal = tr.kind === 'steal' || tr.kind === 'monopoly';
@@ -587,6 +597,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
         }
 
         cardEl.className = `flying-res-card ${cardClass} ${isSteal ? 'stolen-card-flight' : ''}`;
+        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity ${flightMs}ms ease`;
         cardEl.innerHTML = innerHtml;
         cardEl.style.left = `${startX + i * 7}px`;
         cardEl.style.top = `${startY - i * 5 + curveOffset}px`;
@@ -603,8 +614,8 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
 
         setTimeout(() => {
           cardEl.style.opacity = '0';
-          setTimeout(() => cardEl.remove(), 220);
-        }, 680);
+          setTimeout(() => cardEl.remove(), 200);
+        }, Math.max(180, flightMs - 40));
       }, d);
     }
   });
@@ -615,6 +626,10 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
   if (!svg || !state?.board) return;
   const ctm = svg.getScreenCTM();
   if (!ctm) return;
+
+  const speed = getClientSpeed();
+  const flightMs = Math.max(200, Math.round(720 / Math.sqrt(speed)));
+  const stepDelay = Math.max(30, Math.round(110 / speed));
 
   let delay = 0;
   productions.forEach(prod => {
@@ -640,10 +655,11 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
     const cardsToFly = Math.min(prod.amount || 1, 3);
     for (let i = 0; i < cardsToFly; i++) {
       const d = delay;
-      delay += 110;
+      delay += stepDelay;
       setTimeout(() => {
         const cardEl = document.createElement('div');
         cardEl.className = `flying-res-card card-${prod.resource}`;
+        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity ${flightMs}ms ease`;
         cardEl.innerHTML = getMiniSvg(prod.resource);
         cardEl.style.left = `${screenPt.x - 22 + (i * 8)}px`;
         cardEl.style.top = `${screenPt.y - 30 - (i * 6)}px`;
@@ -662,8 +678,8 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
 
         setTimeout(() => {
           cardEl.style.opacity = '0';
-          setTimeout(() => cardEl.remove(), 220);
-        }, 680);
+          setTimeout(() => cardEl.remove(), 200);
+        }, Math.max(180, flightMs - 40));
       }, d);
     }
   });

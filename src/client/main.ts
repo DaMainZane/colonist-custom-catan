@@ -19,16 +19,16 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
-  createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, setBrush, applyPreset,
-  pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab, toggleVictoryMapInspect,
-  setBuildMode, mainTurnButton, rollDice, buyDevCard
+  createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu, setGameSpeedValue,
+  setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
+  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
-  createRoom, joinRoom, copyInviteLink, toggleSound, resetCamera, toggleLobbyToolbar, switchLobbyTab,
-  applyPreset, addBot, removeBot, startGame, rematchLobby, switchVictoryTab, toggleVictoryMapInspect,
-  setBrush, pushSettings,
+  createRoom, joinRoom, copyInviteLink, toggleSound, resetCamera, toggleLobbyToolbar, toggleGameMenu,
+  setGameSpeedValue, switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
+  switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
