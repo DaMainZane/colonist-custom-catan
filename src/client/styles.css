@@ -393,7 +393,7 @@ svg#boardSvg:active { cursor: grabbing; }
 .spot-pulse { cursor: pointer; animation: pulseSpot 1.2s infinite ease-in-out; }
 @keyframes pulseSpot { 0%, 100% { r: 12px; opacity: 0.9; } 50% { r: 16px; opacity: 1; } }
 
-/* Colonist-style drop-down animations for roads, settlements, and cities */
+/* Colonist-style drop-down animations for roads, settlements, cities, and robber */
 .piece-drop-anim {
   transform-origin: 0px 0px;
   animation: colonistDrop 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -406,6 +406,96 @@ svg#boardSvg:active { cursor: grabbing; }
   stroke-width: 3.5;
   pointer-events: none;
   animation: colonistImpactRing 0.48s ease-out both;
+}
+
+.robber-drop-anim {
+  transform-origin: 0px 0px;
+  animation: colonistRobberDrop 0.54s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.robber-impact-ring {
+  transform-origin: 0px 0px;
+  fill: none;
+  stroke: #ff1744;
+  stroke-width: 4;
+  pointer-events: none;
+  animation: colonistImpactRing 0.56s ease-out both;
+}
+
+.flying-robber-piece {
+  position: fixed;
+  width: 46px;
+  height: 54px;
+  z-index: 1000;
+  pointer-events: none;
+  filter: drop-shadow(0 12px 14px rgba(0,0,0,0.55));
+  transition: left 0.46s cubic-bezier(0.22, 1, 0.36, 1), top 0.46s cubic-bezier(0.22, 1, 0.36, 1), transform 0.46s ease, opacity 0.46s ease;
+}
+
+.card-mystery {
+  background: linear-gradient(180deg, #1976d2, #0d47a1);
+  color: #90caf9;
+  font-weight: 900;
+  font-size: 22px;
+}
+
+.stolen-card-flight {
+  border: 2.5px solid #ff1744 !important;
+  box-shadow: 0 0 16px rgba(255, 23, 68, 0.75), 0 8px 20px rgba(0,0,0,0.45) !important;
+}
+
+.hand-stolen-shake {
+  animation: colonistHandStolenShake 0.55s ease-in-out;
+}
+
+.stolen-toast-badge {
+  position: fixed;
+  z-index: 1005;
+  background: #c62828;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 900;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  animation: floatUpFade 1.15s ease-out forwards;
+}
+
+@keyframes colonistRobberDrop {
+  0% {
+    transform: translateY(-90px) scale(1.45);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(0px) scale(1.22, 0.78);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-16px) scale(0.92, 1.08);
+    opacity: 1;
+  }
+  90% {
+    transform: translateY(0px) scale(1.05, 0.96);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) scale(1, 1);
+    opacity: 1;
+  }
+}
+
+@keyframes colonistHandStolenShake {
+  0%, 100% { transform: translateX(0); background: #f4efe6; border-color: #d4cbb8; }
+  15%, 45%, 75% { transform: translateX(-7px); background: #ffebee; border-color: #ff1744; }
+  30%, 60%, 90% { transform: translateX(7px); background: #ffcdd2; border-color: #ff1744; }
+}
+
+@keyframes floatUpFade {
+  0% { transform: translateY(0) scale(0.85); opacity: 1; }
+  20% { transform: translateY(-10px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(-42px) scale(1); opacity: 0; }
 }
 
 .fog-reveal-anim {

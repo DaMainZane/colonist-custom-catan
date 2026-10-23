@@ -225,6 +225,15 @@ function stealOneRandomResource(room: Room, thief: Player, victim: Player): void
     const stolen = pool[Math.floor(Math.random() * pool.length)];
     victim.resources[stolen]--;
     thief.resources[stolen]++;
+    if (!room.recentTransfers) room.recentTransfers = [];
+    room.recentTransfers.push({
+      from: victim.id,
+      to: thief.id,
+      resource: stolen,
+      amount: 1,
+      kind: 'steal',
+      secretForOthers: true
+    });
     addLog(room, `${thief.avatar} ${thief.name} stole 1 resource from ${victim.name}`, thief.color);
   } else {
     addLog(room, `${thief.avatar} ${thief.name} robbed ${victim.name}, but they had no cards!`, thief.color);
@@ -305,11 +314,18 @@ export function executeTradeBetweenPlayers(room: Room, proposer: Player, partner
     if ((Number(trade.offer[r]) || 0) > (proposer.resources[r] || 0)) return false;
     if ((Number(trade.request[r]) || 0) > (partner.resources[r] || 0)) return false;
   }
+  if (!room.recentTransfers) room.recentTransfers = [];
   for (const r of RESOURCES) {
     const o = Number(trade.offer[r]) || 0;
     const req = Number(trade.request[r]) || 0;
     proposer.resources[r] = proposer.resources[r] - o + req;
     partner.resources[r] = partner.resources[r] - req + o;
+    if (o > 0) {
+      room.recentTransfers.push({ from: proposer.id, to: partner.id, resource: r, amount: o, kind: 'playerTrade' });
+    }
+    if (req > 0) {
+      room.recentTransfers.push({ from: partner.id, to: proposer.id, resource: r, amount: req, kind: 'playerTrade' });
+    }
   }
   if (!proposer.stats) proposer.stats = { resourcesEarned: 0, tradesMade: 0 };
   if (!partner.stats) partner.stats = { resourcesEarned: 0, tradesMade: 0 };

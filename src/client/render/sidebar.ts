@@ -20,12 +20,12 @@ export function renderSidebar(): void {
   document.getElementById('bankBar')!.innerHTML = `
     <span style="font-size:20px;" title="Bank">🏦</span>
     ${RESOURCES.map(r => `
-      <div class="bank-item">
+      <div class="bank-item" id="bankRes_${r}">
         <div class="bank-mini-icon card-${r}">${getMiniSvg(r)}</div>
         <span>${b[r]}</span>
       </div>
     `).join('')}
-    <div class="bank-item">
+    <div class="bank-item" id="bankDevDeckItem">
       <div class="bank-mini-icon card-dev">🃏</div>
       <span>${state.devDeckCount}</span>
     </div>

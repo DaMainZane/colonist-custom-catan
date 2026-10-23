@@ -97,8 +97,12 @@ export function scheduleBotAction(room: Room): void {
           if (!pick) {
             bot.goldPending = 0;
           } else {
-            givePlayerResourceFromBank(room, bot, pick, 1);
+            const granted = givePlayerResourceFromBank(room, bot, pick, 1);
             bot.goldPending--;
+            if (granted > 0) {
+              if (!room.recentTransfers) room.recentTransfers = [];
+              room.recentTransfers.push({ from: 'bank', to: bot.id, resource: pick, amount: granted, kind: 'gold' });
+            }
             addLog(room, `${bot.avatar} ${bot.name} picked ${pick} from Gold`, bot.color);
           }
           checkGoldPhaseTransition(room);
@@ -113,6 +117,7 @@ export function scheduleBotAction(room: Room): void {
         try {
           if (bot.discardPending <= 0) return;
           const { surplus } = analyzeBotStrategy(room, bot);
+          const discardedByRes: Record<string, number> = {};
           while (bot.discardPending > 0) {
             // Discard surplus cards first before touching locked build cards
             let pick = RESOURCES.find(r => surplus[r] > 0 && bot.resources[r] > 0);
@@ -126,6 +131,11 @@ export function scheduleBotAction(room: Room): void {
             }
             bot.resources[pick]--;
             bot.discardPending--;
+            discardedByRes[pick] = (discardedByRes[pick] || 0) + 1;
+          }
+          if (!room.recentTransfers) room.recentTransfers = [];
+          for (const r of Object.keys(discardedByRes)) {
+            room.recentTransfers.push({ from: bot.id, to: 'bank', resource: r, amount: discardedByRes[r], kind: 'discard' });
           }
           addLog(room, `${bot.avatar} ${bot.name} discarded excess cards`, bot.color);
           if (room.players.every(p => p.discardPending === 0)) room.phase = 'ROBBER';
@@ -242,6 +252,13 @@ function runBotTurnStep(room: Room, bot: Player): void {
     if (room.devDeck.length > 0 && bot.resources.sheep >= 1 && bot.resources.wheat >= 1 && bot.resources.ore >= 1) {
       bot.resources.sheep--; bot.resources.wheat--; bot.resources.ore--;
       bot.newDevCards.push(room.devDeck.pop());
+      if (!room.recentTransfers) room.recentTransfers = [];
+      room.recentTransfers.push(
+        { from: bot.id, to: 'bank', resource: 'sheep', amount: 1, kind: 'buyDev' },
+        { from: bot.id, to: 'bank', resource: 'wheat', amount: 1, kind: 'buyDev' },
+        { from: bot.id, to: 'bank', resource: 'ore', amount: 1, kind: 'buyDev' },
+        { from: 'bank', to: bot.id, resource: 'dev', amount: 1, kind: 'buyDev' }
+      );
       addLog(room, `${bot.avatar} ${bot.name} bought a Development Card`, bot.color);
       checkWinner(room);
       broadcastRoom(room);
@@ -297,10 +314,15 @@ function playBotDevCard(room: Room, bot: Player, cardType: string): void {
       }
     }
     let stolen = 0;
+    if (!room.recentTransfers) room.recentTransfers = [];
     for (const other of room.players) {
       if (other.id !== bot.id) {
-        stolen += other.resources[bestRes] || 0;
-        other.resources[bestRes] = 0;
+        const amt = other.resources[bestRes] || 0;
+        if (amt > 0) {
+          stolen += amt;
+          other.resources[bestRes] = 0;
+          room.recentTransfers.push({ from: other.id, to: bot.id, resource: bestRes, amount: amt, kind: 'monopoly' });
+        }
       }
     }
     bot.resources[bestRes] += stolen;

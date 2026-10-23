@@ -289,6 +289,9 @@ export function tryHardBotBankTrade(room: Room, bot: Player): boolean {
       bot.resources[targetRes] += 1;
       if (!bot.stats) bot.stats = { resourcesEarned: 0, tradesMade: 0 };
       bot.stats.tradesMade++;
+      if (!room.recentTransfers) room.recentTransfers = [];
+      room.recentTransfers.push({ from: bot.id, to: 'bank', resource: r, amount: ratio, kind: 'bankTrade' });
+      room.recentTransfers.push({ from: 'bank', to: bot.id, resource: targetRes, amount: 1, kind: 'bankTrade' });
       addLog(room, `${bot.avatar} ${bot.name} traded ${ratio} ${r} for 1 ${targetRes} with the Bank 🏦`, bot.color);
       return true;
     }

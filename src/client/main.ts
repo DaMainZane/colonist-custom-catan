@@ -1,5 +1,5 @@
 import { socket } from './socket';
-import { playTone, toggleSound } from './audio';
+import { playTone, playDiceRollSound, playDiscardSound, toggleSound } from './audio';
 import { getMiniSvg } from './icons';
 import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
@@ -8,7 +8,7 @@ import {
 } from './store';
 import { renderAll } from './render/index';
 import {
-  rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations,
+  rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations, triggerCardTransferAnimations,
   onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade } from './render/trade';
@@ -36,9 +36,8 @@ Object.assign(window as any, {
   onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
 });
 
-function animateDice(): void {
-  playTone(300, 0.07, 'triangle');
-  setTimeout(() => playTone(420, 0.09, 'triangle'), 90);
+function animateDice(sum?: number): void {
+  playDiceRollSound(sum);
   const d1 = document.getElementById('die1')!;
   const d2 = document.getElementById('die2')!;
   d1.classList.add('rolling');
@@ -72,6 +71,9 @@ socket.on('errorMsg', (msg: string) => alert(msg));
 socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
   const wasGameOver = state?.status === 'GAMEOVER';
+  const prevMe = state?.players?.find((p: any) => p.id === socket.id);
+  const wasDiscarding = (prevMe?.discardPending || 0) > 0;
+
   setState(newState);
   document.getElementById('authScreen')!.style.display = 'none';
   document.getElementById('gameViewport')!.style.display = 'flex';
@@ -83,12 +85,31 @@ socket.on('gameState', (newState: any) => {
     setTimeout(() => playTone(784, 0.22), 260);
   }
 
-  if (prevDice && prevDice !== state.lastDice.join(',')) animateDice();
+  const diceSum = (state.lastDice?.[0] || 0) + (state.lastDice?.[1] || 0);
+  if (prevDice && prevDice !== state.lastDice.join(',')) {
+    animateDice(diceSum);
+  }
+
+  const meNow = state.players.find(p => p.id === socket.id);
+  if (!wasDiscarding && meNow && meNow.discardPending > 0) {
+    playDiscardSound();
+    const handEl = document.getElementById('myHandPanel');
+    if (handEl) {
+      handEl.classList.remove('hand-stolen-shake');
+      void handEl.offsetWidth;
+      handEl.classList.add('hand-stolen-shake');
+      setTimeout(() => handEl.classList.remove('hand-stolen-shake'), 650);
+    }
+  }
+
   syncAutomaticDrawers();
   renderAll();
 
   if (state.recentProductions && state.recentProductions.length > 0) {
     triggerFlyingResourceAnimations(state.recentProductions);
+  }
+  if (state.recentTransfers && state.recentTransfers.length > 0) {
+    triggerCardTransferAnimations(state.recentTransfers);
   }
 });
 

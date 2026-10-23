@@ -1,6 +1,16 @@
 import { RES_META } from '../constants';
 import { getBoardIconSvg, getMiniSvg } from '../icons';
-import { playTone } from '../audio';
+import {
+  playTone,
+  playPlaceRoadSound,
+  playPlaceSettlementSound,
+  playPlaceCitySound,
+  playPlaceRobberSound,
+  playStealCardSound,
+  playDiscardSound,
+  playTradeSound,
+  playBuyDevCardSound
+} from '../audio';
 import { socket } from '../socket';
 import {
   state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, setBuildModeValue,
@@ -10,8 +20,9 @@ import {
 const knownRoads = new Set<number>();
 const knownBuildings = new Map<number, string>();
 const knownFogHexes = new Set<number>();
+let knownRobberHexId: number | null = null;
 const pieceAnimTimestamps = new Map<string, number>();
-const ANIM_DURATION_MS = 500;
+const ANIM_DURATION_MS = 550;
 
 let cachedBoundsKey = '';
 let cachedBounds = { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
@@ -87,12 +98,29 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     knownBuildings.clear();
     knownFogHexes.clear();
     pieceAnimTimestamps.clear();
+    knownRobberHexId = robberHexId;
     for (const h of hexes) {
       if (h.fog || h.type === 'fog') knownFogHexes.add(h.id);
     }
   }
 
   const now = performance.now();
+  let playedRoadSfx = false;
+  let playedSettleSfx = false;
+  let playedCitySfx = false;
+
+  if (state.status !== 'LOBBY') {
+    if (knownRobberHexId !== null && knownRobberHexId !== robberHexId) {
+      const prevHexId = knownRobberHexId;
+      knownRobberHexId = robberHexId;
+      pieceAnimTimestamps.set('robber_move', now);
+      playPlaceRobberSound();
+      setTimeout(() => triggerRobberMoveAnimation(prevHexId, robberHexId), 0);
+    } else if (knownRobberHexId === null) {
+      knownRobberHexId = robberHexId;
+    }
+  }
+
   for (const h of hexes) {
     const isFog = !!h.fog || h.type === 'fog';
     if (isFog) {
@@ -106,6 +134,10 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     if (e.road && !knownRoads.has(e.id)) {
       knownRoads.add(e.id);
       pieceAnimTimestamps.set(`road_${e.id}`, now);
+      if (state.status !== 'LOBBY' && !playedRoadSfx) {
+        playedRoadSfx = true;
+        playPlaceRoadSound();
+      }
     }
   }
   for (const v of vertices) {
@@ -114,6 +146,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       if (prev !== v.building.type) {
         knownBuildings.set(v.id, v.building.type);
         pieceAnimTimestamps.set(`${v.building.type}_${v.id}`, now);
+        if (state.status !== 'LOBBY') {
+          if (v.building.type === 'city' && !playedCitySfx) {
+            playedCitySfx = true;
+            playPlaceCitySound();
+          } else if (v.building.type === 'settlement' && !playedSettleSfx) {
+            playedSettleSfx = true;
+            playPlaceSettlementSound();
+          }
+        }
       }
     }
   }
@@ -148,6 +189,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   landPolys.forEach((pts: string) => {
     html += `<polygon points="${pts}" fill="#f4d799" stroke="#f4d799" stroke-width="22" stroke-linejoin="round" />`;
   });
+
+  const robberAnim = getPieceAnimAttrs('robber_move', now);
 
   for (const h of hexes) {
     const pts = h.corners.map((c: any) => `${c.x},${c.y}`).join(' ');
@@ -198,9 +241,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + 28}, ${h.y - 16})">
-            <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.35)" />
-            <path d="M-12,16 L12,16 L8,-2 C11,-6 6,-16 0,-16 C-6,-16 -11,-6 -8,-2 Z" fill="#90a4ae" stroke="#263238" stroke-width="2.2" stroke-linejoin="round"/>
-            <circle cx="0" cy="-14" r="7.5" fill="#b0bec5" stroke="#263238" stroke-width="2"/>
+            ${robberAnim.isAnimating ? `<circle cx="0" cy="8" r="26" class="robber-impact-ring" style="${robberAnim.delayStyle}" />` : ''}
+            <g class="${robberAnim.isAnimating ? 'robber-drop-anim' : ''}" style="${robberAnim.delayStyle}">
+              <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.35)" />
+              <path d="M-12,16 L12,16 L8,-2 C11,-6 6,-16 0,-16 C-6,-16 -11,-6 -8,-2 Z" fill="#90a4ae" stroke="#263238" stroke-width="2.2" stroke-linejoin="round"/>
+              <circle cx="0" cy="-14" r="7.5" fill="#b0bec5" stroke="#263238" stroke-width="2"/>
+            </g>
           </g>
         ` : ''}
       </g>
@@ -394,15 +440,174 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
 }
 
 export function clickVertex(vertexId: number): void {
-  playTone(580, 0.09);
   setBuildModeValue(null);
   socket.emit('clickVertex', { code: state.code, vertexId });
 }
 
 export function clickEdge(edgeId: number): void {
-  playTone(460, 0.08);
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
+}
+
+export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): void {
+  const svg = document.getElementById('boardSvg') as unknown as SVGSVGElement | null;
+  if (!svg || !state?.board) return;
+  const fromHex = state.board.hexes[fromHexId];
+  const toHex = state.board.hexes[toHexId];
+  if (!fromHex || !toHex) return;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return;
+
+  const ptFrom = svg.createSVGPoint();
+  ptFrom.x = fromHex.x + 28;
+  ptFrom.y = fromHex.y - 16;
+  const screenFrom = ptFrom.matrixTransform(ctm);
+
+  const ptTo = svg.createSVGPoint();
+  ptTo.x = toHex.x + 28;
+  ptTo.y = toHex.y - 16;
+  const screenTo = ptTo.matrixTransform(ctm);
+
+  const robberEl = document.createElement('div');
+  robberEl.className = 'flying-robber-piece';
+  robberEl.innerHTML = `
+    <svg width="46" height="54" viewBox="-22 -28 44 52">
+      <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.4)" />
+      <path d="M-12,16 L12,16 L8,-2 C11,-6 6,-16 0,-16 C-6,-16 -11,-6 -8,-2 Z" fill="#90a4ae" stroke="#263238" stroke-width="2.4" stroke-linejoin="round"/>
+      <circle cx="0" cy="-14" r="7.5" fill="#cfd8dc" stroke="#263238" stroke-width="2.2"/>
+    </svg>
+  `;
+  robberEl.style.left = `${screenFrom.x - 23}px`;
+  robberEl.style.top = `${screenFrom.y - 27}px`;
+  robberEl.style.transform = 'scale(1.35) translateY(-18px)';
+  document.body.appendChild(robberEl);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      robberEl.style.left = `${screenTo.x - 23}px`;
+      robberEl.style.top = `${screenTo.y - 27}px`;
+      robberEl.style.transform = 'scale(1) translateY(0px)';
+    });
+  });
+
+  setTimeout(() => {
+    robberEl.style.opacity = '0';
+    setTimeout(() => robberEl.remove(), 180);
+  }, 440);
+}
+
+function getTransferTargetEl(actorId: string, resource: string, kind: string): HTMLElement | null {
+  if (actorId === socket.id) {
+    return document.getElementById('myHandPanel');
+  }
+  if (actorId === 'bank') {
+    if (resource === 'dev' || kind === 'buyDev') {
+      return document.getElementById('bankDevDeckItem') || document.getElementById('bankBar');
+    }
+    return document.getElementById(`bankRes_${resource}`) || document.getElementById('bankBar');
+  }
+  return document.getElementById(`playerRow_${actorId}`);
+}
+
+export function triggerCardTransferAnimations(transfers: any[]): void {
+  if (!transfers || transfers.length === 0) return;
+
+  const hasSteal = transfers.some(t => t.kind === 'steal' || t.kind === 'monopoly');
+  const iWasRobbed = transfers.some(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
+  const hasTrade = transfers.some(t => t.kind === 'playerTrade' || t.kind === 'bankTrade');
+  const hasBuyDev = transfers.some(t => t.kind === 'buyDev');
+  const hasDiscard = transfers.some(t => t.kind === 'discard');
+
+  if (hasSteal) playStealCardSound(iWasRobbed);
+  else if (hasBuyDev) playBuyDevCardSound();
+  else if (hasTrade) playTradeSound();
+  else if (hasDiscard) playDiscardSound();
+
+  if (iWasRobbed) {
+    const handEl = document.getElementById('myHandPanel');
+    if (handEl) {
+      handEl.classList.remove('hand-stolen-shake');
+      void handEl.offsetWidth;
+      handEl.classList.add('hand-stolen-shake');
+      setTimeout(() => handEl.classList.remove('hand-stolen-shake'), 650);
+
+      const stolenItems = transfers.filter(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
+      const rect = handEl.getBoundingClientRect();
+      stolenItems.forEach((st, idx) => {
+        const badge = document.createElement('div');
+        badge.className = 'stolen-toast-badge';
+        const resName = RES_META[st.resource]?.name || st.resource.toUpperCase();
+        badge.textContent = `-${st.amount} ${resName} Stolen!`;
+        badge.style.left = `${rect.left + 24 + idx * 110}px`;
+        badge.style.top = `${rect.top - 16}px`;
+        document.body.appendChild(badge);
+        setTimeout(() => badge.remove(), 1200);
+      });
+    }
+  }
+
+  let delay = 0;
+  transfers.forEach((tr, groupIdx) => {
+    const fromEl = getTransferTargetEl(tr.from, tr.resource, tr.kind);
+    const toEl = getTransferTargetEl(tr.to, tr.resource, tr.kind);
+    if (!fromEl || !toEl) return;
+
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    const startX = fromRect.left + fromRect.width / 2 - 22;
+    const startY = fromRect.top + fromRect.height / 2 - 30;
+    const endX = toRect.left + toRect.width / 2 - 22;
+    const endY = toRect.top + toRect.height / 2 - 30;
+
+    // Slight vertical/horizontal offset so simultaneous bidirectional trade cards don't overlap identically
+    const curveOffset = (groupIdx % 2 === 0 ? -1 : 1) * 14;
+    const count = Math.min(tr.amount || 1, 4);
+
+    // If bankTrade or buyDev receiving from bank, add a slight beat after the payment cards fly in
+    const baseGroupDelay = (tr.from === 'bank' && (tr.kind === 'bankTrade' || tr.kind === 'buyDev')) ? 170 : 0;
+
+    for (let i = 0; i < count; i++) {
+      const d = delay + baseGroupDelay;
+      delay += 85;
+      setTimeout(() => {
+        const cardEl = document.createElement('div');
+        const isSteal = tr.kind === 'steal' || tr.kind === 'monopoly';
+        let cardClass = `card-${tr.resource}`;
+        let innerHtml = '';
+
+        if (tr.resource === 'dev') {
+          cardClass = 'card-dev';
+          innerHtml = `<span style="font-size:22px">🃏</span>`;
+        } else if (tr.resource === 'mystery') {
+          cardClass = 'card-mystery';
+          innerHtml = `<span>?</span>`;
+        } else {
+          innerHtml = getMiniSvg(tr.resource);
+        }
+
+        cardEl.className = `flying-res-card ${cardClass} ${isSteal ? 'stolen-card-flight' : ''}`;
+        cardEl.innerHTML = innerHtml;
+        cardEl.style.left = `${startX + i * 7}px`;
+        cardEl.style.top = `${startY - i * 5 + curveOffset}px`;
+        cardEl.style.transform = isSteal ? 'scale(1.12) rotate(-6deg)' : 'scale(0.9)';
+        document.body.appendChild(cardEl);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            cardEl.style.left = `${endX + i * 5}px`;
+            cardEl.style.top = `${endY - i * 4}px`;
+            cardEl.style.transform = 'scale(1) rotate(0deg)';
+          });
+        });
+
+        setTimeout(() => {
+          cardEl.style.opacity = '0';
+          setTimeout(() => cardEl.remove(), 220);
+        }, 680);
+      }, d);
+    }
+  });
 }
 
 export function triggerFlyingResourceAnimations(productions: any[]): void {

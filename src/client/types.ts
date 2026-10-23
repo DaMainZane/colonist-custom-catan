@@ -36,6 +36,15 @@ export interface RecentProduction {
   amount: number;
 }
 
+export interface RecentTransfer {
+  from: string;
+  to: string;
+  resource: string;
+  amount: number;
+  kind: 'steal' | 'playerTrade' | 'bankTrade' | 'buyDev' | 'discard' | 'monopoly' | 'gold';
+  secretForOthers?: boolean;
+}
+
 export interface TradeView {
   id: number;
   fromId: string;
@@ -63,6 +72,7 @@ export interface GameState {
   lastDice: number[];
   lastRollHexIds?: number[];
   recentProductions?: RecentProduction[];
+  recentTransfers?: RecentTransfer[];
   diceStats?: Record<number, number>;
   turnCount?: number;
   startedAt?: number | null;

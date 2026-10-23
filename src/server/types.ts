@@ -132,6 +132,15 @@ export interface RecentProduction {
   amount: number;
 }
 
+export interface RecentTransfer {
+  from: string;
+  to: string;
+  resource: string;
+  amount: number;
+  kind: 'steal' | 'playerTrade' | 'bankTrade' | 'buyDev' | 'discard' | 'monopoly' | 'gold';
+  secretForOthers?: boolean;
+}
+
 export interface Room {
   code: string;
   hostId: string;
@@ -149,6 +158,7 @@ export interface Room {
   lastDice: number[];
   lastRollHexIds: number[];
   recentProductions: RecentProduction[];
+  recentTransfers: RecentTransfer[];
   diceStats: Record<number, number>;
   turnCount: number;
   startedAt: number | null;

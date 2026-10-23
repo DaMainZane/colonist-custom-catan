@@ -22,6 +22,12 @@ export function broadcastRoom(room: Room): void {
   };
   for (const p of room.players) {
     if (p.isBot) continue;
+    const recentTransfers = (room.recentTransfers || []).map(t => {
+      if (t.secretForOthers && p.id !== t.from && p.id !== t.to && room.status !== 'GAMEOVER') {
+        return { ...t, resource: 'mystery' };
+      }
+      return t;
+    });
     const state = {
       code: room.code,
       hostId: room.hostId,
@@ -38,6 +44,7 @@ export function broadcastRoom(room: Room): void {
       lastDice: room.lastDice,
       lastRollHexIds: room.lastRollHexIds || [],
       recentProductions: room.recentProductions || [],
+      recentTransfers,
       diceStats: room.diceStats || {},
       turnCount: room.turnCount || 1,
       startedAt: room.startedAt,
@@ -77,5 +84,6 @@ export function broadcastRoom(room: Room): void {
     if (io) io.to(p.id).emit('gameState', state);
   }
   room.recentProductions = [];
+  room.recentTransfers = [];
   scheduleBotAction(room);
 }

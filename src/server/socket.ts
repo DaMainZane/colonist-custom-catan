@@ -215,6 +215,7 @@ export function registerSocketHandlers(io: Server): void {
       room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
       room.lastRollHexIds = [];
       room.recentProductions = [];
+      room.recentTransfers = [];
       room.longestRoadOwner = null;
       room.largestArmyOwner = null;
       room.winner = null;
@@ -246,6 +247,7 @@ export function registerSocketHandlers(io: Server): void {
       room.largestArmyOwner = null;
       room.lastRollHexIds = [];
       room.recentProductions = [];
+      room.recentTransfers = [];
       room.robberVictims = [];
       room.turnCount = 1;
       room.startedAt = null;
@@ -337,6 +339,8 @@ export function registerSocketHandlers(io: Server): void {
       const granted = givePlayerResourceFromBank(room, player, resource, 1);
       if (granted === 0) return socket.emit('errorMsg', `Bank is out of ${resource.toUpperCase()}!`);
       player.goldPending--;
+      if (!room.recentTransfers) room.recentTransfers = [];
+      room.recentTransfers.push({ from: 'bank', to: player.id, resource, amount: granted, kind: 'gold' });
       addLog(room, `${player.avatar} ${player.name} picked ${resource} from Gold`, player.color);
       checkGoldPhaseTransition(room);
       broadcastRoom(room);
@@ -356,7 +360,14 @@ export function registerSocketHandlers(io: Server): void {
       }
       if (count !== player.discardPending) return;
 
-      for (const r of RESOURCES) player.resources[r] -= Number(discards[r]) || 0;
+      if (!room.recentTransfers) room.recentTransfers = [];
+      for (const r of RESOURCES) {
+        const amt = Number(discards[r]) || 0;
+        if (amt > 0) {
+          player.resources[r] -= amt;
+          room.recentTransfers.push({ from: player.id, to: 'bank', resource: r, amount: amt, kind: 'discard' });
+        }
+      }
       player.discardPending = 0;
       addLog(room, `${player.avatar} ${player.name} discarded ${count} cards`, player.color);
 
@@ -373,6 +384,13 @@ export function registerSocketHandlers(io: Server): void {
 
       player.resources.sheep--; player.resources.wheat--; player.resources.ore--;
       player.newDevCards.push(room.devDeck.pop());
+      if (!room.recentTransfers) room.recentTransfers = [];
+      room.recentTransfers.push(
+        { from: player.id, to: 'bank', resource: 'sheep', amount: 1, kind: 'buyDev' },
+        { from: player.id, to: 'bank', resource: 'wheat', amount: 1, kind: 'buyDev' },
+        { from: player.id, to: 'bank', resource: 'ore', amount: 1, kind: 'buyDev' },
+        { from: 'bank', to: player.id, resource: 'dev', amount: 1, kind: 'buyDev' }
+      );
       addLog(room, `${player.avatar} ${player.name} bought a Development Card`, player.color);
       checkWinner(room);
       broadcastRoom(room);
@@ -408,10 +426,15 @@ export function registerSocketHandlers(io: Server): void {
         addLog(room, `${player.avatar} ${player.name} played Year of Plenty (+2 picks)`, player.color);
       } else if (cardType === 'monopoly' && RESOURCES.includes(monopolyResource)) {
         let stolen = 0;
+        if (!room.recentTransfers) room.recentTransfers = [];
         for (const other of room.players) {
           if (other.id !== player.id) {
-            stolen += other.resources[monopolyResource] || 0;
-            other.resources[monopolyResource] = 0;
+            const amt = other.resources[monopolyResource] || 0;
+            if (amt > 0) {
+              stolen += amt;
+              other.resources[monopolyResource] = 0;
+              room.recentTransfers.push({ from: other.id, to: player.id, resource: monopolyResource, amount: amt, kind: 'monopoly' });
+            }
           }
         }
         player.resources[monopolyResource] += stolen;
@@ -448,9 +471,18 @@ export function registerSocketHandlers(io: Server): void {
         }
       }
 
+      if (!room.recentTransfers) room.recentTransfers = [];
       for (const r of RESOURCES) {
-        player.resources[r] -= Number(give[r]) || 0;
-        player.resources[r] += Number(get[r]) || 0;
+        const giveAmt = Number(give[r]) || 0;
+        const getAmt = Number(get[r]) || 0;
+        player.resources[r] -= giveAmt;
+        player.resources[r] += getAmt;
+        if (giveAmt > 0) {
+          room.recentTransfers.push({ from: player.id, to: 'bank', resource: r, amount: giveAmt, kind: 'bankTrade' });
+        }
+        if (getAmt > 0) {
+          room.recentTransfers.push({ from: 'bank', to: player.id, resource: r, amount: getAmt, kind: 'bankTrade' });
+        }
       }
       if (!player.stats) player.stats = { resourcesEarned: 0, tradesMade: 0 };
       player.stats.tradesMade++;
