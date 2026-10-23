@@ -266,7 +266,8 @@ function createPlayer(id, name, colorIndex, isBot = false) {
     proposedTradeThisTurn: false,
     settlementsLeft: 5,
     citiesLeft: 4,
-    roadsLeft: 15
+    roadsLeft: 15,
+    stats: { resourcesEarned: 0, tradesMade: 0 }
   };
 }
 
@@ -299,6 +300,12 @@ function createRoom(hostId, hostName) {
     board: generateBoard(settings),
     devDeck: createDevDeck(settings),
     turnIndex: 0,
+    turnCount: 0,
+    startedAt: null,
+    finishedAt: null,
+    diceStats: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 },
+    lastRollHexIds: [],
+    recentProductions: [],
     setupStep: 0,
     setupOrder: [],
     phase: 'LOBBY',
@@ -337,12 +344,24 @@ function getBankRemaining(room) {
   return bank;
 }
 
-function givePlayerResourceFromBank(room, player, resource, amount) {
+function givePlayerResourceFromBank(room, player, resource, amount, sourceHexId = null) {
   if (!RESOURCES.includes(resource) || amount <= 0) return 0;
   const bank = getBankRemaining(room);
   const available = bank[resource] || 0;
   const granted = Math.min(amount, available);
-  player.resources[resource] = (player.resources[resource] || 0) + granted;
+  if (granted > 0) {
+    player.resources[resource] = (player.resources[resource] || 0) + granted;
+    if (player.stats) player.stats.resourcesEarned += granted;
+    if (sourceHexId !== null) {
+      room.recentProductions.push({
+        id: `${Date.now()}_${Math.random()}`,
+        hexId: sourceHexId,
+        playerId: player.id,
+        resource,
+        amount: granted
+      });
+    }
+  }
   return granted;
 }
 
@@ -434,8 +453,9 @@ function checkWinner(room) {
       room.status = 'GAMEOVER';
       room.phase = 'GAMEOVER';
       room.activeTrade = null;
-      room.winner = { id: p.id, name: p.name, vp: totalVp, color: p.color };
-      addLog(room, `🏆 ${p.name} wins the game with ${totalVp} VP!`, p.color);
+      room.finishedAt = Date.now();
+      room.winner = { id: p.id, name: p.name, avatar: p.avatar, vp: totalVp, color: p.color };
+      addLog(room, `🏆 ${p.name} won the game with ${totalVp} VPs!`, p.color);
       return true;
     }
   }
@@ -485,6 +505,9 @@ function getTradeRatios(room, playerId) {
 function broadcastRoom(room) {
   if (!room) return;
   const bank = getBankRemaining(room);
+  const productionsToSend = [...(room.recentProductions || [])];
+  room.recentProductions = []; // Clear after broadcasting once so animations don't repeat
+
   for (const p of room.players) {
     if (p.isBot) continue;
     const state = {
@@ -496,6 +519,12 @@ function broadcastRoom(room) {
       bank,
       devDeckCount: room.devDeck.length,
       turnIndex: room.turnIndex,
+      turnCount: room.turnCount,
+      startedAt: room.startedAt,
+      finishedAt: room.finishedAt,
+      diceStats: room.diceStats,
+      lastRollHexIds: room.lastRollHexIds,
+      recentProductions: productionsToSend,
       currentPlayerId: room.players[room.turnIndex]?.id,
       phase: room.phase,
       lastSetupVertexId: room.lastSetupVertexId,
@@ -528,7 +557,9 @@ function broadcastRoom(room) {
         settlementsLeft: pl.settlementsLeft,
         citiesLeft: pl.citiesLeft,
         roadsLeft: pl.roadsLeft,
-        vp: getPlayerVP(room, pl, pl.id === p.id || room.status === 'GAMEOVER')
+        stats: pl.stats,
+        vp: getPlayerVP(room, pl, pl.id === p.id || room.status === 'GAMEOVER'),
+        publicVp: getPlayerVP(room, pl, false)
       }))
     };
     io.to(p.id).emit('gameState', state);
@@ -556,6 +587,7 @@ function advanceSetupTurn(room) {
   if (room.setupStep >= room.setupOrder.length) {
     room.status = 'PLAYING';
     room.turnIndex = 0;
+    room.turnCount = 1;
     room.phase = 'ROLL';
     addLog(room, `Setup complete! ${room.players[0]?.name}'s turn to roll.`);
   } else {
@@ -565,7 +597,7 @@ function advanceSetupTurn(room) {
 }
 
 // ============================================================================
-// ADVANCED HARD BOT AI ENGINE
+// ADVANCED HARD BOT AI ENGINE (Smart Strategy + Human-Like Social Trading)
 // ============================================================================
 
 function getBotProducedResources(room, botId) {
@@ -601,24 +633,21 @@ function scoreVertexForHardBot(room, bot, vertexId) {
     score += pips * 3.0;
 
     if (h.type === 'gold') {
-      score += 6.5; // High priority for Colonist Gold tiles
+      score += 6.5;
     } else if (RESOURCES.includes(h.type)) {
       typesAtVertex.add(h.type);
-      // Strongly reward resources the bot doesn't produce yet
       if (existingProd[h.type] === 0) score += 5.5;
       if (h.type === 'wheat' || h.type === 'ore') score += 1.5;
     }
 
     if (h.number) {
-      if (numbersAtVertex.has(h.number)) score -= 1.5; // Diversify numbers
+      if (numbersAtVertex.has(h.number)) score -= 1.5;
       numbersAtVertex.add(h.number);
     }
   }
 
-  // Resource diversity bonus
   score += typesAtVertex.size * 3.5;
 
-  // Synergy bonus: Wood+Brick or Wheat+Ore
   const hasWood = existingProd.wood > 0 || typesAtVertex.has('wood');
   const hasBrick = existingProd.brick > 0 || typesAtVertex.has('brick');
   const hasWheat = existingProd.wheat > 0 || typesAtVertex.has('wheat');
@@ -626,7 +655,6 @@ function scoreVertexForHardBot(room, bot, vertexId) {
   if (hasWood && hasBrick) score += 4.0;
   if (hasWheat && hasOre) score += 5.0;
 
-  // Port synergy
   if (v.port === '3:1') score += 4.5;
   else if (v.port && (existingProd[v.port] >= 4 || typesAtVertex.has(v.port))) score += 6.5;
 
@@ -646,12 +674,10 @@ function chooseBestRoadForHardBot(room, bot, mustConnectVertexId = null) {
       const endV = room.board.vertices[endVId];
       if (!endV) continue;
 
-      // Direct buildable settlement spot at endpoint
       if (canPlaceSettlement(room, bot.id, endVId, true)) {
         score += 40 + scoreVertexForHardBot(room, bot, endVId);
       }
 
-      // Check 1 step further for high-value settlement spots
       for (const nextVId of endV.adjacentVertices) {
         if (canPlaceSettlement(room, bot.id, nextVId, true)) {
           score += 18 + scoreVertexForHardBot(room, bot, nextVId) * 0.6;
@@ -667,7 +693,6 @@ function chooseBestRoadForHardBot(room, bot, mustConnectVertexId = null) {
   return bestEdge;
 }
 
-// Determines what the Hard Bot is currently trying to build, what it needs, and what it refuses to trade away
 function analyzeBotStrategy(room, bot) {
   const res = { ...bot.resources };
   const hasUpgradeableSettlement = bot.citiesLeft > 0 &&
@@ -710,7 +735,7 @@ function analyzeBotStrategy(room, bot) {
     if (res.ore < 1) missing.push('ore');
     plans.push({
       type: 'dev',
-      priority: 72 - missing.length * 16,
+      priority: 74 - missing.length * 16,
       cost: { wood: 0, brick: 0, sheep: 1, wheat: 1, ore: 1 },
       missing
     });
@@ -722,7 +747,7 @@ function analyzeBotStrategy(room, bot) {
     if (res.brick < 1) missing.push('brick');
     plans.push({
       type: 'road',
-      priority: 65 - missing.length * 16,
+      priority: 68 - missing.length * 16,
       cost: { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 },
       missing
     });
@@ -754,16 +779,14 @@ function chooseBestGoldResourceForBot(room, bot) {
     if (bank[m] > 0) return m;
   }
 
-  // Otherwise pick the rarest resource in hand
   avail.sort((a, b) => (bot.resources[a] || 0) - (bot.resources[b] || 0));
   return avail[0];
 }
 
-// Evaluates a player's trade offer from the perspective of an Advanced Hard Bot
+// Advanced Hard Bot Trade Evaluation — smart, competitive, yet human-like and willing to trade!
 function evaluateTradeForHardBot(room, bot, trade) {
   if (!trade || trade.fromId === bot.id) return 'declined';
 
-  // 1. Check if bot actually has all requested resources
   let totalGiveByBot = 0;
   let totalGetByBot = 0;
   for (const r of RESOURCES) {
@@ -775,46 +798,52 @@ function evaluateTradeForHardBot(room, bot, trade) {
   }
   if (totalGiveByBot === 0 || totalGetByBot === 0) return 'declined';
 
-  // 2. Hard Bot refuses to trade with a player close to winning!
+  // Block only if proposer is literally 1 point away from winning
   const proposer = room.players.find(p => p.id === trade.fromId);
   if (proposer) {
     const proposerPublicVp = getPlayerVP(room, proposer, false);
-    if (proposerPublicVp >= Math.max(4, room.settings.vpToWin - 2)) {
+    if (proposerPublicVp >= room.settings.vpToWin - 1) {
       return 'declined';
     }
   }
 
-  // 3. Check if trade helps bot's active build plan without sacrificing locked cards
-  const { topPlan, surplus } = analyzeBotStrategy(room, bot);
+  const { topPlan, plans, surplus } = analyzeBotStrategy(room, bot);
 
-  let helpsMissing = 0;
-  let hurtsLocked = false;
+  // Check if offered resources help topPlan or any secondary plan
+  const allWantedByBot = new Set();
+  plans.slice(0, 2).forEach(pl => pl.missing.forEach(m => allWantedByBot.add(m)));
+
+  let helpsAnyPlan = false;
+  let hurtsZeroMissingBuild = false;
   for (const r of RESOURCES) {
     const reqAmt = Number(trade.request[r]) || 0;
     const offAmt = Number(trade.offer[r]) || 0;
-    if (offAmt > 0 && topPlan.missing.includes(r)) {
-      helpsMissing += offAmt;
+    if (offAmt > 0 && (allWantedByBot.has(r) || (bot.resources[r] || 0) === 0)) {
+      helpsAnyPlan = true;
     }
-    if (reqAmt > surplus[r]) {
-      hurtsLocked = true;
+    if (topPlan.missing.length === 0 && reqAmt > surplus[r]) {
+      hurtsZeroMissingBuild = true;
     }
   }
 
-  // Accept if it directly gives a needed resource using only surplus cards
-  if (helpsMissing > 0 && !hurtsLocked && totalGetByBot >= totalGiveByBot) {
+  if (hurtsZeroMissingBuild) return 'declined';
+
+  // 1. If the player is offering MORE cards than they ask for (e.g., 2-for-1), bots love value!
+  if (totalGetByBot > totalGiveByBot) {
     return 'accepted';
   }
 
-  // Accept favorable 2-for-1 (or better) trades if it doesn't break an immediate 0-missing build
-  if (totalGetByBot > totalGiveByBot && topPlan.missing.length > 0 && !hurtsLocked) {
+  // 2. If it's a fair 1-for-1 (or equal count) and helps any build or gives a resource the bot lacks
+  if (totalGetByBot === totalGiveByBot && helpsAnyPlan) {
     return 'accepted';
   }
 
-  // Accept even 1-for-1 if the bot has >= 3 of the requested resource and 0 of the offered resource
+  // 3. Human-like casual trading: if bot has >= 2 of the requested card and is getting a different card, accept 70% of the time!
   if (totalGetByBot === totalGiveByBot) {
-    const givesAbundant = RESOURCES.every(r => (trade.request[r] || 0) === 0 || bot.resources[r] >= 3);
-    const getsScarce = RESOURCES.some(r => (trade.offer[r] || 0) > 0 && bot.resources[r] === 0);
-    if (givesAbundant && getsScarce) return 'accepted';
+    const hasDuplicatesOfRequested = RESOURCES.every(r => (trade.request[r] || 0) === 0 || bot.resources[r] >= 2);
+    if (hasDuplicatesOfRequested && Math.random() < 0.72) {
+      return 'accepted';
+    }
   }
 
   return 'declined';
@@ -835,6 +864,7 @@ function tryHardBotBankTrade(room, bot) {
     if (surplus[r] >= ratio) {
       bot.resources[r] -= ratio;
       bot.resources[targetRes] += 1;
+      if (bot.stats) bot.stats.tradesMade++;
       addLog(room, `${bot.avatar} ${bot.name} traded ${ratio} ${r} for 1 ${targetRes} with the Bank 🏦`, bot.color);
       return true;
     }
@@ -845,13 +875,16 @@ function tryHardBotBankTrade(room, bot) {
 function tryHardBotProposeTrade(room, bot) {
   if (bot.proposedTradeThisTurn || room.activeTrade) return false;
   const { topPlan, surplus } = analyzeBotStrategy(room, bot);
-  if (topPlan.missing.length !== 1) return false; // Propose trade when 1 card away from a build!
+  if (topPlan.missing.length === 0 || topPlan.missing.length > 2) return false;
 
   const wantRes = topPlan.missing[0];
-  const offerRes = RESOURCES.find(r => r !== wantRes && surplus[r] >= 1);
+  // Offer a surplus resource, or any resource we have >= 2 of that isn't wantRes
+  let offerRes = RESOURCES.find(r => r !== wantRes && surplus[r] >= 1);
+  if (!offerRes) {
+    offerRes = RESOURCES.find(r => r !== wantRes && (bot.resources[r] || 0) >= 2);
+  }
   if (!offerRes) return false;
 
-  // Check if any other player actually has at least 1 card
   const anyOtherHasCards = room.players.some(p => p.id !== bot.id && getTotalResources(p) > 0);
   if (!anyOtherHasCards) return false;
 
@@ -905,7 +938,7 @@ function chooseBestRobberHexForHardBot(room, bot) {
       }
     }
 
-    if (botHasBuilding) continue; // Never block own hex!
+    if (botHasBuilding) continue;
 
     const pips = getPips(h.number) + (h.type === 'gold' ? 3 : 0);
     const score = oppWeight > 0 ? (pips * 10 * oppWeight) + (maxOppVp * 8) : -pips;
@@ -938,7 +971,6 @@ function scheduleBotAction(room) {
             const decision = evaluateTradeForHardBot(room, bot, room.activeTrade);
             room.activeTrade.responses[bot.id] = decision;
 
-            // If a Bot proposed the trade and another Bot accepted it, execute immediately
             const proposer = room.players.find(p => p.id === room.activeTrade.fromId);
             if (decision === 'accepted' && proposer && proposer.isBot) {
               executeTradeBetweenPlayers(room, proposer, bot, room.activeTrade);
@@ -946,12 +978,11 @@ function scheduleBotAction(room) {
             }
             broadcastRoom(room);
           } catch (e) { console.error(e); }
-        }, 450);
+        }, 400);
         return;
       }
     }
 
-    // If a Bot proposed a trade and all humans/bots have declined (or after timeout), clear it so bot continues
     const proposer = room.players.find(p => p.id === trade.fromId);
     if (proposer && proposer.isBot) {
       const vals = Object.values(trade.responses || {});
@@ -961,10 +992,9 @@ function scheduleBotAction(room) {
             room.activeTrade = null;
             broadcastRoom(room);
           }
-        }, 500);
+        }, 450);
         return;
       }
-      // Wait up to 4.5 seconds for human to accept/decline bot's offer
       if (!trade.timeoutScheduled) {
         trade.timeoutScheduled = true;
         setTimeout(() => {
@@ -972,7 +1002,7 @@ function scheduleBotAction(room) {
             room.activeTrade = null;
             broadcastRoom(room);
           }
-        }, 4500);
+        }, 5000);
       }
       return;
     }
@@ -988,14 +1018,15 @@ function scheduleBotAction(room) {
           if (!pick) {
             bot.goldPending = 0;
           } else {
-            givePlayerResourceFromBank(room, bot, pick, 1);
+            const goldHex = room.board.hexes.find(h => h.type === 'gold');
+            givePlayerResourceFromBank(room, bot, pick, 1, goldHex ? goldHex.id : null);
             bot.goldPending--;
             addLog(room, `${bot.avatar} ${bot.name} picked ${pick} from Gold`, bot.color);
           }
           checkGoldPhaseTransition(room);
           broadcastRoom(room);
         } catch (e) { console.error(e); }
-      }, 400);
+      }, 420);
       return;
     }
 
@@ -1004,8 +1035,8 @@ function scheduleBotAction(room) {
         try {
           if (bot.discardPending <= 0) return;
           const { surplus } = analyzeBotStrategy(room, bot);
+          const count = bot.discardPending;
           while (bot.discardPending > 0) {
-            // Discard surplus cards first before touching locked build cards
             let pick = RESOURCES.find(r => surplus[r] > 0 && bot.resources[r] > 0);
             if (pick) {
               surplus[pick]--;
@@ -1018,7 +1049,7 @@ function scheduleBotAction(room) {
             bot.resources[pick]--;
             bot.discardPending--;
           }
-          addLog(room, `${bot.avatar} ${bot.name} discarded excess cards`, bot.color);
+          addLog(room, `${bot.avatar} ${bot.name} discarded ${count} cards`, bot.color);
           if (room.players.every(p => p.discardPending === 0)) room.phase = 'ROBBER';
           broadcastRoom(room);
         } catch (e) { console.error(e); }
@@ -1034,12 +1065,12 @@ function scheduleBotAction(room) {
   if (room.botTimer) clearTimeout(room.botTimer);
   room.botTimer = setTimeout(() => {
     try { runBotTurnStep(room, current); } catch (e) { console.error(e); }
-  }, 600);
+  }, 650);
 }
 
 function runBotTurnStep(room, bot) {
   if (!room || room.status === 'GAMEOVER' || room.players[room.turnIndex]?.id !== bot.id) return;
-  if (room.activeTrade) return; // Wait while active trade is open
+  if (room.activeTrade) return;
 
   if (room.phase === 'SETUP_SETTLEMENT') {
     const valid = room.board.vertices.filter(v => canPlaceSettlement(room, bot.id, v.id, true));
@@ -1059,7 +1090,6 @@ function runBotTurnStep(room, bot) {
       broadcastRoom(room);
     }
   } else if (room.phase === 'ROLL') {
-    // If Robber is on a hex owned by this Hard Bot and bot has a Knight, play Knight before rolling!
     const robberHex = room.board.hexes[room.board.robberHexId];
     const robberBlockingMe = robberHex && robberHex.vertexIds.some(vId => room.board.vertices[vId]?.building?.owner === bot.id);
     if (robberBlockingMe && !bot.playedDevCardThisTurn && bot.devCards.includes('knight')) {
@@ -1072,30 +1102,19 @@ function runBotTurnStep(room, bot) {
     if (targetHex) handleMoveRobber(room, bot, targetHex.id);
     else { room.phase = 'MAIN'; broadcastRoom(room); }
   } else if (room.phase === 'MAIN') {
-    // 1. Play Dev Card if advantageous
     if (!bot.playedDevCardThisTurn && bot.devCards.length > 0) {
-      if (bot.devCards.includes('roadBuilding') && bot.roadsLeft >= 2) {
-        return playBotDevCard(room, bot, 'roadBuilding');
-      }
-      if (bot.devCards.includes('yearOfPlenty')) {
-        return playBotDevCard(room, bot, 'yearOfPlenty');
-      }
-      if (bot.devCards.includes('monopoly')) {
-        return playBotDevCard(room, bot, 'monopoly');
-      }
-      if (bot.devCards.includes('knight')) {
-        return playBotDevCard(room, bot, 'knight');
-      }
+      if (bot.devCards.includes('roadBuilding') && bot.roadsLeft >= 2) return playBotDevCard(room, bot, 'roadBuilding');
+      if (bot.devCards.includes('yearOfPlenty')) return playBotDevCard(room, bot, 'yearOfPlenty');
+      if (bot.devCards.includes('monopoly')) return playBotDevCard(room, bot, 'monopoly');
+      if (bot.devCards.includes('knight')) return playBotDevCard(room, bot, 'knight');
     }
 
-    // 2. Use any Free Roads from Road Building immediately
     if (bot.freeRoads > 0 && bot.roadsLeft > 0) {
       const e = chooseBestRoadForHardBot(room, bot, null);
       if (e) return handlePlaceRoad(room, bot, e.id);
       bot.freeRoads = 0;
     }
 
-    // 3. Build City if affordable
     if (bot.citiesLeft > 0 && bot.resources.wheat >= 2 && bot.resources.ore >= 3) {
       const mySettles = room.board.vertices.filter(v => v.building && v.building.owner === bot.id && v.building.type === 'settlement');
       if (mySettles.length > 0) {
@@ -1104,7 +1123,6 @@ function runBotTurnStep(room, bot) {
       }
     }
 
-    // 4. Build Settlement if affordable
     if (bot.settlementsLeft > 0 && bot.resources.wood >= 1 && bot.resources.brick >= 1 && bot.resources.sheep >= 1 && bot.resources.wheat >= 1) {
       const validSpots = room.board.vertices.filter(v => canPlaceSettlement(room, bot.id, v.id, false));
       if (validSpots.length > 0) {
@@ -1113,19 +1131,17 @@ function runBotTurnStep(room, bot) {
       }
     }
 
-    // 5. Try Maritime Bank/Port Trade if it unlocks a build
-    if (tryHardBotBankTrade(room, bot)) {
-      broadcastRoom(room);
-      return;
-    }
-
-    // 6. Propose a 1-for-1 Trade to Players if 1 card short of a build
+    // Propose a social player trade before resorting to 4:1 bank trade!
     if (tryHardBotProposeTrade(room, bot)) {
       broadcastRoom(room);
       return;
     }
 
-    // 7. Buy Development Card if affordable
+    if (tryHardBotBankTrade(room, bot)) {
+      broadcastRoom(room);
+      return;
+    }
+
     if (room.devDeck.length > 0 && bot.resources.sheep >= 1 && bot.resources.wheat >= 1 && bot.resources.ore >= 1) {
       bot.resources.sheep--; bot.resources.wheat--; bot.resources.ore--;
       bot.newDevCards.push(room.devDeck.pop());
@@ -1135,7 +1151,6 @@ function runBotTurnStep(room, bot) {
       return;
     }
 
-    // 8. Build Road toward best expansion spot
     if (bot.roadsLeft > 0 && bot.resources.wood >= 1 && bot.resources.brick >= 1) {
       const hasOpenSpot = room.board.vertices.some(v => canPlaceSettlement(room, bot.id, v.id, false));
       const shouldExpand = !hasOpenSpot || (bot.resources.wood >= 2 && bot.resources.brick >= 2);
@@ -1145,7 +1160,6 @@ function runBotTurnStep(room, bot) {
       }
     }
 
-    // 9. End Turn
     handleEndTurn(room, bot);
   }
 }
@@ -1172,7 +1186,6 @@ function playBotDevCard(room, bot, cardType) {
     checkGoldPhaseTransition(room);
     addLog(room, `${bot.avatar} ${bot.name} played Year of Plenty (+2 picks)`, bot.color);
   } else if (cardType === 'monopoly') {
-    // Pick resource most held by opponents
     let bestRes = 'wheat';
     let maxOppCount = -1;
     for (const r of RESOURCES) {
@@ -1221,7 +1234,7 @@ function handlePlaceSettlement(room, player, vertexId) {
       for (const hId of v.hexIds) {
         const hex = room.board.hexes[hId];
         if (!hex) continue;
-        if (RESOURCES.includes(hex.type)) givePlayerResourceFromBank(room, player, hex.type, 1);
+        if (RESOURCES.includes(hex.type)) givePlayerResourceFromBank(room, player, hex.type, 1, hex.id);
         else if (hex.type === 'gold') player.goldPending++;
       }
     }
@@ -1292,9 +1305,11 @@ function handleRollDice(room, player) {
   const d2 = Math.floor(Math.random() * 6) + 1;
   const sum = d1 + d2;
   room.lastDice = [d1, d2];
+  room.diceStats[sum] = (room.diceStats[sum] || 0) + 1;
   addLog(room, `${player.avatar} ${player.name} rolled ${sum} (${d1} + ${d2})`, player.color);
 
   if (sum === 7) {
+    room.lastRollHexIds = [];
     let anyDiscard = false;
     for (const p of room.players) {
       const total = getTotalResources(p);
@@ -1304,9 +1319,15 @@ function handleRollDice(room, player) {
       }
     }
     room.phase = anyDiscard ? 'DISCARD' : 'ROBBER';
+    if (anyDiscard) {
+      addLog(room, `7 was rolled! Players with >${room.settings.cardDiscardLimit} cards must discard half.`, '#c62828');
+    }
   } else {
-    const matching = room.board.hexes.filter(h => h.number === sum && h.id !== room.board.robberHexId && h.type !== 'water');
-    for (const hex of matching) {
+    const allRolledHexes = room.board.hexes.filter(h => h.number === sum && h.type !== 'water');
+    room.lastRollHexIds = allRolledHexes.map(h => h.id);
+
+    const producingHexes = allRolledHexes.filter(h => h.id !== room.board.robberHexId);
+    for (const hex of producingHexes) {
       for (const vId of hex.vertexIds) {
         const b = room.board.vertices[vId]?.building;
         if (b) {
@@ -1317,7 +1338,7 @@ function handleRollDice(room, player) {
               owner.goldPending += amt;
               addLog(room, `${owner.avatar} ${owner.name} earned ${amt} Gold pick(s)!`, owner.color);
             } else if (RESOURCES.includes(hex.type)) {
-              givePlayerResourceFromBank(room, owner, hex.type, amt);
+              givePlayerResourceFromBank(room, owner, hex.type, amt, hex.id);
             }
           }
         }
@@ -1352,7 +1373,6 @@ function handleMoveRobber(room, player, hexId) {
     .filter(p => p && getTotalResources(p) > 0);
 
   if (victims.length > 0) {
-    // Target victim with highest VP
     victims.sort((a, b) => getPlayerVP(room, b, false) - getPlayerVP(room, a, false));
     const victim = victims[0];
     const pool = [];
@@ -1380,6 +1400,8 @@ function executeTradeBetweenPlayers(room, proposer, partner, trade) {
     proposer.resources[r] = proposer.resources[r] - o + req;
     partner.resources[r] = partner.resources[r] - req + o;
   }
+  if (proposer.stats) proposer.stats.tradesMade++;
+  if (partner.stats) partner.stats.tradesMade++;
   addLog(room, `🤝 ${proposer.name} traded with ${partner.name}!`, proposer.color);
   room.activeTrade = null;
   broadcastRoom(room);
@@ -1394,10 +1416,12 @@ function handleEndTurn(room, player) {
   player.proposedTradeThisTurn = false;
   player.freeRoads = 0;
   room.activeTrade = null;
+  room.lastRollHexIds = [];
 
   if (checkWinner(room)) return broadcastRoom(room);
 
   room.turnIndex = (room.turnIndex + 1) % room.players.length;
+  room.turnCount++;
   room.phase = 'ROLL';
   broadcastRoom(room);
 }
@@ -1548,9 +1572,20 @@ io.on('connection', (socket) => {
       p.settlementsLeft = room.settings.maxSettlements;
       p.citiesLeft = room.settings.maxCities;
       p.roadsLeft = room.settings.maxRoads;
+      p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+      p.devCards = [];
+      p.newDevCards = [];
+      p.knightsPlayed = 0;
+      p.longestRoadLength = 0;
+      p.stats = { resourcesEarned: 0, tradesMade: 0 };
     });
 
     room.status = 'SETUP';
+    room.startedAt = Date.now();
+    room.finishedAt = null;
+    room.turnCount = 1;
+    room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+    room.lastRollHexIds = [];
     room.devDeck = createDevDeck(room.settings);
 
     const n = room.players.length;
@@ -1562,6 +1597,30 @@ io.on('connection', (socket) => {
 
     const firstPlayer = room.players[0];
     addLog(room, `🎲 Turn order randomized! ${firstPlayer.avatar} ${firstPlayer.name} goes first!`, firstPlayer.color);
+    broadcastRoom(room);
+  }));
+
+  socket.on('rematchLobby', safe(({ code }) => {
+    const room = rooms[code];
+    if (!room) return;
+    room.status = 'LOBBY';
+    room.phase = 'LOBBY';
+    room.winner = null;
+    room.activeTrade = null;
+    room.longestRoadOwner = null;
+    room.largestArmyOwner = null;
+    room.lastRollHexIds = [];
+    room.board = generateBoard(room.settings);
+    room.players.forEach(p => {
+      p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+      p.devCards = [];
+      p.newDevCards = [];
+      p.knightsPlayed = 0;
+      p.longestRoadLength = 0;
+      p.goldPending = 0;
+      p.discardPending = 0;
+    });
+    addLog(room, `🔄 Returned to Lobby for a new match!`, '#1565c0');
     broadcastRoom(room);
   }));
 
@@ -1610,7 +1669,8 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (!player || player.goldPending <= 0) return;
 
-    const granted = givePlayerResourceFromBank(room, player, resource, 1);
+    const goldHex = room.board.hexes.find(h => h.type === 'gold');
+    const granted = givePlayerResourceFromBank(room, player, resource, 1, goldHex ? goldHex.id : null);
     if (granted === 0) return socket.emit('errorMsg', `Bank is out of ${resource.toUpperCase()}!`);
     player.goldPending--;
     addLog(room, `${player.avatar} ${player.name} picked ${resource} from Gold`, player.color);
@@ -1727,6 +1787,7 @@ io.on('connection', (socket) => {
       player.resources[r] -= Number(give[r]) || 0;
       player.resources[r] += Number(get[r]) || 0;
     }
+    if (player.stats) player.stats.tradesMade++;
     addLog(room, `${player.avatar} ${player.name} traded with the Bank 🏦`, player.color);
     broadcastRoom(room);
   }));
@@ -1771,7 +1832,6 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   }));
 
-  // Human responds (Accept / Decline) to another player's or Bot's trade offer
   socket.on('respondTrade', safe(({ code, decision }) => {
     const room = rooms[code];
     if (!room || !room.activeTrade) return;
@@ -1786,7 +1846,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Verify partner has the requested resources
     for (const r of RESOURCES) {
       if ((Number(trade.request[r]) || 0) > (partner.resources[r] || 0)) {
         return socket.emit('errorMsg', 'You do not have the required resources for this trade!');
@@ -1795,7 +1854,6 @@ io.on('connection', (socket) => {
 
     trade.responses[partner.id] = 'accepted';
 
-    // If the proposer is a Bot (or if immediate execution is desired), execute the swap right away!
     if (proposer.isBot) {
       executeTradeBetweenPlayers(room, proposer, partner, trade);
     } else {
@@ -1803,7 +1861,6 @@ io.on('connection', (socket) => {
     }
   }));
 
-  // Proposer clicks on a specific player/bot who accepted the trade to finalize the swap
   socket.on('confirmTradeWithPartner', safe(({ code, partnerId }) => {
     const room = rooms[code];
     if (!room || !room.activeTrade) return;
@@ -1813,7 +1870,6 @@ io.on('connection', (socket) => {
     const proposer = room.players.find(p => p.id === trade.fromId);
     let partner = room.players.find(p => p.id === partnerId);
     if (!partner) {
-      // Fallback: pick first player/bot who accepted
       const firstAcceptedId = Object.keys(trade.responses || {}).find(id => trade.responses[id] === 'accepted');
       partner = room.players.find(p => p.id === firstAcceptedId);
     }
@@ -1892,5 +1948,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`✅ Colonist-Style HexSettlers (Hard Bots + Full Trade) running at http://localhost:${PORT}`);
+  console.log(`✅ Colonist-Style HexSettlers running at http://localhost:${PORT}`);
 });

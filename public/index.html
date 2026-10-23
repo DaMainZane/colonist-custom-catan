@@ -89,9 +89,9 @@
       font-weight: 800; text-align: center; font-size: 12px; background: #fff;
     }
 
-    /* Top-Center Colonist Active Trade Response Box (Exact Screenshot 1 Layout) */
+    /* Top-Center Colonist Active Trade Response Box */
     #activeTradeModal {
-      position: absolute; top: 10px; right: 16px; width: 390px;
+      position: absolute; top: 10px; right: 16px; width: 410px;
       display: none; flex-direction: column; gap: 5px; z-index: 50;
     }
     .trade-top-avatars {
@@ -124,13 +124,13 @@
 
     /* Bottom-Left Inline Drawer + Adjacent Bank/Player Confirm Buttons */
     #inlineDrawerWrap {
-      position: absolute; bottom: 86px; left: 8px; display: none;
+      position: absolute; bottom: 92px; left: 8px; display: none;
       align-items: flex-end; gap: 8px; z-index: 40;
     }
     #inlineDrawer {
-      width: 350px; background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 10px;
-      padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-      display: flex; flex-direction: column; gap: 8px;
+      width: 420px; background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 10px;
+      padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      display: flex; flex-direction: column; gap: 8px; position: relative;
     }
     #tradeConfirmStack {
       display: none; flex-direction: column; gap: 6px;
@@ -148,46 +148,138 @@
       position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 900; color: #fff;
     }
 
-    .res-Select-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+    /* Colonist Discard Drawer Specific Styling (Screenshot 1) */
+    .discard-header { display: flex; align-items: center; gap: 14px; padding-bottom: 6px; border-bottom: 1px solid #e0d7c6; }
+    .discard-q-card {
+      width: 46px; height: 62px; border-radius: 6px; background: linear-gradient(180deg, #1976d2, #0d47a1);
+      border: 2px solid #222; display: flex; align-items: center; justify-content: center;
+      color: #90caf9; font-size: 30px; font-weight: 900; position: relative; flex-shrink: 0;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+    }
+    .discard-q-card .up-arr {
+      position: absolute; top: -11px; color: #e53935; font-size: 20px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .discard-tray {
+      min-height: 74px; background: #ebe4d8; border-radius: 8px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .discard-confirm-btn {
+      width: 46px; height: 42px; border-radius: 9px;
+      background: linear-gradient(180deg, #4dd0e1 0%, #0288d1 100%);
+      border: 2px solid #fff; color: #fff; font-size: 20px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.25); margin-left: auto;
+    }
+    .discard-confirm-btn:disabled { filter: grayscale(0.8) opacity(0.45); cursor: not-allowed; }
+
+    /* Colonist Overlapping Resource Card Stacks (Screenshot 3) */
+    .res-Select-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .mini-res-card {
-      width: 44px; height: 56px; border-radius: 6px; border: 2px solid #fff;
+      width: 46px; height: 60px; border-radius: 6px; border: 2px solid #222;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-weight: 800; font-size: 11px; cursor: pointer; position: relative;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.25); transition: transform 0.1s;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 2px 5px rgba(0,0,0,0.25);
+      transition: transform 0.1s;
     }
     .mini-res-card:hover { transform: translateY(-3px); }
-    .mini-res-card .badge {
-      position: absolute; top: -5px; right: -5px; background: #0288d1; color: #fff;
-      border-radius: 50%; width: 20px; height: 20px; font-size: 11px;
-      display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff;
-    }
 
-    /* Bottom-Left Player Card Hand */
     .hand-panel {
-      position: absolute; bottom: 6px; left: 8px; height: 74px; min-width: 350px;
+      position: absolute; bottom: 6px; left: 8px; height: 80px; min-width: 390px;
       background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 8px;
-      padding: 6px 12px; display: flex; align-items: center; gap: 9px; z-index: 30;
+      padding: 6px 14px; display: flex; align-items: center; gap: 12px; z-index: 30;
       box-shadow: 0 4px 14px rgba(0,0,0,0.25);
     }
-    .card-stack {
-      position: relative; width: 45px; height: 60px; border-radius: 6px;
-      border: 2px solid #333; display: flex; align-items: center; justify-content: center;
-      box-shadow: -3px 0 0 rgba(255,255,255,0.5), 0 3px 6px rgba(0,0,0,0.3);
-      cursor: pointer; transition: transform 0.12s;
+
+    .stacked-group {
+      position: relative; height: 64px; cursor: pointer; transition: transform 0.12s;
+      display: inline-flex; align-items: center;
     }
-    .card-stack:hover { transform: translateY(-4px); }
-    .card-stack .count-badge {
-      position: absolute; top: -6px; right: -6px; background: #0288d1; color: #fff;
-      font-size: 11px; font-weight: 900; width: 20px; height: 20px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff;
+    .stacked-group:hover { transform: translateY(-5px); }
+    .stack-slice {
+      position: absolute; top: 0; width: 46px; height: 64px; border-radius: 5px;
+      border: 1.8px solid #1a1a1a; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.38), -1px 1px 3px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
     }
-    .card-wood  { background: #119b18; }
-    .card-brick { background: #f04716; }
-    .card-sheep { background: #6ec914; }
-    .card-wheat { background: #f3b213; }
-    .card-ore   { background: #9da9b0; }
+    .corner-ribbon {
+      position: absolute; top: 0; right: 0; width: 22px; height: 22px;
+      background: #0277bd; color: #fff; font-size: 12px; font-weight: 900;
+      border-bottom-left-radius: 10px; display: flex; align-items: center; justify-content: center;
+      padding-left: 2px; padding-bottom: 1px; box-shadow: -1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .card-wood  { background: #1b9e20; }
+    .card-brick { background: #e0533c; }
+    .card-sheep { background: #76d219; }
+    .card-wheat { background: #f2b718; }
+    .card-ore   { background: #90a4ae; }
     .card-gold  { background: linear-gradient(135deg, #ffd700, #ff9800); }
-    .card-dev   { background: linear-gradient(135deg, #8e24aa, #3949ab); color: #fff; }
+    .card-dev   { background: linear-gradient(135deg, #7b1fa2, #303f9f); color: #fff; }
+
+    /* Flying Resource Card Animation (Screenshot 4) */
+    .flying-res-card {
+      position: fixed; width: 44px; height: 60px; border-radius: 5px;
+      border: 2px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; pointer-events: none;
+      transition: left 0.72s cubic-bezier(0.22, 1, 0.36, 1), top 0.72s cubic-bezier(0.22, 1, 0.36, 1), transform 0.72s ease, opacity 0.72s ease;
+    }
+
+    /* Colonist Victory & Post-Game Stats Screen (Screenshot 2) */
+    #victoryOverlay {
+      position: absolute; inset: 0; background: rgba(7, 23, 38, 0.88);
+      backdrop-filter: blur(3px); z-index: 80; display: none;
+      flex-direction: column; align-items: center; justify-content: space-between;
+      padding: 20px 28px; color: #fff;
+    }
+    #reopenVictoryBtn {
+      position: absolute; top: 14px; right: 16px; z-index: 85; display: none;
+    }
+    .vic-top-bar { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; }
+    .vic-logo-badge {
+      background: linear-gradient(180deg, #f3b213, #d48800); border: 3px solid #fff;
+      border-radius: 12px; padding: 6px 22px; font-size: 22px; font-weight: 900;
+      letter-spacing: 1.5px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+    .vic-tabs {
+      width: 100%; display: flex; justify-content: center; gap: 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; margin-top: 8px;
+      font-size: 13px; font-weight: 700; color: #90caf9;
+    }
+    .vic-tab { cursor: pointer; padding: 4px 10px; border-radius: 6px; }
+    .vic-tab.active { color: #fff; background: rgba(255,255,255,0.15); }
+    .vic-body {
+      flex: 1; width: 100%; display: flex; align-items: center; justify-content: center;
+      gap: 32px; padding: 16px 0; overflow: hidden;
+    }
+    .vic-ranks {
+      width: 210px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .vic-rank-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 800;
+    }
+    .dice-chart-box {
+      flex: 1; max-width: 560px; height: 290px; display: flex; flex-direction: column;
+      justify-content: flex-end; align-items: center;
+    }
+    .dice-bars-wrap {
+      width: 100%; height: 240px; display: flex; align-items: flex-end;
+      justify-content: space-between; gap: 8px; padding-top: 20px;
+    }
+    .dice-bar-col {
+      flex: 1; height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end; gap: 6px;
+    }
+    .dice-bar-fill {
+      width: 100%; border-radius: 6px 6px 2px 2px; background: #1e88e5;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 4px; font-size: 11px; font-weight: 900; color: #fff;
+      min-height: 18px; transition: height 0.4s ease;
+    }
+    .dice-bar-fill.is-seven { background: #78909c; }
 
     /* Bottom-Center Action Bar */
     .center-hud {
@@ -318,7 +410,41 @@
         <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Show/Hide Customizer Bar">⚙️</div>
       </div>
 
-      <!-- Tabbed Lobby Customizer (Map Painter + Card/Resource Amounts) -->
+      <!-- Reopen Victory Stats Button (when inspecting map after game ends) -->
+      <button id="reopenVictoryBtn" class="colonist-btn" onclick="toggleVictoryMapInspect(false)">📊 Show Victory Stats</button>
+
+      <!-- Colonist Victory & Dice Stats Overlay (Screenshot 2) -->
+      <div id="victoryOverlay">
+        <div class="vic-top-bar">
+          <div style="width:120px;"></div>
+          <div style="text-align:center;">
+            <div class="vic-logo-badge">🏝️ COLONIST</div>
+            <h2 id="vicTitleText" style="font-size:28px; font-weight:900; margin-top:10px;">You are 1st!</h2>
+            <p id="vicSubText" style="font-size:13px; color:#cbd5e1; margin-top:2px;">Time: 00:00 - Turns: 0</p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <button class="colonist-btn" style="background:#1e293b; border-color:#475569;" onclick="toggleVictoryMapInspect(true)">🗺️ Map / Replay</button>
+            <button class="colonist-btn green" onclick="copyInviteLink()">Share 🔗</button>
+          </div>
+        </div>
+
+        <div class="vic-tabs">
+          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice Stats</div>
+          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview & Resource Stats</div>
+        </div>
+
+        <div class="vic-body">
+          <div class="vic-ranks" id="vicRanksList"></div>
+          <div class="dice-chart-box" id="vicChartContainer"></div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:center;">
+          <button class="colonist-btn" style="background:#334155; padding:10px 28px;" onclick="window.location.reload()">Home</button>
+          <button class="colonist-btn green" style="padding:10px 44px; font-size:15px;" onclick="rematchLobby()">Play Again</button>
+        </div>
+      </div>
+
+      <!-- Tabbed Lobby Customizer -->
       <div id="lobbyToolbar">
         <div class="toolbar-header">
           <div style="display:flex; gap:6px; align-items:center;">
@@ -441,7 +567,6 @@
         </div>
         <div class="turn-pill" id="turnStatusPill">Waiting in Lobby...</div>
         <div class="action-bar">
-          <button class="sq-btn" id="btnConfirmAction" style="display:none; background:linear-gradient(180deg,#4caf50,#2e7d32);" onclick="confirmInlineAction()" title="Confirm">✔</button>
           <button class="sq-btn" id="btnCancelAction" style="display:none; background:linear-gradient(180deg,#ef5350,#c62828);" onclick="closeInlineDrawer()" title="Cancel">✖</button>
           <button class="sq-btn" id="btnTradeDrawer" onclick="toggleTradeDrawer()" title="Open Trade">
             <span>⇄</span><span class="lbl">Trade</span>
@@ -491,6 +616,8 @@
     let isMouseDown = false;
     let buildMode = null;
     let drawerMode = null;
+    let victoryTab = 'dice';
+    let hideVictoryOverlay = false;
 
     let camZoom = 1;
     let camPanX = 0;
@@ -568,7 +695,31 @@
     }
 
     function getMiniSvg(type) {
-      return `<svg width="24" height="24" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.95)}</svg>`;
+      return `<svg width="26" height="26" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.98)}</svg>`;
+    }
+
+    // Builds an overlapping Colonist.io card stack HTML (Screenshot 3)
+    function buildOverlappingStackHtml(cardClass, innerSvgHtml, count, onClickStr, titleStr = '', extraStyle = '') {
+      const visibleSlices = Math.min(Math.max(1, count), 4);
+      const offsetStep = 8;
+      const totalWidth = 46 + (visibleSlices - 1) * offsetStep;
+
+      let slicesHtml = '';
+      for (let i = 0; i < visibleSlices; i++) {
+        const isFront = i === visibleSlices - 1;
+        slicesHtml += `
+          <div class="stack-slice ${cardClass}" style="left:${i * offsetStep}px; ${isFront ? extraStyle : ''}">
+            ${isFront ? innerSvgHtml : ''}
+            ${isFront ? `<div class="corner-ribbon">${count}</div>` : ''}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="stacked-group" style="width:${totalWidth}px;" onclick="${onClickStr}" title="${titleStr}">
+          ${slicesHtml}
+        </div>
+      `;
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -698,19 +849,97 @@
     function addBot() { socket.emit('addBot', { code: state.code }); }
     function removeBot() { socket.emit('removeBot', { code: state.code }); }
     function startGame() { socket.emit('startGame', { code: state.code }); }
+    function rematchLobby() {
+      hideVictoryOverlay = false;
+      socket.emit('rematchLobby', { code: state.code });
+    }
 
     socket.on('errorMsg', (msg) => alert(msg));
 
     socket.on('gameState', (newState) => {
       const prevDice = state ? state.lastDice.join(',') : '';
+      const wasGameOver = state?.status === 'GAMEOVER';
       state = newState;
       document.getElementById('authScreen').style.display = 'none';
       document.getElementById('gameViewport').style.display = 'flex';
 
+      if (!wasGameOver && state.status === 'GAMEOVER') {
+        hideVictoryOverlay = false;
+        playTone(523, 0.12);
+        setTimeout(() => playTone(659, 0.12), 130);
+        setTimeout(() => playTone(784, 0.22), 260);
+      }
+
       if (prevDice && prevDice !== state.lastDice.join(',')) animateDice();
       syncAutomaticDrawers();
       renderAll();
+
+      if (state.recentProductions && state.recentProductions.length > 0) {
+        triggerFlyingResourceAnimations(state.recentProductions);
+      }
     });
+
+    // Spawns flying resource cards from the producing hexes to each receiving player (Screenshot 4)
+    function triggerFlyingResourceAnimations(productions) {
+      const svg = document.getElementById('boardSvg');
+      if (!svg || !state?.board) return;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+
+      let delay = 0;
+      productions.forEach(prod => {
+        const hex = state.board.hexes[prod.hexId];
+        if (!hex) return;
+
+        // Convert SVG hex center (hex.x, hex.y) to screen coordinates
+        const pt = svg.createSVGPoint();
+        pt.x = hex.x;
+        pt.y = hex.y;
+        const screenPt = pt.matrixTransform(ctm);
+
+        // Determine target screen coordinates (bottom-left hand for me, right sidebar row for others)
+        let targetEl = null;
+        if (prod.playerId === socket.id) {
+          targetEl = document.getElementById('myHandPanel');
+        } else {
+          targetEl = document.getElementById(`playerRow_${prod.playerId}`);
+        }
+        if (!targetEl) return;
+        const rect = targetEl.getBoundingClientRect();
+        const targetX = rect.left + rect.width / 2 - 22;
+        const targetY = rect.top + rect.height / 2 - 30;
+
+        const cardsToFly = Math.min(prod.amount || 1, 3);
+        for (let i = 0; i < cardsToFly; i++) {
+          const d = delay;
+          delay += 110;
+          setTimeout(() => {
+            const cardEl = document.createElement('div');
+            cardEl.className = `flying-res-card card-${prod.resource}`;
+            cardEl.innerHTML = getMiniSvg(prod.resource);
+            cardEl.style.left = `${screenPt.x - 22 + (i * 8)}px`;
+            cardEl.style.top = `${screenPt.y - 30 - (i * 6)}px`;
+            cardEl.style.transform = 'scale(0.85)';
+            document.body.appendChild(cardEl);
+
+            playTone(540 + i * 60, 0.06);
+
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                cardEl.style.left = `${targetX}px`;
+                cardEl.style.top = `${targetY}px`;
+                cardEl.style.transform = 'scale(1)';
+              });
+            });
+
+            setTimeout(() => {
+              cardEl.style.opacity = '0';
+              setTimeout(() => cardEl.remove(), 220);
+            }, 680);
+          }, d);
+        }
+      });
+    }
 
     function animateDice() {
       playTone(300, 0.07, 'triangle');
@@ -771,7 +1000,6 @@
       document.getElementById('die1').textContent = state.lastDice[0];
       document.getElementById('die2').textContent = state.lastDice[1];
 
-      // Update Piece Badges on Buttons
       if (me) {
         document.getElementById('badgeRoadCnt').textContent = me.roadsLeft;
         document.getElementById('badgeSettleCnt').textContent = me.settlementsLeft;
@@ -782,14 +1010,14 @@
       if (state.status === 'LOBBY') {
         pill.innerHTML = `🏠 Room <strong>${state.code}</strong> — Paint Map or Add Hard Bots`;
       } else if (state.status === 'GAMEOVER') {
-        pill.innerHTML = `🏆 <strong>${state.winner.name}</strong> Wins (${state.winner.vp} VP)!`;
+        pill.innerHTML = `🏆 <strong>${state.winner?.name}</strong> Won the Game!`;
       } else {
         const phaseTxt = {
           SETUP_SETTLEMENT: 'Place Settlement',
           SETUP_ROAD: 'Place Road',
           ROLL: 'Roll Dice',
           GOLD_PICK: 'Pick Gold Resource',
-          DISCARD: 'Discard Half (7 Rolled)',
+          DISCARD: 'Waiting for Discards (7 Rolled)',
           ROBBER: 'Move Robber',
           MAIN: 'Turn'
         }[state.phase] || state.phase;
@@ -817,6 +1045,7 @@
         document.getElementById('mainBtnLbl').textContent = 'Pass';
       }
 
+      renderVictoryScreen();
       renderActiveTradeModal(me);
       renderHand(me, isMyTurn);
       renderInlineDrawer(me, isMyTurn);
@@ -824,7 +1053,108 @@
       renderBoard(me, isMyTurn);
     }
 
-    // Renders the Top-Center Colonist.io Active Trade Box (with Bot/Player response icons & click-to-confirm!)
+    // Renders Colonist.io Victory & Dice Stats Screen (Screenshot 2)
+    function renderVictoryScreen() {
+      const overlay = document.getElementById('victoryOverlay');
+      const reopenBtn = document.getElementById('reopenVictoryBtn');
+      if (state.status !== 'GAMEOVER') {
+        overlay.style.display = 'none';
+        reopenBtn.style.display = 'none';
+        return;
+      }
+
+      if (hideVictoryOverlay) {
+        overlay.style.display = 'none';
+        reopenBtn.style.display = 'inline-flex';
+        return;
+      }
+      overlay.style.display = 'flex';
+      reopenBtn.style.display = 'none';
+
+      // Sort players by VP descending
+      const ranked = [...state.players].sort((a, b) => b.vp - a.vp);
+      const myRankIdx = ranked.findIndex(p => p.id === socket.id);
+      const ord = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+      document.getElementById('vicTitleText').textContent =
+        myRankIdx !== -1 ? `You are ${ord[myRankIdx]}!` : `${state.winner?.name} Won!`;
+
+      const elapsedSec = state.startedAt && state.finishedAt
+        ? Math.max(1, Math.floor((state.finishedAt - state.startedAt) / 1000))
+        : 0;
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+      document.getElementById('vicSubText').textContent = `Time: ${mins}:${secs} - Turns: ${state.turnCount || 1}`;
+
+      // Left Ranked Players List
+      document.getElementById('vicRanksList').innerHTML = `
+        <div style="text-align:right; font-size:18px; margin-bottom:2px;">🏆</div>
+      ` + ranked.map((p, idx) => `
+        <div class="vic-rank-row" style="border-left: 4px solid ${p.color}">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px">${p.avatar}</span>
+            <span>${p.name}</span>
+          </div>
+          <span style="font-size:16px; color:${idx === 0 ? '#ffd700' : '#fff'}">${p.vp}</span>
+        </div>
+      `).join('');
+
+      // Center Chart Container
+      const chartBox = document.getElementById('vicChartContainer');
+      if (victoryTab === 'dice') {
+        const ds = state.diceStats || {};
+        let maxCount = 1;
+        for (let n = 2; n <= 12; n++) {
+          if ((ds[n] || 0) > maxCount) maxCount = ds[n];
+        }
+
+        let barsHtml = '';
+        for (let n = 2; n <= 12; n++) {
+          const c = ds[n] || 0;
+          const heightPct = Math.max(8, Math.round((c / maxCount) * 100));
+          barsHtml += `
+            <div class="dice-bar-col">
+              <div class="dice-bar-fill ${n === 7 ? 'is-seven' : ''}" style="height:${heightPct}%">${c > 0 ? c : ''}</div>
+              <span style="font-size:11px; font-weight:800; color:#cbd5e1">${n}</span>
+            </div>
+          `;
+        }
+
+        chartBox.innerHTML = `
+          <div style="width:100%; text-align:left; font-weight:800; font-size:14px; margin-bottom:6px;">Dice Rolls</div>
+          <div class="dice-bars-wrap">${barsHtml}</div>
+        `;
+      } else {
+        chartBox.innerHTML = `
+          <div style="width:100%; background:rgba(255,255,255,0.07); border-radius:10px; padding:14px;">
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:6px; margin-bottom:8px;">
+              <span>Player</span><span>VP</span><span>Earned</span><span>Trades</span><span>Roads/Army</span>
+            </div>
+            ${ranked.map(p => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-weight:800; color:${p.color}">${p.avatar} ${p.name}</span>
+                <span>${p.vp}</span>
+                <span>${p.stats?.resourcesEarned || 0}</span>
+                <span>${p.stats?.tradesMade || 0}</span>
+                <span>🛣️${p.longestRoadLength} / ⚔️${p.knightsPlayed}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function switchVictoryTab(tab) {
+      victoryTab = tab;
+      document.getElementById('vicTabDice').classList.toggle('active', tab === 'dice');
+      document.getElementById('vicTabOverview').classList.toggle('active', tab === 'overview');
+      renderVictoryScreen();
+    }
+
+    function toggleVictoryMapInspect(hide) {
+      hideVictoryOverlay = hide;
+      renderVictoryScreen();
+    }
+
     function renderActiveTradeModal(me) {
       const box = document.getElementById('activeTradeModal');
       if (!state.activeTrade) {
@@ -836,7 +1166,6 @@
       const isMyOffer = t.fromId === socket.id;
       const otherPlayers = state.players.filter(p => p.id !== t.fromId);
 
-      // Top bar with opponent avatars & their response badges (⏳, ✔, ✖)
       const avatarsHtml = otherPlayers.map(p => {
         const resp = (t.responses && t.responses[p.id]) || 'pending';
         let badgeBg = '#0288d1', badgeTxt = '⏳';
@@ -851,17 +1180,16 @@
         `;
       }).join('');
 
-      const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r => `
-        <div class="mini-res-card card-${r}">${getMiniSvg(r)}<div class="badge">${t.request[r]}</div></div>
-      `).join('');
+      const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r =>
+        buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.request[r], '', RES_META[r].name)
+      ).join('');
 
-      const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r => `
-        <div class="mini-res-card card-${r}">${getMiniSvg(r)}<div class="badge">${t.offer[r]}</div></div>
-      `).join('');
+      const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r =>
+        buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.offer[r], '', RES_META[r].name)
+      ).join('');
 
       let actionButtonsHtml = '';
       if (isMyOffer) {
-        // Show clickable ✔ button for every player/bot who accepted!
         const acceptedPlayers = otherPlayers.filter(p => t.responses && t.responses[p.id] === 'accepted');
         actionButtonsHtml = acceptedPlayers.map(p => `
           <button class="trade-act-btn" style="background:${p.color}" onclick="confirmTradeWith('${p.id}')" title="Complete Trade with ${p.name}!">✔</button>
@@ -882,13 +1210,13 @@
       box.innerHTML = `
         <div class="trade-top-avatars">${avatarsHtml}</div>
         <div class="trade-offer-body">
-          <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; flex-direction:column; gap:8px;">
             <div class="res-Select-row">
-              <span style="font-size:13px; font-weight:900; color:#2e7d32; width:58px;">👥 ⬇</span>
+              <span style="font-size:13px; font-weight:900; color:#2e7d32; width:54px;">👥 ⬇</span>
               ${ isMyOffer ? wantCardsHtml : giveCardsHtml }
             </div>
             <div class="res-Select-row">
-              <span style="font-size:13px; font-weight:900; color:#c62828; width:58px;">${t.fromAvatar} ⬆</span>
+              <span style="font-size:13px; font-weight:900; color:#c62828; width:54px;">${t.fromAvatar} ⬆</span>
               ${ isMyOffer ? giveCardsHtml : wantCardsHtml }
             </div>
           </div>
@@ -914,6 +1242,7 @@
       socket.emit('cancelTrade', { code: state.code });
     }
 
+    // Renders Bottom-Left Hand with Overlapping Card Stacks (Screenshot 3)
     function renderHand(me, isMyTurn) {
       const panel = document.getElementById('myHandPanel');
       if (!me || !me.resources) {
@@ -922,13 +1251,27 @@
       }
 
       let html = RESOURCES.map(r => {
-        const count = me.resources[r] || 0;
-        return `
-          <div class="card-stack card-${r}" onclick="onClickHandResource('${r}')" title="Click to Offer ${RES_META[r].name} in Trade / Discard">
-            ${getMiniSvg(r)}
-            <div class="count-badge">${count}</div>
-          </div>
-        `;
+        // When discarding or trading, subtract cards currently placed in the tray so they visually move!
+        let count = me.resources[r] || 0;
+        if (drawerMode === 'discard') count = Math.max(0, count - (discardSel[r] || 0));
+        else if (drawerMode === 'trade') count = Math.max(0, count - (tradeGive[r] || 0));
+
+        if (count <= 0 && state.status !== 'LOBBY') return '';
+        if (count <= 0 && state.status === 'LOBBY') {
+          return `
+            <div class="mini-res-card card-${r}" style="opacity:0.55;">
+              ${getMiniSvg(r)}
+              <div class="corner-ribbon">0</div>
+            </div>
+          `;
+        }
+        return buildOverlappingStackHtml(
+          `card-${r}`,
+          getMiniSvg(r),
+          count,
+          `onClickHandResource('${r}')`,
+          `Click to select ${RES_META[r].name}`
+        );
       }).join('');
 
       const allDevs = [...(me.devCards || []), ...(me.newDevCards || [])];
@@ -938,15 +1281,19 @@
 
       Object.keys(devCounts).forEach(c => {
         const canPlay = isMyTurn && !me.playedDevCardThisTurn && (me.devCards || []).includes(c) && c !== 'vp';
-        html += `
-          <div class="card-stack card-dev" style="${canPlay ? 'outline:2.5px solid #ffd700;' : 'opacity:0.85;'}"
-            onclick="${canPlay ? `onClickDevCard('${c}')` : ''}" title="Dev Card: ${c} (Click to Play)">
-            <span style="font-size:20px">${devIcons[c] || '🃏'}</span>
-            <div class="count-badge">${devCounts[c]}</div>
-          </div>
-        `;
+        html += buildOverlappingStackHtml(
+          'card-dev',
+          `<span style="font-size:20px">${devIcons[c] || '🃏'}</span>`,
+          devCounts[c],
+          canPlay ? `onClickDevCard('${c}')` : '',
+          `Dev Card: ${c}`,
+          canPlay ? 'outline:2.5px solid #ffd700;' : 'opacity:0.85;'
+        );
       });
 
+      if (!html) {
+        html = `<span style="font-size:13px; font-weight:700; color:#888;">No cards in hand</span>`;
+      }
       panel.innerHTML = html;
     }
 
@@ -960,10 +1307,10 @@
         if (discardSel[r] < me.resources[r] && totalSelected < me.discardPending) {
           discardSel[r]++;
           playTone(500, 0.05);
+          renderHand(me, isMyTurn);
           renderInlineDrawer(me, isMyTurn);
         }
       } else if (isMyTurn && state.phase === 'MAIN') {
-        // Clicking a resource in hand automatically opens Trade Drawer and adds to Give!
         if (drawerMode !== 'trade') {
           tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
           tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
@@ -972,6 +1319,7 @@
         if (tradeGive[r] < me.resources[r]) {
           tradeGive[r]++;
           playTone(480, 0.05);
+          renderHand(me, isMyTurn);
           renderInlineDrawer(me, isMyTurn);
         }
       }
@@ -1011,9 +1359,7 @@
       const wrap = document.getElementById('inlineDrawerWrap');
       const drawer = document.getElementById('inlineDrawer');
       const sideStack = document.getElementById('tradeConfirmStack');
-      const btnOk = document.getElementById('btnConfirmAction');
       const btnCancel = document.getElementById('btnCancelAction');
-      btnOk.style.display = 'none';
       btnCancel.style.display = 'none';
       sideStack.style.display = 'none';
 
@@ -1049,19 +1395,39 @@
           </div>
         `;
       } else if (drawerMode === 'discard') {
+        // Exact Colonist.io Discard Cards Drawer (Screenshot 1)
         const picked = RESOURCES.reduce((s, r) => s + discardSel[r], 0);
-        btnOk.style.display = picked === me.discardPending ? 'flex' : 'none';
+        const isReady = picked === me.discardPending;
+
+        const trayCardsHtml = RESOURCES.filter(r => discardSel[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            discardSel[r],
+            `removeCardFromDiscard('${r}')`,
+            'Click to return to hand'
+          )
+        ).join('');
+
         drawer.innerHTML = `
-          <div style="font-weight:900; color:#c62828; font-size:13px;">
-            Rolled 7! Click cards in your hand below to discard (${picked}/${me.discardPending}):
-          </div>
-          <div class="res-Select-row">
-            ${RESOURCES.map(r => discardSel[r] > 0 ? `
-              <div class="mini-res-card card-${r}" onclick="discardSel['${r}']--; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);">
-                ${getMiniSvg(r)}
-                <div class="badge">${discardSel[r]}</div>
+          <div class="discard-header">
+            <div class="discard-q-card">
+              <span class="up-arr">⬆</span>
+              <span>?</span>
+            </div>
+            <div>
+              <div style="color:#c62828; font-size:18px; font-weight:900;">Discard Cards (${picked}/${me.discardPending})</div>
+              <div style="color:#333; font-size:12.5px; font-weight:600; line-height:1.35; margin-top:2px;">
+                7 was rolled! You have more than ${state.settings.cardDiscardLimit} cards.<br>
+                You need to discard ${me.discardPending} of them
               </div>
-            ` : '').join('') || '<span style="font-size:12px; color:#777;">Click cards in your hand below...</span>'}
+            </div>
+          </div>
+          <div class="discard-tray">
+            ${trayCardsHtml || '<span style="font-size:12px; color:#777; font-weight:600;">Click cards in your hand below to move them here...</span>'}
+          </div>
+          <div style="display:flex; justify-content:flex-end;">
+            <button class="discard-confirm-btn" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm Discard">✔</button>
           </div>
         `;
       } else if (drawerMode === 'trade') {
@@ -1072,6 +1438,26 @@
         document.getElementById('btnExecPlayerTrade').disabled = !canProposePlayerTrade(me);
 
         const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
+        const wantStacksHtml = RESOURCES.filter(r => tradeWant[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            tradeWant[r],
+            `tradeWant['${r}']--; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);`,
+            'Click to remove'
+          )
+        ).join('');
+
+        const giveStacksHtml = RESOURCES.filter(r => tradeGive[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            tradeGive[r],
+            `tradeGive['${r}']--; renderHand(state.players.find(p=>p.id===socket.id), true); renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);`,
+            'Click to return to hand'
+          )
+        ).join('');
+
         drawer.innerHTML = `
           <div class="res-Select-row" style="justify-content:space-between; border-bottom:1px solid #d4cbb8; padding-bottom:6px;">
             ${RESOURCES.map(r => `
@@ -1082,23 +1468,25 @@
             `).join('')}
             <span style="font-size:20px;" title="Bank / Port Ratios">🏦</span>
           </div>
-          <div class="res-Select-row" style="min-height:58px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+          <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
             <span style="font-weight:900; color:#2e7d32; font-size:13px; width:46px;">👥 ⬇</span>
-            ${RESOURCES.filter(r => tradeWant[r] > 0).map(r => `
-              <div class="mini-res-card card-${r}" onclick="tradeWant['${r}']--; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);">
-                ${getMiniSvg(r)}<div class="badge">${tradeWant[r]}</div>
-              </div>
-            `).join('') || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
+            ${wantStacksHtml || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
           </div>
-          <div class="res-Select-row" style="min-height:58px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+          <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
             <span style="font-weight:900; color:#c62828; font-size:13px; width:46px;">${me.avatar} ⬆</span>
-            ${RESOURCES.filter(r => tradeGive[r] > 0).map(r => `
-              <div class="mini-res-card card-${r}" onclick="tradeGive['${r}']--; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);">
-                ${getMiniSvg(r)}<div class="badge">${tradeGive[r]}</div>
-              </div>
-            `).join('') || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
+            ${giveStacksHtml || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
           </div>
         `;
+      }
+    }
+
+    function removeCardFromDiscard(r) {
+      if (discardSel[r] > 0) {
+        discardSel[r]--;
+        playTone(420, 0.05);
+        const me = state.players.find(p => p.id === socket.id);
+        renderHand(me, state.players[state.turnIndex]?.id === socket.id);
+        renderInlineDrawer(me, state.players[state.turnIndex]?.id === socket.id);
       }
     }
 
@@ -1114,6 +1502,8 @@
     }
 
     function closeInlineDrawer() {
+      tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+      tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
       drawerMode = null;
       buildMode = null;
       renderAll();
@@ -1121,6 +1511,7 @@
 
     function confirmInlineAction() {
       if (drawerMode === 'discard') {
+        playTone(620, 0.1);
         socket.emit('discardCards', { code: state.code, discards: discardSel });
         drawerMode = null;
       }
@@ -1193,7 +1584,7 @@
       `;
 
       document.getElementById('playersStack').innerHTML = state.players.map((p, idx) => `
-        <div class="p-row ${idx === state.turnIndex && state.status !== 'LOBBY' ? 'is-turn' : ''}">
+        <div class="p-row ${idx === state.turnIndex && state.status !== 'LOBBY' ? 'is-turn' : ''}" id="playerRow_${p.id}">
           <div class="p-avatar-wrap">
             <div class="p-circle" style="background:${p.color}">
               <span>${p.avatar}</span>
@@ -1204,13 +1595,14 @@
                 ${p.name} ${p.isBot ? '<span style="font-size:10px; background:#222; color:#ffd700; padding:1px 4px; border-radius:4px;">HARD</span>' : ''}
               </div>
               <div style="font-size:11px; color:#555;">
+                ${p.discardPending > 0 ? '<span style="color:#c62828; font-weight:900;">⚠️ Discarding...</span> ' : ''}
                 ${state.longestRoadOwner === p.id ? '🏆 Road ' : ''}
                 ${state.largestArmyOwner === p.id ? '⚔️ Army' : ''}
               </div>
             </div>
           </div>
           <div class="p-stats">
-            <div class="stat-card-back" style="background:#0288d1" title="Resource Cards">${p.resourceCount}</div>
+            <div class="stat-card-back" style="background:${p.resourceCount > state.settings.cardDiscardLimit ? '#c62828' : '#0288d1'}" title="Resource Cards">${p.resourceCount}</div>
             <div class="stat-card-back card-dev" title="Development Cards">${p.devCardCount}</div>
             <div style="text-align:center; min-width:22px;" title="Knights Played">⚔️<br>${p.knightsPlayed}</div>
             <div style="text-align:center; min-width:22px;" title="Longest Road">🛣️<br>${p.longestRoadLength}</div>
@@ -1224,6 +1616,7 @@
       const svg = document.getElementById('boardSvg');
       const { hexes, vertices, edges, robberHexId } = state.board;
       const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
+      const rolledHexSet = new Set(state.lastRollHexIds || []);
 
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       hexes.forEach(h => {
@@ -1280,6 +1673,7 @@
         const pipsCount = h.number ? Math.max(0, 6 - Math.abs(7 - h.number)) : 0;
         const pipsDots = '•'.repeat(pipsCount);
         const isRedNum = h.number === 6 || h.number === 8;
+        const isRolledHex = rolledHexSet.has(h.id);
 
         html += `
           <g style="${isLobbyHost || canClickRobber ? 'cursor:pointer' : ''}"
@@ -1288,6 +1682,9 @@
             <polygon points="${pts}" fill="${meta.color}" stroke="${meta.border}" stroke-width="8" stroke-linejoin="round" />
             <polygon points="${pts}" fill="none" stroke="#e8c987" stroke-width="3" />
             ${getBoardIconSvg(h.type, h.x, h.y - 30, 1.25)}
+
+            <!-- Colonist Dark Black/Gray Indicator When Number Is Rolled (Screenshot 4) -->
+            ${isRolledHex ? `<polygon points="${pts}" fill="rgba(0, 0, 0, 0.54)" stroke="#111" stroke-width="3" stroke-linejoin="round" />` : ''}
 
             ${h.number ? `
               <rect x="${h.x - 24}" y="${h.y - 4}" width="48" height="46" rx="9" fill="#f5efe6" stroke="#c5bba8" stroke-width="2.5" />
