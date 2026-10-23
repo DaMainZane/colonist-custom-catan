@@ -1,7 +1,10 @@
 import { playTone } from './audio';
 import { socket } from './socket';
-import { state, activeBrush, buildMode, setBuildModeValue, setDrawerMode } from './store';
-import { renderAll } from './render/index';
+import {
+  state, activeBrush, buildMode, setBuildModeValue, setDrawerMode,
+  setVictoryTab, setHideVictoryOverlay
+} from './store';
+import { renderAll, renderVictoryScreen } from './render/index';
 
 // ---------- Landing / lobby ----------
 
@@ -77,6 +80,23 @@ export function pushSettings(): void {
 export function addBot(): void { socket.emit('addBot', { code: state.code }); }
 export function removeBot(): void { socket.emit('removeBot', { code: state.code }); }
 export function startGame(): void { socket.emit('startGame', { code: state.code }); }
+
+export function rematchLobby(): void {
+  setHideVictoryOverlay(false);
+  socket.emit('rematchLobby', { code: state.code });
+}
+
+export function switchVictoryTab(tab: string): void {
+  setVictoryTab(tab);
+  document.getElementById('vicTabDice')?.classList.toggle('active', tab === 'dice');
+  document.getElementById('vicTabOverview')?.classList.toggle('active', tab === 'overview');
+  renderVictoryScreen();
+}
+
+export function toggleVictoryMapInspect(hide: boolean): void {
+  setHideVictoryOverlay(hide);
+  renderVictoryScreen();
+}
 
 // ---------- Turn actions ----------
 

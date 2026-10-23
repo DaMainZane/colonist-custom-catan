@@ -25,6 +25,10 @@ export function givePlayerResourceFromBank(room: Room, player: Player, resource:
   const available = bank[resource] || 0;
   const granted = Math.min(amount, available);
   player.resources[resource] = (player.resources[resource] || 0) + granted;
+  if (granted > 0) {
+    if (!player.stats) player.stats = { resourcesEarned: 0, tradesMade: 0 };
+    player.stats.resourcesEarned += granted;
+  }
   return granted;
 }
 
@@ -116,6 +120,7 @@ export function checkWinner(room: Room): boolean {
       room.status = 'GAMEOVER';
       room.phase = 'GAMEOVER';
       room.activeTrade = null;
+      room.finishedAt = Date.now();
       room.winner = { id: p.id, name: p.name, vp: totalVp, color: p.color };
       addLog(room, `🏆 ${p.name} wins the game with ${totalVp} VP!`, p.color);
       return true;

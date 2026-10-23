@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colonist-Style Catan Online — Hard Bots & Full Trading</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; user-select: none; }
+    body { background: #0069b4; color: #222; height: 100vh; width: 100vw; overflow: hidden; display: flex; }
+
+    /* Auth Landing */
+    #authScreen {
+      position: fixed; inset: 0; background: radial-gradient(circle at center, #0088e0, #004275);
+      display: flex; align-items: center; justify-content: center; z-index: 200;
+    }
+    .auth-card {
+      background: #f5efe6; padding: 28px; border-radius: 16px; width: 390px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45); border: 3px solid #fff; text-align: center;
+    }
+    .auth-card h1 { color: #0069b4; font-size: 26px; font-weight: 900; margin-bottom: 4px; }
+    .auth-card p { color: #666; font-size: 13px; margin-bottom: 18px; }
+    .auth-card input {
+      width: 100%; padding: 11px 14px; border-radius: 10px; border: 2px solid #cbd5e1;
+      font-size: 15px; font-weight: 600; outline: none; background: #fff; color: #222;
+    }
+    .colonist-btn {
+      background: linear-gradient(180deg, #29b6f6 0%, #0288d1 100%);
+      color: #fff; font-weight: 800; border: 2px solid #fff; border-radius: 10px;
+      padding: 9px 14px; cursor: pointer; box-shadow: 0 3px 0 #01579b, 0 4px 10px rgba(0,0,0,0.25);
+      transition: transform 0.08s, filter 0.1s; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .colonist-btn:hover { filter: brightness(1.06); }
+    .colonist-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #01579b; }
+    .colonist-btn:disabled { filter: grayscale(0.8) opacity(0.5); cursor: not-allowed; transform: none; }
+    .colonist-btn.green { background: linear-gradient(180deg, #4caf50 0%, #2e7d32 100%); box-shadow: 0 3px 0 #1b5e20; }
+    .colonist-btn.red { background: linear-gradient(180deg, #ef5350 0%, #c62828 100%); box-shadow: 0 3px 0 #8e0000; }
+
+    /* Main Game Layout */
+    #gameViewport { display: none; width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+    .board-stage {
+      flex: 1; height: 100vh; position: relative; display: flex;
+      align-items: center; justify-content: center; background: #0069b4; overflow: hidden;
+    }
+    svg#boardSvg { width: 100%; height: 100%; cursor: grab; }
+    svg#boardSvg:active { cursor: grabbing; }
+
+    /* Top-Left Icon Column */
+    .left-nav {
+      position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column;
+      gap: 8px; z-index: 45;
+    }
+    .nav-icon-btn {
+      width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.55); color: #fff; font-size: 18px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      backdrop-filter: blur(4px); transition: background 0.15s;
+    }
+    .nav-icon-btn:hover { background: rgba(255,255,255,0.32); }
+
+    /* Compact Tabbed Lobby Bar */
+    #lobbyToolbar {
+      position: absolute; top: 10px; left: 64px; right: 12px;
+      background: rgba(245, 239, 230, 0.97); border: 2px solid #fff; border-radius: 12px;
+      padding: 8px 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.32); z-index: 40;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .toolbar-header {
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #d4cbb8; padding-bottom: 6px; flex-wrap: wrap; gap: 6px;
+    }
+    .tab-pill {
+      padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 12.5px;
+      cursor: pointer; border: 2px solid transparent; background: #e2dacd; color: #333;
+    }
+    .tab-pill.active { background: #0288d1; color: #fff; border-color: #01579b; }
+    .toolbar-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: #333; }
+    .brush-btn {
+      padding: 4px 8px; border-radius: 7px; border: 2px solid transparent; background: #e2dacd;
+      color: #222; font-weight: 700; font-size: 11.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .brush-btn.active { border-color: #0288d1; background: #b3e5fc; color: #01579b; }
+    .setting-chip {
+      display: inline-flex; align-items: center; gap: 4px; background: #e6dfd3;
+      padding: 3px 8px; border-radius: 7px; border: 1px solid #c9c0b1;
+    }
+    .mini-input {
+      width: 52px; padding: 3px 5px; border-radius: 5px; border: 1px solid #888;
+      font-weight: 800; text-align: center; font-size: 12px; background: #fff;
+    }
+
+    /* Top-Center Colonist Active Trade Response Box */
+    #activeTradeModal {
+      position: absolute; top: 10px; right: 16px; width: 410px;
+      display: none; flex-direction: column; gap: 5px; z-index: 50;
+    }
+    .trade-top-avatars {
+      background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 8px;
+      padding: 6px 12px; display: flex; align-items: center; justify-content: center; gap: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .trade-resp-avatar {
+      position: relative; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .trade-resp-avatar .status-dot {
+      position: absolute; bottom: -4px; right: -6px; width: 18px; height: 18px;
+      border-radius: 50%; font-size: 10px; font-weight: 900; color: #fff;
+      display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff;
+    }
+    .trade-offer-body {
+      background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 8px;
+      padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    }
+    .trade-act-btn {
+      width: 38px; height: 38px; border-radius: 8px; border: 2px solid #fff;
+      color: #fff; font-size: 18px; font-weight: 900; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.25); transition: transform 0.1s;
+    }
+    .trade-act-btn:hover { transform: scale(1.07); }
+
+    /* Bottom-Left Inline Drawer + Adjacent Bank/Player Confirm Buttons */
+    #inlineDrawerWrap {
+      position: absolute; bottom: 92px; left: 8px; display: none;
+      align-items: flex-end; gap: 8px; z-index: 40;
+    }
+    #inlineDrawer {
+      width: 420px; background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 10px;
+      padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      display: flex; flex-direction: column; gap: 8px; position: relative;
+    }
+    #tradeConfirmStack {
+      display: none; flex-direction: column; gap: 6px;
+    }
+    .trade-side-btn {
+      width: 60px; height: 60px; border-radius: 12px;
+      background: linear-gradient(180deg, #4dd0e1 0%, #0288d1 100%);
+      border: 2.5px solid #fff; color: #fff; font-size: 22px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.35); position: relative;
+    }
+    .trade-side-btn:hover { filter: brightness(1.08); }
+    .trade-side-btn:disabled { filter: grayscale(0.85) opacity(0.45); cursor: not-allowed; }
+    .trade-side-btn .mini-check {
+      position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 900; color: #fff;
+    }
+
+    /* Colonist Discard Drawer Specific Styling (Screenshot 1) */
+    .discard-header { display: flex; align-items: center; gap: 14px; padding-bottom: 6px; border-bottom: 1px solid #e0d7c6; }
+    .discard-q-card {
+      width: 46px; height: 62px; border-radius: 6px; background: linear-gradient(180deg, #1976d2, #0d47a1);
+      border: 2px solid #222; display: flex; align-items: center; justify-content: center;
+      color: #90caf9; font-size: 30px; font-weight: 900; position: relative; flex-shrink: 0;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+    }
+    .discard-q-card .up-arr {
+      position: absolute; top: -11px; color: #e53935; font-size: 20px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .discard-tray {
+      min-height: 74px; background: #ebe4d8; border-radius: 8px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .discard-confirm-btn {
+      width: 46px; height: 42px; border-radius: 9px;
+      background: linear-gradient(180deg, #4dd0e1 0%, #0288d1 100%);
+      border: 2px solid #fff; color: #fff; font-size: 20px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.25); margin-left: auto;
+    }
+    .discard-confirm-btn:disabled { filter: grayscale(0.8) opacity(0.45); cursor: not-allowed; }
+
+    /* Colonist Overlapping Resource Card Stacks (Screenshot 3) */
+    .res-Select-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .mini-res-card {
+      width: 46px; height: 60px; border-radius: 6px; border: 2px solid #222;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 11px; cursor: pointer; position: relative;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 2px 5px rgba(0,0,0,0.25);
+      transition: transform 0.1s;
+    }
+    .mini-res-card:hover { transform: translateY(-3px); }
+
+    .hand-panel {
+      position: absolute; bottom: 6px; left: 8px; height: 80px; min-width: 390px;
+      background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 8px;
+      padding: 6px 14px; display: flex; align-items: center; gap: 12px; z-index: 30;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    }
+
+    .stacked-group {
+      position: relative; height: 64px; cursor: pointer; transition: transform 0.12s;
+      display: inline-flex; align-items: center;
+    }
+    .stacked-group:hover { transform: translateY(-5px); }
+    .stack-slice {
+      position: absolute; top: 0; width: 46px; height: 64px; border-radius: 5px;
+      border: 1.8px solid #1a1a1a; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.38), -1px 1px 3px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .corner-ribbon {
+      position: absolute; top: 0; right: 0; width: 22px; height: 22px;
+      background: #0277bd; color: #fff; font-size: 12px; font-weight: 900;
+      border-bottom-left-radius: 10px; display: flex; align-items: center; justify-content: center;
+      padding-left: 2px; padding-bottom: 1px; box-shadow: -1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .card-wood  { background: #1b9e20; }
+    .card-brick { background: #e0533c; }
+    .card-sheep { background: #76d219; }
+    .card-wheat { background: #f2b718; }
+    .card-ore   { background: #90a4ae; }
+    .card-gold  { background: linear-gradient(135deg, #ffd700, #ff9800); }
+    .card-dev   { background: linear-gradient(135deg, #7b1fa2, #303f9f); color: #fff; }
+
+    /* Flying Resource Card Animation (Screenshot 4) */
+    .flying-res-card {
+      position: fixed; width: 44px; height: 60px; border-radius: 5px;
+      border: 2px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; pointer-events: none;
+      transition: left 0.72s cubic-bezier(0.22, 1, 0.36, 1), top 0.72s cubic-bezier(0.22, 1, 0.36, 1), transform 0.72s ease, opacity 0.72s ease;
+    }
+
+    /* Colonist Victory & Post-Game Stats Screen (Screenshot 2) */
+    #victoryOverlay {
+      position: absolute; inset: 0; background: rgba(7, 23, 38, 0.88);
+      backdrop-filter: blur(3px); z-index: 80; display: none;
+      flex-direction: column; align-items: center; justify-content: space-between;
+      padding: 20px 28px; color: #fff;
+    }
+    #reopenVictoryBtn {
+      position: absolute; top: 14px; right: 16px; z-index: 85; display: none;
+    }
+    .vic-top-bar { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; }
+    .vic-logo-badge {
+      background: linear-gradient(180deg, #f3b213, #d48800); border: 3px solid #fff;
+      border-radius: 12px; padding: 6px 22px; font-size: 22px; font-weight: 900;
+      letter-spacing: 1.5px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+    .vic-tabs {
+      width: 100%; display: flex; justify-content: center; gap: 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; margin-top: 8px;
+      font-size: 13px; font-weight: 700; color: #90caf9;
+    }
+    .vic-tab { cursor: pointer; padding: 4px 10px; border-radius: 6px; }
+    .vic-tab.active { color: #fff; background: rgba(255,255,255,0.15); }
+    .vic-body {
+      flex: 1; width: 100%; display: flex; align-items: center; justify-content: center;
+      gap: 32px; padding: 16px 0; overflow: hidden;
+    }
+    .vic-ranks {
+      width: 210px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .vic-rank-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 800;
+    }
+    .dice-chart-box {
+      flex: 1; max-width: 560px; height: 290px; display: flex; flex-direction: column;
+      justify-content: flex-end; align-items: center;
+    }
+    .dice-bars-wrap {
+      width: 100%; height: 240px; display: flex; align-items: flex-end;
+      justify-content: space-between; gap: 8px; padding-top: 20px;
+    }
+    .dice-bar-col {
+      flex: 1; height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end; gap: 6px;
+    }
+    .dice-bar-fill {
+      width: 100%; border-radius: 6px 6px 2px 2px; background: #1e88e5;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 4px; font-size: 11px; font-weight: 900; color: #fff;
+      min-height: 18px; transition: height 0.4s ease;
+    }
+    .dice-bar-fill.is-seven { background: #78909c; }
+
+    /* Bottom-Center Action Bar */
+    .center-hud {
+      position: absolute; bottom: 6px; right: 12px;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 30;
+      pointer-events: none;
+    }
+    .center-hud > * { pointer-events: auto; }
+    .dice-pair { display: flex; gap: 8px; cursor: pointer; }
+    .die-box {
+      width: 50px; height: 50px; border-radius: 10px;
+      background: linear-gradient(145deg, #e2e8f0, #94a3b8);
+      border: 2px solid #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 900; color: #0f172a;
+    }
+    .die-box.rolling { animation: shakeDie 0.35s infinite; }
+    @keyframes shakeDie {
+      0%, 100% { transform: rotate(0deg) scale(1); }
+      25% { transform: rotate(-14deg) scale(1.08); }
+      75% { transform: rotate(14deg) scale(1.08); }
+    }
+    .turn-pill {
+      background: #f4efe6; border: 2px solid #d4cbb8; border-radius: 8px;
+      padding: 6px 14px; font-weight: 800; font-size: 13.5px; color: #222;
+      display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    .action-bar { display: flex; gap: 7px; align-items: center; }
+    .sq-btn {
+      width: 60px; height: 60px; border-radius: 12px;
+      background: linear-gradient(180deg, #4dd0e1 0%, #0288d1 100%);
+      border: 2.5px solid #fff; color: #fff; font-size: 22px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.35); position: relative;
+      transition: transform 0.1s, filter 0.1s;
+    }
+    .sq-btn span.lbl { font-size: 9.5px; font-weight: 800; margin-top: 2px; text-transform: uppercase; }
+    .sq-btn .piece-badge {
+      position: absolute; top: 2px; right: 5px; font-size: 11px; font-weight: 900;
+      color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .sq-btn:hover { filter: brightness(1.08); transform: translateY(-2px); }
+    .sq-btn.active-mode { outline: 3px solid #ffd700; background: linear-gradient(180deg, #ffa726, #f57c00); }
+    .sq-btn:disabled { filter: grayscale(0.85) opacity(0.45); cursor: not-allowed; transform: none; }
+
+    /* Right Colonist Sidebar */
+    .right-sidebar {
+      width: 315px; height: 100vh; background: #0077c8; padding: 6px;
+      display: flex; flex-direction: column; gap: 6px; z-index: 35; border-left: 2px solid rgba(255,255,255,0.2);
+    }
+    .cream-box {
+      background: #f4efe6; border-radius: 8px; border: 1.5px solid #d4cbb8;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #logSection { height: 22%; padding: 8px 10px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+    .log-line { padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.06); font-weight: 700; }
+
+    #chatSection { height: 22%; display: flex; flex-direction: column; }
+    #chatFeed { flex: 1; padding: 8px 10px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+    .chat-input-wrap { padding: 5px; border-top: 1px solid #ddd; background: #fff; display: flex; }
+    .chat-input-wrap input { flex: 1; border: none; outline: none; padding: 4px 6px; font-size: 13px; font-weight: 600; }
+
+    .bank-bar {
+      background: #f4efe6; border-radius: 8px; padding: 6px 8px;
+      display: flex; align-items: center; justify-content: space-between;
+      border: 1.5px solid #d4cbb8;
+    }
+    .bank-item { display: flex; flex-direction: column; align-items: center; font-size: 11.5px; font-weight: 900; }
+    .bank-mini-icon {
+      width: 26px; height: 32px; border-radius: 4px; display: flex;
+      align-items: center; justify-content: center; border: 1.5px solid #333; margin-bottom: 2px;
+    }
+
+    .players-stack { flex: 1; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; }
+    .p-row {
+      background: #bdb8b0; border-radius: 8px; padding: 7px 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      border: 2px solid transparent; transition: background 0.15s;
+    }
+    .p-row.is-turn { background: #f4efe6; border-color: #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+    .p-avatar-wrap { display: flex; align-items: center; gap: 8px; }
+    .p-circle {
+      width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 20px; border: 2.5px solid #fff; position: relative;
+    }
+    .vp-ribbon {
+      position: absolute; bottom: -6px; background: #f4efe6; color: #111;
+      border: 1.5px solid #555; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 900;
+    }
+    .p-stats { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 12px; }
+    .stat-card-back {
+      width: 24px; height: 32px; border-radius: 4px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-weight: 900; font-size: 12px; border: 1.5px solid #fff;
+    }
+
+    .spot-pulse { cursor: pointer; animation: pulseSpot 1.2s infinite ease-in-out; }
+    @keyframes pulseSpot { 0%, 100% { r: 12px; opacity: 0.9; } 50% { r: 16px; opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <!-- 1. LANDING SCREEN -->
+  <div id="authScreen">
+    <div class="auth-card">
+      <h1>🏝️ COLONIST CUSTOM</h1>
+      <p>Advanced Hard Bots • Full Trading • Custom Map Painter</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <input id="playerNameInput" type="text" placeholder="Enter Nickname" maxlength="15" value="AvocadoMan" />
+        <button class="colonist-btn green" onclick="createRoom()">✨ Create Custom Game</button>
+        <div style="font-size:12px; font-weight:800; color:#888; margin: 4px 0;">— OR JOIN FRIEND'S ROOM —</div>
+        <div style="display:flex; gap:8px;">
+          <input id="roomCodeInput" type="text" placeholder="ROOM CODE" style="text-transform:uppercase; text-align:center;" />
+          <button class="colonist-btn" onclick="joinRoom()">Join</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. GAME VIEWPORT -->
+  <div id="gameViewport">
+    <div class="board-stage" id="boardStage">
+
+      <!-- Top-Left Utility Icons -->
+      <div class="left-nav">
+        <div class="nav-icon-btn" onclick="copyInviteLink()" title="Copy Invite Link">🔗</div>
+        <div class="nav-icon-btn" id="btnToggleSound" onclick="toggleSound()" title="Toggle Sound">🔊</div>
+        <div class="nav-icon-btn" onclick="resetCamera()" title="Reset Board Zoom/Pan">🔍</div>
+        <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Show/Hide Customizer Bar">⚙️</div>
+      </div>
+
+      <!-- Reopen Victory Stats Button (when inspecting map after game ends) -->
+      <button id="reopenVictoryBtn" class="colonist-btn" onclick="toggleVictoryMapInspect(false)">📊 Show Victory Stats</button>
+
+      <!-- Colonist Victory & Dice Stats Overlay (Screenshot 2) -->
+      <div id="victoryOverlay">
+        <div class="vic-top-bar">
+          <div style="width:120px;"></div>
+          <div style="text-align:center;">
+            <div class="vic-logo-badge">🏝️ COLONIST</div>
+            <h2 id="vicTitleText" style="font-size:28px; font-weight:900; margin-top:10px;">You are 1st!</h2>
+            <p id="vicSubText" style="font-size:13px; color:#cbd5e1; margin-top:2px;">Time: 00:00 - Turns: 0</p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <button class="colonist-btn" style="background:#1e293b; border-color:#475569;" onclick="toggleVictoryMapInspect(true)">🗺️ Map / Replay</button>
+            <button class="colonist-btn green" onclick="copyInviteLink()">Share 🔗</button>
+          </div>
+        </div>
+
+        <div class="vic-tabs">
+          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice Stats</div>
+          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview & Resource Stats</div>
+        </div>
+
+        <div class="vic-body">
+          <div class="vic-ranks" id="vicRanksList"></div>
+          <div class="dice-chart-box" id="vicChartContainer"></div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:center;">
+          <button class="colonist-btn" style="background:#334155; padding:10px 28px;" onclick="window.location.reload()">Home</button>
+          <button class="colonist-btn green" style="padding:10px 44px; font-size:15px;" onclick="rematchLobby()">Play Again</button>
+        </div>
+      </div>
+
+      <!-- Tabbed Lobby Customizer -->
+      <div id="lobbyToolbar">
+        <div class="toolbar-header">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span class="tab-pill active" id="tabBtnMap" onclick="switchLobbyTab('map')">🎨 Map Painter</span>
+            <span class="tab-pill" id="tabBtnCards" onclick="switchLobbyTab('cards')">🃏 Card & Resource Amounts</span>
+          </div>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <button class="brush-btn" onclick="applyPreset('standard')">🎲 Standard</button>
+            <button class="brush-btn" onclick="applyPreset('goldRush')">★ Gold Rush</button>
+            <button class="brush-btn" onclick="applyPreset('archipelago')">🏝️ Islands</button>
+            <button class="brush-btn" onclick="applyPreset('blank')">🌊 Blank Ocean</button>
+            <button class="colonist-btn" style="padding:5px 10px;" onclick="addBot()">+ 🤖 Hard Bot</button>
+            <button class="colonist-btn red" style="padding:5px 10px;" onclick="removeBot()">- Bot</button>
+            <button class="colonist-btn green" style="padding:5px 14px;" onclick="startGame()">▶ Start Game</button>
+          </div>
+        </div>
+
+        <!-- TAB 1: MAP PAINTER -->
+        <div id="lobbyTabMap" style="display:flex; flex-direction:column; gap:6px;">
+          <div class="toolbar-row">
+            <span>Tile Brush:</span>
+            <button class="brush-btn active" onclick="setBrush('terrain','wood',this)">🌲 Wood</button>
+            <button class="brush-btn" onclick="setBrush('terrain','brick',this)">🧱 Brick</button>
+            <button class="brush-btn" onclick="setBrush('terrain','sheep',this)">🐑 Sheep</button>
+            <button class="brush-btn" onclick="setBrush('terrain','wheat',this)">🌾 Wheat</button>
+            <button class="brush-btn" onclick="setBrush('terrain','ore',this)">⛰️ Ore</button>
+            <button class="brush-btn" onclick="setBrush('terrain','gold',this)"><span id="goldBtnIcon"></span> Gold</button>
+            <button class="brush-btn" onclick="setBrush('terrain','desert',this)">🌵 Desert</button>
+            <button class="brush-btn" onclick="setBrush('terrain','water',this)">🌊 Ocean (Erase)</button>
+            <button class="brush-btn" onclick="setBrush('robber','robber',this)">♟️ Place Robber</button>
+          </div>
+          <div class="toolbar-row">
+            <span>Numbers:</span>
+            <button class="brush-btn" onclick="setBrush('number','2',this)">2</button>
+            <button class="brush-btn" onclick="setBrush('number','3',this)">3</button>
+            <button class="brush-btn" onclick="setBrush('number','4',this)">4</button>
+            <button class="brush-btn" onclick="setBrush('number','5',this)">5</button>
+            <button class="brush-btn" onclick="setBrush('number','6',this)" style="color:#c62828">6</button>
+            <button class="brush-btn" onclick="setBrush('number','8',this)" style="color:#c62828">8</button>
+            <button class="brush-btn" onclick="setBrush('number','9',this)">9</button>
+            <button class="brush-btn" onclick="setBrush('number','10',this)">10</button>
+            <button class="brush-btn" onclick="setBrush('number','11',this)">11</button>
+            <button class="brush-btn" onclick="setBrush('number','12',this)">12</button>
+            <button class="brush-btn" onclick="setBrush('number','none',this)">❌ Clear #</button>
+            <span style="margin-left:6px;">Ports:</span>
+            <button class="brush-btn" onclick="setBrush('port','3:1',this)">⛵ 3:1 ?</button>
+            <button class="brush-btn" onclick="setBrush('port','wood',this)">⛵ 2:1 🌲</button>
+            <button class="brush-btn" onclick="setBrush('port','brick',this)">⛵ 2:1 🧱</button>
+            <button class="brush-btn" onclick="setBrush('port','sheep',this)">⛵ 2:1 🐑</button>
+            <button class="brush-btn" onclick="setBrush('port','wheat',this)">⛵ 2:1 🌾</button>
+            <button class="brush-btn" onclick="setBrush('port','ore',this)">⛵ 2:1 ⛰️</button>
+            <button class="brush-btn" onclick="setBrush('port','none',this)">❌ No Port</button>
+          </div>
+        </div>
+
+        <!-- TAB 2: CUSTOM CARD & RESOURCE AMOUNTS -->
+        <div id="lobbyTabCards" style="display:none; flex-direction:column; gap:6px;">
+          <div class="toolbar-row">
+            <div class="setting-chip">
+              <span>Map Size:</span>
+              <select id="setRadius" class="mini-input" style="width:88px" onchange="pushSettings()">
+                <option value="1">Mini (7)</option>
+                <option value="2" selected>Std (19)</option>
+                <option value="3">Large (37)</option>
+                <option value="4">Mega (61)</option>
+              </select>
+            </div>
+            <div class="setting-chip"><span>VP to Win:</span><input id="setVp" type="number" class="mini-input" value="10" min="3" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Max Players:</span><input id="setMaxP" type="number" class="mini-input" value="4" min="2" max="8" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>7-Discard Limit:</span><input id="setDiscard" type="number" class="mini-input" value="7" min="3" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Gold Hexes:</span><input id="setGold" type="number" class="mini-input" value="2" min="0" max="40" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Desert Hexes:</span><input id="setDesert" type="number" class="mini-input" value="1" min="0" max="15" onchange="pushSettings()" /></div>
+          </div>
+          <div class="toolbar-row">
+            <div class="setting-chip" style="background:#dcedc8">
+              <span>🏦 Bank Resource Cards (per type):</span>
+              <input id="setBankRes" type="number" class="mini-input" value="19" min="5" max="999" onchange="pushSettings()" />
+            </div>
+            <div class="setting-chip" style="background:#e1bee7"><span>⚔️ Knights:</span><input id="setDevKnight" type="number" class="mini-input" value="14" min="0" max="100" onchange="pushSettings()" /></div>
+            <div class="setting-chip" style="background:#e1bee7"><span>⭐ VP Cards:</span><input id="setDevVp" type="number" class="mini-input" value="5" min="0" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip" style="background:#e1bee7"><span>🛣️ Road Build:</span><input id="setDevRb" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip" style="background:#e1bee7"><span>🎁 Year of Plenty:</span><input id="setDevYop" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip" style="background:#e1bee7"><span>🎩 Monopoly:</span><input id="setDevMono" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Max Roads:</span><input id="setMaxRoad" type="number" class="mini-input" value="15" min="5" max="50" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Max Settle:</span><input id="setMaxSettle" type="number" class="mini-input" value="5" min="2" max="20" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Max Cities:</span><input id="setMaxCity" type="number" class="mini-input" value="4" min="1" max="20" onchange="pushSettings()" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top-Center Colonist Active Trade Response Box -->
+      <div id="activeTradeModal"></div>
+
+      <!-- Interactive SVG Island Board -->
+      <svg id="boardSvg" viewBox="-500 -450 1000 900"></svg>
+
+      <!-- Bottom-Left Inline Drawer + Adjacent Bank/Player Trade Confirm Buttons -->
+      <div id="inlineDrawerWrap">
+        <div id="inlineDrawer"></div>
+        <div id="tradeConfirmStack">
+          <button class="trade-side-btn" id="btnExecBankTrade" onclick="executeBankTrade()" title="Trade with Bank / Port">
+            <span class="mini-check">✔</span>
+            <span>🏦</span>
+          </button>
+          <button class="trade-side-btn" id="btnExecPlayerTrade" onclick="proposePlayerTrade()" title="Offer Trade to Players & Bots">
+            <span class="mini-check">✔</span>
+            <span>👥</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom-Left Resource & Dev Card Hand -->
+      <div class="hand-panel" id="myHandPanel"></div>
+
+      <!-- Bottom-Center Dice, Turn Banner & Glossy Action Buttons -->
+      <div class="center-hud">
+        <div class="dice-pair" id="dicePair" onclick="rollDice()" title="Click to Roll Dice">
+          <div class="die-box" id="die1">4</div>
+          <div class="die-box" id="die2">3</div>
+        </div>
+        <div class="turn-pill" id="turnStatusPill">Waiting in Lobby...</div>
+        <div class="action-bar">
+          <button class="sq-btn" id="btnCancelAction" style="display:none; background:linear-gradient(180deg,#ef5350,#c62828);" onclick="closeInlineDrawer()" title="Cancel">✖</button>
+          <button class="sq-btn" id="btnTradeDrawer" onclick="toggleTradeDrawer()" title="Open Trade">
+            <span>⇄</span><span class="lbl">Trade</span>
+          </button>
+          <button class="sq-btn" id="btnBuyDev" onclick="buyDevCard()" title="Buy Dev Card (1 Sheep, 1 Wheat, 1 Ore)">
+            <span>🃏</span><span class="lbl">Dev</span>
+          </button>
+          <button class="sq-btn" id="btnBuildRoad" onclick="setBuildMode('road')" title="Build Road (1 Wood, 1 Brick)">
+            <span class="piece-badge" id="badgeRoadCnt">15</span>
+            <span>┃</span><span class="lbl">Road</span>
+          </button>
+          <button class="sq-btn" id="btnBuildSettle" onclick="setBuildMode('settlement')" title="Build Settlement (1 Wood, 1 Brick, 1 Sheep, 1 Wheat)">
+            <span class="piece-badge" id="badgeSettleCnt">5</span>
+            <span>⛺</span><span class="lbl">Settle</span>
+          </button>
+          <button class="sq-btn" id="btnBuildCity" onclick="setBuildMode('city')" title="Build City (2 Wheat, 3 Ore)">
+            <span class="piece-badge" id="badgeCityCnt">4</span>
+            <span>🏛️</span><span class="lbl">City</span>
+          </button>
+          <button class="sq-btn" id="btnMainTurnAction" onclick="mainTurnButton()" title="Roll / Pass">
+            <span id="mainBtnIcon">🎲</span><span class="lbl" id="mainBtnLbl">Roll</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Colonist Sidebar -->
+    <div class="right-sidebar">
+      <div class="cream-box" id="logSection"></div>
+      <div class="cream-box" id="chatSection">
+        <div id="chatFeed"></div>
+        <div class="chat-input-wrap">
+          <input id="chatInput" type="text" placeholder="Send a message" onkeydown="if(event.key==='Enter') sendChat()" />
+        </div>
+      </div>
+      <div class="bank-bar" id="bankBar"></div>
+      <div class="players-stack" id="playersStack"></div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let state = null;
+    let soundOn = true;
+    let activeBrush = { type: 'terrain', value: 'wood' };
+    let isMouseDown = false;
+    let buildMode = null;
+    let drawerMode = null;
+    let victoryTab = 'dice';
+    let hideVictoryOverlay = false;
+
+    let camZoom = 1;
+    let camPanX = 0;
+    let camPanY = 0;
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+
+    let tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    let tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    let discardSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+
+    const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+    const RES_META = {
+      wood:   { color: '#119b18', border: '#0c7511', name: 'Wood' },
+      brick:  { color: '#f04716', border: '#bd320b', name: 'Brick' },
+      sheep:  { color: '#6ec914', border: '#52990d', name: 'Sheep' },
+      wheat:  { color: '#f3b213', border: '#c48d08', name: 'Wheat' },
+      ore:    { color: '#9da9b0', border: '#74828a', name: 'Ore' },
+      desert: { color: '#d4c890', border: '#b3a56b', name: 'Desert' },
+      gold:   { color: 'url(#goldGrad)', border: '#d48800', name: 'Gold' }
+    };
+
+    function getBoardIconSvg(type, x, y, scale = 1) {
+      const gOpen = `<g transform="translate(${x}, ${y}) scale(${scale})">`;
+      const gClose = `</g>`;
+      switch (type) {
+        case 'wood':
+          return `${gOpen}
+            <rect x="-3" y="6" width="6" height="8" fill="#5d4037"/>
+            <polygon points="0,-18 -14,-2 14,-2" fill="#0a4d0e" stroke="#fff" stroke-width="1.2"/>
+            <polygon points="0,-10 -16,7 16,7" fill="#0d6312" stroke="#fff" stroke-width="1.2"/>
+          ${gClose}`;
+        case 'brick':
+          return `${gOpen}
+            <rect x="-15" y="-12" width="14" height="8" rx="1.5" fill="#8f2406" stroke="#fff" stroke-width="1.2"/>
+            <rect x="1" y="-12" width="14" height="8" rx="1.5" fill="#a82b08" stroke="#fff" stroke-width="1.2"/>
+            <rect x="-8" y="-2" width="16" height="8" rx="1.5" fill="#a82b08" stroke="#fff" stroke-width="1.2"/>
+          ${gClose}`;
+        case 'sheep':
+          return `${gOpen}
+            <rect x="-9" y="2" width="3" height="8" fill="#333"/>
+            <rect x="6" y="2" width="3" height="8" fill="#333"/>
+            <circle cx="-6" cy="-4" r="8" fill="#fff"/>
+            <circle cx="4" cy="-5" r="9" fill="#fff"/>
+            <circle cx="0" cy="-1" r="8" fill="#fff"/>
+            <circle cx="-11" cy="-5" r="5" fill="#222"/>
+          ${gClose}`;
+        case 'wheat':
+          return `${gOpen}
+            <path d="M-6,10 L6,-12 M0,10 L0,-15 M6,10 L-6,-12" stroke="#875c00" stroke-width="2.5" stroke-linecap="round"/>
+            <ellipse cx="-5" cy="-6" rx="3.5" ry="6" transform="rotate(-25 -5 -6)" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
+            <ellipse cx="0" cy="-9" rx="3.5" ry="6" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
+            <ellipse cx="5" cy="-6" rx="3.5" ry="6" transform="rotate(25 5 -6)" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
+          ${gClose}`;
+        case 'ore':
+          return `${gOpen}
+            <polygon points="-15,8 -8,-8 2,8" fill="#546e7a" stroke="#fff" stroke-width="1.3"/>
+            <polygon points="0,9 9,-10 17,9" fill="#455a64" stroke="#fff" stroke-width="1.3"/>
+            <polygon points="-8,10 1,-13 10,10" fill="#78909c" stroke="#fff" stroke-width="1.3"/>
+          ${gClose}`;
+        case 'gold':
+          return `${gOpen}
+            <polygon points="-16,6 -11,-4 3,-4 8,6" fill="#ffb300" stroke="#fff" stroke-width="1.4"/>
+            <polygon points="-4,8 1,-2 15,-2 20,8" fill="#ffa000" stroke="#fff" stroke-width="1.4"/>
+            <circle cx="0" cy="-9" r="9" fill="#ffee58" stroke="#b26a00" stroke-width="2"/>
+            <text x="0" y="-5" text-anchor="middle" font-size="11" font-weight="900" fill="#b26a00">$</text>
+          ${gClose}`;
+        case 'desert':
+          return `${gOpen}
+            <path d="M0,14 L0,-12 M0,2 L-9,2 L-9,-6 M0,-2 L9,-2 L9,-9" stroke="#2e7d32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          ${gClose}`;
+        default:
+          return '';
+      }
+    }
+
+    function getMiniSvg(type) {
+      return `<svg width="26" height="26" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.98)}</svg>`;
+    }
+
+    // Builds an overlapping Colonist.io card stack HTML (Screenshot 3)
+    function buildOverlappingStackHtml(cardClass, innerSvgHtml, count, onClickStr, titleStr = '', extraStyle = '') {
+      const visibleSlices = Math.min(Math.max(1, count), 4);
+      const offsetStep = 8;
+      const totalWidth = 46 + (visibleSlices - 1) * offsetStep;
+
+      let slicesHtml = '';
+      for (let i = 0; i < visibleSlices; i++) {
+        const isFront = i === visibleSlices - 1;
+        slicesHtml += `
+          <div class="stack-slice ${cardClass}" style="left:${i * offsetStep}px; ${isFront ? extraStyle : ''}">
+            ${isFront ? innerSvgHtml : ''}
+            ${isFront ? `<div class="corner-ribbon">${count}</div>` : ''}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="stacked-group" style="width:${totalWidth}px;" onclick="${onClickStr}" title="${titleStr}">
+          ${slicesHtml}
+        </div>
+      `;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('goldBtnIcon').innerHTML = getMiniSvg('gold');
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('room')) document.getElementById('roomCodeInput').value = params.get('room');
+
+      const stage = document.getElementById('boardStage');
+      stage.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 1.08 : 0.92;
+        camZoom = Math.max(0.45, Math.min(2.2, camZoom * factor));
+        renderBoard(state?.players.find(p => p.id === socket.id), state?.players[state?.turnIndex]?.id === socket.id);
+      }, { passive: false });
+
+      stage.addEventListener('mousedown', (e) => {
+        if (e.button === 2 || e.button === 1 || e.altKey) {
+          isPanning = true;
+          panStart = { x: e.clientX - camPanX, y: e.clientY - camPanY };
+        } else {
+          isMouseDown = true;
+        }
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (isPanning) {
+          camPanX = e.clientX - panStart.x;
+          camPanY = e.clientY - panStart.y;
+          renderBoard(state?.players.find(p => p.id === socket.id), state?.players[state?.turnIndex]?.id === socket.id);
+        }
+      });
+      window.addEventListener('mouseup', () => { isMouseDown = false; isPanning = false; });
+      stage.addEventListener('contextmenu', e => e.preventDefault());
+    });
+
+    function resetCamera() {
+      camZoom = 1; camPanX = 0; camPanY = 0;
+      if (state) renderBoard(state.players.find(p => p.id === socket.id), state.players[state.turnIndex]?.id === socket.id);
+    }
+
+    function switchLobbyTab(tab) {
+      document.getElementById('tabBtnMap').classList.toggle('active', tab === 'map');
+      document.getElementById('tabBtnCards').classList.toggle('active', tab === 'cards');
+      document.getElementById('lobbyTabMap').style.display = tab === 'map' ? 'flex' : 'none';
+      document.getElementById('lobbyTabCards').style.display = tab === 'cards' ? 'flex' : 'none';
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq = 440, dur = 0.09, type = 'sine') {
+      if (!soundOn) return;
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.11, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      document.getElementById('btnToggleSound').textContent = soundOn ? '🔊' : '🔇';
+    }
+
+    function toggleLobbyToolbar() {
+      const el = document.getElementById('lobbyToolbar');
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function createRoom() {
+      socket.emit('createRoom', { name: document.getElementById('playerNameInput').value });
+    }
+    function joinRoom() {
+      socket.emit('joinRoom', {
+        code: document.getElementById('roomCodeInput').value,
+        name: document.getElementById('playerNameInput').value
+      });
+    }
+    function copyInviteLink() {
+      if (!state) return;
+      const url = `${window.location.origin}/?room=${state.code}`;
+      navigator.clipboard.writeText(url);
+      playTone(660, 0.1);
+    }
+
+    function setBrush(type, value, btn) {
+      activeBrush = { type, value };
+      document.querySelectorAll('.brush-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    function applyPreset(preset) {
+      if (!state) return;
+      socket.emit('applyMapPreset', { code: state.code, preset });
+      playTone(520, 0.08);
+    }
+
+    function pushSettings() {
+      if (!state || state.hostId !== socket.id) return;
+      socket.emit('updateSettings', {
+        code: state.code,
+        newSettings: {
+          boardRadius: document.getElementById('setRadius').value,
+          vpToWin: document.getElementById('setVp').value,
+          maxPlayers: document.getElementById('setMaxP').value,
+          cardDiscardLimit: document.getElementById('setDiscard').value,
+          goldTiles: document.getElementById('setGold').value,
+          desertTiles: document.getElementById('setDesert').value,
+          bankResourcePerType: document.getElementById('setBankRes').value,
+          devKnights: document.getElementById('setDevKnight').value,
+          devVp: document.getElementById('setDevVp').value,
+          devRoadBuilding: document.getElementById('setDevRb').value,
+          devYearOfPlenty: document.getElementById('setDevYop').value,
+          devMonopoly: document.getElementById('setDevMono').value,
+          maxRoads: document.getElementById('setMaxRoad').value,
+          maxSettlements: document.getElementById('setMaxSettle').value,
+          maxCities: document.getElementById('setMaxCity').value
+        }
+      });
+    }
+
+    function addBot() { socket.emit('addBot', { code: state.code }); }
+    function removeBot() { socket.emit('removeBot', { code: state.code }); }
+    function startGame() { socket.emit('startGame', { code: state.code }); }
+    function rematchLobby() {
+      hideVictoryOverlay = false;
+      socket.emit('rematchLobby', { code: state.code });
+    }
+
+    socket.on('errorMsg', (msg) => alert(msg));
+
+    socket.on('gameState', (newState) => {
+      const prevDice = state ? state.lastDice.join(',') : '';
+      const wasGameOver = state?.status === 'GAMEOVER';
+      state = newState;
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('gameViewport').style.display = 'flex';
+
+      if (!wasGameOver && state.status === 'GAMEOVER') {
+        hideVictoryOverlay = false;
+        playTone(523, 0.12);
+        setTimeout(() => playTone(659, 0.12), 130);
+        setTimeout(() => playTone(784, 0.22), 260);
+      }
+
+      if (prevDice && prevDice !== state.lastDice.join(',')) animateDice();
+      syncAutomaticDrawers();
+      renderAll();
+
+      if (state.recentProductions && state.recentProductions.length > 0) {
+        triggerFlyingResourceAnimations(state.recentProductions);
+      }
+    });
+
+    // Spawns flying resource cards from the producing hexes to each receiving player (Screenshot 4)
+    function triggerFlyingResourceAnimations(productions) {
+      const svg = document.getElementById('boardSvg');
+      if (!svg || !state?.board) return;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+
+      let delay = 0;
+      productions.forEach(prod => {
+        const hex = state.board.hexes[prod.hexId];
+        if (!hex) return;
+
+        // Convert SVG hex center (hex.x, hex.y) to screen coordinates
+        const pt = svg.createSVGPoint();
+        pt.x = hex.x;
+        pt.y = hex.y;
+        const screenPt = pt.matrixTransform(ctm);
+
+        // Determine target screen coordinates (bottom-left hand for me, right sidebar row for others)
+        let targetEl = null;
+        if (prod.playerId === socket.id) {
+          targetEl = document.getElementById('myHandPanel');
+        } else {
+          targetEl = document.getElementById(`playerRow_${prod.playerId}`);
+        }
+        if (!targetEl) return;
+        const rect = targetEl.getBoundingClientRect();
+        const targetX = rect.left + rect.width / 2 - 22;
+        const targetY = rect.top + rect.height / 2 - 30;
+
+        const cardsToFly = Math.min(prod.amount || 1, 3);
+        for (let i = 0; i < cardsToFly; i++) {
+          const d = delay;
+          delay += 110;
+          setTimeout(() => {
+            const cardEl = document.createElement('div');
+            cardEl.className = `flying-res-card card-${prod.resource}`;
+            cardEl.innerHTML = getMiniSvg(prod.resource);
+            cardEl.style.left = `${screenPt.x - 22 + (i * 8)}px`;
+            cardEl.style.top = `${screenPt.y - 30 - (i * 6)}px`;
+            cardEl.style.transform = 'scale(0.85)';
+            document.body.appendChild(cardEl);
+
+            playTone(540 + i * 60, 0.06);
+
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                cardEl.style.left = `${targetX}px`;
+                cardEl.style.top = `${targetY}px`;
+                cardEl.style.transform = 'scale(1)';
+              });
+            });
+
+            setTimeout(() => {
+              cardEl.style.opacity = '0';
+              setTimeout(() => cardEl.remove(), 220);
+            }, 680);
+          }, d);
+        }
+      });
+    }
+
+    function animateDice() {
+      playTone(300, 0.07, 'triangle');
+      setTimeout(() => playTone(420, 0.09, 'triangle'), 90);
+      const d1 = document.getElementById('die1');
+      const d2 = document.getElementById('die2');
+      d1.classList.add('rolling');
+      d2.classList.add('rolling');
+      setTimeout(() => {
+        d1.classList.remove('rolling');
+        d2.classList.remove('rolling');
+      }, 360);
+    }
+
+    function syncAutomaticDrawers() {
+      const me = state.players.find(p => p.id === socket.id);
+      if (!me) return;
+
+      if (me.goldPending > 0) {
+        drawerMode = 'gold';
+      } else if (state.phase === 'DISCARD' && me.discardPending > 0) {
+        if (drawerMode !== 'discard') {
+          discardSel = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+          drawerMode = 'discard';
+        }
+      } else if (drawerMode === 'gold' || drawerMode === 'discard') {
+        drawerMode = null;
+      }
+    }
+
+    function renderAll() {
+      const me = state.players.find(p => p.id === socket.id);
+      const current = state.players[state.turnIndex];
+      const isMyTurn = current && current.id === socket.id;
+
+      const lobbyBar = document.getElementById('lobbyToolbar');
+      if (state.status === 'LOBBY') {
+        const s = state.settings;
+        document.getElementById('setRadius').value = s.boardRadius;
+        document.getElementById('setVp').value = s.vpToWin;
+        document.getElementById('setMaxP').value = s.maxPlayers;
+        document.getElementById('setDiscard').value = s.cardDiscardLimit;
+        document.getElementById('setGold').value = s.goldTiles;
+        document.getElementById('setDesert').value = s.desertTiles;
+        document.getElementById('setBankRes').value = s.bankResourcePerType;
+        document.getElementById('setDevKnight').value = s.devKnights;
+        document.getElementById('setDevVp').value = s.devVp;
+        document.getElementById('setDevRb').value = s.devRoadBuilding;
+        document.getElementById('setDevYop').value = s.devYearOfPlenty;
+        document.getElementById('setDevMono').value = s.devMonopoly;
+        document.getElementById('setMaxRoad').value = s.maxRoads;
+        document.getElementById('setMaxSettle').value = s.maxSettlements;
+        document.getElementById('setMaxCity').value = s.maxCities;
+      } else {
+        lobbyBar.style.display = 'none';
+      }
+
+      document.getElementById('die1').textContent = state.lastDice[0];
+      document.getElementById('die2').textContent = state.lastDice[1];
+
+      if (me) {
+        document.getElementById('badgeRoadCnt').textContent = me.roadsLeft;
+        document.getElementById('badgeSettleCnt').textContent = me.settlementsLeft;
+        document.getElementById('badgeCityCnt').textContent = me.citiesLeft;
+      }
+
+      const pill = document.getElementById('turnStatusPill');
+      if (state.status === 'LOBBY') {
+        pill.innerHTML = `🏠 Room <strong>${state.code}</strong> — Paint Map or Add Hard Bots`;
+      } else if (state.status === 'GAMEOVER') {
+        pill.innerHTML = `🏆 <strong>${state.winner?.name}</strong> Won the Game!`;
+      } else {
+        const phaseTxt = {
+          SETUP_SETTLEMENT: 'Place Settlement',
+          SETUP_ROAD: 'Place Road',
+          ROLL: 'Roll Dice',
+          GOLD_PICK: 'Pick Gold Resource',
+          DISCARD: 'Waiting for Discards (7 Rolled)',
+          ROBBER: 'Move Robber',
+          MAIN: 'Turn'
+        }[state.phase] || state.phase;
+        pill.innerHTML = `<span>${current?.avatar || ''}</span> <strong>${current?.name}</strong> — ${phaseTxt}`;
+      }
+
+      document.getElementById('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
+      document.getElementById('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);
+      document.getElementById('btnBuildRoad').disabled = !(isMyTurn && (state.phase === 'MAIN' || state.phase === 'SETUP_ROAD'));
+      document.getElementById('btnBuildSettle').disabled = !(isMyTurn && (state.phase === 'MAIN' || state.phase === 'SETUP_SETTLEMENT'));
+      document.getElementById('btnBuildCity').disabled = !(isMyTurn && state.phase === 'MAIN');
+
+      document.getElementById('btnBuildRoad').classList.toggle('active-mode', buildMode === 'road');
+      document.getElementById('btnBuildSettle').classList.toggle('active-mode', buildMode === 'settlement');
+      document.getElementById('btnBuildCity').classList.toggle('active-mode', buildMode === 'city');
+
+      const mainBtn = document.getElementById('btnMainTurnAction');
+      if (state.phase === 'ROLL') {
+        mainBtn.disabled = !isMyTurn;
+        document.getElementById('mainBtnIcon').textContent = '🎲';
+        document.getElementById('mainBtnLbl').textContent = 'Roll';
+      } else {
+        mainBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
+        document.getElementById('mainBtnIcon').textContent = '⏩';
+        document.getElementById('mainBtnLbl').textContent = 'Pass';
+      }
+
+      renderVictoryScreen();
+      renderActiveTradeModal(me);
+      renderHand(me, isMyTurn);
+      renderInlineDrawer(me, isMyTurn);
+      renderSidebar();
+      renderBoard(me, isMyTurn);
+    }
+
+    // Renders Colonist.io Victory & Dice Stats Screen (Screenshot 2)
+    function renderVictoryScreen() {
+      const overlay = document.getElementById('victoryOverlay');
+      const reopenBtn = document.getElementById('reopenVictoryBtn');
+      if (state.status !== 'GAMEOVER') {
+        overlay.style.display = 'none';
+        reopenBtn.style.display = 'none';
+        return;
+      }
+
+      if (hideVictoryOverlay) {
+        overlay.style.display = 'none';
+        reopenBtn.style.display = 'inline-flex';
+        return;
+      }
+      overlay.style.display = 'flex';
+      reopenBtn.style.display = 'none';
+
+      // Sort players by VP descending
+      const ranked = [...state.players].sort((a, b) => b.vp - a.vp);
+      const myRankIdx = ranked.findIndex(p => p.id === socket.id);
+      const ord = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+      document.getElementById('vicTitleText').textContent =
+        myRankIdx !== -1 ? `You are ${ord[myRankIdx]}!` : `${state.winner?.name} Won!`;
+
+      const elapsedSec = state.startedAt && state.finishedAt
+        ? Math.max(1, Math.floor((state.finishedAt - state.startedAt) / 1000))
+        : 0;
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+      document.getElementById('vicSubText').textContent = `Time: ${mins}:${secs} - Turns: ${state.turnCount || 1}`;
+
+      // Left Ranked Players List
+      document.getElementById('vicRanksList').innerHTML = `
+        <div style="text-align:right; font-size:18px; margin-bottom:2px;">🏆</div>
+      ` + ranked.map((p, idx) => `
+        <div class="vic-rank-row" style="border-left: 4px solid ${p.color}">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px">${p.avatar}</span>
+            <span>${p.name}</span>
+          </div>
+          <span style="font-size:16px; color:${idx === 0 ? '#ffd700' : '#fff'}">${p.vp}</span>
+        </div>
+      `).join('');
+
+      // Center Chart Container
+      const chartBox = document.getElementById('vicChartContainer');
+      if (victoryTab === 'dice') {
+        const ds = state.diceStats || {};
+        let maxCount = 1;
+        for (let n = 2; n <= 12; n++) {
+          if ((ds[n] || 0) > maxCount) maxCount = ds[n];
+        }
+
+        let barsHtml = '';
+        for (let n = 2; n <= 12; n++) {
+          const c = ds[n] || 0;
+          const heightPct = Math.max(8, Math.round((c / maxCount) * 100));
+          barsHtml += `
+            <div class="dice-bar-col">
+              <div class="dice-bar-fill ${n === 7 ? 'is-seven' : ''}" style="height:${heightPct}%">${c > 0 ? c : ''}</div>
+              <span style="font-size:11px; font-weight:800; color:#cbd5e1">${n}</span>
+            </div>
+          `;
+        }
+
+        chartBox.innerHTML = `
+          <div style="width:100%; text-align:left; font-weight:800; font-size:14px; margin-bottom:6px;">Dice Rolls</div>
+          <div class="dice-bars-wrap">${barsHtml}</div>
+        `;
+      } else {
+        chartBox.innerHTML = `
+          <div style="width:100%; background:rgba(255,255,255,0.07); border-radius:10px; padding:14px;">
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:6px; margin-bottom:8px;">
+              <span>Player</span><span>VP</span><span>Earned</span><span>Trades</span><span>Roads/Army</span>
+            </div>
+            ${ranked.map(p => `
+              <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-weight:800; color:${p.color}">${p.avatar} ${p.name}</span>
+                <span>${p.vp}</span>
+                <span>${p.stats?.resourcesEarned || 0}</span>
+                <span>${p.stats?.tradesMade || 0}</span>
+                <span>🛣️${p.longestRoadLength} / ⚔️${p.knightsPlayed}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function switchVictoryTab(tab) {
+      victoryTab = tab;
+      document.getElementById('vicTabDice').classList.toggle('active', tab === 'dice');
+      document.getElementById('vicTabOverview').classList.toggle('active', tab === 'overview');
+      renderVictoryScreen();
+    }
+
+    function toggleVictoryMapInspect(hide) {
+      hideVictoryOverlay = hide;
+      renderVictoryScreen();
+    }
+
+    function renderActiveTradeModal(me) {
+      const box = document.getElementById('activeTradeModal');
+      if (!state.activeTrade) {
+        box.style.display = 'none';
+        return;
+      }
+      box.style.display = 'flex';
+      const t = state.activeTrade;
+      const isMyOffer = t.fromId === socket.id;
+      const otherPlayers = state.players.filter(p => p.id !== t.fromId);
+
+      const avatarsHtml = otherPlayers.map(p => {
+        const resp = (t.responses && t.responses[p.id]) || 'pending';
+        let badgeBg = '#0288d1', badgeTxt = '⏳';
+        if (resp === 'accepted') { badgeBg = '#2e7d32'; badgeTxt = '✔'; }
+        else if (resp === 'declined') { badgeBg = '#c62828'; badgeTxt = '✖'; }
+
+        return `
+          <div class="trade-resp-avatar" style="background:${p.color}" title="${p.name}: ${resp.toUpperCase()}">
+            <span>${p.avatar}</span>
+            <div class="status-dot" style="background:${badgeBg}">${badgeTxt}</div>
+          </div>
+        `;
+      }).join('');
+
+      const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r =>
+        buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.request[r], '', RES_META[r].name)
+      ).join('');
+
+      const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r =>
+        buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.offer[r], '', RES_META[r].name)
+      ).join('');
+
+      let actionButtonsHtml = '';
+      if (isMyOffer) {
+        const acceptedPlayers = otherPlayers.filter(p => t.responses && t.responses[p.id] === 'accepted');
+        actionButtonsHtml = acceptedPlayers.map(p => `
+          <button class="trade-act-btn" style="background:${p.color}" onclick="confirmTradeWith('${p.id}')" title="Complete Trade with ${p.name}!">✔</button>
+        `).join('') + `
+          <button class="trade-act-btn" style="background:#ef5350" onclick="cancelTrade()" title="Cancel Trade Offer">✖</button>
+        `;
+      } else {
+        const myResp = (t.responses && t.responses[socket.id]) || 'pending';
+        const canAfford = me && RESOURCES.every(r => (t.request[r] || 0) <= (me.resources[r] || 0));
+        actionButtonsHtml = `
+          <button class="trade-act-btn" style="background:#4caf50; ${!canAfford ? 'opacity:0.4; cursor:not-allowed;' : ''}"
+            onclick="${canAfford ? `respondToTrade('accepted')` : ''}" title="${canAfford ? 'Accept Trade' : 'Not enough cards'}">✔</button>
+          <button class="trade-act-btn" style="background:#ef5350; ${myResp === 'declined' ? 'opacity:0.4;' : ''}"
+            onclick="respondToTrade('declined')" title="Decline Trade">✖</button>
+        `;
+      }
+
+      box.innerHTML = `
+        <div class="trade-top-avatars">${avatarsHtml}</div>
+        <div class="trade-offer-body">
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="res-Select-row">
+              <span style="font-size:13px; font-weight:900; color:#2e7d32; width:54px;">👥 ⬇</span>
+              ${ isMyOffer ? wantCardsHtml : giveCardsHtml }
+            </div>
+            <div class="res-Select-row">
+              <span style="font-size:13px; font-weight:900; color:#c62828; width:54px;">${t.fromAvatar} ⬆</span>
+              ${ isMyOffer ? giveCardsHtml : wantCardsHtml }
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            ${actionButtonsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function respondToTrade(decision) {
+      playTone(decision === 'accepted' ? 680 : 300, 0.1);
+      socket.emit('respondTrade', { code: state.code, decision });
+    }
+
+    function confirmTradeWith(partnerId) {
+      playTone(760, 0.12);
+      socket.emit('confirmTradeWithPartner', { code: state.code, partnerId });
+      drawerMode = null;
+    }
+
+    function cancelTrade() {
+      socket.emit('cancelTrade', { code: state.code });
+    }
+
+    // Renders Bottom-Left Hand with Overlapping Card Stacks (Screenshot 3)
+    function renderHand(me, isMyTurn) {
+      const panel = document.getElementById('myHandPanel');
+      if (!me || !me.resources) {
+        panel.innerHTML = '<span style="font-weight:700; color:#666;">Spectating</span>';
+        return;
+      }
+
+      let html = RESOURCES.map(r => {
+        // When discarding or trading, subtract cards currently placed in the tray so they visually move!
+        let count = me.resources[r] || 0;
+        if (drawerMode === 'discard') count = Math.max(0, count - (discardSel[r] || 0));
+        else if (drawerMode === 'trade') count = Math.max(0, count - (tradeGive[r] || 0));
+
+        if (count <= 0 && state.status !== 'LOBBY') return '';
+        if (count <= 0 && state.status === 'LOBBY') {
+          return `
+            <div class="mini-res-card card-${r}" style="opacity:0.55;">
+              ${getMiniSvg(r)}
+              <div class="corner-ribbon">0</div>
+            </div>
+          `;
+        }
+        return buildOverlappingStackHtml(
+          `card-${r}`,
+          getMiniSvg(r),
+          count,
+          `onClickHandResource('${r}')`,
+          `Click to select ${RES_META[r].name}`
+        );
+      }).join('');
+
+      const allDevs = [...(me.devCards || []), ...(me.newDevCards || [])];
+      const devCounts = {};
+      allDevs.forEach(c => devCounts[c] = (devCounts[c] || 0) + 1);
+      const devIcons = { knight: '⚔️', roadBuilding: '🛣️', yearOfPlenty: '🎁', monopoly: '🎩', vp: '⭐' };
+
+      Object.keys(devCounts).forEach(c => {
+        const canPlay = isMyTurn && !me.playedDevCardThisTurn && (me.devCards || []).includes(c) && c !== 'vp';
+        html += buildOverlappingStackHtml(
+          'card-dev',
+          `<span style="font-size:20px">${devIcons[c] || '🃏'}</span>`,
+          devCounts[c],
+          canPlay ? `onClickDevCard('${c}')` : '',
+          `Dev Card: ${c}`,
+          canPlay ? 'outline:2.5px solid #ffd700;' : 'opacity:0.85;'
+        );
+      });
+
+      if (!html) {
+        html = `<span style="font-size:13px; font-weight:700; color:#888;">No cards in hand</span>`;
+      }
+      panel.innerHTML = html;
+    }
+
+    function onClickHandResource(r) {
+      const me = state.players.find(p => p.id === socket.id);
+      const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+      if (!me) return;
+
+      if (drawerMode === 'discard') {
+        const totalSelected = RESOURCES.reduce((s, k) => s + discardSel[k], 0);
+        if (discardSel[r] < me.resources[r] && totalSelected < me.discardPending) {
+          discardSel[r]++;
+          playTone(500, 0.05);
+          renderHand(me, isMyTurn);
+          renderInlineDrawer(me, isMyTurn);
+        }
+      } else if (isMyTurn && state.phase === 'MAIN') {
+        if (drawerMode !== 'trade') {
+          tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+          tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+          drawerMode = 'trade';
+        }
+        if (tradeGive[r] < me.resources[r]) {
+          tradeGive[r]++;
+          playTone(480, 0.05);
+          renderHand(me, isMyTurn);
+          renderInlineDrawer(me, isMyTurn);
+        }
+      }
+    }
+
+    function onClickDevCard(cardType) {
+      if (cardType === 'monopoly') {
+        drawerMode = 'monopoly';
+        renderInlineDrawer(state.players.find(p => p.id === socket.id), true);
+      } else {
+        socket.emit('playDevCard', { code: state.code, cardType });
+        playTone(620, 0.12);
+      }
+    }
+
+    function canExecuteBankTrade(me) {
+      if (!me || !me.resources) return false;
+      const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
+      let credits = 0;
+      for (const r of RESOURCES) {
+        const g = tradeGive[r] || 0;
+        if (g > me.resources[r] || g % ratios[r] !== 0) return false;
+        credits += g / ratios[r];
+      }
+      const wanted = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
+      return credits > 0 && credits === wanted;
+    }
+
+    function canProposePlayerTrade(me) {
+      if (!me || !me.resources) return false;
+      const giveSum = RESOURCES.reduce((s, r) => s + (tradeGive[r] || 0), 0);
+      const wantSum = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
+      return giveSum > 0 && wantSum > 0;
+    }
+
+    function renderInlineDrawer(me, isMyTurn) {
+      const wrap = document.getElementById('inlineDrawerWrap');
+      const drawer = document.getElementById('inlineDrawer');
+      const sideStack = document.getElementById('tradeConfirmStack');
+      const btnCancel = document.getElementById('btnCancelAction');
+      btnCancel.style.display = 'none';
+      sideStack.style.display = 'none';
+
+      if (!drawerMode || !me) {
+        wrap.style.display = 'none';
+        return;
+      }
+      wrap.style.display = 'flex';
+
+      if (drawerMode === 'gold') {
+        drawer.innerHTML = `
+          <div style="font-weight:900; color:#b26a00; font-size:13.5px; display:flex; align-items:center; gap:6px;">
+            ${getMiniSvg('gold')} <span>Gold Reward — Click ${me.goldPending} Resource(s) to Claim:</span>
+          </div>
+          <div class="res-Select-row">
+            ${RESOURCES.map(r => `
+              <div class="mini-res-card card-${r}" onclick="pickGold('${r}')">
+                ${getMiniSvg(r)}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (drawerMode === 'monopoly') {
+        btnCancel.style.display = 'flex';
+        drawer.innerHTML = `
+          <div style="font-weight:900; color:#6a1b9a; font-size:13.5px;">🎩 Monopoly — Click a Resource to Steal All:</div>
+          <div class="res-Select-row">
+            ${RESOURCES.map(r => `
+              <div class="mini-res-card card-${r}" onclick="confirmMonopoly('${r}')">
+                ${getMiniSvg(r)}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (drawerMode === 'discard') {
+        // Exact Colonist.io Discard Cards Drawer (Screenshot 1)
+        const picked = RESOURCES.reduce((s, r) => s + discardSel[r], 0);
+        const isReady = picked === me.discardPending;
+
+        const trayCardsHtml = RESOURCES.filter(r => discardSel[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            discardSel[r],
+            `removeCardFromDiscard('${r}')`,
+            'Click to return to hand'
+          )
+        ).join('');
+
+        drawer.innerHTML = `
+          <div class="discard-header">
+            <div class="discard-q-card">
+              <span class="up-arr">⬆</span>
+              <span>?</span>
+            </div>
+            <div>
+              <div style="color:#c62828; font-size:18px; font-weight:900;">Discard Cards (${picked}/${me.discardPending})</div>
+              <div style="color:#333; font-size:12.5px; font-weight:600; line-height:1.35; margin-top:2px;">
+                7 was rolled! You have more than ${state.settings.cardDiscardLimit} cards.<br>
+                You need to discard ${me.discardPending} of them
+              </div>
+            </div>
+          </div>
+          <div class="discard-tray">
+            ${trayCardsHtml || '<span style="font-size:12px; color:#777; font-weight:600;">Click cards in your hand below to move them here...</span>'}
+          </div>
+          <div style="display:flex; justify-content:flex-end;">
+            <button class="discard-confirm-btn" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm Discard">✔</button>
+          </div>
+        `;
+      } else if (drawerMode === 'trade') {
+        btnCancel.style.display = 'flex';
+        sideStack.style.display = 'flex';
+
+        document.getElementById('btnExecBankTrade').disabled = !canExecuteBankTrade(me);
+        document.getElementById('btnExecPlayerTrade').disabled = !canProposePlayerTrade(me);
+
+        const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
+        const wantStacksHtml = RESOURCES.filter(r => tradeWant[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            tradeWant[r],
+            `tradeWant['${r}']--; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);`,
+            'Click to remove'
+          )
+        ).join('');
+
+        const giveStacksHtml = RESOURCES.filter(r => tradeGive[r] > 0).map(r =>
+          buildOverlappingStackHtml(
+            `card-${r}`,
+            getMiniSvg(r),
+            tradeGive[r],
+            `tradeGive['${r}']--; renderHand(state.players.find(p=>p.id===socket.id), true); renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);`,
+            'Click to return to hand'
+          )
+        ).join('');
+
+        drawer.innerHTML = `
+          <div class="res-Select-row" style="justify-content:space-between; border-bottom:1px solid #d4cbb8; padding-bottom:6px;">
+            ${RESOURCES.map(r => `
+              <div class="mini-res-card card-${r}" onclick="tradeWant['${r}']++; renderInlineDrawer(state.players.find(p=>p.id===socket.id), true);" title="Click to add ${RES_META[r].name} to Wanted (${ratios[r]}:1 Bank)">
+                ${getMiniSvg(r)}
+                <span style="font-size:9.5px; color:#fff;">${ratios[r]}:1</span>
+              </div>
+            `).join('')}
+            <span style="font-size:20px;" title="Bank / Port Ratios">🏦</span>
+          </div>
+          <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+            <span style="font-weight:900; color:#2e7d32; font-size:13px; width:46px;">👥 ⬇</span>
+            ${wantStacksHtml || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
+          </div>
+          <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+            <span style="font-weight:900; color:#c62828; font-size:13px; width:46px;">${me.avatar} ⬆</span>
+            ${giveStacksHtml || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
+          </div>
+        `;
+      }
+    }
+
+    function removeCardFromDiscard(r) {
+      if (discardSel[r] > 0) {
+        discardSel[r]--;
+        playTone(420, 0.05);
+        const me = state.players.find(p => p.id === socket.id);
+        renderHand(me, state.players[state.turnIndex]?.id === socket.id);
+        renderInlineDrawer(me, state.players[state.turnIndex]?.id === socket.id);
+      }
+    }
+
+    function toggleTradeDrawer() {
+      if (drawerMode === 'trade') {
+        drawerMode = null;
+      } else {
+        tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        drawerMode = 'trade';
+      }
+      renderAll();
+    }
+
+    function closeInlineDrawer() {
+      tradeGive = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+      tradeWant = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+      drawerMode = null;
+      buildMode = null;
+      renderAll();
+    }
+
+    function confirmInlineAction() {
+      if (drawerMode === 'discard') {
+        playTone(620, 0.1);
+        socket.emit('discardCards', { code: state.code, discards: discardSel });
+        drawerMode = null;
+      }
+      renderAll();
+    }
+
+    function executeBankTrade() {
+      playTone(620, 0.1);
+      socket.emit('bankTrade', { code: state.code, give: tradeGive, get: tradeWant });
+      drawerMode = null;
+      renderAll();
+    }
+
+    function proposePlayerTrade() {
+      playTone(580, 0.1);
+      socket.emit('proposeTrade', { code: state.code, offer: tradeGive, request: tradeWant });
+    }
+
+    function confirmMonopoly(r) {
+      socket.emit('playDevCard', { code: state.code, cardType: 'monopoly', monopolyResource: r });
+      drawerMode = null;
+      renderAll();
+    }
+
+    function pickGold(resource) {
+      playTone(780, 0.1);
+      socket.emit('pickGoldResource', { code: state.code, resource });
+    }
+
+    function setBuildMode(mode) {
+      buildMode = buildMode === mode ? null : mode;
+      renderAll();
+    }
+
+    function mainTurnButton() {
+      if (state.phase === 'ROLL') rollDice();
+      else endTurn();
+    }
+
+    function rollDice() { socket.emit('rollDice', { code: state.code }); }
+    function buyDevCard() { socket.emit('buyDevCard', { code: state.code }); playTone(540, 0.1); }
+    function endTurn() { buildMode = null; drawerMode = null; socket.emit('endTurn', { code: state.code }); }
+
+    function renderSidebar() {
+      const logEl = document.getElementById('logSection');
+      logEl.innerHTML = state.logs.map(l => `
+        <div class="log-line" style="color:${l.color || '#222'}">${l.text}</div>
+      `).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+
+      const chatEl = document.getElementById('chatFeed');
+      chatEl.innerHTML = (state.chats || []).map(c => `
+        <div><strong style="color:${c.color}">${c.avatar} ${c.sender}:</strong> <span style="color:${c.color}">${c.text}</span></div>
+      `).join('');
+      chatEl.scrollTop = chatEl.scrollHeight;
+
+      const b = state.bank || { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 };
+      document.getElementById('bankBar').innerHTML = `
+        <span style="font-size:20px;" title="Bank">🏦</span>
+        ${RESOURCES.map(r => `
+          <div class="bank-item">
+            <div class="bank-mini-icon card-${r}">${getMiniSvg(r)}</div>
+            <span>${b[r]}</span>
+          </div>
+        `).join('')}
+        <div class="bank-item">
+          <div class="bank-mini-icon card-dev">🃏</div>
+          <span>${state.devDeckCount}</span>
+        </div>
+      `;
+
+      document.getElementById('playersStack').innerHTML = state.players.map((p, idx) => `
+        <div class="p-row ${idx === state.turnIndex && state.status !== 'LOBBY' ? 'is-turn' : ''}" id="playerRow_${p.id}">
+          <div class="p-avatar-wrap">
+            <div class="p-circle" style="background:${p.color}">
+              <span>${p.avatar}</span>
+              <div class="vp-ribbon">${p.vp}</div>
+            </div>
+            <div>
+              <div style="font-weight:800; font-size:13px;">
+                ${p.name} ${p.isBot ? '<span style="font-size:10px; background:#222; color:#ffd700; padding:1px 4px; border-radius:4px;">HARD</span>' : ''}
+              </div>
+              <div style="font-size:11px; color:#555;">
+                ${p.discardPending > 0 ? '<span style="color:#c62828; font-weight:900;">⚠️ Discarding...</span> ' : ''}
+                ${state.longestRoadOwner === p.id ? '🏆 Road ' : ''}
+                ${state.largestArmyOwner === p.id ? '⚔️ Army' : ''}
+              </div>
+            </div>
+          </div>
+          <div class="p-stats">
+            <div class="stat-card-back" style="background:${p.resourceCount > state.settings.cardDiscardLimit ? '#c62828' : '#0288d1'}" title="Resource Cards">${p.resourceCount}</div>
+            <div class="stat-card-back card-dev" title="Development Cards">${p.devCardCount}</div>
+            <div style="text-align:center; min-width:22px;" title="Knights Played">⚔️<br>${p.knightsPlayed}</div>
+            <div style="text-align:center; min-width:22px;" title="Longest Road">🛣️<br>${p.longestRoadLength}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderBoard(me, isMyTurn) {
+      if (!state || !state.board) return;
+      const svg = document.getElementById('boardSvg');
+      const { hexes, vertices, edges, robberHexId } = state.board;
+      const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
+      const rolledHexSet = new Set(state.lastRollHexIds || []);
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      hexes.forEach(h => {
+        h.corners.forEach(pt => {
+          if (pt.x < minX) minX = pt.x;
+          if (pt.x > maxX) maxX = pt.x;
+          if (pt.y < minY) minY = pt.y;
+          if (pt.y > maxY) maxY = pt.y;
+        });
+      });
+
+      const topExtra = state.status === 'LOBBY' ? 210 : 115;
+      const bottomExtra = 165;
+      const sidePad = 130;
+
+      const baseX = (minX - sidePad) - camPanX * camZoom;
+      const baseY = (minY - topExtra) - camPanY * camZoom;
+      const baseW = ((maxX - minX) + sidePad * 2) * camZoom;
+      const baseH = ((maxY - minY) + topExtra + bottomExtra) * camZoom;
+      svg.setAttribute('viewBox', `${baseX} ${baseY} ${baseW} ${baseH}`);
+
+      let html = `
+        <defs>
+          <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffd700" />
+            <stop offset="50%" stop-color="#ff9800" />
+            <stop offset="100%" stop-color="#ffd700" />
+          </linearGradient>
+        </defs>
+      `;
+
+      const landPolys = hexes.filter(h => h.type !== 'water').map(h => h.corners.map(c => `${c.x},${c.y}`).join(' '));
+      landPolys.forEach(pts => {
+        html += `<polygon points="${pts}" fill="#26c6da" stroke="#26c6da" stroke-width="46" stroke-linejoin="round" opacity="0.45" />`;
+      });
+      landPolys.forEach(pts => {
+        html += `<polygon points="${pts}" fill="#f4d799" stroke="#f4d799" stroke-width="22" stroke-linejoin="round" />`;
+      });
+
+      for (const h of hexes) {
+        const pts = h.corners.map(c => `${c.x},${c.y}`).join(' ');
+        if (h.type === 'water') {
+          if (state.status === 'LOBBY') {
+            html += `
+              <polygon points="${pts}" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.22)" stroke-width="2" stroke-dasharray="6,4"
+                style="cursor:pointer" onmousedown="onHexInteract(${h.id}, event)" onmouseenter="if(isMouseDown) onHexInteract(${h.id}, event)" />
+            `;
+          }
+          continue;
+        }
+
+        const meta = RES_META[h.type] || RES_META.desert;
+        const canClickRobber = isMyTurn && state.phase === 'ROBBER' && h.id !== robberHexId;
+        const pipsCount = h.number ? Math.max(0, 6 - Math.abs(7 - h.number)) : 0;
+        const pipsDots = '•'.repeat(pipsCount);
+        const isRedNum = h.number === 6 || h.number === 8;
+        const isRolledHex = rolledHexSet.has(h.id);
+
+        html += `
+          <g style="${isLobbyHost || canClickRobber ? 'cursor:pointer' : ''}"
+             onmousedown="onHexInteract(${h.id}, event)"
+             onmouseenter="if(isMouseDown) onHexInteract(${h.id}, event)">
+            <polygon points="${pts}" fill="${meta.color}" stroke="${meta.border}" stroke-width="8" stroke-linejoin="round" />
+            <polygon points="${pts}" fill="none" stroke="#e8c987" stroke-width="3" />
+            ${getBoardIconSvg(h.type, h.x, h.y - 30, 1.25)}
+
+            <!-- Colonist Dark Black/Gray Indicator When Number Is Rolled (Screenshot 4) -->
+            ${isRolledHex ? `<polygon points="${pts}" fill="rgba(0, 0, 0, 0.54)" stroke="#111" stroke-width="3" stroke-linejoin="round" />` : ''}
+
+            ${h.number ? `
+              <rect x="${h.x - 24}" y="${h.y - 4}" width="48" height="46" rx="9" fill="#f5efe6" stroke="#c5bba8" stroke-width="2.5" />
+              <text x="${h.x}" y="${h.y + 22}" text-anchor="middle" font-size="25" font-weight="900" fill="${isRedNum ? '#d50000' : '#111'}">${h.number}</text>
+              <text x="${h.x}" y="${h.y + 36}" text-anchor="middle" font-size="14" font-weight="900" letter-spacing="1" fill="${isRedNum ? '#d50000' : '#333'}">${pipsDots}</text>
+            ` : ''}
+
+            ${h.id === robberHexId ? `
+              <g transform="translate(${h.x + 28}, ${h.y - 16})">
+                <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.35)" />
+                <path d="M-12,16 L12,16 L8,-2 C11,-6 6,-16 0,-16 C-6,-16 -11,-6 -8,-2 Z" fill="#90a4ae" stroke="#263238" stroke-width="2.2" stroke-linejoin="round"/>
+                <circle cx="0" cy="-14" r="7.5" fill="#b0bec5" stroke="#263238" stroke-width="2"/>
+              </g>
+            ` : ''}
+          </g>
+        `;
+      }
+
+      for (const e of edges) {
+        if (e.hexIds.length !== 1) continue;
+        const v1 = vertices[e.v1], v2 = vertices[e.v2];
+        if (!v1 || !v2) continue;
+
+        const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+        const h = hexes[e.hexIds[0]];
+        const dx = mx - h.x, dy = my - h.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const sx = mx + (dx / len) * 44;
+        const sy = my + (dy / len) * 44;
+
+        if (e.port) {
+          const portRatio = e.port === '3:1' ? '3:1' : '2:1';
+          html += `
+            <g onclick="${isLobbyHost ? `onEdgeInteract(${e.id})` : ''}" style="${isLobbyHost ? 'cursor:pointer' : ''}">
+              <line x1="${v1.x}" y1="${v1.y}" x2="${sx}" y2="${sy}" stroke="#d9822b" stroke-width="6" stroke-linecap="round" />
+              <line x1="${v2.x}" y1="${v2.y}" x2="${sx}" y2="${sy}" stroke="#d9822b" stroke-width="6" stroke-linecap="round" />
+              <path d="M ${sx-20} ${sy+10} L ${sx+20} ${sy+10} L ${sx+13} ${sy+20} L ${sx-13} ${sy+20} Z" fill="#8d4925" stroke="#fff" stroke-width="1.5" />
+              <path d="M ${sx-17} ${sy+9} Q ${sx} ${sy-28} ${sx+17} ${sy+9} Z" fill="#fff" stroke="#ccc" stroke-width="1.5" />
+              ${e.port === '3:1'
+                ? `<text x="${sx}" y="${sy - 3}" text-anchor="middle" font-size="14" font-weight="900" fill="#b71c1c">?</text>`
+                : getBoardIconSvg(e.port, sx, sy - 6, 0.55)
+              }
+              <text x="${sx}" y="${sy + 8}" text-anchor="middle" font-size="9.5" font-weight="900" fill="#111">${portRatio}</text>
+            </g>
+          `;
+        } else if (isLobbyHost && activeBrush.type === 'port') {
+          html += `
+            <circle cx="${mx}" cy="${my}" r="9" fill="rgba(255,255,255,0.45)" stroke="#0288d1" stroke-width="2"
+              style="cursor:pointer" onclick="onEdgeInteract(${e.id})" />
+          `;
+        }
+      }
+
+      for (const e of edges) {
+        const v1 = vertices[e.v1], v2 = vertices[e.v2];
+        if (!v1 || !v2) continue;
+        if (e.road) {
+          const owner = state.players.find(p => p.id === e.road);
+          html += `
+            <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="#222" stroke-width="14" stroke-linecap="round" />
+            <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="${owner?.color || '#fff'}" stroke-width="9" stroke-linecap="round" />
+          `;
+        } else if (isMyTurn && canClientPlaceRoad(e, me)) {
+          const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+          html += `
+            <g onclick="clickEdge(${e.id})" style="cursor:pointer">
+              <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="rgba(255,255,255,0.4)" stroke-width="14" stroke-linecap="round" />
+              <circle cx="${mx}" cy="${my}" r="10" fill="#4caf50" stroke="#fff" stroke-width="2.5" />
+            </g>
+          `;
+        }
+      }
+
+      for (const v of vertices) {
+        if (v.building) {
+          const owner = state.players.find(p => p.id === v.building.owner);
+          const col = owner?.color || '#fff';
+          const canUpgrade = isMyTurn && state.phase === 'MAIN' && v.building.owner === socket.id &&
+            v.building.type === 'settlement' && me.resources.wheat >= 2 && me.resources.ore >= 3 && me.citiesLeft > 0;
+
+          if (v.building.type === 'settlement') {
+            html += `
+              <g onclick="${canUpgrade ? `clickVertex(${v.id})` : ''}" style="${canUpgrade ? 'cursor:pointer' : ''}">
+                <polygon points="${v.x},${v.y-17} ${v.x+14},${v.y-5} ${v.x+14},${v.y+13} ${v.x-14},${v.y+13} ${v.x-14},${v.y-5}"
+                  fill="${col}" stroke="${canUpgrade ? '#ffd700' : '#111'}" stroke-width="${canUpgrade ? '4' : '3'}" stroke-linejoin="round" />
+              </g>
+            `;
+          } else {
+            html += `
+              <g>
+                <polygon points="${v.x-18},${v.y+14} ${v.x-18},${v.y-6} ${v.x-6},${v.y-19} ${v.x+6},${v.y-6} ${v.x+18},${v.y-6} ${v.x+18},${v.y+14}"
+                  fill="${col}" stroke="#111" stroke-width="3" stroke-linejoin="round" />
+              </g>
+            `;
+          }
+        } else if (isMyTurn && canClientPlaceSettlement(v, me)) {
+          html += `
+            <circle cx="${v.x}" cy="${v.y}" r="13" fill="rgba(255, 215, 0, 0.9)" stroke="#fff" stroke-width="3"
+              class="spot-pulse" onclick="clickVertex(${v.id})" />
+          `;
+        }
+      }
+
+      svg.innerHTML = html;
+    }
+
+    function onHexInteract(hexId, ev) {
+      if (ev && (ev.button === 2 || ev.button === 1 || ev.altKey)) return;
+      if (state.status === 'LOBBY' && state.hostId === socket.id) {
+        if (activeBrush.type === 'terrain' || activeBrush.type === 'number' || activeBrush.type === 'robber') {
+          socket.emit('paintHex', {
+            code: state.code,
+            hexId,
+            paintType: activeBrush.type,
+            paintValue: activeBrush.value
+          });
+          playTone(400, 0.04);
+        }
+      } else if (state.phase === 'ROBBER' && state.players[state.turnIndex]?.id === socket.id) {
+        socket.emit('clickHex', { code: state.code, hexId });
+        playTone(260, 0.12);
+      }
+    }
+
+    function onEdgeInteract(edgeId) {
+      if (state.status === 'LOBBY' && state.hostId === socket.id && activeBrush.type === 'port') {
+        socket.emit('paintPort', { code: state.code, edgeId, portValue: activeBrush.value });
+        playTone(520, 0.06);
+      }
+    }
+
+    function canClientPlaceSettlement(v, me) {
+      if (!me || me.settlementsLeft <= 0) return false;
+      for (const adjId of v.adjacentVertices) {
+        if (state.board.vertices[adjId]?.building) return false;
+      }
+      if (state.phase === 'SETUP_SETTLEMENT') return true;
+      if (state.phase !== 'MAIN') return false;
+      if (buildMode && buildMode !== 'settlement') return false;
+      if (me.resources.wood < 1 || me.resources.brick < 1 || me.resources.sheep < 1 || me.resources.wheat < 1) return false;
+      return v.edgeIds.some(eId => state.board.edges[eId]?.road === socket.id);
+    }
+
+    function canClientPlaceRoad(e, me) {
+      if (!me || me.roadsLeft <= 0) return false;
+      if (state.phase === 'SETUP_ROAD') {
+        return e.v1 === state.lastSetupVertexId || e.v2 === state.lastSetupVertexId;
+      }
+      if (state.phase !== 'MAIN') return false;
+      if (buildMode && buildMode !== 'road' && me.freeRoads === 0) return false;
+      const canAfford = me.freeRoads > 0 || (me.resources.wood >= 1 && me.resources.brick >= 1);
+      if (!canAfford) return false;
+
+      for (const vId of [e.v1, e.v2]) {
+        const v = state.board.vertices[vId];
+        if (!v) continue;
+        if (v.building && v.building.owner === socket.id) return true;
+        if (v.building && v.building.owner !== socket.id) continue;
+        if (v.edgeIds.some(oe => state.board.edges[oe]?.road === socket.id)) return true;
+      }
+      return false;
+    }
+
+    function clickVertex(vertexId) {
+      playTone(580, 0.09);
+      buildMode = null;
+      socket.emit('clickVertex', { code: state.code, vertexId });
+    }
+
+    function clickEdge(edgeId) {
+      playTone(460, 0.08);
+      buildMode = null;
+      socket.emit('clickEdge', { code: state.code, edgeId });
+    }
+
+    function sendChat() {
+      const inp = document.getElementById('chatInput');
+      if (!inp.value.trim()) return;
+      socket.emit('sendChat', { code: state.code, text: inp.value });
+      inp.value = '';
+    }
+  </script>
+</body>
+</html>

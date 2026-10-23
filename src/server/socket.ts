@@ -194,10 +194,30 @@ export function registerSocketHandlers(io: Server): void {
         p.settlementsLeft = room.settings.maxSettlements;
         p.citiesLeft = room.settings.maxCities;
         p.roadsLeft = room.settings.maxRoads;
+        p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        p.devCards = [];
+        p.newDevCards = [];
+        p.knightsPlayed = 0;
+        p.longestRoadLength = 0;
+        p.goldPending = 0;
+        p.discardPending = 0;
+        p.freeRoads = 0;
+        p.playedDevCardThisTurn = false;
+        p.proposedTradeThisTurn = false;
+        p.stats = { resourcesEarned: 0, tradesMade: 0 };
       });
 
       room.status = 'SETUP';
       room.devDeck = createDevDeck(room.settings);
+      room.startedAt = Date.now();
+      room.finishedAt = null;
+      room.turnCount = 1;
+      room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+      room.lastRollHexIds = [];
+      room.recentProductions = [];
+      room.longestRoadOwner = null;
+      room.largestArmyOwner = null;
+      room.winner = null;
 
       const n = room.players.length;
       const forward = Array.from({ length: n }, (_, i) => i);
@@ -208,6 +228,51 @@ export function registerSocketHandlers(io: Server): void {
 
       const firstPlayer = room.players[0];
       addLog(room, `🎲 Turn order randomized! ${firstPlayer.avatar} ${firstPlayer.name} goes first!`, firstPlayer.color);
+      broadcastRoom(room);
+    }));
+
+    socket.on('rematchLobby', safe(({ code }) => {
+      const room = rooms[code];
+      if (!room) return;
+      if (room.botTimer) clearTimeout(room.botTimer);
+
+      room.status = 'LOBBY';
+      room.phase = 'LOBBY';
+      room.PreGoldPhase = null;
+      room.PreRobberPhase = null;
+      room.activeTrade = null;
+      room.winner = null;
+      room.longestRoadOwner = null;
+      room.largestArmyOwner = null;
+      room.lastRollHexIds = [];
+      room.recentProductions = [];
+      room.robberVictims = [];
+      room.turnCount = 1;
+      room.startedAt = null;
+      room.finishedAt = null;
+      room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+      room.board = generateBoard(room.settings);
+      room.devDeck = createDevDeck(room.settings);
+
+      room.players.forEach((p, idx) => {
+        p.color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
+        p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+        p.devCards = [];
+        p.newDevCards = [];
+        p.knightsPlayed = 0;
+        p.longestRoadLength = 0;
+        p.goldPending = 0;
+        p.discardPending = 0;
+        p.freeRoads = 0;
+        p.playedDevCardThisTurn = false;
+        p.proposedTradeThisTurn = false;
+        p.settlementsLeft = room.settings.maxSettlements;
+        p.citiesLeft = room.settings.maxCities;
+        p.roadsLeft = room.settings.maxRoads;
+        p.stats = { resourcesEarned: 0, tradesMade: 0 };
+      });
+
+      addLog(room, '🔄 Returned to Lobby for a rematch!', '#1565c0');
       broadcastRoom(room);
     }));
 
@@ -387,6 +452,8 @@ export function registerSocketHandlers(io: Server): void {
         player.resources[r] -= Number(give[r]) || 0;
         player.resources[r] += Number(get[r]) || 0;
       }
+      if (!player.stats) player.stats = { resourcesEarned: 0, tradesMade: 0 };
+      player.stats.tradesMade++;
       addLog(room, `${player.avatar} ${player.name} traded with the Bank 🏦`, player.color);
       broadcastRoom(room);
     }));

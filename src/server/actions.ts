@@ -33,11 +33,18 @@ export function handlePlaceSettlement(room: Room, player: Player, vertexId: numb
   if (isSetup) {
     room.lastSetupVertexId = vertexId;
     if (room.setupStep >= room.players.length) {
+      room.recentProductions = [];
       for (const hId of v.hexIds) {
         const hex = room.board.hexes[hId];
         if (!hex || hex.fog) continue;
-        if (RESOURCES.includes(hex.type)) givePlayerResourceFromBank(room, player, hex.type, 1);
-        else if (hex.type === 'gold') player.goldPending++;
+        if (RESOURCES.includes(hex.type)) {
+          const granted = givePlayerResourceFromBank(room, player, hex.type, 1);
+          if (granted > 0) {
+            room.recentProductions.push({ hexId: hId, playerId: player.id, resource: hex.type, amount: granted });
+          }
+        } else if (hex.type === 'gold') {
+          player.goldPending++;
+        }
       }
     }
     room.phase = 'SETUP_ROAD';
@@ -79,6 +86,7 @@ export function handlePlaceRoad(room: Room, player: Player, edgeId: number): voi
   ]);
 
   const fallbackNums = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+  if (!room.recentProductions) room.recentProductions = [];
   for (const hId of touchedHexIds) {
     const hex = room.board.hexes[hId];
     if (!hex || !hex.fog) continue;
@@ -92,6 +100,9 @@ export function handlePlaceRoad(room: Room, player: Player, edgeId: number): voi
 
     if (RESOURCES.includes(hex.type)) {
       const granted = givePlayerResourceFromBank(room, player, hex.type, 1);
+      if (granted > 0) {
+        room.recentProductions.push({ hexId: hId, playerId: player.id, resource: hex.type, amount: granted });
+      }
       addLog(
         room,
         `🌫️ ${player.avatar} ${player.name} revealed ${hex.type.toUpperCase()} (${hex.number}) from Fog${granted > 0 ? ` (+1 ${hex.type})` : ''}!`,
@@ -154,9 +165,13 @@ export function handleRollDice(room: Room, player: Player): void {
   const d2 = Math.floor(Math.random() * 6) + 1;
   const sum = d1 + d2;
   room.lastDice = [d1, d2];
+  if (!room.diceStats) room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+  room.diceStats[sum] = (room.diceStats[sum] || 0) + 1;
+  room.recentProductions = [];
   addLog(room, `${player.avatar} ${player.name} rolled ${sum} (${d1} + ${d2})`, player.color);
 
   if (sum === 7) {
+    room.lastRollHexIds = [];
     room.PreRobberPhase = 'MAIN';
     let anyDiscard = false;
     for (const p of room.players) {
@@ -169,6 +184,7 @@ export function handleRollDice(room: Room, player: Player): void {
     room.phase = anyDiscard ? 'DISCARD' : 'ROBBER';
   } else {
     const matching = room.board.hexes.filter(h => !h.fog && h.number === sum && h.id !== room.board.robberHexId && h.type !== 'water');
+    room.lastRollHexIds = matching.map(h => h.id);
     for (const hex of matching) {
       for (const vId of hex.vertexIds) {
         const b = room.board.vertices[vId]?.building;
@@ -180,7 +196,10 @@ export function handleRollDice(room: Room, player: Player): void {
               owner.goldPending += amt;
               addLog(room, `${owner.avatar} ${owner.name} earned ${amt} Gold pick(s)!`, owner.color);
             } else if (RESOURCES.includes(hex.type)) {
-              givePlayerResourceFromBank(room, owner, hex.type, amt);
+              const granted = givePlayerResourceFromBank(room, owner, hex.type, amt);
+              if (granted > 0) {
+                room.recentProductions.push({ hexId: hex.id, playerId: owner.id, resource: hex.type, amount: granted });
+              }
             }
           }
         }
@@ -292,6 +311,10 @@ export function executeTradeBetweenPlayers(room: Room, proposer: Player, partner
     proposer.resources[r] = proposer.resources[r] - o + req;
     partner.resources[r] = partner.resources[r] - req + o;
   }
+  if (!proposer.stats) proposer.stats = { resourcesEarned: 0, tradesMade: 0 };
+  if (!partner.stats) partner.stats = { resourcesEarned: 0, tradesMade: 0 };
+  proposer.stats.tradesMade++;
+  partner.stats.tradesMade++;
   addLog(room, `🤝 ${proposer.name} traded with ${partner.name}!`, proposer.color);
   room.activeTrade = null;
   broadcastRoom(room);
@@ -306,6 +329,8 @@ export function handleEndTurn(room: Room, player: Player): void {
   player.proposedTradeThisTurn = false;
   player.freeRoads = 0;
   room.activeTrade = null;
+  room.lastRollHexIds = [];
+  room.turnCount = (room.turnCount || 1) + 1;
 
   if (checkWinner(room)) return broadcastRoom(room);
 

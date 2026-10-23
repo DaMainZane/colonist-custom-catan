@@ -1,5 +1,5 @@
-import { RESOURCES } from '../constants';
-import { getMiniSvg } from '../icons';
+import { RESOURCES, RES_META } from '../constants';
+import { getMiniSvg, buildOverlappingStackHtml } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { state, setDrawerMode } from '../store';
@@ -31,13 +31,13 @@ export function renderActiveTradeModal(me: any): void {
     `;
   }).join('');
 
-  const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r => `
-    <div class="mini-res-card card-${r}">${getMiniSvg(r)}<div class="badge">${t.request[r]}</div></div>
-  `).join('');
+  const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r =>
+    buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.request[r], '', RES_META[r].name)
+  ).join('');
 
-  const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r => `
-    <div class="mini-res-card card-${r}">${getMiniSvg(r)}<div class="badge">${t.offer[r]}</div></div>
-  `).join('');
+  const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r =>
+    buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.offer[r], '', RES_META[r].name)
+  ).join('');
 
   let actionButtonsHtml = '';
   if (isMyOffer) {

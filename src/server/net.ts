@@ -36,6 +36,12 @@ export function broadcastRoom(room: Room): void {
       robberVictims: room.robberVictims || [],
       lastSetupVertexId: room.lastSetupVertexId,
       lastDice: room.lastDice,
+      lastRollHexIds: room.lastRollHexIds || [],
+      recentProductions: room.recentProductions || [],
+      diceStats: room.diceStats || {},
+      turnCount: room.turnCount || 1,
+      startedAt: room.startedAt,
+      finishedAt: room.finishedAt,
       longestRoadOwner: room.longestRoadOwner,
       largestArmyOwner: room.largestArmyOwner,
       activeTrade: room.activeTrade,
@@ -64,10 +70,12 @@ export function broadcastRoom(room: Room): void {
         settlementsLeft: pl.settlementsLeft,
         citiesLeft: pl.citiesLeft,
         roadsLeft: pl.roadsLeft,
+        stats: pl.stats || { resourcesEarned: 0, tradesMade: 0 },
         vp: getPlayerVP(room, pl, pl.id === p.id || room.status === 'GAMEOVER')
       }))
     };
     if (io) io.to(p.id).emit('gameState', state);
   }
+  room.recentProductions = [];
   scheduleBotAction(room);
 }

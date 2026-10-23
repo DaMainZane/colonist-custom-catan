@@ -287,6 +287,8 @@ export function tryHardBotBankTrade(room: Room, bot: Player): boolean {
     if (surplus[r] >= ratio) {
       bot.resources[r] -= ratio;
       bot.resources[targetRes] += 1;
+      if (!bot.stats) bot.stats = { resourcesEarned: 0, tradesMade: 0 };
+      bot.stats.tradesMade++;
       addLog(room, `${bot.avatar} ${bot.name} traded ${ratio} ${r} for 1 ${targetRes} with the Bank 🏦`, bot.color);
       return true;
     }

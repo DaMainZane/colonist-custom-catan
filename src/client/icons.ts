@@ -63,6 +63,36 @@ export function getBoardIconSvg(type: string, x: number, y: number, scale = 1): 
 }
 
 export function getMiniSvg(type: string): string {
-  return `<svg width="24" height="24" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.95)}</svg>`;
+  return `<svg width="26" height="26" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.98)}</svg>`;
+}
+
+export function buildOverlappingStackHtml(
+  cardClass: string,
+  innerSvgHtml: string,
+  count: number,
+  onClickStr: string,
+  titleStr = '',
+  extraStyle = ''
+): string {
+  const visibleSlices = Math.min(Math.max(1, count), 4);
+  const offsetStep = 8;
+  const totalWidth = 46 + (visibleSlices - 1) * offsetStep;
+
+  let slicesHtml = '';
+  for (let i = 0; i < visibleSlices; i++) {
+    const isFront = i === visibleSlices - 1;
+    slicesHtml += `
+      <div class="stack-slice ${cardClass}" style="left:${i * offsetStep}px; ${isFront ? extraStyle : ''}">
+        ${isFront ? innerSvgHtml : ''}
+        ${isFront ? `<div class="corner-ribbon">${count}</div>` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="stacked-group" style="width:${totalWidth}px;" onclick="${onClickStr}" title="${titleStr}">
+      ${slicesHtml}
+    </div>
+  `;
 }
 

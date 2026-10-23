@@ -66,6 +66,11 @@ export interface Board {
   robberHexId: number;
 }
 
+export interface PlayerStats {
+  resourcesEarned: number;
+  tradesMade: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -86,6 +91,7 @@ export interface Player {
   settlementsLeft: number;
   citiesLeft: number;
   roadsLeft: number;
+  stats: PlayerStats;
 }
 
 export interface LogEntry {
@@ -119,6 +125,13 @@ export interface Winner {
   color: string;
 }
 
+export interface RecentProduction {
+  hexId: number;
+  playerId: string;
+  resource: string;
+  amount: number;
+}
+
 export interface Room {
   code: string;
   hostId: string;
@@ -134,6 +147,12 @@ export interface Room {
   PreGoldPhase: string | null;
   PreRobberPhase?: string | null;
   lastDice: number[];
+  lastRollHexIds: number[];
+  recentProductions: RecentProduction[];
+  diceStats: Record<number, number>;
+  turnCount: number;
+  startedAt: number | null;
+  finishedAt: number | null;
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
   activeTrade: Trade | null;

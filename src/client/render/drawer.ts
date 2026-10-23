@@ -1,5 +1,5 @@
 import { RESOURCES, RES_META } from '../constants';
-import { getMiniSvg } from '../icons';
+import { getMiniSvg, buildOverlappingStackHtml } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import {
@@ -7,6 +7,7 @@ import {
   setDrawerMode, setBuildModeValue
 } from '../store';
 import { renderAll } from './index';
+import { renderHand } from './hand';
 
 function myPlayer(): any {
   return state.players.find(p => p.id === socket.id);
@@ -34,25 +35,40 @@ export function canProposePlayerTrade(me: any): boolean {
 
 // Counter adjusters used by inline onclick handlers inside the drawer markup.
 export function adjustDiscard(r: string, delta: number): void {
-  discardSel[r] += delta;
-  renderInlineDrawer(myPlayer(), true);
+  discardSel[r] = Math.max(0, (discardSel[r] || 0) + delta);
+  const me = myPlayer();
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+  renderHand(me, isMyTurn);
+  renderInlineDrawer(me, isMyTurn);
+}
+export function removeCardFromDiscard(r: string): void {
+  if (discardSel[r] > 0) {
+    discardSel[r]--;
+    playTone(420, 0.05);
+    const me = myPlayer();
+    const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+    renderHand(me, isMyTurn);
+    renderInlineDrawer(me, isMyTurn);
+  }
 }
 export function adjustTradeWant(r: string, delta: number): void {
-  tradeWant[r] += delta;
+  tradeWant[r] = Math.max(0, (tradeWant[r] || 0) + delta);
   renderInlineDrawer(myPlayer(), true);
 }
 export function adjustTradeGive(r: string, delta: number): void {
-  tradeGive[r] += delta;
-  renderInlineDrawer(myPlayer(), true);
+  tradeGive[r] = Math.max(0, (tradeGive[r] || 0) + delta);
+  const me = myPlayer();
+  renderHand(me, true);
+  renderInlineDrawer(me, true);
 }
 
 export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
   const wrap = document.getElementById('inlineDrawerWrap')!;
   const drawer = document.getElementById('inlineDrawer')!;
   const sideStack = document.getElementById('tradeConfirmStack')!;
-  const btnOk = document.getElementById('btnConfirmAction')!;
+  const btnOk = document.getElementById('btnConfirmAction');
   const btnCancel = document.getElementById('btnCancelAction')!;
-  btnOk.style.display = 'none';
+  if (btnOk) btnOk.style.display = 'none';
   btnCancel.style.display = 'none';
   sideStack.style.display = 'none';
 
@@ -89,18 +105,37 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
     `;
   } else if (drawerMode === 'discard') {
     const picked = RESOURCES.reduce((s, r) => s + discardSel[r], 0);
-    btnOk.style.display = picked === me.discardPending ? 'flex' : 'none';
+    const isReady = picked === me.discardPending;
+
+    const trayCardsHtml = RESOURCES.filter(r => discardSel[r] > 0).map(r =>
+      buildOverlappingStackHtml(
+        `card-${r}`,
+        getMiniSvg(r),
+        discardSel[r],
+        `removeCardFromDiscard('${r}')`,
+        'Click to return to hand'
+      )
+    ).join('');
+
     drawer.innerHTML = `
-      <div style="font-weight:900; color:#c62828; font-size:13px;">
-        Rolled 7! Click cards in your hand below to discard (${picked}/${me.discardPending}):
-      </div>
-      <div class="res-Select-row">
-        ${RESOURCES.map(r => discardSel[r] > 0 ? `
-          <div class="mini-res-card card-${r}" onclick="adjustDiscard('${r}', -1)">
-            ${getMiniSvg(r)}
-            <div class="badge">${discardSel[r]}</div>
+      <div class="discard-header">
+        <div class="discard-q-card">
+          <span class="up-arr">⬆</span>
+          <span>?</span>
+        </div>
+        <div>
+          <div style="color:#c62828; font-size:18px; font-weight:900;">Discard Cards (${picked}/${me.discardPending})</div>
+          <div style="color:#333; font-size:12.5px; font-weight:600; line-height:1.35; margin-top:2px;">
+            7 was rolled! You have more than ${state.settings.cardDiscardLimit} cards.<br>
+            You need to discard ${me.discardPending} of them
           </div>
-        ` : '').join('') || '<span style="font-size:12px; color:#777;">Click cards in your hand below...</span>'}
+        </div>
+      </div>
+      <div class="discard-tray">
+        ${trayCardsHtml || '<span style="font-size:12px; color:#777; font-weight:600;">Click cards in your hand below to move them here...</span>'}
+      </div>
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="discard-confirm-btn" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm Discard">✔</button>
       </div>
     `;
   } else if (drawerMode === 'robberSteal') {
@@ -131,6 +166,26 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
     (document.getElementById('btnExecPlayerTrade') as HTMLButtonElement).disabled = !canProposePlayerTrade(me);
 
     const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
+    const wantStacksHtml = RESOURCES.filter(r => tradeWant[r] > 0).map(r =>
+      buildOverlappingStackHtml(
+        `card-${r}`,
+        getMiniSvg(r),
+        tradeWant[r],
+        `adjustTradeWant('${r}', -1)`,
+        'Click to remove'
+      )
+    ).join('');
+
+    const giveStacksHtml = RESOURCES.filter(r => tradeGive[r] > 0).map(r =>
+      buildOverlappingStackHtml(
+        `card-${r}`,
+        getMiniSvg(r),
+        tradeGive[r],
+        `adjustTradeGive('${r}', -1)`,
+        'Click to return to hand'
+      )
+    ).join('');
+
     drawer.innerHTML = `
       <div class="res-Select-row" style="justify-content:space-between; border-bottom:1px solid #d4cbb8; padding-bottom:6px;">
         ${RESOURCES.map(r => `
@@ -141,21 +196,13 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
         `).join('')}
         <span style="font-size:20px;" title="Bank / Port Ratios">🏦</span>
       </div>
-      <div class="res-Select-row" style="min-height:58px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+      <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
         <span style="font-weight:900; color:#2e7d32; font-size:13px; width:46px;">👥 ⬇</span>
-        ${RESOURCES.filter(r => tradeWant[r] > 0).map(r => `
-          <div class="mini-res-card card-${r}" onclick="adjustTradeWant('${r}', -1)">
-            ${getMiniSvg(r)}<div class="badge">${tradeWant[r]}</div>
-          </div>
-        `).join('') || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
+        ${wantStacksHtml || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
       </div>
-      <div class="res-Select-row" style="min-height:58px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
+      <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
         <span style="font-weight:900; color:#c62828; font-size:13px; width:46px;">${me.avatar} ⬆</span>
-        ${RESOURCES.filter(r => tradeGive[r] > 0).map(r => `
-          <div class="mini-res-card card-${r}" onclick="adjustTradeGive('${r}', -1)">
-            ${getMiniSvg(r)}<div class="badge">${tradeGive[r]}</div>
-          </div>
-        `).join('') || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
+        ${giveStacksHtml || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
       </div>
     `;
   }
@@ -173,6 +220,8 @@ export function toggleTradeDrawer(): void {
 }
 
 export function closeInlineDrawer(): void {
+  clearRes(tradeGive);
+  clearRes(tradeWant);
   setDrawerMode(null);
   setBuildModeValue(null);
   renderAll();
@@ -180,6 +229,7 @@ export function closeInlineDrawer(): void {
 
 export function confirmInlineAction(): void {
   if (drawerMode === 'discard') {
+    playTone(620, 0.1);
     socket.emit('discardCards', { code: state.code, discards: discardSel });
     setDrawerMode(null);
   }

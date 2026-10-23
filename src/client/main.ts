@@ -3,33 +3,36 @@ import { playTone, toggleSound } from './audio';
 import { getMiniSvg } from './icons';
 import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
-  setState, setIsMouseDown, setIsPanning, setCamZoom, setCamPan, setDrawerMode, clearRes
+  setState, setIsMouseDown, setIsPanning, setCamZoom, setCamPan, setDrawerMode,
+  setHideVictoryOverlay, clearRes
 } from './store';
 import { renderAll } from './render/index';
 import {
-  rerenderBoard, resetCamera, getBoardBounds,
+  rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations,
   onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade } from './render/trade';
 import { onClickHandResource, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
-  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, adjustTradeWant, adjustTradeGive
+  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
   createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, setBrush, applyPreset,
-  pushSettings, addBot, removeBot, startGame, setBuildMode, mainTurnButton, rollDice, buyDevCard
+  pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab, toggleVictoryMapInspect,
+  setBuildMode, mainTurnButton, rollDice, buyDevCard
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, copyInviteLink, toggleSound, resetCamera, toggleLobbyToolbar, switchLobbyTab,
-  applyPreset, addBot, removeBot, startGame, setBrush, pushSettings,
+  applyPreset, addBot, removeBot, startGame, rematchLobby, switchVictoryTab, toggleVictoryMapInspect,
+  setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
-  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, adjustTradeWant, adjustTradeGive,
+  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
 });
 
@@ -68,13 +71,25 @@ socket.on('errorMsg', (msg: string) => alert(msg));
 
 socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
+  const wasGameOver = state?.status === 'GAMEOVER';
   setState(newState);
   document.getElementById('authScreen')!.style.display = 'none';
   document.getElementById('gameViewport')!.style.display = 'flex';
 
+  if (!wasGameOver && state.status === 'GAMEOVER') {
+    setHideVictoryOverlay(false);
+    playTone(523, 0.12);
+    setTimeout(() => playTone(659, 0.12), 130);
+    setTimeout(() => playTone(784, 0.22), 260);
+  }
+
   if (prevDice && prevDice !== state.lastDice.join(',')) animateDice();
   syncAutomaticDrawers();
   renderAll();
+
+  if (state.recentProductions && state.recentProductions.length > 0) {
+    triggerFlyingResourceAnimations(state.recentProductions);
+  }
 });
 
 function init(): void {

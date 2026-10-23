@@ -41,6 +41,40 @@
         <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Show/Hide Customizer Bar">⚙️</div>
       </div>
 
+      <!-- Reopen Victory Stats Button (when inspecting map after game ends) -->
+      <button id="reopenVictoryBtn" class="colonist-btn" onclick="toggleVictoryMapInspect(false)">📊 Show Victory Stats</button>
+
+      <!-- Colonist Victory & Dice Stats Overlay -->
+      <div id="victoryOverlay">
+        <div class="vic-top-bar">
+          <div style="width:120px;"></div>
+          <div style="text-align:center;">
+            <div class="vic-logo-badge">🏝️ COLONIST</div>
+            <h2 id="vicTitleText" style="font-size:28px; font-weight:900; margin-top:10px;">You are 1st!</h2>
+            <p id="vicSubText" style="font-size:13px; color:#cbd5e1; margin-top:2px;">Time: 00:00 - Turns: 0</p>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <button class="colonist-btn" style="background:#1e293b; border-color:#475569;" onclick="toggleVictoryMapInspect(true)">🗺️ Map / Replay</button>
+            <button class="colonist-btn green" onclick="copyInviteLink()">Share 🔗</button>
+          </div>
+        </div>
+
+        <div class="vic-tabs">
+          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice Stats</div>
+          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview & Resource Stats</div>
+        </div>
+
+        <div class="vic-body">
+          <div class="vic-ranks" id="vicRanksList"></div>
+          <div class="dice-chart-box" id="vicChartContainer"></div>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:center;">
+          <button class="colonist-btn" style="background:#334155; padding:10px 28px;" onclick="window.location.reload()">Home</button>
+          <button class="colonist-btn green" style="padding:10px 44px; font-size:15px;" onclick="rematchLobby()">Play Again</button>
+        </div>
+      </div>
+
       <!-- Tabbed Lobby Customizer (Map Painter + Card/Resource Amounts) -->
       <div id="lobbyToolbar">
         <div class="toolbar-header">

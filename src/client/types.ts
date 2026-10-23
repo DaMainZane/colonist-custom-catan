@@ -23,6 +23,17 @@ export interface PlayerView {
   citiesLeft: number;
   roadsLeft: number;
   vp: number;
+  stats?: {
+    resourcesEarned: number;
+    tradesMade: number;
+  };
+}
+
+export interface RecentProduction {
+  hexId: number;
+  playerId: string;
+  resource: string;
+  amount: number;
 }
 
 export interface TradeView {
@@ -50,6 +61,12 @@ export interface GameState {
   robberVictims?: string[];
   lastSetupVertexId?: number | null;
   lastDice: number[];
+  lastRollHexIds?: number[];
+  recentProductions?: RecentProduction[];
+  diceStats?: Record<number, number>;
+  turnCount?: number;
+  startedAt?: number | null;
+  finishedAt?: number | null;
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
   activeTrade: TradeView | null;

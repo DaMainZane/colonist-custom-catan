@@ -43,7 +43,8 @@ export function createPlayer(id: string, name: string, colorIndex: number, isBot
     proposedTradeThisTurn: false,
     settlementsLeft: 5,
     citiesLeft: 4,
-    roadsLeft: 15
+    roadsLeft: 15,
+    stats: { resourcesEarned: 0, tradesMade: 0 }
   };
 }
 
@@ -82,6 +83,12 @@ export function createRoom(hostId: string, hostName: string): Room {
     phase: 'LOBBY',
     PreGoldPhase: null,
     lastDice: [4, 3],
+    lastRollHexIds: [],
+    recentProductions: [],
+    diceStats: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 },
+    turnCount: 1,
+    startedAt: null,
+    finishedAt: null,
     longestRoadOwner: null,
     largestArmyOwner: null,
     activeTrade: null,

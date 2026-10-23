@@ -1,5 +1,5 @@
 import { RES_META } from '../constants';
-import { getBoardIconSvg } from '../icons';
+import { getBoardIconSvg, getMiniSvg } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import {
@@ -80,6 +80,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const svg = document.getElementById('boardSvg')!;
   const { hexes, vertices, edges, robberHexId } = state.board;
   const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
+  const rolledHexSet = new Set<number>(state.lastRollHexIds || []);
 
   if (state.status === 'LOBBY') {
     knownRoads.clear();
@@ -167,6 +168,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     const pipsCount = (!isFog && h.number) ? Math.max(0, 6 - Math.abs(7 - h.number)) : 0;
     const pipsDots = '•'.repeat(pipsCount);
     const isRedNum = h.number === 6 || h.number === 8;
+    const isRolledHex = !isFog && rolledHexSet.has(h.id);
     const fogAnim = getPieceAnimAttrs(`fog_${h.id}`, now);
 
     html += `
@@ -178,13 +180,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <g transform="translate(${h.x}, ${h.y})">
           <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
             ${getBoardIconSvg(tileType, 0, isFog ? -16 : -30, 1.25)}
-            ${(!isFog && h.number) ? `
+          </g>
+        </g>
+
+        <!-- Colonist Dark Black/Gray Indicator When Number Is Rolled -->
+        ${isRolledHex ? `<polygon points="${pts}" fill="rgba(0, 0, 0, 0.54)" stroke="#111" stroke-width="3" stroke-linejoin="round" />` : ''}
+
+        ${(!isFog && h.number) ? `
+          <g transform="translate(${h.x}, ${h.y})">
+            <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
               <rect x="-24" y="-4" width="48" height="46" rx="9" fill="#f5efe6" stroke="#c5bba8" stroke-width="2.5" />
               <text x="0" y="22" text-anchor="middle" font-size="25" font-weight="900" fill="${isRedNum ? '#d50000' : '#111'}">${h.number}</text>
               <text x="0" y="36" text-anchor="middle" font-size="14" font-weight="900" letter-spacing="1" fill="${isRedNum ? '#d50000' : '#333'}">${pipsDots}</text>
-            ` : ''}
+            </g>
           </g>
-        </g>
+        ` : ''}
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + 28}, ${h.y - 16})">
@@ -393,5 +403,64 @@ export function clickEdge(edgeId: number): void {
   playTone(460, 0.08);
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
+}
+
+export function triggerFlyingResourceAnimations(productions: any[]): void {
+  const svg = document.getElementById('boardSvg') as unknown as SVGSVGElement | null;
+  if (!svg || !state?.board) return;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return;
+
+  let delay = 0;
+  productions.forEach(prod => {
+    const hex = state.board.hexes[prod.hexId];
+    if (!hex) return;
+
+    const pt = svg.createSVGPoint();
+    pt.x = hex.x;
+    pt.y = hex.y;
+    const screenPt = pt.matrixTransform(ctm);
+
+    let targetEl: HTMLElement | null = null;
+    if (prod.playerId === socket.id) {
+      targetEl = document.getElementById('myHandPanel');
+    } else {
+      targetEl = document.getElementById(`playerRow_${prod.playerId}`);
+    }
+    if (!targetEl) return;
+    const rect = targetEl.getBoundingClientRect();
+    const targetX = rect.left + rect.width / 2 - 22;
+    const targetY = rect.top + rect.height / 2 - 30;
+
+    const cardsToFly = Math.min(prod.amount || 1, 3);
+    for (let i = 0; i < cardsToFly; i++) {
+      const d = delay;
+      delay += 110;
+      setTimeout(() => {
+        const cardEl = document.createElement('div');
+        cardEl.className = `flying-res-card card-${prod.resource}`;
+        cardEl.innerHTML = getMiniSvg(prod.resource);
+        cardEl.style.left = `${screenPt.x - 22 + (i * 8)}px`;
+        cardEl.style.top = `${screenPt.y - 30 - (i * 6)}px`;
+        cardEl.style.transform = 'scale(0.85)';
+        document.body.appendChild(cardEl);
+
+        playTone(540 + i * 60, 0.06);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            cardEl.style.left = `${targetX}px`;
+            cardEl.style.top = `${targetY}px`;
+            cardEl.style.transform = 'scale(1)';
+          });
+        });
+
+        setTimeout(() => {
+          cardEl.style.opacity = '0';
+          setTimeout(() => cardEl.remove(), 220);
+        }, 680);
+      }, d);
+    }
+  });
 }
 

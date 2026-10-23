@@ -1,5 +1,5 @@
 import { RESOURCES, RES_META } from '../constants';
-import { getMiniSvg } from '../icons';
+import { getMiniSvg, buildOverlappingStackHtml } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode } from '../store';
@@ -13,13 +13,27 @@ export function renderHand(me: any, isMyTurn: boolean): void {
   }
 
   let html = RESOURCES.map(r => {
-    const count = me.resources[r] || 0;
-    return `
-      <div class="card-stack card-${r}" onclick="onClickHandResource('${r}')" title="Click to Offer ${RES_META[r].name} in Trade / Discard">
-        ${getMiniSvg(r)}
-        <div class="count-badge">${count}</div>
-      </div>
-    `;
+    // When discarding or trading, subtract cards currently placed in the tray so they visually move!
+    let count = me.resources[r] || 0;
+    if (drawerMode === 'discard') count = Math.max(0, count - (discardSel[r] || 0));
+    else if (drawerMode === 'trade') count = Math.max(0, count - (tradeGive[r] || 0));
+
+    if (count <= 0 && state.status !== 'LOBBY') return '';
+    if (count <= 0 && state.status === 'LOBBY') {
+      return `
+        <div class="mini-res-card card-${r}" style="opacity:0.55;">
+          ${getMiniSvg(r)}
+          <div class="corner-ribbon">0</div>
+        </div>
+      `;
+    }
+    return buildOverlappingStackHtml(
+      `card-${r}`,
+      getMiniSvg(r),
+      count,
+      `onClickHandResource('${r}')`,
+      `Click to select ${RES_META[r].name}`
+    );
   }).join('');
 
   const allDevs = [...(me.devCards || []), ...(me.newDevCards || [])];
@@ -29,15 +43,19 @@ export function renderHand(me: any, isMyTurn: boolean): void {
 
   Object.keys(devCounts).forEach(c => {
     const canPlay = isMyTurn && !me.playedDevCardThisTurn && (me.devCards || []).includes(c) && c !== 'vp';
-    html += `
-      <div class="card-stack card-dev" style="${canPlay ? 'outline:2.5px solid #ffd700;' : 'opacity:0.85;'}"
-        onclick="${canPlay ? `onClickDevCard('${c}')` : ''}" title="Dev Card: ${c} (Click to Play)">
-        <span style="font-size:20px">${devIcons[c] || '🃏'}</span>
-        <div class="count-badge">${devCounts[c]}</div>
-      </div>
-    `;
+    html += buildOverlappingStackHtml(
+      'card-dev',
+      `<span style="font-size:20px">${devIcons[c] || '🃏'}</span>`,
+      devCounts[c],
+      canPlay ? `onClickDevCard('${c}')` : '',
+      `Dev Card: ${c}`,
+      canPlay ? 'outline:2.5px solid #ffd700;' : 'opacity:0.85;'
+    );
   });
 
+  if (!html) {
+    html = `<span style="font-size:13px; font-weight:700; color:#888;">No cards in hand</span>`;
+  }
   panel.innerHTML = html;
 }
 
@@ -51,6 +69,7 @@ export function onClickHandResource(r: string): void {
     if (discardSel[r] < me.resources[r] && totalSelected < me.discardPending) {
       discardSel[r]++;
       playTone(500, 0.05);
+      renderHand(me, isMyTurn);
       renderInlineDrawer(me, isMyTurn);
     }
   } else if (isMyTurn && state.phase === 'MAIN') {
@@ -63,6 +82,7 @@ export function onClickHandResource(r: string): void {
     if (tradeGive[r] < me.resources[r]) {
       tradeGive[r]++;
       playTone(480, 0.05);
+      renderHand(me, isMyTurn);
       renderInlineDrawer(me, isMyTurn);
     }
   }
