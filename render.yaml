@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: catan
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true

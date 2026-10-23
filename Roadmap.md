@@ -1,4 +1,4 @@
-# Catan Rework: Architecture Brainstorm
+	# Catan Rework: Architecture Brainstorm
 
 ## 1. Goal
 A modular Catan-style game, hosted remotely for a private group (max 8 players), playable in phone and PC browsers. It has bots, a player-facing map/level maker, and an engine where new pieces, mechanics and interactions are added as self-contained modules. One build command bundles everything. The README is rewritten to document the infrastructure and goals. Most of the current internals will be replaced.
