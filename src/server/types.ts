@@ -5,6 +5,7 @@ export interface Settings {
   boardRadius: number;
   goldTiles: number;
   desertTiles: number;
+  fogTiles?: number;
   vpToWin: number;
   maxPlayers: number;
   cardDiscardLimit: number;
@@ -32,6 +33,7 @@ export interface Hex {
   y?: number;
   type: string;
   number: number | null;
+  fog?: boolean;
   corners?: { x: number; y: number }[];
   vertexIds?: number[];
 }
@@ -130,6 +132,7 @@ export interface Room {
   setupOrder: number[];
   phase: string;
   PreGoldPhase: string | null;
+  PreRobberPhase?: string | null;
   lastDice: number[];
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
@@ -138,5 +141,6 @@ export interface Room {
   logs: LogEntry[];
   chats: ChatEntry[];
   lastSetupVertexId?: number | null;
+  robberVictims?: string[];
   botTimer?: any;
 }

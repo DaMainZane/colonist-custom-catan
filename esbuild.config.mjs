@@ -59,10 +59,12 @@ if (watching) {
   };
   fsWatch('public', { recursive: true }, recopy);
   fsWatch('src/client/styles.css', recopy);
-  process.on('SIGINT', () => {
+  const cleanup = () => {
     if (child) child.kill();
     process.exit(0);
-  });
+  };
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 } else {
   await build(serverOptions);
   await build(clientOptions);

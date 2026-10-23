@@ -60,6 +60,7 @@ export function pushSettings(): void {
       cardDiscardLimit: val('setDiscard'),
       goldTiles: val('setGold'),
       desertTiles: val('setDesert'),
+      fogTiles: val('setFog'),
       bankResourcePerType: val('setBankRes'),
       devKnights: val('setDevKnight'),
       devVp: val('setDevVp'),

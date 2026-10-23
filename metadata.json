@@ -1,0 +1,8 @@
+{
+  "name": "Colonist-Style Catan Online",
+  "description": "Customizable Online Multiplayer Catan Board Game with Hard Bots, Full Trading, and Custom Map Painter",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

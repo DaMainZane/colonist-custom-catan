@@ -7,15 +7,25 @@ import {
   setCamZoom, setCamPan
 } from '../store';
 
-export function renderBoard(me: any, isMyTurn: boolean): void {
-  if (!state || !state.board) return;
-  const svg = document.getElementById('boardSvg')!;
-  const { hexes, vertices, edges, robberHexId } = state.board;
-  const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
+const knownRoads = new Set<number>();
+const knownBuildings = new Map<number, string>();
+const knownFogHexes = new Set<number>();
+const pieceAnimTimestamps = new Map<string, number>();
+const ANIM_DURATION_MS = 500;
+
+let cachedBoundsKey = '';
+let cachedBounds = { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
+
+export function getBoardBounds(): { centerX0: number; centerY0: number; contentW: number; contentH: number } {
+  if (!state || !state.board || !state.board.hexes || state.board.hexes.length === 0) {
+    return { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
+  }
+  const key = `${state.code}_${state.status}_${state.board.hexes.length}`;
+  if (key === cachedBoundsKey) return cachedBounds;
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  hexes.forEach(h => {
-    h.corners.forEach(pt => {
+  state.board.hexes.forEach((h: any) => {
+    h.corners.forEach((pt: any) => {
       if (pt.x < minX) minX = pt.x;
       if (pt.x > maxX) maxX = pt.x;
       if (pt.y < minY) minY = pt.y;
@@ -27,11 +37,87 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const bottomExtra = 165;
   const sidePad = 130;
 
-  const baseX = (minX - sidePad) - camPanX * camZoom;
-  const baseY = (minY - topExtra) - camPanY * camZoom;
-  const baseW = ((maxX - minX) + sidePad * 2) * camZoom;
-  const baseH = ((maxY - minY) + topExtra + bottomExtra) * camZoom;
+  const contentX = minX - sidePad;
+  const contentY = minY - topExtra;
+  const contentW = (maxX - minX) + sidePad * 2;
+  const contentH = (maxY - minY) + topExtra + bottomExtra;
+
+  cachedBoundsKey = key;
+  cachedBounds = {
+    centerX0: contentX + contentW / 2,
+    centerY0: contentY + contentH / 2,
+    contentW,
+    contentH
+  };
+  return cachedBounds;
+}
+
+export function updateCameraViewBox(): void {
+  if (!state || !state.board) return;
+  const svg = document.getElementById('boardSvg');
+  if (!svg) return;
+  const { centerX0, centerY0, contentW, contentH } = getBoardBounds();
+  const baseW = contentW * camZoom;
+  const baseH = contentH * camZoom;
+  const baseX = (centerX0 - camPanX) - baseW / 2;
+  const baseY = (centerY0 - camPanY) - baseH / 2;
   svg.setAttribute('viewBox', `${baseX} ${baseY} ${baseW} ${baseH}`);
+}
+
+function getPieceAnimAttrs(key: string, now: number): { isAnimating: boolean; delayStyle: string } {
+  const start = pieceAnimTimestamps.get(key);
+  if (start === undefined) return { isAnimating: false, delayStyle: '' };
+  const elapsed = now - start;
+  if (elapsed >= ANIM_DURATION_MS) return { isAnimating: false, delayStyle: '' };
+  return {
+    isAnimating: true,
+    delayStyle: `animation-delay: -${Math.max(0, Math.round(elapsed))}ms;`
+  };
+}
+
+export function renderBoard(me: any, isMyTurn: boolean): void {
+  if (!state || !state.board) return;
+  const svg = document.getElementById('boardSvg')!;
+  const { hexes, vertices, edges, robberHexId } = state.board;
+  const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
+
+  if (state.status === 'LOBBY') {
+    knownRoads.clear();
+    knownBuildings.clear();
+    knownFogHexes.clear();
+    pieceAnimTimestamps.clear();
+    for (const h of hexes) {
+      if (h.fog || h.type === 'fog') knownFogHexes.add(h.id);
+    }
+  }
+
+  const now = performance.now();
+  for (const h of hexes) {
+    const isFog = !!h.fog || h.type === 'fog';
+    if (isFog) {
+      knownFogHexes.add(h.id);
+    } else if (knownFogHexes.has(h.id)) {
+      knownFogHexes.delete(h.id);
+      pieceAnimTimestamps.set(`fog_${h.id}`, now);
+    }
+  }
+  for (const e of edges) {
+    if (e.road && !knownRoads.has(e.id)) {
+      knownRoads.add(e.id);
+      pieceAnimTimestamps.set(`road_${e.id}`, now);
+    }
+  }
+  for (const v of vertices) {
+    if (v.building) {
+      const prev = knownBuildings.get(v.id);
+      if (prev !== v.building.type) {
+        knownBuildings.set(v.id, v.building.type);
+        pieceAnimTimestamps.set(`${v.building.type}_${v.id}`, now);
+      }
+    }
+  }
+
+  updateCameraViewBox();
 
   let html = `
     <defs>
@@ -40,19 +126,30 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <stop offset="50%" stop-color="#ff9800" />
         <stop offset="100%" stop-color="#ffd700" />
       </linearGradient>
+      <linearGradient id="fogGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#cfd8dc" />
+        <stop offset="50%" stop-color="#b0bec5" />
+        <stop offset="100%" stop-color="#90a4ae" />
+      </linearGradient>
     </defs>
   `;
 
-  const landPolys = hexes.filter(h => h.type !== 'water').map(h => h.corners.map(c => `${c.x},${c.y}`).join(' '));
-  landPolys.forEach(pts => {
+  const coastalHexIds = new Set<number>();
+  for (const e of edges) {
+    if (e.hexIds.length === 1) coastalHexIds.add(e.hexIds[0]);
+  }
+  const landPolys = hexes
+    .filter((h: any) => h.type !== 'water' && coastalHexIds.has(h.id))
+    .map((h: any) => h.corners.map((c: any) => `${c.x},${c.y}`).join(' '));
+  landPolys.forEach((pts: string) => {
     html += `<polygon points="${pts}" fill="#26c6da" stroke="#26c6da" stroke-width="46" stroke-linejoin="round" opacity="0.45" />`;
   });
-  landPolys.forEach(pts => {
+  landPolys.forEach((pts: string) => {
     html += `<polygon points="${pts}" fill="#f4d799" stroke="#f4d799" stroke-width="22" stroke-linejoin="round" />`;
   });
 
   for (const h of hexes) {
-    const pts = h.corners.map(c => `${c.x},${c.y}`).join(' ');
+    const pts = h.corners.map((c: any) => `${c.x},${c.y}`).join(' ');
     if (h.type === 'water') {
       if (state.status === 'LOBBY') {
         html += `
@@ -63,27 +160,33 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       continue;
     }
 
-    const meta = RES_META[h.type] || RES_META.desert;
-    const canClickRobber = isMyTurn && state.phase === 'ROBBER' && h.id !== robberHexId;
-    const pipsCount = h.number ? Math.max(0, 6 - Math.abs(7 - h.number)) : 0;
+    const isFog = !!h.fog || h.type === 'fog';
+    const tileType = isFog ? 'fog' : h.type;
+    const meta = RES_META[tileType] || RES_META.desert;
+    const canClickRobber = isMyTurn && state.phase === 'ROBBER' && h.id !== robberHexId && !isFog;
+    const pipsCount = (!isFog && h.number) ? Math.max(0, 6 - Math.abs(7 - h.number)) : 0;
     const pipsDots = '•'.repeat(pipsCount);
     const isRedNum = h.number === 6 || h.number === 8;
+    const fogAnim = getPieceAnimAttrs(`fog_${h.id}`, now);
 
     html += `
       <g style="${isLobbyHost || canClickRobber ? 'cursor:pointer' : ''}"
          onmousedown="onHexInteract(${h.id}, event)"
          onmouseenter="onHexEnter(${h.id}, event)">
         <polygon points="${pts}" fill="${meta.color}" stroke="${meta.border}" stroke-width="8" stroke-linejoin="round" />
-        <polygon points="${pts}" fill="none" stroke="#e8c987" stroke-width="3" />
-        ${getBoardIconSvg(h.type, h.x, h.y - 30, 1.25)}
+        <polygon points="${pts}" fill="none" stroke="${isFog ? '#eceff1' : '#e8c987'}" stroke-width="3" />
+        <g transform="translate(${h.x}, ${h.y})">
+          <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
+            ${getBoardIconSvg(tileType, 0, isFog ? -16 : -30, 1.25)}
+            ${(!isFog && h.number) ? `
+              <rect x="-24" y="-4" width="48" height="46" rx="9" fill="#f5efe6" stroke="#c5bba8" stroke-width="2.5" />
+              <text x="0" y="22" text-anchor="middle" font-size="25" font-weight="900" fill="${isRedNum ? '#d50000' : '#111'}">${h.number}</text>
+              <text x="0" y="36" text-anchor="middle" font-size="14" font-weight="900" letter-spacing="1" fill="${isRedNum ? '#d50000' : '#333'}">${pipsDots}</text>
+            ` : ''}
+          </g>
+        </g>
 
-        ${h.number ? `
-          <rect x="${h.x - 24}" y="${h.y - 4}" width="48" height="46" rx="9" fill="#f5efe6" stroke="#c5bba8" stroke-width="2.5" />
-          <text x="${h.x}" y="${h.y + 22}" text-anchor="middle" font-size="25" font-weight="900" fill="${isRedNum ? '#d50000' : '#111'}">${h.number}</text>
-          <text x="${h.x}" y="${h.y + 36}" text-anchor="middle" font-size="14" font-weight="900" letter-spacing="1" fill="${isRedNum ? '#d50000' : '#333'}">${pipsDots}</text>
-        ` : ''}
-
-        ${h.id === robberHexId ? `
+        ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + 28}, ${h.y - 16})">
             <ellipse cx="0" cy="18" rx="14" ry="5" fill="rgba(0,0,0,0.35)" />
             <path d="M-12,16 L12,16 L8,-2 C11,-6 6,-16 0,-16 C-6,-16 -11,-6 -8,-2 Z" fill="#90a4ae" stroke="#263238" stroke-width="2.2" stroke-linejoin="round"/>
@@ -134,9 +237,19 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     if (!v1 || !v2) continue;
     if (e.road) {
       const owner = state.players.find(p => p.id === e.road);
+      const mx = (v1.x + v2.x) / 2;
+      const my = (v1.y + v2.y) / 2;
+      const dx = (v2.x - v1.x) / 2;
+      const dy = (v2.y - v1.y) / 2;
+      const anim = getPieceAnimAttrs(`road_${e.id}`, now);
       html += `
-        <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="#222" stroke-width="14" stroke-linecap="round" />
-        <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="${owner?.color || '#fff'}" stroke-width="9" stroke-linecap="round" />
+        <g transform="translate(${mx}, ${my})">
+          ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+          <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+            <line x1="${-dx}" y1="${-dy}" x2="${dx}" y2="${dy}" stroke="#222" stroke-width="14" stroke-linecap="round" />
+            <line x1="${-dx}" y1="${-dy}" x2="${dx}" y2="${dy}" stroke="${owner?.color || '#fff'}" stroke-width="9" stroke-linecap="round" />
+          </g>
+        </g>
       `;
     } else if (isMyTurn && canClientPlaceRoad(e, me)) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
@@ -149,25 +262,39 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
 
+  const robberVictimSet = new Set<string>(state.robberVictims || []);
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#fff';
       const canUpgrade = isMyTurn && state.phase === 'MAIN' && v.building.owner === socket.id &&
         v.building.type === 'settlement' && me.resources.wheat >= 2 && me.resources.ore >= 3 && me.citiesLeft > 0;
+      const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
+        v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
+      const isClickable = canUpgrade || canRobThisBuilding;
 
       if (v.building.type === 'settlement') {
+        const anim = getPieceAnimAttrs(`settlement_${v.id}`, now);
         html += `
-          <g onclick="${canUpgrade ? `clickVertex(${v.id})` : ''}" style="${canUpgrade ? 'cursor:pointer' : ''}">
-            <polygon points="${v.x},${v.y-17} ${v.x+14},${v.y-5} ${v.x+14},${v.y+13} ${v.x-14},${v.y+13} ${v.x-14},${v.y-5}"
-              fill="${col}" stroke="${canUpgrade ? '#ffd700' : '#111'}" stroke-width="${canUpgrade ? '4' : '3'}" stroke-linejoin="round" />
+          <g transform="translate(${v.x}, ${v.y})" onclick="${isClickable ? `clickVertex(${v.id})` : ''}" style="${isClickable ? 'cursor:pointer' : ''}">
+            ${anim.isAnimating ? `<circle cx="0" cy="4" r="24" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+            ${canRobThisBuilding ? `<circle cx="0" cy="0" r="22" fill="none" stroke="#ff1744" stroke-width="3.5" stroke-dasharray="5,3" />` : ''}
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+              <polygon points="0,-17 14,-5 14,13 -14,13 -14,-5"
+                fill="${col}" stroke="${canUpgrade ? '#ffd700' : (canRobThisBuilding ? '#ff1744' : '#111')}" stroke-width="${isClickable ? '4' : '3'}" stroke-linejoin="round" />
+            </g>
           </g>
         `;
       } else {
+        const anim = getPieceAnimAttrs(`city_${v.id}`, now);
         html += `
-          <g>
-            <polygon points="${v.x-18},${v.y+14} ${v.x-18},${v.y-6} ${v.x-6},${v.y-19} ${v.x+6},${v.y-6} ${v.x+18},${v.y-6} ${v.x+18},${v.y+14}"
-              fill="${col}" stroke="#111" stroke-width="3" stroke-linejoin="round" />
+          <g transform="translate(${v.x}, ${v.y})" onclick="${canRobThisBuilding ? `clickVertex(${v.id})` : ''}" style="${canRobThisBuilding ? 'cursor:pointer' : ''}">
+            ${anim.isAnimating ? `<circle cx="0" cy="4" r="28" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+            ${canRobThisBuilding ? `<circle cx="0" cy="0" r="25" fill="none" stroke="#ff1744" stroke-width="3.5" stroke-dasharray="5,3" />` : ''}
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+              <polygon points="-18,14 -18,-6 -6,-19 6,-6 18,-6 18,14"
+                fill="${col}" stroke="${canRobThisBuilding ? '#ff1744' : '#111'}" stroke-width="${canRobThisBuilding ? '4' : '3'}" stroke-linejoin="round" />
+            </g>
           </g>
         `;
       }
@@ -182,19 +309,16 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   svg.innerHTML = html;
 }
 
-// Re-renders the board from current state (used by camera pan/zoom/reset).
+// Updates camera viewBox immediately on pan/zoom/reset without reconstructing the SVG DOM.
 export function rerenderBoard(): void {
   if (!state) return;
-  renderBoard(
-    state.players.find(p => p.id === socket.id),
-    state.players[state.turnIndex]?.id === socket.id
-  );
+  updateCameraViewBox();
 }
 
 export function resetCamera(): void {
   setCamZoom(1);
   setCamPan(0, 0);
-  rerenderBoard();
+  updateCameraViewBox();
 }
 
 export function onHexInteract(hexId: number, ev?: MouseEvent): void {
@@ -270,3 +394,4 @@ export function clickEdge(edgeId: number): void {
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
 }
+

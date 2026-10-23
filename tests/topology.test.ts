@@ -48,6 +48,31 @@ describe('topology', () => {
     expect(b.hexes.every(h => h.type === 'water')).toBe(true);
     expect(b.vertices).toHaveLength(0);
   });
+
+  it('never spawns ports on two tiles next to each other', () => {
+    for (const r of [1, 2, 3, 4]) {
+      const b = generateBoard({ ...settings, boardRadius: r });
+      const portEdges = b.edges.filter(e => e.port);
+      expect(portEdges.length).toBeGreaterThan(0);
+      const portHexes = portEdges.map(e => b.hexes[e.hexIds[0]]);
+      for (let i = 0; i < portHexes.length; i++) {
+        for (let j = i + 1; j < portHexes.length; j++) {
+          const a = portHexes[i];
+          const c = portHexes[j];
+          const dist = (Math.abs(a.q - c.q) + Math.abs(a.q + a.r - c.q - c.r) + Math.abs(a.r - c.r)) / 2;
+          expect(dist).toBeGreaterThan(1);
+        }
+      }
+    }
+  });
+
+  it('supports board radius up to 50 and fogIsland preset', () => {
+    const fogBoard = generateBoard(settings, 'fogIsland');
+    expect(fogBoard.hexes.some(h => h.fog)).toBe(true);
+
+    const bigBoard = generateBoard({ ...settings, boardRadius: 10 }, 'blank');
+    expect(bigBoard.hexes).toHaveLength(1 + 3 * 10 * 11);
+  });
 });
 
 describe('util', () => {
@@ -67,3 +92,4 @@ describe('util', () => {
     expect(clamp(2.9, 1, 4, 2)).toBe(2);
   });
 });
+

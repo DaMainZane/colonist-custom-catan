@@ -6,12 +6,15 @@ import {
   setState, setIsMouseDown, setIsPanning, setCamZoom, setCamPan, setDrawerMode, clearRes
 } from './store';
 import { renderAll } from './render/index';
-import { rerenderBoard, resetCamera, onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge } from './render/board';
+import {
+  rerenderBoard, resetCamera, getBoardBounds,
+  onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
+} from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade } from './render/trade';
 import { onClickHandResource, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
-  confirmMonopoly, pickGold, adjustDiscard, adjustTradeWant, adjustTradeGive
+  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, adjustTradeWant, adjustTradeGive
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
@@ -26,7 +29,7 @@ Object.assign(window as any, {
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
-  pickGold, confirmMonopoly, adjustDiscard, adjustTradeWant, adjustTradeGive,
+  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
 });
 
@@ -49,12 +52,14 @@ function syncAutomaticDrawers(): void {
 
   if (me.goldPending > 0) {
     setDrawerMode('gold');
+  } else if (state.phase === 'ROBBER_STEAL' && state.currentPlayerId === socket.id) {
+    setDrawerMode('robberSteal');
   } else if (state.phase === 'DISCARD' && me.discardPending > 0) {
     if (drawerMode !== 'discard') {
       clearRes(discardSel);
       setDrawerMode('discard');
     }
-  } else if (drawerMode === 'gold' || drawerMode === 'discard') {
+  } else if (drawerMode === 'gold' || drawerMode === 'discard' || drawerMode === 'robberSteal') {
     setDrawerMode(null);
   }
 }
@@ -80,23 +85,55 @@ function init(): void {
   const stage = document.getElementById('boardStage')!;
   stage.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 1.08 : 0.92;
-    setCamZoom(Math.max(0.45, Math.min(2.2, camZoom * factor)));
+    if (!state || !state.board) return;
+    const svg = document.getElementById('boardSvg')!;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    const { contentW, contentH } = getBoardBounds();
+    const baseUnitPerPx = Math.max(contentW / rect.width, contentH / rect.height);
+
+    const oldZoom = camZoom;
+    const factor = e.deltaY > 0 ? 1.12 : (1 / 1.12);
+    const newZoom = Math.max(0.01, Math.min(5.0, oldZoom * factor));
+
+    const offsetX = e.clientX - (rect.left + rect.width / 2);
+    const offsetY = e.clientY - (rect.top + rect.height / 2);
+
+    const oldWorldPerPx = oldZoom * baseUnitPerPx;
+    const newWorldPerPx = newZoom * baseUnitPerPx;
+
+    // Anchor the world point directly underneath the cursor
+    const newPanX = camPanX + offsetX * (newWorldPerPx - oldWorldPerPx);
+    const newPanY = camPanY + offsetY * (newWorldPerPx - oldWorldPerPx);
+
+    setCamZoom(newZoom);
+    setCamPan(newPanX, newPanY);
     rerenderBoard();
   }, { passive: false });
 
   stage.addEventListener('mousedown', (e: MouseEvent) => {
-    if (e.button === 2 || e.button === 1 || e.altKey) {
+    const isOceanOrStage = e.target === stage || (e.target as Element)?.id === 'boardSvg';
+    const canLeftPan = state && (state.status !== 'LOBBY' || isOceanOrStage);
+    if (e.button === 2 || e.button === 1 || e.altKey || (e.button === 0 && isOceanOrStage && canLeftPan)) {
       setIsPanning(true);
-      panStart.x = e.clientX - camPanX;
-      panStart.y = e.clientY - camPanY;
+      panStart.x = e.clientX;
+      panStart.y = e.clientY;
     } else {
       setIsMouseDown(true);
     }
   });
   window.addEventListener('mousemove', (e: MouseEvent) => {
-    if (isPanning) {
-      setCamPan(e.clientX - panStart.x, e.clientY - panStart.y);
+    if (isPanning && state && state.board) {
+      const svg = document.getElementById('boardSvg')!;
+      const rect = svg.getBoundingClientRect();
+      const { contentW, contentH } = getBoardBounds();
+      const worldPerPx = camZoom * Math.max(contentW / (rect.width || 1), contentH / (rect.height || 1));
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      panStart.x = e.clientX;
+      panStart.y = e.clientY;
+      setCamPan(camPanX + dx * worldPerPx, camPanY + dy * worldPerPx);
       rerenderBoard();
     }
   });
@@ -109,3 +146,4 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+

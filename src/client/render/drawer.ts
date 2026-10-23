@@ -103,6 +103,26 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
         ` : '').join('') || '<span style="font-size:12px; color:#777;">Click cards in your hand below...</span>'}
       </div>
     `;
+  } else if (drawerMode === 'robberSteal') {
+    const victimIds = state.robberVictims || [];
+    const victims = victimIds
+      .map((id: string) => state.players.find(p => p.id === id))
+      .filter(Boolean);
+    drawer.innerHTML = `
+      <div style="font-weight:900; color:#c62828; font-size:13.5px; display:flex; align-items:center; gap:6px;">
+        <span>♟️ Choose a Player to Rob:</span>
+      </div>
+      <div class="res-Select-row" style="gap:8px;">
+        ${victims.map((v: any) => `
+          <button class="colonist-btn" style="background:${v.color}; padding:7px 12px; display:flex; align-items:center; gap:7px; border-radius:10px;"
+            onclick="chooseRobberVictim('${v.id}')">
+            <span style="font-size:17px;">${v.avatar}</span>
+            <span style="font-weight:900;">${v.name}</span>
+            <span style="background:rgba(0,0,0,0.28); padding:2px 6px; border-radius:6px; font-size:11.5px;">🃏 ${v.resourceCount}</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
   } else if (drawerMode === 'trade') {
     btnCancel.style.display = 'flex';
     sideStack.style.display = 'flex';
@@ -188,3 +208,10 @@ export function pickGold(resource: string): void {
   playTone(780, 0.1);
   socket.emit('pickGoldResource', { code: state.code, resource });
 }
+
+export function chooseRobberVictim(victimId: string): void {
+  playTone(340, 0.11);
+  socket.emit('stealFromPlayer', { code: state.code, victimId });
+  setDrawerMode(null);
+}
+

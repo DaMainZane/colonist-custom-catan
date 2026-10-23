@@ -21,6 +21,7 @@ export function renderAll(): void {
     setVal('setDiscard', s.cardDiscardLimit);
     setVal('setGold', s.goldTiles);
     setVal('setDesert', s.desertTiles);
+    if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
     setVal('setBankRes', s.bankResourcePerType);
     setVal('setDevKnight', s.devKnights);
     setVal('setDevVp', s.devVp);
@@ -57,6 +58,7 @@ export function renderAll(): void {
       GOLD_PICK: 'Pick Gold Resource',
       DISCARD: 'Discard Half (7 Rolled)',
       ROBBER: 'Move Robber',
+      ROBBER_STEAL: 'Choose Player to Rob',
       MAIN: 'Turn'
     } as Record<string, string>)[state.phase] || state.phase;
     pill.innerHTML = `<span>${current?.avatar || ''}</span> <strong>${current?.name}</strong> — ${phaseTxt}`;

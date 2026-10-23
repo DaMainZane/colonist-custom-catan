@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRoom } from '../src/server/rooms';
+import { handleMoveRobber, handlePlaceRoad, handleStealFromVictim } from '../src/server/actions';
+import { createPlayer, createRoom } from '../src/server/rooms';
 import {
   canPlaceSettlement,
   computePlayerLongestRoad,
@@ -84,4 +85,52 @@ describe('rules', () => {
       expect(ratios[portVertex.port]).toBe(2);
     }
   });
+
+  it('reveals fog tile and grants 1 resource when road touches fog tile', () => {
+    const room = createRoom('host', 'Host');
+    const player = room.players[0];
+    room.status = 'PLAYING';
+    room.phase = 'MAIN';
+    player.resources.wood = 1;
+    player.resources.brick = 1;
+
+    const targetHex = room.board.hexes[0];
+    targetHex.type = 'ore';
+    targetHex.number = 8;
+    targetHex.fog = true;
+
+    const vId = targetHex.vertexIds[0];
+    room.board.vertices[vId].building = { owner: 'host', type: 'settlement' };
+    const edgeId = room.board.vertices[vId].edgeIds[0];
+
+    handlePlaceRoad(room, player, edgeId);
+    expect(targetHex.fog).toBe(false);
+    expect(player.resources.ore).toBe(1);
+  });
+
+  it('prompts player choice when robbing a hex with 2 or more opponents', () => {
+    const room = createRoom('host', 'Host');
+    const p2 = createPlayer('p2', 'Alice', 1, false);
+    const p3 = createPlayer('p3', 'Bob', 2, false);
+    p2.resources.wheat = 2;
+    p3.resources.sheep = 3;
+    room.players.push(p2, p3);
+    room.status = 'PLAYING';
+    room.phase = 'ROBBER';
+
+    const targetHex = room.board.hexes.find(h => h.id !== room.board.robberHexId && h.vertexIds.length === 6);
+    expect(targetHex).toBeDefined();
+    room.board.vertices[targetHex.vertexIds[0]].building = { owner: 'p2', type: 'settlement' };
+    room.board.vertices[targetHex.vertexIds[2]].building = { owner: 'p3', type: 'settlement' };
+
+    handleMoveRobber(room, room.players[0], targetHex.id);
+    expect(room.phase).toBe('ROBBER_STEAL');
+    expect(room.robberVictims).toEqual(expect.arrayContaining(['p2', 'p3']));
+
+    handleStealFromVictim(room, room.players[0], 'p3');
+    expect(room.phase).toBe('MAIN');
+    expect(room.players[0].resources.sheep).toBe(1);
+    expect(p3.resources.sheep).toBe(2);
+  });
 });
+

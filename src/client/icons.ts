@@ -25,10 +25,10 @@ export function getBoardIconSvg(type: string, x: number, y: number, scale = 1): 
       ${gClose}`;
     case 'wheat':
       return `${gOpen}
-        <path d="M-6,10 L6,-12 M0,10 L0,-15 M6,10 L-6,-12" stroke="#875c00" stroke-width="2.5" stroke-linecap="round"/>
-        <ellipse cx="-5" cy="-6" rx="3.5" ry="6" transform="rotate(-25 -5 -6)" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
-        <ellipse cx="0" cy="-9" rx="3.5" ry="6" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
-        <ellipse cx="5" cy="-6" rx="3.5" ry="6" transform="rotate(25 5 -6)" fill="#ffe066" stroke="#875c00" stroke-width="1.2"/>
+        <path d="M-6,10 L6,-12 M0,10 L0,-15 M6,10 L-6,-12" stroke="#8d6e00" stroke-width="2.5" stroke-linecap="round"/>
+        <ellipse cx="-5" cy="-6" rx="3.5" ry="6" transform="rotate(-25 -5 -6)" fill="#fff9c4" stroke="#8d6e00" stroke-width="1.3"/>
+        <ellipse cx="0" cy="-9" rx="3.5" ry="6" fill="#fff9c4" stroke="#8d6e00" stroke-width="1.3"/>
+        <ellipse cx="5" cy="-6" rx="3.5" ry="6" transform="rotate(25 5 -6)" fill="#fff9c4" stroke="#8d6e00" stroke-width="1.3"/>
       ${gClose}`;
     case 'ore':
       return `${gOpen}
@@ -47,6 +47,16 @@ export function getBoardIconSvg(type: string, x: number, y: number, scale = 1): 
       return `${gOpen}
         <path d="M0,14 L0,-12 M0,2 L-9,2 L-9,-6 M0,-2 L9,-2 L9,-9" stroke="#2e7d32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       ${gClose}`;
+    case 'fog':
+      return `${gOpen}
+        <ellipse cx="-12" cy="4" rx="14" ry="9" fill="#eceff1" opacity="0.92"/>
+        <ellipse cx="12" cy="5" rx="14" ry="9" fill="#cfd8dc" opacity="0.92"/>
+        <ellipse cx="-4" cy="-5" rx="13" ry="10" fill="#ffffff" opacity="0.95"/>
+        <ellipse cx="8" cy="-4" rx="12" ry="9" fill="#eceff1" opacity="0.95"/>
+        <ellipse cx="0" cy="6" rx="18" ry="8" fill="#ffffff"/>
+        <circle cx="0" cy="24" r="14" fill="#f5efe6" stroke="#90a4ae" stroke-width="2.2"/>
+        <text x="0" y="30" text-anchor="middle" font-size="18" font-weight="900" fill="#455a64">?</text>
+      ${gClose}`;
     default:
       return '';
   }
@@ -55,3 +65,4 @@ export function getBoardIconSvg(type: string, x: number, y: number, scale = 1): 
 export function getMiniSvg(type: string): string {
   return `<svg width="24" height="24" viewBox="-20 -20 40 34">${getBoardIconSvg(type, 0, 2, 0.95)}</svg>`;
 }
+

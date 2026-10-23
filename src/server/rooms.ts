@@ -53,6 +53,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     boardRadius: 2,
     goldTiles: 2,
     desertTiles: 1,
+    fogTiles: 0,
     vpToWin: 10,
     maxPlayers: 4,
     cardDiscardLimit: 7,
@@ -85,6 +86,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     largestArmyOwner: null,
     activeTrade: null,
     winner: null,
+    robberVictims: [],
     logs: [{ text: `Room ${code} created. Bots are set to ADVANCED HARD.`, color: '#1565c0' }],
     chats: [{ sender: hostName, avatar: '🦊', color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add Hard Bots to start.' }]
   };

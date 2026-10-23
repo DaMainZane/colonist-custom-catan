@@ -12,6 +12,14 @@ export function setIo(server: Server): void {
 export function broadcastRoom(room: Room): void {
   if (!room) return;
   const bank = getBankRemaining(room);
+  const clientBoard = {
+    ...room.board,
+    hexes: room.board.hexes.map(h =>
+      h.fog && room.status !== 'GAMEOVER'
+        ? { ...h, type: 'fog', number: null, fog: true }
+        : h
+    )
+  };
   for (const p of room.players) {
     if (p.isBot) continue;
     const state = {
@@ -19,12 +27,13 @@ export function broadcastRoom(room: Room): void {
       hostId: room.hostId,
       status: room.status,
       settings: room.settings,
-      board: room.board,
+      board: clientBoard,
       bank,
       devDeckCount: room.devDeck.length,
       turnIndex: room.turnIndex,
       currentPlayerId: room.players[room.turnIndex]?.id,
       phase: room.phase,
+      robberVictims: room.robberVictims || [],
       lastSetupVertexId: room.lastSetupVertexId,
       lastDice: room.lastDice,
       longestRoadOwner: room.longestRoadOwner,
@@ -58,7 +67,7 @@ export function broadcastRoom(room: Room): void {
         vp: getPlayerVP(room, pl, pl.id === p.id || room.status === 'GAMEOVER')
       }))
     };
-    io.to(p.id).emit('gameState', state);
+    if (io) io.to(p.id).emit('gameState', state);
   }
   scheduleBotAction(room);
 }

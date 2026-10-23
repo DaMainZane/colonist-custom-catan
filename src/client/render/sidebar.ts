@@ -31,8 +31,14 @@ export function renderSidebar(): void {
     </div>
   `;
 
-  document.getElementById('playersStack')!.innerHTML = state.players.map((p, idx) => `
-    <div class="p-row ${idx === state.turnIndex && state.status !== 'LOBBY' ? 'is-turn' : ''}">
+  const canPickVictim = state.phase === 'ROBBER_STEAL' && state.currentPlayerId === socket.id;
+  const victimSet = new Set<string>(state.robberVictims || []);
+
+  document.getElementById('playersStack')!.innerHTML = state.players.map((p, idx) => {
+    const isVictim = canPickVictim && victimSet.has(p.id);
+    return `
+    <div class="p-row ${idx === state.turnIndex && state.status !== 'LOBBY' ? 'is-turn' : ''} ${isVictim ? 'can-rob' : ''}"
+      ${isVictim ? `onclick="chooseRobberVictim('${p.id}')" title="Click to Rob ${p.name}"` : ''}>
       <div class="p-avatar-wrap">
         <div class="p-circle" style="background:${p.color}">
           <span>${p.avatar}</span>
@@ -41,6 +47,7 @@ export function renderSidebar(): void {
         <div>
           <div style="font-weight:800; font-size:13px;">
             ${p.name} ${p.isBot ? '<span style="font-size:10px; background:#222; color:#ffd700; padding:1px 4px; border-radius:4px;">HARD</span>' : ''}
+            ${isVictim ? '<span style="font-size:10px; background:#d50000; color:#fff; padding:1px 5px; border-radius:4px;">♟️ ROB</span>' : ''}
           </div>
           <div style="font-size:11px; color:#555;">
             ${state.longestRoadOwner === p.id ? '🏆 Road ' : ''}
@@ -55,7 +62,8 @@ export function renderSidebar(): void {
         <div style="text-align:center; min-width:22px;" title="Longest Road">🛣️<br>${p.longestRoadLength}</div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 export function sendChat(): void {

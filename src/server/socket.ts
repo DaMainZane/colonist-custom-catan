@@ -6,7 +6,8 @@ import {
   handlePlaceCity,
   handlePlaceRoad,
   handlePlaceSettlement,
-  handleRollDice
+  handleRollDice,
+  handleStealFromVictim
 } from './actions';
 import { PLAYER_COLORS, RESOURCES } from './constants';
 import { broadcastRoom } from './net';
@@ -19,7 +20,7 @@ import {
   givePlayerResourceFromBank,
   updateLargestArmy
 } from './rules';
-import { generateBoard, rebuildBoardTopology } from './topology';
+import { generateBoard, hexDistance, rebuildBoardTopology } from './topology';
 import { clamp, shuffle } from './util';
 
 export function registerSocketHandlers(io: Server): void {
@@ -78,11 +79,14 @@ export function registerSocketHandlers(io: Server): void {
       if (!room || room.hostId !== socket.id || room.status !== 'LOBBY' || !newSettings) return;
       const oldRadius = room.settings.boardRadius;
       const oldGold = room.settings.goldTiles;
+      const oldDesert = room.settings.desertTiles;
+      const oldFog = room.settings.fogTiles ?? 0;
 
       room.settings = {
-        boardRadius: clamp(newSettings.boardRadius, 1, 4, room.settings.boardRadius),
-        goldTiles: clamp(newSettings.goldTiles, 0, 40, room.settings.goldTiles),
-        desertTiles: clamp(newSettings.desertTiles, 0, 15, room.settings.desertTiles),
+        boardRadius: clamp(newSettings.boardRadius, 1, 50, room.settings.boardRadius),
+        goldTiles: clamp(newSettings.goldTiles, 0, 500, room.settings.goldTiles),
+        desertTiles: clamp(newSettings.desertTiles, 0, 200, room.settings.desertTiles),
+        fogTiles: clamp(newSettings.fogTiles, 0, 2000, room.settings.fogTiles ?? 0),
         vpToWin: clamp(newSettings.vpToWin, 3, 50, room.settings.vpToWin),
         maxPlayers: clamp(newSettings.maxPlayers, 2, 8, room.settings.maxPlayers),
         cardDiscardLimit: clamp(newSettings.cardDiscardLimit, 3, 50, room.settings.cardDiscardLimit),
@@ -99,7 +103,12 @@ export function registerSocketHandlers(io: Server): void {
 
       room.devDeck = createDevDeck(room.settings);
 
-      if (oldRadius !== room.settings.boardRadius || oldGold !== room.settings.goldTiles) {
+      if (
+        oldRadius !== room.settings.boardRadius ||
+        oldGold !== room.settings.goldTiles ||
+        oldDesert !== room.settings.desertTiles ||
+        oldFog !== (room.settings.fogTiles ?? 0)
+      ) {
         room.board = generateBoard(room.settings);
       }
       broadcastRoom(room);
@@ -122,16 +131,28 @@ export function registerSocketHandlers(io: Server): void {
       room.board.edges.forEach(e => { if (e.port) existingPorts[e.key] = e.port; });
 
       if (paintType === 'terrain') {
-        hex.type = paintValue;
-        if (paintValue === 'desert' || paintValue === 'water') hex.number = null;
-        else if (!hex.number) hex.number = 6;
+        if (paintValue === 'fog') {
+          if (hex.type === 'water' || hex.type === 'desert' || !hex.type || hex.type === 'fog') {
+            hex.type = RESOURCES[Math.floor(Math.random() * RESOURCES.length)];
+          }
+          if (!hex.number) {
+            const nums = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+            hex.number = nums[Math.floor(Math.random() * nums.length)];
+          }
+          hex.fog = true;
+        } else {
+          hex.fog = false;
+          hex.type = paintValue;
+          if (paintValue === 'desert' || paintValue === 'water') hex.number = null;
+          else if (!hex.number) hex.number = 6;
+        }
         room.board = rebuildBoardTopology(room.board.hexes, existingPorts, false);
       } else if (paintType === 'number') {
         if (hex.type !== 'water' && hex.type !== 'desert') {
           hex.number = paintValue === 'none' ? null : Number(paintValue);
         }
       } else if (paintType === 'robber') {
-        if (hex.type !== 'water') room.board.robberHexId = hex.id;
+        if (hex.type !== 'water' && !hex.fog) room.board.robberHexId = hex.id;
       }
       broadcastRoom(room);
     }));
@@ -142,8 +163,16 @@ export function registerSocketHandlers(io: Server): void {
       const edge = room.board.edges[edgeId];
       if (!edge || edge.hexIds.length !== 1) return;
 
+      const targetHex = room.board.hexes[edge.hexIds[0]];
       const existingPorts: Record<string, string> = {};
-      room.board.edges.forEach(e => { if (e.port) existingPorts[e.key] = e.port; });
+      room.board.edges.forEach(e => {
+        if (!e.port) return;
+        if (portValue !== 'none' && targetHex && e.id !== edge.id && e.hexIds.length === 1) {
+          const otherHex = room.board.hexes[e.hexIds[0]];
+          if (otherHex && hexDistance(targetHex, otherHex) <= 1) return;
+        }
+        existingPorts[e.key] = e.port;
+      });
       if (portValue === 'none') delete existingPorts[edge.key];
       else existingPorts[edge.key] = portValue;
 
@@ -190,11 +219,24 @@ export function registerSocketHandlers(io: Server): void {
       const v = room.board.vertices[vertexId];
       if (!v) return;
 
+      if (room.phase === 'ROBBER_STEAL' && v.building && (room.robberVictims || []).includes(v.building.owner)) {
+        handleStealFromVictim(room, player, v.building.owner);
+        return;
+      }
+
       if (v.building && v.building.owner === player.id && v.building.type === 'settlement') {
         handlePlaceCity(room, player, vertexId);
       } else if (!v.building) {
         handlePlaceSettlement(room, player, vertexId);
       }
+    }));
+
+    socket.on('stealFromPlayer', safe(({ code, victimId }) => {
+      const room = rooms[code];
+      if (!room) return;
+      const player = room.players[room.turnIndex];
+      if (!player || player.id !== socket.id) return;
+      handleStealFromVictim(room, player, victimId);
     }));
 
     socket.on('clickEdge', safe(({ code, edgeId }) => {
@@ -288,6 +330,7 @@ export function registerSocketHandlers(io: Server): void {
         addLog(room, `${player.avatar} ${player.name} played a Knight`, player.color);
         updateLargestArmy(room);
         checkWinner(room);
+        room.PreRobberPhase = room.phase;
         room.phase = 'ROBBER';
       } else if (cardType === 'roadBuilding') {
         player.freeRoads += 2;

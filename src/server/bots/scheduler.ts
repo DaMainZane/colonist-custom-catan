@@ -5,7 +5,8 @@ import {
   handlePlaceCity,
   handlePlaceRoad,
   handlePlaceSettlement,
-  handleRollDice
+  handleRollDice,
+  handleStealFromVictim
 } from '../actions';
 import { RESOURCES } from '../constants';
 import { broadcastRoom } from '../net';
@@ -179,6 +180,10 @@ function runBotTurnStep(room: Room, bot: Player): void {
     const targetHex = chooseBestRobberHexForHardBot(room, bot);
     if (targetHex) handleMoveRobber(room, bot, targetHex.id);
     else { room.phase = 'MAIN'; broadcastRoom(room); }
+  } else if (room.phase === 'ROBBER_STEAL') {
+    const victimId = (room.robberVictims || [])[0];
+    if (victimId) handleStealFromVictim(room, bot, victimId);
+    else { room.phase = 'MAIN'; broadcastRoom(room); }
   } else if (room.phase === 'MAIN') {
     // 1. Play Dev Card if advantageous
     if (!bot.playedDevCardThisTurn && bot.devCards.length > 0) {
@@ -269,6 +274,7 @@ function playBotDevCard(room: Room, bot: Player, cardType: string): void {
     addLog(room, `${bot.avatar} ${bot.name} played a Knight`, bot.color);
     updateLargestArmy(room);
     checkWinner(room);
+    room.PreRobberPhase = room.phase;
     room.phase = 'ROBBER';
   } else if (cardType === 'roadBuilding') {
     bot.freeRoads += 2;

@@ -7,7 +7,7 @@ import { registerSocketHandlers } from './socket';
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: '*' }, maxHttpBufferSize: 1e7 });
 setIo(io);
 
 app.get('/health', (req, res) => res.status(200).send('ok'));
@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 registerSocketHandlers(io);
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`✅ Colonist-Style HexSettlers (Hard Bots + Full Trade) running at http://localhost:${PORT}`);
+const PORT = Number(process.env.PORT) || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Colonist-Style HexSettlers (Hard Bots + Full Trade) running at http://0.0.0.0:${PORT}`);
 });

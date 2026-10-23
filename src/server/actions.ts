@@ -35,7 +35,7 @@ export function handlePlaceSettlement(room: Room, player: Player, vertexId: numb
     if (room.setupStep >= room.players.length) {
       for (const hId of v.hexIds) {
         const hex = room.board.hexes[hId];
-        if (!hex) continue;
+        if (!hex || hex.fog) continue;
         if (RESOURCES.includes(hex.type)) givePlayerResourceFromBank(room, player, hex.type, 1);
         else if (hex.type === 'gold') player.goldPending++;
       }
@@ -64,9 +64,51 @@ export function handlePlaceRoad(room: Room, player: Player, edgeId: number): voi
     }
   }
 
-  room.board.edges[edgeId].road = player.id;
+  const edge = room.board.edges[edgeId];
+  edge.road = player.id;
   player.roadsLeft--;
   addLog(room, `${player.avatar} ${player.name} placed a Road`, player.color);
+
+  // Fog mechanic: when a road touches any fog tile (via edge or endpoint vertices), reveal it and grant 1 resource of that tile
+  const v1 = room.board.vertices[edge.v1];
+  const v2 = room.board.vertices[edge.v2];
+  const touchedHexIds = new Set<number>([
+    ...edge.hexIds,
+    ...(v1 ? v1.hexIds : []),
+    ...(v2 ? v2.hexIds : [])
+  ]);
+
+  const fallbackNums = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+  for (const hId of touchedHexIds) {
+    const hex = room.board.hexes[hId];
+    if (!hex || !hex.fog) continue;
+    hex.fog = false;
+    if (!RESOURCES.includes(hex.type) && hex.type !== 'gold' && hex.type !== 'desert') {
+      hex.type = RESOURCES[Math.floor(Math.random() * RESOURCES.length)];
+    }
+    if (hex.type !== 'desert' && !hex.number) {
+      hex.number = fallbackNums[Math.floor(Math.random() * fallbackNums.length)];
+    }
+
+    if (RESOURCES.includes(hex.type)) {
+      const granted = givePlayerResourceFromBank(room, player, hex.type, 1);
+      addLog(
+        room,
+        `🌫️ ${player.avatar} ${player.name} revealed ${hex.type.toUpperCase()} (${hex.number}) from Fog${granted > 0 ? ` (+1 ${hex.type})` : ''}!`,
+        player.color
+      );
+    } else if (hex.type === 'gold') {
+      player.goldPending++;
+      addLog(
+        room,
+        `🌫️ ${player.avatar} ${player.name} revealed GOLD (${hex.number}) from Fog (+1 Gold pick)!`,
+        player.color
+      );
+    } else if (hex.type === 'desert') {
+      addLog(room, `🌫️ ${player.avatar} ${player.name} revealed a DESERT from Fog!`, player.color);
+    }
+  }
+
   updateLongestRoad(room);
 
   if (isSetup) {
@@ -79,6 +121,11 @@ export function handlePlaceRoad(room: Room, player: Player, edgeId: number): voi
       advanceSetupTurn(room);
     }
   } else {
+    checkGoldPhaseTransition(room);
+    if (room.players.some(p => p.goldPending > 0)) {
+      room.PreGoldPhase = 'MAIN';
+      room.phase = 'GOLD_PICK';
+    }
     checkWinner(room);
   }
   broadcastRoom(room);
@@ -110,6 +157,7 @@ export function handleRollDice(room: Room, player: Player): void {
   addLog(room, `${player.avatar} ${player.name} rolled ${sum} (${d1} + ${d2})`, player.color);
 
   if (sum === 7) {
+    room.PreRobberPhase = 'MAIN';
     let anyDiscard = false;
     for (const p of room.players) {
       const total = getTotalResources(p);
@@ -120,7 +168,7 @@ export function handleRollDice(room: Room, player: Player): void {
     }
     room.phase = anyDiscard ? 'DISCARD' : 'ROBBER';
   } else {
-    const matching = room.board.hexes.filter(h => h.number === sum && h.id !== room.board.robberHexId && h.type !== 'water');
+    const matching = room.board.hexes.filter(h => !h.fog && h.number === sum && h.id !== room.board.robberHexId && h.type !== 'water');
     for (const hex of matching) {
       for (const vId of hex.vertexIds) {
         const b = room.board.vertices[vId]?.building;
@@ -149,37 +197,86 @@ export function handleRollDice(room: Room, player: Player): void {
   broadcastRoom(room);
 }
 
+function stealOneRandomResource(room: Room, thief: Player, victim: Player): void {
+  const pool: string[] = [];
+  RESOURCES.forEach(r => {
+    for (let i = 0; i < (victim.resources[r] || 0); i++) pool.push(r);
+  });
+  if (pool.length > 0) {
+    const stolen = pool[Math.floor(Math.random() * pool.length)];
+    victim.resources[stolen]--;
+    thief.resources[stolen]++;
+    addLog(room, `${thief.avatar} ${thief.name} stole 1 resource from ${victim.name}`, thief.color);
+  } else {
+    addLog(room, `${thief.avatar} ${thief.name} robbed ${victim.name}, but they had no cards!`, thief.color);
+  }
+}
+
 export function handleMoveRobber(room: Room, player: Player, hexId: number): void {
   if (room.phase !== 'ROBBER') return;
   const hex = room.board.hexes[hexId];
-  if (!hex || hex.type === 'water' || hex.id === room.board.robberHexId) return;
+  if (!hex || hex.type === 'water' || hex.fog || hex.id === room.board.robberHexId) return;
 
   room.board.robberHexId = hex.id;
   addLog(room, `${player.avatar} ${player.name} moved the Robber`, player.color);
 
   const victimIds = new Set<string>();
-  for (const vId of hex.vertexIds) {
+  for (const vId of hex.vertexIds || []) {
     const b = room.board.vertices[vId]?.building;
     if (b && b.owner !== player.id) victimIds.add(b.owner);
   }
-  const victims = [...victimIds]
-    .map(id => room.players.find(p => p.id === id))
-    .filter(p => p && getTotalResources(p) > 0);
 
-  if (victims.length > 0) {
-    // Target victim with highest VP
-    victims.sort((a, b) => getPlayerVP(room, b, false) - getPlayerVP(room, a, false));
-    const victim = victims[0];
-    const pool: string[] = [];
-    RESOURCES.forEach(r => { for (let i = 0; i < victim.resources[r]; i++) pool.push(r); });
-    if (pool.length > 0) {
-      const stolen = pool[Math.floor(Math.random() * pool.length)];
-      victim.resources[stolen]--;
-      player.resources[stolen]++;
-      addLog(room, `${player.avatar} ${player.name} stole 1 resource from ${victim.name}`, player.color);
-    }
+  const playersOnHex = [...victimIds]
+    .map(id => room.players.find(p => p.id === id))
+    .filter((p): p is Player => !!p);
+
+  const finishRobberPhase = () => {
+    room.robberVictims = [];
+    room.phase = room.PreRobberPhase || 'MAIN';
+    room.PreRobberPhase = null;
+  };
+
+  if (playersOnHex.length === 0) {
+    finishRobberPhase();
+    broadcastRoom(room);
+    return;
   }
-  room.phase = 'MAIN';
+
+  if (playersOnHex.length === 1) {
+    stealOneRandomResource(room, player, playersOnHex[0]);
+    finishRobberPhase();
+    broadcastRoom(room);
+    return;
+  }
+
+  // 2 or more other players have buildings on this hex
+  if (player.isBot) {
+    const withCards = playersOnHex.filter(p => getTotalResources(p) > 0);
+    const pool = withCards.length > 0 ? withCards : playersOnHex;
+    pool.sort((a, b) => getPlayerVP(room, b, false) - getPlayerVP(room, a, false));
+    stealOneRandomResource(room, player, pool[0]);
+    finishRobberPhase();
+    broadcastRoom(room);
+    return;
+  }
+
+  room.robberVictims = playersOnHex.map(p => p.id);
+  room.phase = 'ROBBER_STEAL';
+  broadcastRoom(room);
+}
+
+export function handleStealFromVictim(room: Room, player: Player, victimId: string): void {
+  if (room.phase !== 'ROBBER_STEAL') return;
+  const allowed = room.robberVictims || [];
+  if (!allowed.includes(victimId)) return;
+
+  const victim = room.players.find(p => p.id === victimId);
+  if (victim && victim.id !== player.id) {
+    stealOneRandomResource(room, player, victim);
+  }
+  room.robberVictims = [];
+  room.phase = room.PreRobberPhase || 'MAIN';
+  room.PreRobberPhase = null;
   broadcastRoom(room);
 }
 

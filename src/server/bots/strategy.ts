@@ -18,7 +18,7 @@ export function getBotProducedResources(room: Room, botId: string): Resources {
       const mult = v.building.type === 'city' ? 2 : 1;
       for (const hId of v.hexIds) {
         const h = room.board.hexes[hId];
-        if (h && prod[h.type] !== undefined) {
+        if (h && !h.fog && prod[h.type] !== undefined) {
           prod[h.type] += getPips(h.number) * mult;
         }
       }
@@ -38,7 +38,12 @@ export function scoreVertexForHardBot(room: Room, bot: Player, vertexId: number)
 
   for (const hId of v.hexIds) {
     const h = room.board.hexes[hId];
-    if (!h || h.type === 'water' || h.type === 'desert') continue;
+    if (!h || h.type === 'water') continue;
+    if (h.fog) {
+      score += 5.0; // Unexplored fog tile bonus
+      continue;
+    }
+    if (h.type === 'desert') continue;
 
     const pips = getPips(h.number);
     score += pips * 3.0;
@@ -88,6 +93,10 @@ export function chooseBestRoadForHardBot(room: Room, bot: Player, mustConnectVer
     for (const endVId of [e.v1, e.v2]) {
       const endV = room.board.vertices[endVId];
       if (!endV) continue;
+
+      for (const hId of endV.hexIds) {
+        if (room.board.hexes[hId]?.fog) score += 14;
+      }
 
       // Direct buildable settlement spot at endpoint
       if (canPlaceSettlement(room, bot.id, endVId, true)) {
@@ -325,7 +334,7 @@ export function tryHardBotProposeTrade(room: Room, bot: Player): boolean {
 }
 
 export function chooseBestRobberHexForHardBot(room: Room, bot: Player) {
-  const candidates = room.board.hexes.filter(h => h.type !== 'water' && h.id !== room.board.robberHexId);
+  const candidates = room.board.hexes.filter(h => h.type !== 'water' && !h.fog && h.id !== room.board.robberHexId);
   let bestHex = candidates[0];
   let bestScore = -9999;
 

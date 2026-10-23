@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Colonist-Style Catan Online — Hard Bots & Full Trading</title>
+  <meta name="description" content="Customizable Online Multiplayer Catan Board Game with Hard Bots, Full Trading, and Custom Map Painter" />
+  <meta property="og:title" content="Colonist-Style Catan Online — Hard Bots & Full Trading" />
+  <meta property="og:description" content="Customizable Online Multiplayer Catan Board Game with Hard Bots, Full Trading, and Custom Map Painter" />
   <script src="/socket.io/socket.io.js"></script>
   <link rel="stylesheet" href="/app.css" />
 </head>
@@ -48,6 +51,7 @@
           <div style="display:flex; gap:5px; align-items:center;">
             <button class="brush-btn" onclick="applyPreset('standard')">🎲 Standard</button>
             <button class="brush-btn" onclick="applyPreset('goldRush')">★ Gold Rush</button>
+            <button class="brush-btn" onclick="applyPreset('fogIsland')">🌫️ Fog Island</button>
             <button class="brush-btn" onclick="applyPreset('archipelago')">🏝️ Islands</button>
             <button class="brush-btn" onclick="applyPreset('blank')">🌊 Blank Ocean</button>
             <button class="colonist-btn" style="padding:5px 10px;" onclick="addBot()">+ 🤖 Hard Bot</button>
@@ -67,6 +71,7 @@
             <button class="brush-btn" onclick="setBrush('terrain','ore',this)">⛰️ Ore</button>
             <button class="brush-btn" onclick="setBrush('terrain','gold',this)"><span id="goldBtnIcon"></span> Gold</button>
             <button class="brush-btn" onclick="setBrush('terrain','desert',this)">🌵 Desert</button>
+            <button class="brush-btn" onclick="setBrush('terrain','fog',this)">🌫️ Fog</button>
             <button class="brush-btn" onclick="setBrush('terrain','water',this)">🌊 Ocean (Erase)</button>
             <button class="brush-btn" onclick="setBrush('robber','robber',this)">♟️ Place Robber</button>
           </div>
@@ -98,19 +103,15 @@
         <div id="lobbyTabCards" style="display:none; flex-direction:column; gap:6px;">
           <div class="toolbar-row">
             <div class="setting-chip">
-              <span>Map Size:</span>
-              <select id="setRadius" class="mini-input" style="width:88px" onchange="pushSettings()">
-                <option value="1">Mini (7)</option>
-                <option value="2" selected>Std (19)</option>
-                <option value="3">Large (37)</option>
-                <option value="4">Mega (61)</option>
-              </select>
+              <span>Map Size (Radius 1–50):</span>
+              <input id="setRadius" type="number" class="mini-input" value="2" min="1" max="50" onchange="pushSettings()" />
             </div>
             <div class="setting-chip"><span>VP to Win:</span><input id="setVp" type="number" class="mini-input" value="10" min="3" max="50" onchange="pushSettings()" /></div>
             <div class="setting-chip"><span>Max Players:</span><input id="setMaxP" type="number" class="mini-input" value="4" min="2" max="8" onchange="pushSettings()" /></div>
             <div class="setting-chip"><span>7-Discard Limit:</span><input id="setDiscard" type="number" class="mini-input" value="7" min="3" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Gold Hexes:</span><input id="setGold" type="number" class="mini-input" value="2" min="0" max="40" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Desert Hexes:</span><input id="setDesert" type="number" class="mini-input" value="1" min="0" max="15" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Gold Hexes:</span><input id="setGold" type="number" class="mini-input" value="2" min="0" max="500" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>Desert Hexes:</span><input id="setDesert" type="number" class="mini-input" value="1" min="0" max="200" onchange="pushSettings()" /></div>
+            <div class="setting-chip"><span>🌫️ Fog Hexes:</span><input id="setFog" type="number" class="mini-input" value="0" min="0" max="2000" onchange="pushSettings()" /></div>
           </div>
           <div class="toolbar-row">
             <div class="setting-chip" style="background:#dcedc8">

@@ -47,6 +47,7 @@ export interface GameState {
   turnIndex: number;
   currentPlayerId: string;
   phase: string;
+  robberVictims?: string[];
   lastSetupVertexId?: number | null;
   lastDice: number[];
   longestRoadOwner: string | null;
