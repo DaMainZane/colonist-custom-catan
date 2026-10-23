@@ -34,14 +34,11 @@ Stack: Node, Express, Socket.io, SVG. Files: `server.js` (rules, topology, bots,
 
 ## 4. Build and bundling
 
-**CHOICE 1: build model**
-- **A (recommended):** esbuild with two entry points. `src/server/main.js` → `dist/main.js`, and `src/client/main.js` → `dist/public/app.js`. `npm run dev` watches and restarts; `npm run build` produces the deployable.
-- **B:** A, plus the client bundle and static assets embedded into `dist/main.js`, so one file runs the whole game (`node dist/main.js`). Best for easy hosting. (One file literally shared by server and browser isn't possible; B is the closest.)
-- **C:** no bundler, native ES modules with import maps. Zero tooling, but many requests and no single `main.js`.
+**Decided: build model**
+- esbuild with two entry points. `src/server/main.ts` → `dist/main.js`, and `src/client/main.ts` → `dist/public/app.js`. `npm run dev` watches and restarts; `npm run build` produces the deployable.
 
-**CHOICE 2: language**
-- **A:** plain JS with JSDoc types and `checkJs`
-- **B (recommended):** TypeScript. esbuild compiles it with no config, and types catch mistakes in module definitions, which matters most for a modular system.
+**Decided: language**
+- TypeScript. esbuild compiles it with no config, and types catch mistakes in module definitions, which matters most for a modular system.
 
 ## 5. Target architecture
 
@@ -55,8 +52,8 @@ catan/
     (future) walls, ships, events...
   src/
     shared/  engine: topology, registry, state, actions, phases, validate, views, rng
-    server/  main.js, rooms, net, auth/reconnect, persistence, bots/, scheduler
-    client/  main.js, net, store, render/, ui/, editor/, input/, audio, styles
+    server/  main.ts, rooms, net, auth/reconnect, persistence, bots/, scheduler
+    client/  main.ts, net, store, render/, ui/, editor/, input/, audio, styles
   maps/      built-in map JSON
   tests/     engine tests + headless bot-vs-bot sims
   dist/      build output (gitignored)
@@ -88,6 +85,7 @@ export const wall = {
 
 **Packs and rulesets**
 - A ruleset is an ordered list of packs plus parameter overrides (VP target, bank size, deck counts, piece limits…)
+- The host toggles packs per room in the lobby (presets plus checkboxes), with no server restart needed
 - Vanilla, Gold Rush and custom sets are just presets
 - Longest Road and Largest Army become "award" modules
 
@@ -128,25 +126,18 @@ export const wall = {
 
 **Test-play:** one click starts a solo game vs bots on the current map.
 
-**CHOICE 3: editor mode**
-- **A (recommended):** standalone editor page (local autosave) plus "Use in lobby". It reuses the board renderer and works on phones.
-- **B:** keep the current live-painting-in-lobby model (host paints, everyone sees it). Simple, but the map is not saved or shared.
-- **C:** both A and B.
+**Decided: editor mode**
+- Standalone editor page (local autosave) plus "Use in lobby". It reuses the board renderer and works on phones.
 
 ## 7. UI development philosophy
 
-**CHOICE 4: philosophy**
-- **A. Colonist-faithful, desktop-first:** shrink it for phones. Cheapest, but worst on mobile (the current state).
-- **B. Mobile-first, single layout:** board fills the screen, panels are bottom sheets. Works everywhere, but looks sparse on PC.
-- **C. Adaptive shells (recommended):** shared components and state, two layout shells (desktop: sidebar and hand dock; phone: bottom sheets and a compact HUD) chosen by viewport and pointer type.
-- **D. Board-centric contextual UI:** few buttons, and tapping a spot offers the valid actions there. Fewest controls, best on small screens. Pairs well with C.
-- **E. Data-driven UI (adopt regardless):** buttons, icons, cards and the editor palette come from the registry. Skins are CSS variables plus icon packs.
+**Decided: UI philosophy (minimalist, functional, interactive)**
+- **Board-centric contextual UI:** few permanent buttons. Tapping a spot or piece on the board offers the valid actions there (build road, upgrade to city, move robber).
+- **Adaptive shells:** shared components and state, two layout shells chosen by viewport and pointer type. Desktop: slim side panel and hand dock. Phone: bottom sheets and a compact HUD.
+- **Data-driven UI:** buttons, icons, cards and the editor palette are generated from the registry. Skins are CSS variables plus icon packs.
 
-**CHOICE 5: UI framework/renderer**
-- **A:** vanilla JS + a tiny reactive store + keyed SVG updates (no framework, smallest bundle)
-- **B (recommended):** Preact (+htm or JSX). Tiny, component-based, easy with esbuild.
-- **C:** Svelte (compile-time, very small output, extra toolchain)
-- **D:** React (largest ecosystem, heaviest)
+**Decided: UI framework/renderer**
+- Preact (+htm or JSX). Tiny, component-based, builds easily with esbuild.
 - **Renderer:** SVG behind a renderer interface. It's enough up to ~61 hexes with keyed updates, and canvas can be swapped in later.
 
 **Phone requirements (all options)**
@@ -160,10 +151,8 @@ export const wall = {
 
 ## 8. Hosting for a private 8-player server
 
-**CHOICE 6: hosting**
-- **A. Container on a small cloud host** (Fly.io, Render, Railway, or an always-free VM). Pick a Southeast Asia region (e.g. Singapore) where offered, since latency matters for turn-based sockets less than for action games but still counts. Check current free-tier limits; some free tiers sleep when idle.
-- **B. Home PC + Cloudflare Tunnel.** Free, with no port forwarding, but the PC must stay on.
-- **C. Cheap VPS + Caddy (auto HTTPS) + systemd or pm2.** Most control and always on.
+**Decided: hosting**
+- **Container on a small cloud host** (Fly.io, Render, Railway, or an always-free VM). Pick a Southeast Asia region (e.g. Singapore) where offered, since latency matters for turn-based sockets less than for action games but still counts. Check current free-tier limits; some free tiers sleep when idle.
 
 **Access control (no accounts):** a server passphrase or invite-link token, optional per-room passcode, a hard 8-player cap, basic rate limiting, locked-down CORS.
 
@@ -185,7 +174,7 @@ export const wall = {
 
 ## 10. Development roadmap (commit after each phase)
 - **P0, safety net:** tag the current version. Add a headless harness that plays the old game with bots, to compare behavior later.
-- **P1, tooling and split (no behavior change):** esbuild, TypeScript or JSDoc, split `server.js` and `index.html` into modules. Stub README.
+- **P1, tooling and split (no behavior change):** esbuild, TypeScript, split `server.js` and `index.html` into modules. Stub README.
 - **P2, engine core:** registry, action pipeline, phase machine, seeded RNG. Port the base rules into `packs/base` and gold into `packs/gold`. Unify the human and bot paths. Engine tests.
 - **P3, identity and persistence:** player tokens, reconnect and grace-period bot cover, room passcode, snapshots and restore.
 - **P4, responsive UI:** pointer input, adaptive shells, keyed renderer, PWA. Test on real phones.
@@ -205,11 +194,11 @@ export const wall = {
 - 8 players on big maps needs a minimum-land check and a fair-start check.
 - Test touch input on real devices early. Desktop emulation misses a lot.
 
-## 12. Decisions needed (reply like "1B 2B 3A 4C 5B 6A 7A")
-1. Build model: A / B / C (recommended: A, or B)
-2. Language: A / B (recommended: B)
-3. Editor mode: A / B / C (recommended: A)
-4. UI philosophy: A / B / C / D (recommended: C + D + E)
-5. Framework: A / B / C / D (recommended: B)
-6. Hosting: A / B / C
-7. Rule modules (packs): **A** = developer-only, enabled in config; **B (recommended)** = also toggled per room in the lobby as presets and checkboxes
+## 12. Decisions
+1. Build model: esbuild, two entry points (server and client)
+2. Language: TypeScript
+3. Editor mode: standalone editor page plus "Use in lobby"
+4. UI philosophy: board-centric contextual UI, adaptive shells, data-driven UI
+5. Framework: Preact, with an SVG renderer behind an interface
+6. Hosting: container on a small cloud host
+7. Rule modules (packs): the host toggles packs per room in the lobby, as presets and checkboxes
