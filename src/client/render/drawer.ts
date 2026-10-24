@@ -1,5 +1,7 @@
+// MODULE: bottom-left sheet (trade, discard, gold, monopoly, robber victim picker) | USED BY: render/index.ts, hand.ts, main.ts
+// Flat sheet from "Design UI Philosophy.md": no emoji, pictogram icons, every color comes from a token class in styles.css.
 import { RESOURCES, RES_META } from '../constants';
-import { getMiniSvg, buildOverlappingStackHtml } from '../icons';
+import { getMiniSvg, buildOverlappingStackHtml, uiIcon, robberMarkup } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import {
@@ -8,6 +10,7 @@ import {
 } from '../store';
 import { renderAll } from './index';
 import { renderHand } from './hand';
+import { esc, initial } from '../util';
 
 function myPlayer(): any {
   return state.players.find(p => p.id === socket.id);
@@ -33,7 +36,7 @@ export function canProposePlayerTrade(me: any): boolean {
   return giveSum > 0 && wantSum > 0;
 }
 
-// Counter adjusters used by inline onclick handlers inside the drawer markup.
+// Counter adjusters used by inline onclick handlers inside the sheet markup.
 export function adjustDiscard(r: string, delta: number): void {
   discardSel[r] = Math.max(0, (discardSel[r] || 0) + delta);
   const me = myPlayer();
@@ -62,6 +65,18 @@ export function adjustTradeGive(r: string, delta: number): void {
   renderInlineDrawer(me, true);
 }
 
+// One pickable resource card. `rate` adds the small ratio chip underneath (trade sheet only).
+function pickCardHtml(r: string, onclick: string, title: string, rate?: number): string {
+  const rateHtml = rate !== undefined
+    ? `<span class="rate ${rate < 4 ? 'better' : ''}">${rate}:1</span>`
+    : '';
+  return `
+    <div class="mini-res-card card-${r}" onclick="${onclick}" title="${esc(title)}">
+      ${getMiniSvg(r)}
+      ${rateHtml}
+    </div>`;
+}
+
 export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
   const wrap = document.getElementById('inlineDrawerWrap')!;
   const drawer = document.getElementById('inlineDrawer')!;
@@ -80,27 +95,23 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
 
   if (drawerMode === 'gold') {
     drawer.innerHTML = `
-      <div style="font-weight:900; color:#b26a00; font-size:13.5px; display:flex; align-items:center; gap:6px;">
-        ${getMiniSvg('gold')} <span>Gold Reward — Click ${me.goldPending} Resource(s) to Claim:</span>
+      <div class="sheet-head">
+        <span class="sheet-title">${getMiniSvg('gold').replace('width="28" height="28"', 'width="22" height="22"')} Gold reward</span>
+        <span class="sheet-sub">Pick ${me.goldPending} resource${me.goldPending === 1 ? '' : 's'}</span>
       </div>
-      <div class="res-Select-row">
-        ${RESOURCES.map(r => `
-          <div class="mini-res-card card-${r}" onclick="pickGold('${r}')">
-            ${getMiniSvg(r)}
-          </div>
-        `).join('')}
+      <div class="pick-row">
+        ${RESOURCES.map(r => pickCardHtml(r, `pickGold('${r}')`, `Take ${RES_META[r].name}`)).join('')}
       </div>
     `;
   } else if (drawerMode === 'monopoly') {
     btnCancel.style.display = 'flex';
     drawer.innerHTML = `
-      <div style="font-weight:900; color:#6a1b9a; font-size:13.5px;">🎩 Monopoly — Click a Resource to Steal All:</div>
-      <div class="res-Select-row">
-        ${RESOURCES.map(r => `
-          <div class="mini-res-card card-${r}" onclick="confirmMonopoly('${r}')">
-            ${getMiniSvg(r)}
-          </div>
-        `).join('')}
+      <div class="sheet-head">
+        <span class="sheet-title">Monopoly</span>
+      </div>
+      <div class="sheet-sub">Pick a resource. Every other player hands you all of theirs.</div>
+      <div class="pick-row">
+        ${RESOURCES.map(r => pickCardHtml(r, `confirmMonopoly('${r}')`, `Take all ${RES_META[r].name}`)).join('')}
       </div>
     `;
   } else if (drawerMode === 'discard') {
@@ -118,42 +129,35 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
     ).join('');
 
     drawer.innerHTML = `
-      <div class="discard-header">
-        <div class="discard-q-card">
-          <span class="up-arr">⬆</span>
-          <span>?</span>
-        </div>
-        <div>
-          <div style="color:#c62828; font-size:18px; font-weight:900;">Discard Cards (${picked}/${me.discardPending})</div>
-          <div style="color:#333; font-size:12.5px; font-weight:600; line-height:1.35; margin-top:2px;">
-            7 was rolled! You have more than ${state.settings.cardDiscardLimit} cards.<br>
-            You need to discard ${me.discardPending} of them
-          </div>
-        </div>
+      <div class="sheet-head">
+        <span class="sheet-title danger">Discard ${me.discardPending} cards</span>
+        <span class="sheet-sub">${picked} of ${me.discardPending} chosen</span>
       </div>
-      <div class="discard-tray">
-        ${trayCardsHtml || '<span style="font-size:12px; color:#777; font-weight:600;">Click cards in your hand below to move them here...</span>'}
+      <div class="sheet-sub">A 7 was rolled and you hold more than ${state.settings.cardDiscardLimit} cards. Click cards in your hand to move them here.</div>
+      <div class="tray">
+        ${trayCardsHtml || '<span class="tray-hint">Nothing chosen yet</span>'}
       </div>
-      <div style="display:flex; justify-content:flex-end;">
-        <button class="discard-confirm-btn" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm Discard">✔</button>
+      <div class="sheet-foot">
+        <button class="btn primary" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm discard">${uiIcon('check', 18)}Discard</button>
       </div>
     `;
   } else if (drawerMode === 'robberSteal') {
-    const victimIds = state.robberVictims || [];
-    const victims = victimIds
+    const victims = (state.robberVictims || [])
       .map((id: string) => state.players.find(p => p.id === id))
       .filter(Boolean);
     drawer.innerHTML = `
-      <div style="font-weight:900; color:#c62828; font-size:13.5px; display:flex; align-items:center; gap:6px;">
-        <span>♟️ Choose a Player to Rob:</span>
+      <div class="sheet-head">
+        <span class="sheet-title danger">
+          <svg width="20" height="24" viewBox="-14 -24 28 40" aria-hidden="true">${robberMarkup()}</svg>
+          Choose who to rob
+        </span>
       </div>
-      <div class="res-Select-row" style="gap:8px;">
+      <div class="pick-row">
         ${victims.map((v: any) => `
-          <button class="colonist-btn" style="background:${v.color}; padding:7px 12px; display:flex; align-items:center; gap:7px; border-radius:10px;"
-            onclick="chooseRobberVictim('${v.id}')">
-            <span style="font-size:17px;">${v.avatar}</span>
-            <span style="font-weight:900;">${v.name}</span>
-            <span style="background:rgba(0,0,0,0.28); padding:2px 6px; border-radius:6px; font-size:11.5px;">🃏 ${v.resourceCount}</span>
+          <button class="victim-btn" onclick="chooseRobberVictim('${esc(v.id)}')" title="Steal a card from ${esc(v.name)}">
+            <span class="avatar" style="background:${esc(v.color)}">${initial(v.name)}</span>
+            <span>${esc(v.name)}</span>
+            <span class="count">${uiIcon('cards', 14)}${v.resourceCount}</span>
           </button>
         `).join('')}
       </div>
@@ -162,7 +166,8 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
     btnCancel.style.display = 'flex';
     sideStack.style.display = 'flex';
 
-    (document.getElementById('btnExecBankTrade') as HTMLButtonElement).disabled = !canExecuteBankTrade(me);
+    const bankOk = canExecuteBankTrade(me);
+    (document.getElementById('btnExecBankTrade') as HTMLButtonElement).disabled = !bankOk;
     (document.getElementById('btnExecPlayerTrade') as HTMLButtonElement).disabled = !canProposePlayerTrade(me);
 
     const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
@@ -186,24 +191,29 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       )
     ).join('');
 
+    const giveSum = RESOURCES.reduce((s, r) => s + (tradeGive[r] || 0), 0);
+    const wantSum = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
+    let hint = 'Click a resource above for what you want, then cards in your hand for what you give.';
+    if (bankOk) hint = 'Bank trade is ready.';
+    else if (giveSum > 0 || wantSum > 0) hint = 'Bank trades need exact ratios. Offer it to players instead, or adjust the cards.';
+
     drawer.innerHTML = `
-      <div class="res-Select-row" style="justify-content:space-between; border-bottom:1px solid #d4cbb8; padding-bottom:6px;">
-        ${RESOURCES.map(r => `
-          <div class="mini-res-card card-${r}" onclick="adjustTradeWant('${r}', 1)" title="Click to add ${RES_META[r].name} to Wanted (${ratios[r]}:1 Bank)">
-            ${getMiniSvg(r)}
-            <span style="font-size:9.5px; color:#fff;">${ratios[r]}:1</span>
-          </div>
-        `).join('')}
-        <span style="font-size:20px;" title="Bank / Port Ratios">🏦</span>
+      <div class="sheet-head">
+        <span class="sheet-title">${uiIcon('swap', 18)} Trade</span>
+        <span class="sheet-sub">Ratios show your bank and port rates</span>
       </div>
-      <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
-        <span style="font-weight:900; color:#2e7d32; font-size:13px; width:46px;">👥 ⬇</span>
-        ${wantStacksHtml || '<span style="font-size:11.5px; color:#666;">Click resource icons above that you WANT...</span>'}
+      <div class="pick-row">
+        ${RESOURCES.map(r => pickCardHtml(r, `adjustTradeWant('${r}', 1)`, `Want ${RES_META[r].name} (${ratios[r]}:1 with the bank)`, ratios[r])).join('')}
       </div>
-      <div class="res-Select-row" style="min-height:68px; background:#e8e0d2; padding:4px 8px; border-radius:6px;">
-        <span style="font-weight:900; color:#c62828; font-size:13px; width:46px;">${me.avatar} ⬆</span>
-        ${giveStacksHtml || '<span style="font-size:11.5px; color:#666;">Click cards in your hand below to GIVE...</span>'}
+      <div class="sheet-label">You get</div>
+      <div class="tray">
+        ${wantStacksHtml || '<span class="tray-hint">Pick resources above</span>'}
       </div>
+      <div class="sheet-label">You give</div>
+      <div class="tray">
+        ${giveStacksHtml || '<span class="tray-hint">Click cards in your hand</span>'}
+      </div>
+      <div class="trade-hint ${bankOk ? 'ok' : ''}">${hint}</div>
     `;
   }
 }
@@ -264,4 +274,3 @@ export function chooseRobberVictim(victimId: string): void {
   socket.emit('stealFromPlayer', { code: state.code, victimId });
   setDrawerMode(null);
 }
-

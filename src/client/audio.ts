@@ -1,4 +1,5 @@
 import { soundOn, setSoundOn } from './store';
+import { uiIcon } from './icons';
 
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
@@ -178,5 +179,5 @@ export function playBuyDevCardSound(): void {
 
 export function toggleSound(): void {
   setSoundOn(!soundOn);
-  document.getElementById('btnToggleSound')!.textContent = soundOn ? '🔊' : '🔇';
+  document.getElementById('btnToggleSound')!.innerHTML = uiIcon(soundOn ? 'sound' : 'mute');
 }

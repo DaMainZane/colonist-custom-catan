@@ -3,62 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Colonist-Style Catan Online — Hard Bots & Full Trading</title>
-  <meta name="description" content="Customizable Online Multiplayer Catan Board Game with Hard Bots, Full Trading, and Custom Map Painter" />
-  <meta property="og:title" content="Colonist-Style Catan Online — Hard Bots & Full Trading" />
-  <meta property="og:description" content="Customizable Online Multiplayer Catan Board Game with Hard Bots, Full Trading, and Custom Map Painter" />
+  <title>Colonist Custom: Online Catan with Bots and a Map Painter</title>
+  <meta name="description" content="Customizable online multiplayer Catan with bots, full trading and a custom map painter" />
+  <meta property="og:title" content="Colonist Custom: Online Catan with Bots and a Map Painter" />
+  <meta property="og:description" content="Customizable online multiplayer Catan with bots, full trading and a custom map painter" />
+  <script>
+    // Apply the saved theme before first paint so the page never flashes the wrong one.
+    try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
 
-  <!-- 1. LANDING SCREEN -->
+  <!-- 1. LANDING -->
   <div id="authScreen">
     <div class="auth-card">
-      <h1>🏝️ COLONIST CUSTOM</h1>
-      <p>Advanced Hard Bots • Full Trading • Custom Map Painter</p>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <input id="playerNameInput" type="text" placeholder="Enter Nickname" maxlength="15" value="AvocadoMan" />
-        <button class="colonist-btn green" onclick="createRoom()">✨ Create Custom Game</button>
-        <div style="font-size:12px; font-weight:800; color:#888; margin: 4px 0;">— OR JOIN FRIEND'S ROOM —</div>
+      <h1 class="brand"><span data-glyph="wood"></span> Colonist Custom</h1>
+      <p>Bots, full trading and a custom map painter</p>
+      <div class="stack">
+        <input id="playerNameInput" class="text-input" type="text" placeholder="Nickname" maxlength="15" value="AvocadoMan" />
+        <button class="btn primary" onclick="createRoom()"><span data-icon="plus" data-size="18"></span>Create game</button>
+        <div class="auth-divider">OR JOIN A ROOM</div>
         <div style="display:flex; gap:8px;">
-          <input id="roomCodeInput" type="text" placeholder="ROOM CODE" style="text-transform:uppercase; text-align:center;" />
-          <button class="colonist-btn" onclick="joinRoom()">Join</button>
+          <input id="roomCodeInput" class="text-input" type="text" placeholder="ROOM CODE" style="text-transform:uppercase; text-align:center;" />
+          <button class="btn" style="min-width:84px;" onclick="joinRoom()">Join</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 2. GAME VIEWPORT -->
+  <!-- 2. GAME -->
   <div id="gameViewport">
     <div class="board-stage" id="boardStage">
 
-      <!-- Top-Left Utility Icons -->
+      <!-- Navigation -->
       <div class="left-nav">
-        <div class="nav-icon-btn" onclick="copyInviteLink()" title="Copy Invite Link">🔗</div>
-        <div class="nav-icon-btn" id="btnToggleSound" onclick="toggleSound()" title="Toggle Sound">🔊</div>
-        <div class="nav-icon-btn" onclick="resetCamera()" title="Reset Board Zoom/Pan">🔍</div>
-        <div class="nav-icon-btn" id="btnQuickSpeed" onclick="toggleGameMenu()" title="Adjust Game Speed">
-          <span>⚡</span>
-          <span class="speed-mini-badge" id="navSpeedBadge">1x</span>
-        </div>
-        <div class="nav-icon-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Game Menu / Customizer Bar">⚙️</div>
+        <button class="nav-btn" onclick="copyInviteLink()" title="Copy invite link"><span data-icon="link"></span></button>
+        <button class="nav-btn" id="btnToggleSound" onclick="toggleSound()" title="Sound"><span data-icon="sound"></span></button>
+        <button class="nav-btn" onclick="toggleTheme()" title="Light or dark theme"><span data-icon="theme"></span></button>
+        <button class="nav-btn" onclick="resetCamera()" title="Fit board to screen"><span data-icon="fit"></span></button>
+        <button class="nav-btn" id="btnQuickSpeed" onclick="toggleGameMenu()" title="Game speed">
+          <span data-icon="bolt"></span>
+          <span class="nav-badge" id="navSpeedBadge">1x</span>
+        </button>
+        <button class="nav-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Game menu"><span data-icon="sliders"></span></button>
       </div>
 
-      <!-- In-Game & Lobby Game Menu Popover (Game Speed Adjust + Quick Controls) -->
+      <!-- In-game menu -->
       <div id="gameSettingsMenu" class="game-settings-menu" style="display:none;">
-        <div class="game-menu-header">
-          <span>⚙️ Game Menu</span>
-          <button class="game-menu-close" onclick="toggleGameMenu(false)">✖</button>
+        <div class="menu-head">
+          <span>Game menu</span>
+          <button class="icon-btn" onclick="toggleGameMenu(false)" title="Close"><span data-icon="close" data-size="18"></span></button>
         </div>
-        <div class="game-menu-section">
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:900; color:#222;">
-            <span>⚡ Game & Bot Speed</span>
-            <span id="menuSpeedLabel" style="color:#0288d1;">1x (Normal)</span>
+        <div class="menu-section">
+          <div class="row-between">
+            <span>Game and bot speed</span>
+            <span id="menuSpeedLabel" class="muted">1x (Normal)</span>
           </div>
-          <input id="menuSpeedSlider" type="range" min="0.5" max="8" step="0.25" value="1"
-            style="width:100%; accent-color:#0288d1; cursor:pointer;"
-            oninput="setGameSpeedValue(this.value)" />
+          <input id="menuSpeedSlider" type="range" min="0.5" max="8" step="0.25" value="1" oninput="setGameSpeedValue(this.value)" />
           <div class="speed-preset-row">
             <button class="speed-preset-btn" data-speed="0.5" onclick="setGameSpeedValue(0.5)">0.5x</button>
             <button class="speed-preset-btn active" data-speed="1" onclick="setGameSpeedValue(1)">1x</button>
@@ -67,33 +70,33 @@
             <button class="speed-preset-btn" data-speed="8" onclick="setGameSpeedValue(8)">8x</button>
           </div>
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; border-top:1px solid #d4cbb8; padding-top:8px;">
-          <button class="brush-btn" style="flex:1; justify-content:center;" onclick="resetCamera()">🔍 Reset Zoom</button>
-          <button class="brush-btn" style="flex:1; justify-content:center;" onclick="rematchLobby()">🔄 Lobby</button>
+        <div class="menu-actions">
+          <button class="btn sm" onclick="resetCamera()"><span data-icon="fit" data-size="16"></span>Fit board</button>
+          <button class="btn sm" onclick="rematchLobby()"><span data-icon="refresh" data-size="16"></span>Back to lobby</button>
         </div>
       </div>
 
-      <!-- Reopen Victory Stats Button (when inspecting map after game ends) -->
-      <button id="reopenVictoryBtn" class="colonist-btn" onclick="toggleVictoryMapInspect(false)">📊 Show Victory Stats</button>
+      <!-- Reopen victory stats when inspecting the map after the game -->
+      <button id="reopenVictoryBtn" class="btn" onclick="toggleVictoryMapInspect(false)"><span data-icon="users" data-size="18"></span>Show results</button>
 
-      <!-- Colonist Victory & Dice Stats Overlay -->
+      <!-- Victory and dice stats -->
       <div id="victoryOverlay">
         <div class="vic-top-bar">
-          <div style="width:120px;"></div>
-          <div style="text-align:center;">
-            <div class="vic-logo-badge">🏝️ COLONIST</div>
-            <h2 id="vicTitleText" style="font-size:28px; font-weight:900; margin-top:10px;">You are 1st!</h2>
-            <p id="vicSubText" style="font-size:13px; color:#cbd5e1; margin-top:2px;">Time: 00:00 - Turns: 0</p>
+          <div class="vic-spacer"></div>
+          <div class="vic-center">
+            <div class="vic-logo-badge">COLONIST CUSTOM</div>
+            <h2 id="vicTitleText" class="vic-title">You are 1st!</h2>
+            <p id="vicSubText" class="vic-sub">Time: 00:00 - Turns: 0</p>
           </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <button class="colonist-btn" style="background:#1e293b; border-color:#475569;" onclick="toggleVictoryMapInspect(true)">🗺️ Map / Replay</button>
-            <button class="colonist-btn green" onclick="copyInviteLink()">Share 🔗</button>
+          <div class="vic-side">
+            <button class="btn vic-btn-dark" onclick="toggleVictoryMapInspect(true)"><span data-icon="map" data-size="18"></span>View map</button>
+            <button class="btn primary" onclick="copyInviteLink()"><span data-icon="link" data-size="18"></span>Share</button>
           </div>
         </div>
 
         <div class="vic-tabs">
-          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice Stats</div>
-          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview & Resource Stats</div>
+          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice stats</div>
+          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview</div>
         </div>
 
         <div class="vic-body">
@@ -101,185 +104,192 @@
           <div class="dice-chart-box" id="vicChartContainer"></div>
         </div>
 
-        <div style="display:flex; gap:14px; align-items:center;">
-          <button class="colonist-btn" style="background:#334155; padding:10px 28px;" onclick="window.location.reload()">Home</button>
-          <button class="colonist-btn green" style="padding:10px 44px; font-size:15px;" onclick="rematchLobby()">Play Again</button>
+        <div class="vic-actions">
+          <button class="btn vic-btn-dark" onclick="window.location.reload()"><span data-icon="home" data-size="18"></span>Home</button>
+          <button class="btn primary" onclick="rematchLobby()"><span data-icon="refresh" data-size="18"></span>Play again</button>
         </div>
       </div>
 
-      <!-- Tabbed Lobby Customizer (Map Painter + Card/Resource Amounts) -->
+      <!-- Lobby dock: map painter and rules -->
       <div id="lobbyToolbar">
-        <div class="toolbar-header">
-          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-            <span class="tab-pill active" id="tabBtnMap" onclick="switchLobbyTab('map')">🎨 Map Painter</span>
-            <span class="tab-pill" id="tabBtnCards" onclick="switchLobbyTab('cards')">🃏 Card & Resource Amounts</span>
-            <div class="setting-chip" style="background:#fff9c4; border-color:#d4c028;">
-              <span>⚡ Speed:</span>
-              <select id="setGameSpeedHeader" class="mini-input" style="width:86px;" onchange="setGameSpeedValue(this.value)">
-                <option value="0.5">0.5x Slow</option>
-                <option value="1" selected>1x Normal</option>
-                <option value="2">2x Fast</option>
-                <option value="4">4x Faster</option>
-                <option value="8">8x Blitz</option>
-              </select>
-            </div>
+        <div class="dock-head">
+          <div class="tabs">
+            <button class="tab active" id="tabBtnMap" onclick="switchLobbyTab('map')">Map painter</button>
+            <button class="tab" id="tabBtnCards" onclick="switchLobbyTab('cards')">Rules and cards</button>
           </div>
-          <div style="display:flex; gap:5px; align-items:center;">
-            <button class="brush-btn" onclick="applyPreset('standard')">🎲 Standard</button>
-            <button class="brush-btn" onclick="applyPreset('goldRush')">★ Gold Rush</button>
-            <button class="brush-btn" onclick="applyPreset('fogIsland')">🌫️ Fog Island</button>
-            <button class="brush-btn" onclick="applyPreset('archipelago')">🏝️ Islands</button>
-            <button class="brush-btn" onclick="applyPreset('blank')">🌊 Blank Ocean</button>
-            <button class="colonist-btn" style="padding:5px 10px;" onclick="addBot()">+ 🤖 Hard Bot</button>
-            <button class="colonist-btn red" style="padding:5px 10px;" onclick="removeBot()">- Bot</button>
-            <button class="colonist-btn green" style="padding:5px 14px;" onclick="startGame()">▶ Start Game</button>
+          <div class="dock-actions">
+            <select id="setGameSpeedHeader" class="num" title="Game speed" onchange="setGameSpeedValue(this.value)">
+              <option value="0.5">0.5x Slow</option>
+              <option value="1" selected>1x Normal</option>
+              <option value="2">2x Fast</option>
+              <option value="4">4x Faster</option>
+              <option value="8">8x Blitz</option>
+            </select>
+            <button class="chip-btn" onclick="applyPreset('standard')">Standard</button>
+            <button class="chip-btn" onclick="applyPreset('goldRush')">Gold rush</button>
+            <button class="chip-btn" onclick="applyPreset('fogIsland')">Fog island</button>
+            <button class="chip-btn" onclick="applyPreset('archipelago')">Islands</button>
+            <button class="chip-btn" onclick="applyPreset('blank')">Blank ocean</button>
+            <span class="tool-sep"></span>
+            <button class="btn sm" onclick="addBot()"><span data-icon="plus" data-size="16"></span>Bot</button>
+            <button class="btn sm" onclick="removeBot()"><span data-icon="minus" data-size="16"></span>Bot</button>
+            <button class="btn sm primary" onclick="startGame()"><span data-icon="play" data-size="16"></span>Start</button>
           </div>
         </div>
 
-        <!-- TAB 1: MAP PAINTER -->
-        <div id="lobbyTabMap" style="display:flex; flex-direction:column; gap:6px;">
-          <div class="toolbar-row">
-            <span>Tile Brush:</span>
-            <button class="brush-btn active" onclick="setBrush('terrain','wood',this)">🌲 Wood</button>
-            <button class="brush-btn" onclick="setBrush('terrain','brick',this)">🧱 Brick</button>
-            <button class="brush-btn" onclick="setBrush('terrain','sheep',this)">🐑 Sheep</button>
-            <button class="brush-btn" onclick="setBrush('terrain','wheat',this)">🌾 Wheat</button>
-            <button class="brush-btn" onclick="setBrush('terrain','ore',this)">⛰️ Ore</button>
-            <button class="brush-btn" onclick="setBrush('terrain','gold',this)"><span id="goldBtnIcon"></span> Gold</button>
-            <button class="brush-btn" onclick="setBrush('terrain','desert',this)">🌵 Desert</button>
-            <button class="brush-btn" onclick="setBrush('terrain','fog',this)">🌫️ Fog</button>
-            <button class="brush-btn" onclick="setBrush('terrain','water',this)">🌊 Ocean (Erase)</button>
-            <button class="brush-btn" onclick="setBrush('robber','robber',this)">♟️ Place Robber</button>
+        <!-- Tab 1: map painter -->
+        <div id="lobbyTabMap" class="dock-body">
+          <div class="tool-row">
+            <span class="tool-label">Tiles</span>
+            <button class="brush-btn swatch t-wood active" title="Wood" onclick="setBrush('terrain','wood',this)"><span data-glyph="wood"></span></button>
+            <button class="brush-btn swatch t-brick" title="Brick" onclick="setBrush('terrain','brick',this)"><span data-glyph="brick"></span></button>
+            <button class="brush-btn swatch t-sheep" title="Sheep" onclick="setBrush('terrain','sheep',this)"><span data-glyph="sheep"></span></button>
+            <button class="brush-btn swatch t-wheat" title="Wheat" onclick="setBrush('terrain','wheat',this)"><span data-glyph="wheat"></span></button>
+            <button class="brush-btn swatch t-ore" title="Ore" onclick="setBrush('terrain','ore',this)"><span data-glyph="ore"></span></button>
+            <button class="brush-btn swatch t-gold" title="Gold" onclick="setBrush('terrain','gold',this)"><span data-glyph="gold"></span></button>
+            <button class="brush-btn swatch t-desert" title="Desert" onclick="setBrush('terrain','desert',this)"><span data-glyph="desert"></span></button>
+            <button class="brush-btn swatch t-fog" title="Fog" onclick="setBrush('terrain','fog',this)"><span data-glyph="fog"></span></button>
+            <button class="brush-btn swatch t-water" title="Ocean (erase)" onclick="setBrush('terrain','water',this)"><span data-icon="waves" data-size="22"></span></button>
+            <span class="tool-sep"></span>
+            <button class="brush-btn swatch t-any" title="Place robber" onclick="setBrush('robber','robber',this)"><span data-robber></span></button>
           </div>
-          <div class="toolbar-row">
-            <span>Numbers:</span>
+          <div class="tool-row">
+            <span class="tool-label">Numbers</span>
             <button class="brush-btn" onclick="setBrush('number','2',this)">2</button>
             <button class="brush-btn" onclick="setBrush('number','3',this)">3</button>
             <button class="brush-btn" onclick="setBrush('number','4',this)">4</button>
             <button class="brush-btn" onclick="setBrush('number','5',this)">5</button>
-            <button class="brush-btn" onclick="setBrush('number','6',this)" style="color:#c62828">6</button>
-            <button class="brush-btn" onclick="setBrush('number','8',this)" style="color:#c62828">8</button>
+            <button class="brush-btn hot" onclick="setBrush('number','6',this)">6</button>
+            <button class="brush-btn hot" onclick="setBrush('number','8',this)">8</button>
             <button class="brush-btn" onclick="setBrush('number','9',this)">9</button>
             <button class="brush-btn" onclick="setBrush('number','10',this)">10</button>
             <button class="brush-btn" onclick="setBrush('number','11',this)">11</button>
             <button class="brush-btn" onclick="setBrush('number','12',this)">12</button>
-            <button class="brush-btn" onclick="setBrush('number','none',this)">❌ Clear #</button>
-            <span style="margin-left:6px;">Ports:</span>
-            <button class="brush-btn" onclick="setBrush('port','3:1',this)">⛵ 3:1 ?</button>
-            <button class="brush-btn" onclick="setBrush('port','wood',this)">⛵ 2:1 🌲</button>
-            <button class="brush-btn" onclick="setBrush('port','brick',this)">⛵ 2:1 🧱</button>
-            <button class="brush-btn" onclick="setBrush('port','sheep',this)">⛵ 2:1 🐑</button>
-            <button class="brush-btn" onclick="setBrush('port','wheat',this)">⛵ 2:1 🌾</button>
-            <button class="brush-btn" onclick="setBrush('port','ore',this)">⛵ 2:1 ⛰️</button>
-            <button class="brush-btn" onclick="setBrush('port','none',this)">❌ No Port</button>
+            <button class="brush-btn swatch t-any" title="Clear number" onclick="setBrush('number','none',this)"><span data-icon="close" data-size="18"></span></button>
+          </div>
+          <div class="tool-row">
+            <span class="tool-label">Ports</span>
+            <button class="brush-btn swatch has-ratio t-any" title="3:1 any resource" onclick="setBrush('port','3:1',this)"><span class="ratio">3:1</span></button>
+            <button class="brush-btn swatch has-ratio t-wood" title="Wood 2:1" onclick="setBrush('port','wood',this)"><span data-glyph="wood"></span><span class="ratio">2:1</span></button>
+            <button class="brush-btn swatch has-ratio t-brick" title="Brick 2:1" onclick="setBrush('port','brick',this)"><span data-glyph="brick"></span><span class="ratio">2:1</span></button>
+            <button class="brush-btn swatch has-ratio t-sheep" title="Sheep 2:1" onclick="setBrush('port','sheep',this)"><span data-glyph="sheep"></span><span class="ratio">2:1</span></button>
+            <button class="brush-btn swatch has-ratio t-wheat" title="Wheat 2:1" onclick="setBrush('port','wheat',this)"><span data-glyph="wheat"></span><span class="ratio">2:1</span></button>
+            <button class="brush-btn swatch has-ratio t-ore" title="Ore 2:1" onclick="setBrush('port','ore',this)"><span data-glyph="ore"></span><span class="ratio">2:1</span></button>
+            <button class="brush-btn swatch t-any" title="Remove port" onclick="setBrush('port','none',this)"><span data-icon="close" data-size="18"></span></button>
           </div>
         </div>
 
-        <!-- TAB 2: CUSTOM CARD & RESOURCE AMOUNTS -->
-        <div id="lobbyTabCards" style="display:none; flex-direction:column; gap:6px;">
-          <div class="toolbar-row">
-            <div class="setting-chip" style="background:#fff9c4">
-              <span>⚡ Game Speed:</span>
-              <select id="setGameSpeed" class="mini-input" style="width:92px;" onchange="setGameSpeedValue(this.value)">
-                <option value="0.5">0.5x Slow</option>
-                <option value="1" selected>1x Normal</option>
-                <option value="2">2x Fast</option>
-                <option value="4">4x Faster</option>
-                <option value="8">8x Blitz</option>
-              </select>
+        <!-- Tab 2: rules and card amounts -->
+        <div id="lobbyTabCards" class="dock-body" style="display:none;">
+          <div class="rules-grid">
+            <div class="rule-group">
+              <h4>Game</h4>
+              <label class="field">Speed
+                <select id="setGameSpeed" class="num" onchange="setGameSpeedValue(this.value)">
+                  <option value="0.5">0.5x Slow</option>
+                  <option value="1" selected>1x Normal</option>
+                  <option value="2">2x Fast</option>
+                  <option value="4">4x Faster</option>
+                  <option value="8">8x Blitz</option>
+                </select>
+              </label>
+              <label class="field">Map radius (1-50)<input id="setRadius" type="number" class="num" value="2" min="1" max="50" onchange="pushSettings()" /></label>
+              <label class="field">VP to win<input id="setVp" type="number" class="num" value="10" min="3" max="50" onchange="pushSettings()" /></label>
+              <label class="field">Max players<input id="setMaxP" type="number" class="num" value="4" min="2" max="8" onchange="pushSettings()" /></label>
+              <label class="field">Discard above<input id="setDiscard" type="number" class="num" value="7" min="3" max="50" onchange="pushSettings()" /></label>
             </div>
-            <div class="setting-chip">
-              <span>Map Size (Radius 1–50):</span>
-              <input id="setRadius" type="number" class="mini-input" value="2" min="1" max="50" onchange="pushSettings()" />
+            <div class="rule-group">
+              <h4>Special tiles</h4>
+              <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="2" min="0" max="500" onchange="pushSettings()" /></label>
+              <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>
+              <label class="field">Fog hexes<input id="setFog" type="number" class="num" value="0" min="0" max="2000" onchange="pushSettings()" /></label>
             </div>
-            <div class="setting-chip"><span>VP to Win:</span><input id="setVp" type="number" class="mini-input" value="10" min="3" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Max Players:</span><input id="setMaxP" type="number" class="mini-input" value="4" min="2" max="8" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>7-Discard Limit:</span><input id="setDiscard" type="number" class="mini-input" value="7" min="3" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Gold Hexes:</span><input id="setGold" type="number" class="mini-input" value="2" min="0" max="500" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Desert Hexes:</span><input id="setDesert" type="number" class="mini-input" value="1" min="0" max="200" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>🌫️ Fog Hexes:</span><input id="setFog" type="number" class="mini-input" value="0" min="0" max="2000" onchange="pushSettings()" /></div>
-          </div>
-          <div class="toolbar-row">
-            <div class="setting-chip" style="background:#dcedc8">
-              <span>🏦 Bank Resource Cards (per type):</span>
-              <input id="setBankRes" type="number" class="mini-input" value="19" min="5" max="999" onchange="pushSettings()" />
+            <div class="rule-group">
+              <h4>Bank and dev cards</h4>
+              <label class="field">Bank cards per type<input id="setBankRes" type="number" class="num" value="19" min="5" max="999" onchange="pushSettings()" /></label>
+              <label class="field">Knights<input id="setDevKnight" type="number" class="num" value="14" min="0" max="100" onchange="pushSettings()" /></label>
+              <label class="field">Victory points<input id="setDevVp" type="number" class="num" value="5" min="0" max="50" onchange="pushSettings()" /></label>
+              <label class="field">Road building<input id="setDevRb" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
+              <label class="field">Year of plenty<input id="setDevYop" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
+              <label class="field">Monopoly<input id="setDevMono" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
             </div>
-            <div class="setting-chip" style="background:#e1bee7"><span>⚔️ Knights:</span><input id="setDevKnight" type="number" class="mini-input" value="14" min="0" max="100" onchange="pushSettings()" /></div>
-            <div class="setting-chip" style="background:#e1bee7"><span>⭐ VP Cards:</span><input id="setDevVp" type="number" class="mini-input" value="5" min="0" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip" style="background:#e1bee7"><span>🛣️ Road Build:</span><input id="setDevRb" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip" style="background:#e1bee7"><span>🎁 Year of Plenty:</span><input id="setDevYop" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip" style="background:#e1bee7"><span>🎩 Monopoly:</span><input id="setDevMono" type="number" class="mini-input" value="2" min="0" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Max Roads:</span><input id="setMaxRoad" type="number" class="mini-input" value="15" min="5" max="50" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Max Settle:</span><input id="setMaxSettle" type="number" class="mini-input" value="5" min="2" max="20" onchange="pushSettings()" /></div>
-            <div class="setting-chip"><span>Max Cities:</span><input id="setMaxCity" type="number" class="mini-input" value="4" min="1" max="20" onchange="pushSettings()" /></div>
+            <div class="rule-group">
+              <h4>Pieces per player</h4>
+              <label class="field">Roads<input id="setMaxRoad" type="number" class="num" value="15" min="5" max="50" onchange="pushSettings()" /></label>
+              <label class="field">Settlements<input id="setMaxSettle" type="number" class="num" value="5" min="2" max="20" onchange="pushSettings()" /></label>
+              <label class="field">Cities<input id="setMaxCity" type="number" class="num" value="4" min="1" max="20" onchange="pushSettings()" /></label>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Top-Center Colonist Active Trade Response Box -->
+      <!-- Hint bar -->
+      <div id="hintBar"></div>
+
+      <!-- Active trade offer -->
       <div id="activeTradeModal"></div>
 
-      <!-- Interactive SVG Island Board -->
+      <!-- Board -->
       <svg id="boardSvg" viewBox="-500 -450 1000 900"></svg>
 
-      <!-- Bottom-Left Inline Drawer + Adjacent Bank/Player Trade Confirm Buttons -->
+      <!-- Bottom-left sheet and trade confirm buttons -->
       <div id="inlineDrawerWrap">
         <div id="inlineDrawer"></div>
         <div id="tradeConfirmStack">
-          <button class="trade-side-btn" id="btnExecBankTrade" onclick="executeBankTrade()" title="Trade with Bank / Port">
-            <span class="mini-check">✔</span>
-            <span>🏦</span>
+          <button class="trade-side-btn" id="btnExecBankTrade" onclick="executeBankTrade()" title="Trade with bank or port">
+            <span data-icon="bank" data-size="22"></span>
+            <span>Bank</span>
           </button>
-          <button class="trade-side-btn" id="btnExecPlayerTrade" onclick="proposePlayerTrade()" title="Offer Trade to Players & Bots">
-            <span class="mini-check">✔</span>
-            <span>👥</span>
+          <button class="trade-side-btn" id="btnExecPlayerTrade" onclick="proposePlayerTrade()" title="Offer trade to players and bots">
+            <span data-icon="users" data-size="22"></span>
+            <span>Players</span>
           </button>
         </div>
       </div>
 
-      <!-- Bottom-Left Resource & Dev Card Hand -->
+      <!-- Hand -->
       <div class="hand-panel" id="myHandPanel"></div>
 
-      <!-- Bottom-Center Dice, Turn Banner & Glossy Action Buttons -->
+      <!-- Dice, turn pill and actions -->
       <div class="center-hud">
-        <div class="dice-pair" id="dicePair" onclick="rollDice()" title="Click to Roll Dice">
-          <div class="die-box" id="die1">4</div>
-          <div class="die-box" id="die2">3</div>
+        <div class="dice-pair" id="dicePair" onclick="rollDice()" title="Roll dice">
+          <div class="die-box" id="die1"></div>
+          <div class="die-box" id="die2"></div>
         </div>
-        <div class="turn-pill" id="turnStatusPill">Waiting in Lobby...</div>
+        <div class="turn-pill" id="turnStatusPill">Waiting in lobby</div>
         <div class="action-bar">
-          <button class="sq-btn" id="btnConfirmAction" style="display:none; background:linear-gradient(180deg,#4caf50,#2e7d32);" onclick="confirmInlineAction()" title="Confirm">✔</button>
-          <button class="sq-btn" id="btnCancelAction" style="display:none; background:linear-gradient(180deg,#ef5350,#c62828);" onclick="closeInlineDrawer()" title="Cancel">✖</button>
-          <button class="sq-btn" id="btnTradeDrawer" onclick="toggleTradeDrawer()" title="Open Trade">
-            <span>⇄</span><span class="lbl">Trade</span>
+          <button class="act-btn primary" id="btnConfirmAction" style="display:none;" onclick="confirmInlineAction()" title="Confirm"><span data-icon="check" data-size="22"></span></button>
+          <button class="act-btn danger" id="btnCancelAction" style="display:none;" onclick="closeInlineDrawer()" title="Cancel"><span data-icon="close" data-size="22"></span></button>
+          <button class="act-btn" id="btnTradeDrawer" onclick="toggleTradeDrawer()" title="Trade">
+            <span data-icon="swap" data-size="22"></span><span class="lbl">Trade</span>
           </button>
-          <button class="sq-btn" id="btnBuyDev" onclick="buyDevCard()" title="Buy Dev Card (1 Sheep, 1 Wheat, 1 Ore)">
-            <span>🃏</span><span class="lbl">Dev</span>
+          <button class="act-btn" id="btnBuyDev" onclick="buyDevCard()" title="Buy dev card (1 sheep, 1 wheat, 1 ore)">
+            <span data-icon="devbuy" data-size="22"></span><span class="lbl">Dev</span>
           </button>
-          <button class="sq-btn" id="btnBuildRoad" onclick="setBuildMode('road')" title="Build Road (1 Wood, 1 Brick)">
+          <button class="act-btn" id="btnBuildRoad" onclick="setBuildMode('road')" title="Build road (1 wood, 1 brick)">
             <span class="piece-badge" id="badgeRoadCnt">15</span>
-            <span>┃</span><span class="lbl">Road</span>
+            <span data-icon="road" data-size="22"></span><span class="lbl">Road</span>
           </button>
-          <button class="sq-btn" id="btnBuildSettle" onclick="setBuildMode('settlement')" title="Build Settlement (1 Wood, 1 Brick, 1 Sheep, 1 Wheat)">
+          <button class="act-btn" id="btnBuildSettle" onclick="setBuildMode('settlement')" title="Build settlement (1 wood, 1 brick, 1 sheep, 1 wheat)">
             <span class="piece-badge" id="badgeSettleCnt">5</span>
-            <span>⛺</span><span class="lbl">Settle</span>
+            <span data-icon="house" data-size="22"></span><span class="lbl">Settle</span>
           </button>
-          <button class="sq-btn" id="btnBuildCity" onclick="setBuildMode('city')" title="Build City (2 Wheat, 3 Ore)">
+          <button class="act-btn" id="btnBuildCity" onclick="setBuildMode('city')" title="Build city (2 wheat, 3 ore)">
             <span class="piece-badge" id="badgeCityCnt">4</span>
-            <span>🏛️</span><span class="lbl">City</span>
+            <span data-icon="city" data-size="22"></span><span class="lbl">City</span>
           </button>
-          <button class="sq-btn" id="btnMainTurnAction" onclick="mainTurnButton()" title="Roll / Pass">
-            <span id="mainBtnIcon">🎲</span><span class="lbl" id="mainBtnLbl">Roll</span>
+          <button class="act-btn" id="btnMainTurnAction" onclick="mainTurnButton()" title="Roll or pass">
+            <span id="mainBtnIcon" data-icon="dice" data-size="22"></span><span class="lbl" id="mainBtnLbl">Roll</span>
           </button>
         </div>
       </div>
 
     </div>
 
-    <!-- Right Colonist Sidebar -->
+    <!-- Right sidebar -->
     <div class="right-sidebar">
-      <div class="cream-box" id="logSection"></div>
-      <div class="cream-box" id="chatSection">
+      <div id="logSection"></div>
+      <div id="chatSection">
         <div id="chatFeed"></div>
         <div class="chat-input-wrap">
           <input id="chatInput" type="text" placeholder="Send a message" onkeydown="if(event.key==='Enter') sendChat()" />

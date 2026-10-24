@@ -1,10 +1,18 @@
+// MODULE: active trade offer box (top right) and trade responses | USED BY: render/index.ts, main.ts
 import { RESOURCES, RES_META } from '../constants';
-import { getMiniSvg, buildOverlappingStackHtml } from '../icons';
+import { getMiniSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { state, setDrawerMode } from '../store';
+import { esc, initial } from '../util';
 
-// Renders the top-right active trade box (with bot/player response icons and click-to-confirm).
+function stacksHtml(counts: Record<string, number>): string {
+  return RESOURCES.filter(r => counts[r] > 0).map(r =>
+    buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), counts[r], '', RES_META[r].name)
+  ).join('');
+}
+
+// Renders the top-right trade box: opponent response badges, the two card rows, and accept / decline / confirm buttons.
 export function renderActiveTradeModal(me: any): void {
   const box = document.getElementById('activeTradeModal')!;
   if (!state.activeTrade) {
@@ -16,65 +24,53 @@ export function renderActiveTradeModal(me: any): void {
   const isMyOffer = t.fromId === socket.id;
   const otherPlayers = state.players.filter(p => p.id !== t.fromId);
 
-  // Top bar with opponent avatars and their response badges
   const avatarsHtml = otherPlayers.map(p => {
     const resp = (t.responses && t.responses[p.id]) || 'pending';
-    let badgeBg = '#0288d1', badgeTxt = '⏳';
-    if (resp === 'accepted') { badgeBg = '#2e7d32'; badgeTxt = '✔'; }
-    else if (resp === 'declined') { badgeBg = '#c62828'; badgeTxt = '✖'; }
-
+    const cls = resp === 'accepted' ? 'ok' : resp === 'declined' ? 'no' : 'wait';
+    const icon = resp === 'accepted' ? uiIcon('check', 11) : resp === 'declined' ? uiIcon('close', 11) : '';
     return `
-      <div class="trade-resp-avatar" style="background:${p.color}" title="${p.name}: ${resp.toUpperCase()}">
-        <span>${p.avatar}</span>
-        <div class="status-dot" style="background:${badgeBg}">${badgeTxt}</div>
-      </div>
-    `;
+      <div class="resp" title="${esc(p.name)}: ${esc(resp)}">
+        <div class="avatar" style="background:${esc(p.color)}">${initial(p.name)}</div>
+        <div class="status ${cls}">${icon}</div>
+      </div>`;
   }).join('');
 
-  const wantCardsHtml = RESOURCES.filter(r => t.request[r] > 0).map(r =>
-    buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.request[r], '', RES_META[r].name)
-  ).join('');
+  // Rows are shown from my point of view: first what I give, then what I get.
+  const giveHtml = stacksHtml(isMyOffer ? t.offer : t.request);
+  const getHtml = stacksHtml(isMyOffer ? t.request : t.offer);
 
-  const giveCardsHtml = RESOURCES.filter(r => t.offer[r] > 0).map(r =>
-    buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), t.offer[r], '', RES_META[r].name)
-  ).join('');
-
-  let actionButtonsHtml = '';
+  let actionsHtml = '';
   if (isMyOffer) {
-    // Clickable ✔ button for every player/bot who accepted
-    const acceptedPlayers = otherPlayers.filter(p => t.responses && t.responses[p.id] === 'accepted');
-    actionButtonsHtml = acceptedPlayers.map(p => `
-      <button class="trade-act-btn" style="background:${p.color}" onclick="confirmTradeWith('${p.id}')" title="Complete Trade with ${p.name}!">✔</button>
+    const accepted = otherPlayers.filter(p => t.responses && t.responses[p.id] === 'accepted');
+    actionsHtml = accepted.map(p => `
+      <button class="act-circle" style="background:${esc(p.color)}" onclick="confirmTradeWith('${esc(p.id)}')" title="Trade with ${esc(p.name)}">${uiIcon('check', 20)}</button>
     `).join('') + `
-      <button class="trade-act-btn" style="background:#ef5350" onclick="cancelTrade()" title="Cancel Trade Offer">✖</button>
+      <button class="act-circle no" onclick="cancelTrade()" title="Cancel offer">${uiIcon('close', 20)}</button>
     `;
   } else {
     const myResp = (t.responses && t.responses[socket.id]) || 'pending';
-    const canAfford = me && RESOURCES.every(r => (t.request[r] || 0) <= (me.resources[r] || 0));
-    actionButtonsHtml = `
-      <button class="trade-act-btn" style="background:#4caf50; ${!canAfford ? 'opacity:0.4; cursor:not-allowed;' : ''}"
-        onclick="${canAfford ? `respondToTrade('accepted')` : ''}" title="${canAfford ? 'Accept Trade' : 'Not enough cards'}">✔</button>
-      <button class="trade-act-btn" style="background:#ef5350; ${myResp === 'declined' ? 'opacity:0.4;' : ''}"
-        onclick="respondToTrade('declined')" title="Decline Trade">✖</button>
+    const canAfford = !!me && RESOURCES.every(r => (t.request[r] || 0) <= (me.resources[r] || 0));
+    actionsHtml = `
+      <button class="act-circle ${canAfford ? '' : 'off'}" ${canAfford ? `onclick="respondToTrade('accepted')"` : 'disabled'}
+        title="${canAfford ? 'Accept' : 'Not enough cards'}">${uiIcon('check', 20)}</button>
+      <button class="act-circle no ${myResp === 'declined' ? 'off' : ''}" onclick="respondToTrade('declined')" title="Decline">${uiIcon('close', 20)}</button>
     `;
   }
 
   box.innerHTML = `
     <div class="trade-top-avatars">${avatarsHtml}</div>
     <div class="trade-offer-body">
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <div class="res-Select-row">
-          <span style="font-size:13px; font-weight:900; color:#2e7d32; width:58px;">👥 ⬇</span>
-          ${ isMyOffer ? wantCardsHtml : giveCardsHtml }
+      <div class="trade-rows">
+        <div class="trade-row">
+          <span class="trade-row-label">You give</span>
+          ${giveHtml}
         </div>
-        <div class="res-Select-row">
-          <span style="font-size:13px; font-weight:900; color:#c62828; width:58px;">${t.fromAvatar} ⬆</span>
-          ${ isMyOffer ? giveCardsHtml : wantCardsHtml }
+        <div class="trade-row">
+          <span class="trade-row-label">You get</span>
+          ${getHtml}
         </div>
       </div>
-      <div style="display:flex; gap:6px; align-items:center;">
-        ${actionButtonsHtml}
-      </div>
+      <div class="trade-actions">${actionsHtml}</div>
     </div>
   `;
 }

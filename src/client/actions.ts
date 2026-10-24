@@ -5,6 +5,7 @@ import {
   setVictoryTab, setHideVictoryOverlay
 } from './store';
 import { renderAll, renderVictoryScreen } from './render/index';
+import { showToast } from './ui';
 
 // ---------- Landing / lobby ----------
 
@@ -22,7 +23,10 @@ export function joinRoom(): void {
 export function copyInviteLink(): void {
   if (!state) return;
   const url = `${window.location.origin}/?room=${state.code}`;
-  navigator.clipboard.writeText(url);
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Invite link copied'),
+    () => showToast(url)
+  );
   playTone(660, 0.1);
 }
 

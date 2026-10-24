@@ -5,6 +5,8 @@ import { renderHand } from './hand';
 import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderBoard } from './board';
+import { uiIcon, dieFaceSvg } from '../icons';
+import { esc, initial } from '../util';
 
 export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
@@ -54,8 +56,8 @@ export function renderAll(): void {
     lobbyBar.style.display = 'none';
   }
 
-  document.getElementById('die1')!.textContent = String(state.lastDice[0]);
-  document.getElementById('die2')!.textContent = String(state.lastDice[1]);
+  document.getElementById('die1')!.innerHTML = dieFaceSvg(state.lastDice[0]);
+  document.getElementById('die2')!.innerHTML = dieFaceSvg(state.lastDice[1]);
 
   // Piece badges on buttons
   if (me) {
@@ -65,10 +67,11 @@ export function renderAll(): void {
   }
 
   const pill = document.getElementById('turnStatusPill')!;
+  pill.classList.toggle('mine', isMyTurn && state.status !== 'LOBBY' && state.status !== 'GAMEOVER');
   if (state.status === 'LOBBY') {
-    pill.innerHTML = `🏠 Room <strong>${state.code}</strong> — Paint Map or Add Hard Bots`;
+    pill.innerHTML = `Room <strong>${esc(state.code)}</strong> · paint the map or add bots`;
   } else if (state.status === 'GAMEOVER') {
-    pill.innerHTML = `🏆 <strong>${state.winner?.name}</strong> Won the Game!`;
+    pill.innerHTML = `<strong>${esc(state.winner?.name)}</strong> won the game`;
   } else {
     const phaseTxt = ({
       SETUP_SETTLEMENT: 'Place Settlement',
@@ -80,7 +83,7 @@ export function renderAll(): void {
       ROBBER_STEAL: 'Choose Player to Rob',
       MAIN: 'Turn'
     } as Record<string, string>)[state.phase] || state.phase;
-    pill.innerHTML = `<span>${current?.avatar || ''}</span> <strong>${current?.name}</strong> — ${phaseTxt}`;
+    pill.innerHTML = `<span class="avatar" style="background:${esc(current?.color)}">${initial(current?.name || '?')}</span> <strong>${esc(current?.name)}</strong> · ${phaseTxt}`;
   }
 
   const btn = (id: string) => document.getElementById(id) as HTMLButtonElement;
@@ -97,13 +100,15 @@ export function renderAll(): void {
   const mainBtn = btn('btnMainTurnAction');
   if (state.phase === 'ROLL') {
     mainBtn.disabled = !isMyTurn;
-    document.getElementById('mainBtnIcon')!.textContent = '🎲';
+    document.getElementById('mainBtnIcon')!.innerHTML = uiIcon('dice', 22);
     document.getElementById('mainBtnLbl')!.textContent = 'Roll';
   } else {
     mainBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
-    document.getElementById('mainBtnIcon')!.textContent = '⏩';
+    document.getElementById('mainBtnIcon')!.innerHTML = uiIcon('pass', 22);
     document.getElementById('mainBtnLbl')!.textContent = 'Pass';
   }
+  mainBtn.classList.toggle('primary', !mainBtn.disabled);
+  document.getElementById('dicePair')!.classList.toggle('can-roll', isMyTurn && state.phase === 'ROLL');
 
   renderVictoryScreen();
   renderActiveTradeModal(me);
@@ -145,15 +150,13 @@ export function renderVictoryScreen(): void {
   const secs = String(elapsedSec % 60).padStart(2, '0');
   document.getElementById('vicSubText')!.textContent = `Time: ${mins}:${secs} - Turns: ${state.turnCount || 1}`;
 
-  document.getElementById('vicRanksList')!.innerHTML = `
-    <div style="text-align:right; font-size:18px; margin-bottom:2px;">🏆</div>
-  ` + ranked.map((p, idx) => `
-    <div class="vic-rank-row" style="border-left: 4px solid ${p.color}">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:18px">${p.avatar}</span>
-        <span>${p.name}</span>
+  document.getElementById('vicRanksList')!.innerHTML = ranked.map((p, idx) => `
+    <div class="vic-rank-row ${idx === 0 ? 'winner' : ''}">
+      <div class="who">
+        <span class="avatar p-avatar" style="background:${esc(p.color)}">${initial(p.name)}</span>
+        <span>${esc(p.name)}</span>
       </div>
-      <span style="font-size:16px; color:${idx === 0 ? '#ffd700' : '#fff'}">${p.vp}</span>
+      <span class="pts">${p.vp}</span>
     </div>
   `).join('');
 
@@ -172,28 +175,28 @@ export function renderVictoryScreen(): void {
       barsHtml += `
         <div class="dice-bar-col">
           <div class="dice-bar-fill ${n === 7 ? 'is-seven' : ''}" style="height:${heightPct}%">${c > 0 ? c : ''}</div>
-          <span style="font-size:11px; font-weight:800; color:#cbd5e1">${n}</span>
+          <span class="dice-bar-label">${n}</span>
         </div>
       `;
     }
 
     chartBox.innerHTML = `
-      <div style="width:100%; text-align:left; font-weight:800; font-size:14px; margin-bottom:6px;">Dice Rolls</div>
+      <div class="vic-chart-title">Dice rolls</div>
       <div class="dice-bars-wrap">${barsHtml}</div>
     `;
   } else {
     chartBox.innerHTML = `
-      <div style="width:100%; background:rgba(255,255,255,0.07); border-radius:10px; padding:14px;">
-        <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:6px; margin-bottom:8px;">
-          <span>Player</span><span>VP</span><span>Earned</span><span>Trades</span><span>Roads/Army</span>
+      <div class="vic-table">
+        <div class="vic-table-row head">
+          <span>Player</span><span>VP</span><span>Earned</span><span>Trades</span><span>Road / Army</span>
         </div>
         ${ranked.map(p => `
-          <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap:8px; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
-            <span style="font-weight:800; color:${p.color}">${p.avatar} ${p.name}</span>
+          <div class="vic-table-row">
+            <span class="who"><span class="avatar p-avatar" style="background:${esc(p.color)}; width:24px; height:24px; font-size:11px">${initial(p.name)}</span>${esc(p.name)}</span>
             <span>${p.vp}</span>
             <span>${p.stats?.resourcesEarned || 0}</span>
             <span>${p.stats?.tradesMade || 0}</span>
-            <span>🛣️${p.longestRoadLength} / ⚔️${p.knightsPlayed}</span>
+            <span>${p.longestRoadLength} / ${p.knightsPlayed}</span>
           </div>
         `).join('')}
       </div>

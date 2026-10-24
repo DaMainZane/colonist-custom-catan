@@ -1,6 +1,7 @@
 import { socket } from './socket';
 import { playTone, playDiceRollSound, playDiscardSound, toggleSound } from './audio';
-import { getMiniSvg } from './icons';
+import { hydrateIcons } from './icons';
+import { toggleTheme, showToast } from './ui';
 import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   setState, setIsMouseDown, setIsPanning, setCamZoom, setCamPan, setDrawerMode,
@@ -26,7 +27,7 @@ import {
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
-  createRoom, joinRoom, copyInviteLink, toggleSound, resetCamera, toggleLobbyToolbar, toggleGameMenu,
+  createRoom, joinRoom, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
   setGameSpeedValue, switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
@@ -66,7 +67,7 @@ function syncAutomaticDrawers(): void {
   }
 }
 
-socket.on('errorMsg', (msg: string) => alert(msg));
+socket.on('errorMsg', (msg: string) => showToast(msg));
 
 socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
@@ -114,7 +115,7 @@ socket.on('gameState', (newState: any) => {
 });
 
 function init(): void {
-  document.getElementById('goldBtnIcon')!.innerHTML = getMiniSvg('gold');
+  hydrateIcons();
   const params = new URLSearchParams(window.location.search);
   if (params.get('room')) (document.getElementById('roomCodeInput') as HTMLInputElement).value = params.get('room')!;
 
