@@ -1,33 +1,45 @@
+// MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | USED BY: server/main
 import type { Server } from 'socket.io';
-import {
-  executeTradeBetweenPlayers,
-  handleEndTurn,
-  handleMoveRobber,
-  handlePlaceCity,
-  handlePlaceRoad,
-  handlePlaceSettlement,
-  handleRollDice,
-  handleStealFromVictim
-} from './actions';
-import { PLAYER_COLORS, RESOURCES } from './constants';
+import { PLAYER_COLORS } from '../shared';
+import { victimsOnHex } from '../packs/base/robbing';
+import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
+import { clearBotTimers, createLobbyPlayer, createRoom, humanIds, addLobbyLog, rooms } from './rooms';
+import { newBoard, isPreset, paintHex, paintPort } from './lobby';
+import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
-import { addLog, createDevDeck, createPlayer, createRoom, rooms } from './rooms';
-import {
-  checkGoldPhaseTransition,
-  checkWinner,
-  getBankRemaining,
-  getTradeRatios,
-  givePlayerResourceFromBank,
-  updateLargestArmy
-} from './rules';
-import { generateBoard, hexDistance, rebuildBoardTopology } from './topology';
-import { clamp, shuffle } from './util';
+import { registry } from './runtime';
+import type { Settings } from './types';
+import { clamp } from './util';
+
+const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
 
 export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket) => {
     const safe = (fn: (data: any) => void) => (data: any = {}) => {
       try { fn(data); } catch (err) { console.error('Socket handler error:', err); }
     };
+
+    /**
+     * Runs one engine action for this socket's player and broadcasts the result.
+     * `report` sends the engine's reason back to the player (used where the old server did too).
+     */
+    const act = (code: string, type: string, payload: any = {}, report = false): void => {
+      const room = rooms[code];
+      if (!room || !room.game) return;
+      const res = runAction(room, socket.id, type, payload);
+      if (!res.ok) {
+        if (report) socket.emit('errorMsg', res.error);
+        return;
+      }
+      broadcastRoom(room);
+    };
+
+    const hostLobbyRoom = (code: string) => {
+      const room = rooms[code];
+      return room && room.hostId === socket.id && !room.game ? room : null;
+    };
+
+    // ---- Lobby ------------------------------------------------------------
 
     socket.on('createRoom', safe(({ name }) => {
       const cleanName = (name || 'Settler').trim().substring(0, 16);
@@ -41,82 +53,71 @@ export function registerSocketHandlers(io: Server): void {
       const cleanName = (name || 'Settler').trim().substring(0, 16);
       const room = rooms[cleanCode];
       if (!room) return socket.emit('errorMsg', 'Room not found!');
-      if (room.status !== 'LOBBY') return socket.emit('errorMsg', 'Game already started!');
-      if (room.players.length >= room.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
+      if (room.game) return socket.emit('errorMsg', 'Game already started!');
+      if (room.lobbyPlayers.length >= room.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
 
-      const newP = createPlayer(socket.id, cleanName, room.players.length, false);
-      room.players.push(newP);
+      const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
+      room.lobbyPlayers.push(newP);
       socket.join(room.code);
-      addLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
+      addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
       broadcastRoom(room);
     }));
 
     socket.on('addBot', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      if (room.players.length >= room.settings.maxPlayers) return;
-      const botNames = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
-      const used = new Set(room.players.map(p => p.name));
-      const botName = botNames.find(n => !used.has(n)) || `Bot ${room.players.length}`;
-      const bot = createPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.players.length, true);
-      room.players.push(bot);
-      addLog(room, `🤖 ${bot.name} [ADVANCED HARD] added`, bot.color);
+      const room = hostLobbyRoom(code);
+      if (!room || room.lobbyPlayers.length >= room.settings.maxPlayers) return;
+      const used = new Set(room.lobbyPlayers.map(p => p.name));
+      const botName = BOT_NAMES.find(n => !used.has(n)) || `Bot ${room.lobbyPlayers.length}`;
+      const bot = createLobbyPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.lobbyPlayers.length, true);
+      room.lobbyPlayers.push(bot);
+      addLobbyLog(room, `🤖 ${bot.name} [ADVANCED HARD] added`, bot.color);
       broadcastRoom(room);
     }));
 
     socket.on('removeBot', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      const idx = room.players.findLastIndex(p => p.isBot);
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      const idx = room.lobbyPlayers.findLastIndex(p => p.isBot);
       if (idx !== -1) {
-        room.players.splice(idx, 1);
+        room.lobbyPlayers.splice(idx, 1);
         broadcastRoom(room);
       }
     }));
 
     socket.on('updateSettings', safe(({ code, newSettings }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY' || !newSettings) return;
-      const oldRadius = room.settings.boardRadius;
-      const oldGold = room.settings.goldTiles;
-      const oldDesert = room.settings.desertTiles;
-      const oldFog = room.settings.fogTiles ?? 0;
+      const room = hostLobbyRoom(code);
+      if (!room || !newSettings) return;
+      const old = room.settings;
+      const speed = Number(newSettings.gameSpeed);
+      const gameSpeed = Number.isFinite(speed) && speed > 0 ? Math.max(0.25, Math.min(10, speed)) : (old.gameSpeed ?? 1);
 
-      const parsedSpeed = Number(newSettings.gameSpeed);
-      const nextGameSpeed = Number.isFinite(parsedSpeed) && parsedSpeed > 0
-        ? Math.max(0.25, Math.min(10, parsedSpeed))
-        : (room.settings.gameSpeed ?? 1);
-
-      room.settings = {
-        boardRadius: clamp(newSettings.boardRadius, 1, 50, room.settings.boardRadius),
-        goldTiles: clamp(newSettings.goldTiles, 0, 500, room.settings.goldTiles),
-        desertTiles: clamp(newSettings.desertTiles, 0, 200, room.settings.desertTiles),
-        fogTiles: clamp(newSettings.fogTiles, 0, 2000, room.settings.fogTiles ?? 0),
-        vpToWin: clamp(newSettings.vpToWin, 3, 50, room.settings.vpToWin),
-        maxPlayers: clamp(newSettings.maxPlayers, 2, 8, room.settings.maxPlayers),
-        cardDiscardLimit: clamp(newSettings.cardDiscardLimit, 3, 50, room.settings.cardDiscardLimit),
-        bankResourcePerType: clamp(newSettings.bankResourcePerType, 5, 999, room.settings.bankResourcePerType),
-        devKnights: clamp(newSettings.devKnights, 0, 100, room.settings.devKnights),
-        devVp: clamp(newSettings.devVp, 0, 50, room.settings.devVp),
-        devRoadBuilding: clamp(newSettings.devRoadBuilding, 0, 50, room.settings.devRoadBuilding),
-        devYearOfPlenty: clamp(newSettings.devYearOfPlenty, 0, 50, room.settings.devYearOfPlenty),
-        devMonopoly: clamp(newSettings.devMonopoly, 0, 50, room.settings.devMonopoly),
-        maxSettlements: clamp(newSettings.maxSettlements, 2, 20, room.settings.maxSettlements),
-        maxCities: clamp(newSettings.maxCities, 1, 20, room.settings.maxCities),
-        maxRoads: clamp(newSettings.maxRoads, 5, 50, room.settings.maxRoads),
-        gameSpeed: nextGameSpeed
+      const next: Settings = {
+        boardRadius: clamp(newSettings.boardRadius, 1, 50, old.boardRadius),
+        goldTiles: clamp(newSettings.goldTiles, 0, 500, old.goldTiles),
+        desertTiles: clamp(newSettings.desertTiles, 0, 200, old.desertTiles),
+        fogTiles: clamp(newSettings.fogTiles, 0, 2000, old.fogTiles ?? 0),
+        vpToWin: clamp(newSettings.vpToWin, 3, 50, old.vpToWin),
+        maxPlayers: clamp(newSettings.maxPlayers, 2, 8, old.maxPlayers),
+        cardDiscardLimit: clamp(newSettings.cardDiscardLimit, 3, 50, old.cardDiscardLimit),
+        bankResourcePerType: clamp(newSettings.bankResourcePerType, 5, 999, old.bankResourcePerType),
+        devKnights: clamp(newSettings.devKnights, 0, 100, old.devKnights),
+        devVp: clamp(newSettings.devVp, 0, 50, old.devVp),
+        devRoadBuilding: clamp(newSettings.devRoadBuilding, 0, 50, old.devRoadBuilding),
+        devYearOfPlenty: clamp(newSettings.devYearOfPlenty, 0, 50, old.devYearOfPlenty),
+        devMonopoly: clamp(newSettings.devMonopoly, 0, 50, old.devMonopoly),
+        maxSettlements: clamp(newSettings.maxSettlements, 2, 20, old.maxSettlements),
+        maxCities: clamp(newSettings.maxCities, 1, 20, old.maxCities),
+        maxRoads: clamp(newSettings.maxRoads, 5, 50, old.maxRoads),
+        gameSpeed
       };
+      room.settings = next;
 
-      room.devDeck = createDevDeck(room.settings);
-
-      if (
-        oldRadius !== room.settings.boardRadius ||
-        oldGold !== room.settings.goldTiles ||
-        oldDesert !== room.settings.desertTiles ||
-        oldFog !== (room.settings.fogTiles ?? 0)
-      ) {
-        room.board = generateBoard(room.settings);
-      }
+      const boardChanged =
+        old.boardRadius !== next.boardRadius ||
+        old.goldTiles !== next.goldTiles ||
+        old.desertTiles !== next.desertTiles ||
+        (old.fogTiles ?? 0) !== (next.fogTiles ?? 0);
+      if (boardChanged) room.board = newBoard(next);
       broadcastRoom(room);
     }));
 
@@ -130,537 +131,142 @@ export function registerSocketHandlers(io: Server): void {
     }));
 
     socket.on('applyMapPreset', safe(({ code, preset }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      room.board = generateBoard(room.settings, preset);
+      const room = hostLobbyRoom(code);
+      if (!room || !isPreset(preset)) return;
+      room.board = newBoard(room.settings, preset);
       broadcastRoom(room);
     }));
 
     socket.on('paintHex', safe(({ code, hexId, paintType, paintValue }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      const hex = room.board.hexes[hexId];
-      if (!hex) return;
-
-      const existingPorts: Record<string, string> = {};
-      room.board.edges.forEach(e => { if (e.port) existingPorts[e.key] = e.port; });
-
-      if (paintType === 'terrain') {
-        if (paintValue === 'fog') {
-          if (hex.type === 'water' || hex.type === 'desert' || !hex.type || hex.type === 'fog') {
-            hex.type = RESOURCES[Math.floor(Math.random() * RESOURCES.length)];
-          }
-          if (!hex.number) {
-            const nums = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
-            hex.number = nums[Math.floor(Math.random() * nums.length)];
-          }
-          hex.fog = true;
-        } else {
-          hex.fog = false;
-          hex.type = paintValue;
-          if (paintValue === 'desert' || paintValue === 'water') hex.number = null;
-          else if (!hex.number) hex.number = 6;
-        }
-        room.board = rebuildBoardTopology(room.board.hexes, existingPorts, false);
-      } else if (paintType === 'number') {
-        if (hex.type !== 'water' && hex.type !== 'desert') {
-          hex.number = paintValue === 'none' ? null : Number(paintValue);
-        }
-      } else if (paintType === 'robber') {
-        if (hex.type !== 'water' && !hex.fog) room.board.robberHexId = hex.id;
-      }
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      room.board = paintHex(room.board, hexId, paintType, paintValue);
       broadcastRoom(room);
     }));
 
     socket.on('paintPort', safe(({ code, edgeId, portValue }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      const edge = room.board.edges[edgeId];
-      if (!edge || edge.hexIds.length !== 1) return;
-
-      const targetHex = room.board.hexes[edge.hexIds[0]];
-      const existingPorts: Record<string, string> = {};
-      room.board.edges.forEach(e => {
-        if (!e.port) return;
-        if (portValue !== 'none' && targetHex && e.id !== edge.id && e.hexIds.length === 1) {
-          const otherHex = room.board.hexes[e.hexIds[0]];
-          if (otherHex && hexDistance(targetHex, otherHex) <= 1) return;
-        }
-        existingPorts[e.key] = e.port;
-      });
-      if (portValue === 'none') delete existingPorts[edge.key];
-      else existingPorts[edge.key] = portValue;
-
-      room.board = rebuildBoardTopology(room.board.hexes, existingPorts, false);
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      room.board = paintPort(room.board, edgeId, portValue);
       broadcastRoom(room);
     }));
 
     socket.on('startGame', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
-      if (room.players.length < 2) return socket.emit('errorMsg', 'Add at least 1 Bot or wait for a 2nd player!');
-      if (room.board.vertices.length < room.players.length * 4) {
-        return socket.emit('errorMsg', 'Map needs more land tiles for this player count!');
-      }
-
-      room.players = shuffle(room.players);
-      room.players.forEach((p, idx) => {
-        p.color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
-        p.settlementsLeft = room.settings.maxSettlements;
-        p.citiesLeft = room.settings.maxCities;
-        p.roadsLeft = room.settings.maxRoads;
-        p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-        p.devCards = [];
-        p.newDevCards = [];
-        p.knightsPlayed = 0;
-        p.longestRoadLength = 0;
-        p.goldPending = 0;
-        p.discardPending = 0;
-        p.freeRoads = 0;
-        p.playedDevCardThisTurn = false;
-        p.proposedTradeThisTurn = false;
-        p.stats = { resourcesEarned: 0, tradesMade: 0 };
-      });
-
-      room.status = 'SETUP';
-      room.devDeck = createDevDeck(room.settings);
-      room.startedAt = Date.now();
-      room.finishedAt = null;
-      room.turnCount = 1;
-      room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
-      room.lastRollHexIds = [];
-      room.recentProductions = [];
-      room.recentTransfers = [];
-      room.longestRoadOwner = null;
-      room.largestArmyOwner = null;
-      room.winner = null;
-
-      const n = room.players.length;
-      const forward = Array.from({ length: n }, (_, i) => i);
-      room.setupOrder = [...forward, ...[...forward].reverse()];
-      room.setupStep = 0;
-      room.turnIndex = room.setupOrder[0];
-      room.phase = 'SETUP_SETTLEMENT';
-
-      const firstPlayer = room.players[0];
-      addLog(room, `🎲 Turn order randomized! ${firstPlayer.avatar} ${firstPlayer.name} goes first!`, firstPlayer.color);
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      const error = startGame(room);
+      if (error) return socket.emit('errorMsg', error);
       broadcastRoom(room);
     }));
 
     socket.on('rematchLobby', safe(({ code }) => {
       const room = rooms[code];
       if (!room) return;
-      if (room.botTimer) clearTimeout(room.botTimer);
-
-      room.status = 'LOBBY';
-      room.phase = 'LOBBY';
-      room.PreGoldPhase = null;
-      room.PreRobberPhase = null;
-      room.activeTrade = null;
-      room.winner = null;
-      room.longestRoadOwner = null;
-      room.largestArmyOwner = null;
-      room.lastRollHexIds = [];
-      room.recentProductions = [];
-      room.recentTransfers = [];
-      room.robberVictims = [];
-      room.turnCount = 1;
-      room.startedAt = null;
-      room.finishedAt = null;
-      room.diceStats = { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
-      room.board = generateBoard(room.settings);
-      room.devDeck = createDevDeck(room.settings);
-
-      room.players.forEach((p, idx) => {
-        p.color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
-        p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-        p.devCards = [];
-        p.newDevCards = [];
-        p.knightsPlayed = 0;
-        p.longestRoadLength = 0;
-        p.goldPending = 0;
-        p.discardPending = 0;
-        p.freeRoads = 0;
-        p.playedDevCardThisTurn = false;
-        p.proposedTradeThisTurn = false;
-        p.settlementsLeft = room.settings.maxSettlements;
-        p.citiesLeft = room.settings.maxCities;
-        p.roadsLeft = room.settings.maxRoads;
-        p.stats = { resourcesEarned: 0, tradesMade: 0 };
-      });
-
-      addLog(room, '🔄 Returned to Lobby for a rematch!', '#1565c0');
+      rematch(room);
       broadcastRoom(room);
     }));
+
+    // ---- Board clicks -------------------------------------------------------
 
     socket.on('clickVertex', safe(({ code, vertexId }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      const v = room.board.vertices[vertexId];
+      const g = rooms[code]?.game;
+      if (!g) return;
+      const v = g.board.vertices[vertexId];
       if (!v) return;
 
-      if (room.phase === 'ROBBER_STEAL' && v.building && (room.robberVictims || []).includes(v.building.owner)) {
-        handleStealFromVictim(room, player, v.building.owner);
-        return;
+      if (g.phase === 'robber_steal' && v.piece && victimsOnHex(g, g.board.robberHexId, socket.id).includes(v.piece.owner)) {
+        return act(code, 'steal', { victimId: v.piece.owner });
       }
-
-      if (v.building && v.building.owner === player.id && v.building.type === 'settlement') {
-        handlePlaceCity(room, player, vertexId);
-      } else if (!v.building) {
-        handlePlaceSettlement(room, player, vertexId);
+      if (v.piece && v.piece.owner === socket.id && v.piece.type === SETTLEMENT) {
+        return act(code, 'build', { piece: CITY, loc: vertexId });
       }
+      if (!v.piece) act(code, 'build', { piece: SETTLEMENT, loc: vertexId });
     }));
 
-    socket.on('stealFromPlayer', safe(({ code, victimId }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      handleStealFromVictim(room, player, victimId);
-    }));
+    socket.on('clickEdge', safe(({ code, edgeId }) => act(code, 'build', { piece: ROAD, loc: edgeId })));
+    socket.on('clickHex', safe(({ code, hexId }) => act(code, 'move_robber', { hexId })));
+    socket.on('stealFromPlayer', safe(({ code, victimId }) => act(code, 'steal', { victimId })));
 
-    socket.on('clickEdge', safe(({ code, edgeId }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      handlePlaceRoad(room, player, edgeId);
-    }));
+    // ---- Turn actions ---------------------------------------------------------
 
-    socket.on('clickHex', safe(({ code, hexId }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      handleMoveRobber(room, player, hexId);
-    }));
-
-    socket.on('rollDice', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      handleRollDice(room, player);
-    }));
-
-    socket.on('pickGoldResource', safe(({ code, resource }) => {
-      const room = rooms[code];
-      if (!room || !RESOURCES.includes(resource)) return;
-      const player = room.players.find(p => p.id === socket.id);
-      if (!player || player.goldPending <= 0) return;
-
-      const granted = givePlayerResourceFromBank(room, player, resource, 1);
-      if (granted === 0) return socket.emit('errorMsg', `Bank is out of ${resource.toUpperCase()}!`);
-      player.goldPending--;
-      if (!room.recentTransfers) room.recentTransfers = [];
-      room.recentTransfers.push({ from: 'bank', to: player.id, resource, amount: granted, kind: 'gold' });
-      addLog(room, `${player.avatar} ${player.name} picked ${resource} from Gold`, player.color);
-      checkGoldPhaseTransition(room);
-      broadcastRoom(room);
-    }));
-
-    socket.on('discardCards', safe(({ code, discards }) => {
-      const room = rooms[code];
-      if (!room || room.phase !== 'DISCARD' || !discards) return;
-      const player = room.players.find(p => p.id === socket.id);
-      if (!player || player.discardPending <= 0) return;
-
-      let count = 0;
-      for (const r of RESOURCES) {
-        const amt = Number(discards[r]) || 0;
-        if (amt < 0 || amt > player.resources[r]) return;
-        count += amt;
-      }
-      if (count !== player.discardPending) return;
-
-      if (!room.recentTransfers) room.recentTransfers = [];
-      for (const r of RESOURCES) {
-        const amt = Number(discards[r]) || 0;
-        if (amt > 0) {
-          player.resources[r] -= amt;
-          room.recentTransfers.push({ from: player.id, to: 'bank', resource: r, amount: amt, kind: 'discard' });
-        }
-      }
-      player.discardPending = 0;
-      addLog(room, `${player.avatar} ${player.name} discarded ${count} cards`, player.color);
-
-      if (room.players.every(p => p.discardPending === 0)) room.phase = 'ROBBER';
-      broadcastRoom(room);
-    }));
-
-    socket.on('buyDevCard', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room || room.phase !== 'MAIN') return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id || room.devDeck.length === 0) return;
-      if (player.resources.sheep < 1 || player.resources.wheat < 1 || player.resources.ore < 1) return;
-
-      player.resources.sheep--; player.resources.wheat--; player.resources.ore--;
-      player.newDevCards.push(room.devDeck.pop());
-      if (!room.recentTransfers) room.recentTransfers = [];
-      room.recentTransfers.push(
-        { from: player.id, to: 'bank', resource: 'sheep', amount: 1, kind: 'buyDev' },
-        { from: player.id, to: 'bank', resource: 'wheat', amount: 1, kind: 'buyDev' },
-        { from: player.id, to: 'bank', resource: 'ore', amount: 1, kind: 'buyDev' },
-        { from: 'bank', to: player.id, resource: 'dev', amount: 1, kind: 'buyDev' }
-      );
-      addLog(room, `${player.avatar} ${player.name} bought a Development Card`, player.color);
-      checkWinner(room);
-      broadcastRoom(room);
-    }));
+    socket.on('rollDice', safe(({ code }) => act(code, 'roll')));
+    socket.on('endTurn', safe(({ code }) => act(code, 'end_turn')));
+    socket.on('buyDevCard', safe(({ code }) => act(code, 'buy_dev')));
+    socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
+    socket.on('discardCards', safe(({ code, discards }) => act(code, 'discard', { cards: discards })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {
-      const room = rooms[code];
-      if (!room || (room.phase !== 'MAIN' && room.phase !== 'ROLL')) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id || player.playedDevCardThisTurn) return;
-
-      const idx = player.devCards.indexOf(cardType);
-      if (idx === -1) return;
-
-      player.devCards.splice(idx, 1);
-      player.playedDevCardThisTurn = true;
-
-      if (cardType === 'knight') {
-        player.knightsPlayed++;
-        addLog(room, `${player.avatar} ${player.name} played a Knight`, player.color);
-        updateLargestArmy(room);
-        checkWinner(room);
-        room.PreRobberPhase = room.phase;
-        room.phase = 'ROBBER';
-      } else if (cardType === 'roadBuilding') {
-        player.freeRoads += 2;
-        addLog(room, `${player.avatar} ${player.name} played Road Building (+2 free roads)`, player.color);
-      } else if (cardType === 'yearOfPlenty') {
-        player.goldPending += 2;
-        room.PreGoldPhase = room.phase;
-        room.phase = 'GOLD_PICK';
-        checkGoldPhaseTransition(room);
-        addLog(room, `${player.avatar} ${player.name} played Year of Plenty (+2 picks)`, player.color);
-      } else if (cardType === 'monopoly' && RESOURCES.includes(monopolyResource)) {
-        let stolen = 0;
-        if (!room.recentTransfers) room.recentTransfers = [];
-        for (const other of room.players) {
-          if (other.id !== player.id) {
-            const amt = other.resources[monopolyResource] || 0;
-            if (amt > 0) {
-              stolen += amt;
-              other.resources[monopolyResource] = 0;
-              room.recentTransfers.push({ from: other.id, to: player.id, resource: monopolyResource, amount: amt, kind: 'monopoly' });
-            }
-          }
-        }
-        player.resources[monopolyResource] += stolen;
-        addLog(room, `${player.avatar} ${player.name} Monopolized ${stolen} ${monopolyResource}!`, player.color);
-      }
-      broadcastRoom(room);
+      act(code, 'play_dev', { card: cardType, resource: monopolyResource });
     }));
 
-    socket.on('bankTrade', safe(({ code, give, get }) => {
-      const room = rooms[code];
-      if (!room || room.phase !== 'MAIN' || !give || !get) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-
-      const ratios = getTradeRatios(room, player.id);
-      const bank = getBankRemaining(room);
-      let credits = 0;
-      for (const r of RESOURCES) {
-        const amt = Number(give[r]) || 0;
-        if (amt > player.resources[r]) return socket.emit('errorMsg', `Not enough ${r.toUpperCase()}!`);
-        if (amt % ratios[r] !== 0) {
-          return socket.emit('errorMsg', `Bank trade requires ${ratios[r]}:1 for ${r.toUpperCase()}! Use Player Trade 👥 to offer custom amounts.`);
-        }
-        credits += amt / ratios[r];
-      }
-      const requested = RESOURCES.reduce((s, r) => s + (Number(get[r]) || 0), 0);
-      if (credits <= 0 || credits !== requested) {
-        return socket.emit('errorMsg', `Bank trade mismatch: your offered cards equal ${credits} resource(s), but you selected ${requested} wanted card(s).`);
-      }
-
-      for (const r of RESOURCES) {
-        if ((Number(get[r]) || 0) > bank[r]) {
-          return socket.emit('errorMsg', `Bank does not have enough ${r.toUpperCase()}!`);
-        }
-      }
-
-      if (!room.recentTransfers) room.recentTransfers = [];
-      for (const r of RESOURCES) {
-        const giveAmt = Number(give[r]) || 0;
-        const getAmt = Number(get[r]) || 0;
-        player.resources[r] -= giveAmt;
-        player.resources[r] += getAmt;
-        if (giveAmt > 0) {
-          room.recentTransfers.push({ from: player.id, to: 'bank', resource: r, amount: giveAmt, kind: 'bankTrade' });
-        }
-        if (getAmt > 0) {
-          room.recentTransfers.push({ from: 'bank', to: player.id, resource: r, amount: getAmt, kind: 'bankTrade' });
-        }
-      }
-      if (!player.stats) player.stats = { resourcesEarned: 0, tradesMade: 0 };
-      player.stats.tradesMade++;
-      addLog(room, `${player.avatar} ${player.name} traded with the Bank 🏦`, player.color);
-      broadcastRoom(room);
-    }));
-
-    socket.on('proposeTrade', safe(({ code, offer, request }) => {
-      const room = rooms[code];
-      if (!room || room.phase !== 'MAIN' || !offer || !request) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-
-      let offerSum = 0, reqSum = 0;
-      for (const r of RESOURCES) {
-        const o = Number(offer[r]) || 0;
-        const req = Number(request[r]) || 0;
-        if (o > player.resources[r]) return socket.emit('errorMsg', `You don't have enough ${r}!`);
-        offerSum += o;
-        reqSum += req;
-      }
-      if (offerSum === 0 || reqSum === 0) {
-        return socket.emit('errorMsg', 'Select at least 1 card to Give and 1 card you Want!');
-      }
-
-      const responses: Record<string, string> = {};
-      room.players.forEach(p => {
-        if (p.id !== player.id) responses[p.id] = 'pending';
-      });
-
-      room.activeTrade = {
-        id: Date.now(),
-        fromId: player.id,
-        fromName: player.name,
-        fromAvatar: player.avatar,
-        fromColor: player.color,
-        offer,
-        request,
-        responses
-      };
-
-      const offStr = RESOURCES.filter(r => offer[r] > 0).map(r => `${offer[r]} ${r}`).join(', ');
-      const reqStr = RESOURCES.filter(r => request[r] > 0).map(r => `${request[r]} ${r}`).join(', ');
-      addLog(room, `${player.avatar} ${player.name} wants to give [${offStr}] for [${reqStr}]`, player.color);
-      broadcastRoom(room);
-    }));
-
-    // Human responds (Accept / Decline) to another player's or Bot's trade offer
-    socket.on('respondTrade', safe(({ code, decision }) => {
-      const room = rooms[code];
-      if (!room || !room.activeTrade) return;
-      const trade = room.activeTrade;
-      const partner = room.players.find(p => p.id === socket.id);
-      const proposer = room.players.find(p => p.id === trade.fromId);
-      if (!partner || !proposer || partner.id === proposer.id) return;
-
-      if (decision === 'declined') {
-        trade.responses[partner.id] = 'declined';
-        broadcastRoom(room);
-        return;
-      }
-
-      // Verify partner has the requested resources
-      for (const r of RESOURCES) {
-        if ((Number(trade.request[r]) || 0) > (partner.resources[r] || 0)) {
-          return socket.emit('errorMsg', 'You do not have the required resources for this trade!');
-        }
-      }
-
-      trade.responses[partner.id] = 'accepted';
-
-      // If the proposer is a Bot (or if immediate execution is desired), execute the swap right away!
-      if (proposer.isBot) {
-        executeTradeBetweenPlayers(room, proposer, partner, trade);
-      } else {
-        broadcastRoom(room);
-      }
-    }));
-
-    // Proposer clicks on a specific player/bot who accepted the trade to finalize the swap
-    socket.on('confirmTradeWithPartner', safe(({ code, partnerId }) => {
-      const room = rooms[code];
-      if (!room || !room.activeTrade) return;
-      const trade = room.activeTrade;
-      if (trade.fromId !== socket.id) return;
-
-      const proposer = room.players.find(p => p.id === trade.fromId);
-      let partner = room.players.find(p => p.id === partnerId);
-      if (!partner) {
-        // Fallback: pick first player/bot who accepted
-        const firstAcceptedId = Object.keys(trade.responses || {}).find(id => trade.responses[id] === 'accepted');
-        partner = room.players.find(p => p.id === firstAcceptedId);
-      }
-      if (!partner || trade.responses[partner.id] !== 'accepted') {
-        return socket.emit('errorMsg', 'Wait for a player or bot to accept (✔) your trade offer!');
-      }
-
-      executeTradeBetweenPlayers(room, proposer, partner, trade);
-    }));
+    socket.on('bankTrade', safe(({ code, give, get }) => act(code, 'bank_trade', { give, get }, true)));
+    socket.on('proposeTrade', safe(({ code, offer, request }) => act(code, 'propose_trade', { offer, request }, true)));
+    socket.on('respondTrade', safe(({ code, decision }) => act(code, 'respond_trade', { decision }, true)));
+    socket.on('confirmTradeWithPartner', safe(({ code, partnerId }) => act(code, 'confirm_trade', { partnerId }, true)));
 
     socket.on('cancelTrade', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room || !room.activeTrade) return;
-      if (room.activeTrade.fromId === socket.id) {
-        room.activeTrade = null;
-      } else if (room.activeTrade.responses) {
-        room.activeTrade.responses[socket.id] = 'declined';
-      }
-      broadcastRoom(room);
-    }));
-
-    socket.on('endTurn', safe(({ code }) => {
-      const room = rooms[code];
-      if (!room) return;
-      const player = room.players[room.turnIndex];
-      if (!player || player.id !== socket.id) return;
-      handleEndTurn(room, player);
+      const trade = rooms[code]?.game?.trade;
+      if (!trade) return;
+      // The proposer withdraws the offer, anyone else just declines it.
+      if (trade.fromId === socket.id) act(code, 'cancel_trade');
+      else act(code, 'respond_trade', { decision: 'declined' });
     }));
 
     socket.on('sendChat', safe(({ code, text }) => {
       const room = rooms[code];
       if (!room || !text) return;
-      const player = room.players.find(p => p.id === socket.id);
-      if (!player) return;
-      room.chats.push({
-        sender: player.name,
-        avatar: player.avatar,
-        color: player.color,
-        text: String(text).trim().substring(0, 120)
-      });
+      const me = room.game ? room.game.players.find(p => p.id === socket.id) : room.lobbyPlayers.find(p => p.id === socket.id);
+      if (!me) return;
+      room.chats.push({ sender: me.name, avatar: me.avatar, color: me.color, text: String(text).trim().substring(0, 120) });
       if (room.chats.length > 60) room.chats.shift();
       broadcastRoom(room);
     }));
+
+    // ---- Disconnect ---------------------------------------------------------------
 
     socket.on('disconnect', () => {
       try {
         for (const code of Object.keys(rooms)) {
           const room = rooms[code];
-          const idx = room.players.findIndex(p => p.id === socket.id);
-          if (idx === -1) continue;
+          const g = room.game;
 
-          if (room.status === 'LOBBY') {
-            room.players.splice(idx, 1);
-            if (room.players.filter(p => !p.isBot).length === 0) {
-              if (room.botTimer) clearTimeout(room.botTimer);
+          if (!g) {
+            const idx = room.lobbyPlayers.findIndex(p => p.id === socket.id);
+            if (idx === -1) continue;
+            room.lobbyPlayers.splice(idx, 1);
+            if (humanIds(room).length === 0) {
+              clearBotTimers(room);
               delete rooms[code];
-            } else {
-              if (room.hostId === socket.id) {
-                const nextHuman = room.players.find(p => !p.isBot);
-                if (nextHuman) room.hostId = nextHuman.id;
-              }
-              broadcastRoom(room);
+              continue;
             }
-          } else {
-            const p = room.players[idx];
-            p.isBot = true;
-            p.difficulty = 'ADVANCED HARD';
-            if (!p.name.includes('(Bot)')) p.name += ' (Bot)';
-            addLog(room, `🤖 ${p.name} disconnected — Hard Bot took over.`, p.color);
+            if (room.hostId === socket.id) room.hostId = humanIds(room)[0];
             broadcastRoom(room);
+            continue;
           }
+
+          const p = g.players.find(pl => pl.id === socket.id);
+          if (!p) continue;
+          p.isBot = true;
+          p.difficulty = 'ADVANCED HARD';
+          if (!p.name.includes('(Bot)')) p.name += ' (Bot)';
+          g.log.push({ text: `🤖 ${p.name} disconnected — Hard Bot took over.`, color: p.color });
+          if (g.log.length > 80) g.log.shift();
+
+          const humans = humanIds(room);
+          if (humans.length === 0) {
+            // Nobody can ever rejoin (identity is the socket id until Step 3), so stop simulating.
+            clearBotTimers(room);
+            delete rooms[code];
+            continue;
+          }
+          if (room.hostId === socket.id) room.hostId = humans[0];
+          broadcastRoom(room);
         }
       } catch (e) { console.error(e); }
     });
   });
 }
+
+// Used by tests/sim to confirm the registry and the client-visible colours stay in sync.
+export const SEAT_COLORS = PLAYER_COLORS;
+export const KNOWN_TILE_IDS = (): string[] => [...registry.tiles.keys()];

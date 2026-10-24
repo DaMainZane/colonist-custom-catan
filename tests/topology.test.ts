@@ -1,36 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { generateBoard } from '../src/server/topology';
-import type { Settings } from '../src/server/types';
+import { createRng, generateBoard } from '../src/shared';
+import { defaultSettings, fullRules, registry } from '../src/server/runtime';
 import { clamp, getPips } from '../src/server/util';
 
-const settings: Settings = {
-  boardRadius: 2,
-  goldTiles: 2,
-  desertTiles: 1,
-  vpToWin: 10,
-  maxPlayers: 4,
-  cardDiscardLimit: 7,
-  bankResourcePerType: 19,
-  devKnights: 14,
-  devVp: 5,
-  devRoadBuilding: 2,
-  devYearOfPlenty: 2,
-  devMonopoly: 2,
-  maxSettlements: 5,
-  maxCities: 4,
-  maxRoads: 15
-};
+const make = (over: Record<string, any> = {}, preset = 'standard', seed = 1) =>
+  generateBoard(registry, fullRules({ ...defaultSettings(), ...over }), createRng(seed), preset);
 
 describe('topology', () => {
   it('radius 2 board has 19 hexes, 54 vertices, 72 edges', () => {
-    const b = generateBoard(settings);
+    const b = make();
     expect(b.hexes).toHaveLength(19);
     expect(b.vertices).toHaveLength(54);
     expect(b.edges).toHaveLength(72);
   });
 
   it('has 30 coastal edges and every vertex has 2-3 neighbours', () => {
-    const b = generateBoard(settings);
+    const b = make();
     expect(b.edges.filter(e => e.hexIds.length === 1)).toHaveLength(30);
     for (const v of b.vertices) {
       expect(v.adjacentVertices.length).toBeGreaterThanOrEqual(2);
@@ -39,19 +24,19 @@ describe('topology', () => {
   });
 
   it('puts the robber on the desert', () => {
-    const b = generateBoard(settings);
+    const b = make();
     expect(b.hexes[b.robberHexId].type).toBe('desert');
   });
 
   it('blank preset is all water with no vertices', () => {
-    const b = generateBoard(settings, 'blank');
+    const b = make({}, 'blank');
     expect(b.hexes.every(h => h.type === 'water')).toBe(true);
     expect(b.vertices).toHaveLength(0);
   });
 
   it('never spawns ports on two tiles next to each other', () => {
     for (const r of [1, 2, 3, 4]) {
-      const b = generateBoard({ ...settings, boardRadius: r });
+      const b = make({ boardRadius: r });
       const portEdges = b.edges.filter(e => e.port);
       expect(portEdges.length).toBeGreaterThan(0);
       const portHexes = portEdges.map(e => b.hexes[e.hexIds[0]]);
@@ -66,12 +51,17 @@ describe('topology', () => {
     }
   });
 
-  it('supports board radius up to 50 and fogIsland preset', () => {
-    const fogBoard = generateBoard(settings, 'fogIsland');
-    expect(fogBoard.hexes.some(h => h.fog)).toBe(true);
+  it('supports board radius up to 50 and the fogIsland preset', () => {
+    const fogBoard = make({}, 'fogIsland');
+    expect(fogBoard.hexes.some(h => h.ext.hidden)).toBe(true);
 
-    const bigBoard = generateBoard({ ...settings, boardRadius: 10 }, 'blank');
+    const bigBoard = make({ boardRadius: 10 }, 'blank');
     expect(bigBoard.hexes).toHaveLength(1 + 3 * 10 * 11);
+  });
+
+  it('goldRush puts gold tiles on the board', () => {
+    const b = make({}, 'goldRush');
+    expect(b.hexes.some(h => h.type === 'gold')).toBe(true);
   });
 });
 
@@ -92,4 +82,3 @@ describe('util', () => {
     expect(clamp(2.9, 1, 4, 2)).toBe(2);
   });
 });
-

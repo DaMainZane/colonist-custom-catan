@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { handleMoveRobber, handlePlaceRoad, handleStealFromVictim } from '../src/server/actions';
-import { createPlayer, createRoom } from '../src/server/rooms';
-import {
-  canPlaceSettlement,
-  computePlayerLongestRoad,
-  getPlayerVP,
-  getTradeRatios
-} from '../src/server/rules';
-import type { Board } from '../src/server/types';
+import { computeVP, createGame, dispatch, getPlayer, makeCtx } from '../src/shared';
+import type { Board, GameState } from '../src/shared';
+import { longestRoadFor } from '../src/packs/base/longestRoad';
+import { canPlaceSettlement } from '../src/packs/base/placement';
+import { victimsOnHex } from '../src/packs/base/robbing';
+import { tradeRatios } from '../src/packs/base/trading';
+import { registry } from '../src/server/runtime';
+
+/** A fresh game with fixed seat order: p1, p2, ... */
+function newGame(n = 2): GameState {
+  return createGame(registry, {
+    players: Array.from({ length: n }, (_, i) => ({ id: `p${i + 1}`, name: `Player ${i + 1}` })),
+    seed: 1,
+    shuffleSeats: false
+  });
+}
 
 function findPath(board: Board, length: number): number[] | null {
   const used = new Set<number>();
@@ -33,104 +40,120 @@ function findPath(board: Board, length: number): number[] | null {
 
 describe('rules', () => {
   it('enforces the distance rule for settlements', () => {
-    const room = createRoom('host', 'Host');
-    const v0 = room.board.vertices[0];
-    v0.building = { owner: 'host', type: 'settlement' };
+    const g = newGame();
+    const ctx = makeCtx(g, registry);
+    const v0 = g.board.vertices[0];
+    v0.piece = { owner: 'p1', type: 'settlement' };
 
     for (const adj of v0.adjacentVertices) {
-      expect(canPlaceSettlement(room, 'host', adj, true)).toBe(false);
+      expect(canPlaceSettlement(ctx, 'p1', adj, 'setup')).toBe(false);
     }
-    const far = room.board.vertices.find(v => v.id !== 0 && !v0.adjacentVertices.includes(v.id));
-    expect(canPlaceSettlement(room, 'host', far.id, true)).toBe(true);
+    const far = g.board.vertices.find(v => v.id !== 0 && !v0.adjacentVertices.includes(v.id))!;
+    expect(canPlaceSettlement(ctx, 'p1', far.id, 'setup')).toBe(true);
     // Outside setup, a settlement also needs a connected road
-    expect(canPlaceSettlement(room, 'host', far.id, false)).toBe(false);
+    expect(canPlaceSettlement(ctx, 'p1', far.id, 'build')).toBe(false);
   });
 
   it('counts city as 2 VP and settlement as 1', () => {
-    const room = createRoom('host', 'Host');
-    const player = room.players[0];
-    room.board.vertices[0].building = { owner: 'host', type: 'settlement' };
-    room.board.vertices[10].building = { owner: 'host', type: 'city' };
-    expect(getPlayerVP(room, player)).toBe(3);
+    const g = newGame();
+    g.board.vertices[0].piece = { owner: 'p1', type: 'settlement' };
+    g.board.vertices[10].piece = { owner: 'p1', type: 'city' };
+    expect(computeVP(g, registry, getPlayer(g, 'p1')!, false)).toBe(3);
   });
 
   it('counts hidden VP cards only when requested', () => {
-    const room = createRoom('host', 'Host');
-    const player = room.players[0];
-    player.devCards = ['vp', 'knight'];
-    player.newDevCards = ['vp'];
-    expect(getPlayerVP(room, player, false)).toBe(0);
-    expect(getPlayerVP(room, player, true)).toBe(2);
+    const g = newGame();
+    const p = getPlayer(g, 'p1')!;
+    p.devCards = ['vp', 'knight'];
+    p.newDevCards = ['vp'];
+    expect(computeVP(g, registry, p, false)).toBe(0);
+    expect(computeVP(g, registry, p, true)).toBe(2);
   });
 
   it('computes longest road for a 5-road chain', () => {
-    const room = createRoom('host', 'Host');
-    const path = findPath(room.board, 5);
+    const g = newGame();
+    const path = findPath(g.board, 5);
     expect(path).not.toBeNull();
-    for (const eId of path) room.board.edges[eId].road = 'host';
-    expect(computePlayerLongestRoad(room.board, 'host')).toBe(5);
+    for (const eId of path!) g.board.edges[eId].piece = { owner: 'p1', type: 'road' };
+    expect(longestRoadFor(makeCtx(g, registry), 'p1')).toBe(5);
   });
 
   it('gives 4:1 by default and better ratios on a port', () => {
-    const room = createRoom('host', 'Host');
-    expect(getTradeRatios(room, 'host')).toEqual({ wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 });
+    const g = newGame();
+    expect(tradeRatios(g, registry, 'p1')).toEqual({ wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 });
 
-    const portVertex = room.board.vertices.find(v => v.port);
+    const portVertex = g.board.vertices.find(v => v.port)!;
     expect(portVertex).toBeDefined();
-    portVertex.building = { owner: 'host', type: 'settlement' };
-    const ratios = getTradeRatios(room, 'host');
-    if (portVertex.port === '3:1') {
-      expect(Object.values(ratios).every(r => r <= 3)).toBe(true);
+    portVertex.piece = { owner: 'p1', type: 'settlement' };
+    const ratios = tradeRatios(g, registry, 'p1');
+    const port = registry.ports.get(portVertex.port!)!;
+    if (port.resource === null) {
+      expect(Object.values(ratios).every(r => r <= port.ratio)).toBe(true);
     } else {
-      expect(ratios[portVertex.port]).toBe(2);
+      expect(ratios[port.resource]).toBe(port.ratio);
     }
   });
 
-  it('reveals fog tile and grants 1 resource when road touches fog tile', () => {
-    const room = createRoom('host', 'Host');
-    const player = room.players[0];
-    room.status = 'PLAYING';
-    room.phase = 'MAIN';
-    player.resources.wood = 1;
-    player.resources.brick = 1;
+  it('reveals a fog tile and grants 1 resource when a road touches it', () => {
+    const g = newGame();
+    g.phase = 'main';
+    g.turnCount = 1;
+    const p = getPlayer(g, 'p1')!;
+    p.resources.wood = 1;
+    p.resources.brick = 1;
 
-    const targetHex = room.board.hexes[0];
-    targetHex.type = 'ore';
-    targetHex.number = 8;
-    targetHex.fog = true;
+    const hex = g.board.hexes.find(h => registry.tiles.get(h.type)?.land && h.number !== null)!;
+    hex.type = 'ore';
+    hex.number = 8;
+    hex.ext = { ...hex.ext, hidden: true, maskAs: 'fog' };
 
-    const vId = targetHex.vertexIds[0];
-    room.board.vertices[vId].building = { owner: 'host', type: 'settlement' };
-    const edgeId = room.board.vertices[vId].edgeIds[0];
+    const vId = hex.vertexIds[0];
+    g.board.vertices[vId].piece = { owner: 'p1', type: 'settlement' };
+    const edgeId = g.board.vertices[vId].edgeIds[0];
 
-    handlePlaceRoad(room, player, edgeId);
-    expect(targetHex.fog).toBe(false);
-    expect(player.resources.ore).toBe(1);
+    const res = dispatch(g, registry, { type: 'build', playerId: 'p1', payload: { piece: 'road', loc: edgeId } });
+    expect(res.ok).toBe(true);
+    expect(hex.ext.hidden).toBeUndefined();
+    expect(p.resources.ore).toBe(1);
   });
 
-  it('prompts player choice when robbing a hex with 2 or more opponents', () => {
-    const room = createRoom('host', 'Host');
-    const p2 = createPlayer('p2', 'Alice', 1, false);
-    const p3 = createPlayer('p3', 'Bob', 2, false);
+  it('prompts the thief to choose when the robber hex has 2 or more opponents', () => {
+    const g = newGame(3);
+    g.phase = 'robber';
+    g.turnCount = 1;
+    const p1 = getPlayer(g, 'p1')!;
+    const p2 = getPlayer(g, 'p2')!;
+    const p3 = getPlayer(g, 'p3')!;
     p2.resources.wheat = 2;
     p3.resources.sheep = 3;
-    room.players.push(p2, p3);
-    room.status = 'PLAYING';
-    room.phase = 'ROBBER';
 
-    const targetHex = room.board.hexes.find(h => h.id !== room.board.robberHexId && h.vertexIds.length === 6);
-    expect(targetHex).toBeDefined();
-    room.board.vertices[targetHex.vertexIds[0]].building = { owner: 'p2', type: 'settlement' };
-    room.board.vertices[targetHex.vertexIds[2]].building = { owner: 'p3', type: 'settlement' };
+    const target = g.board.hexes.find(
+      h => h.id !== g.board.robberHexId && registry.tiles.get(h.type)?.land && !h.ext.hidden && h.vertexIds.length === 6
+    )!;
+    expect(target).toBeDefined();
+    g.board.vertices[target.vertexIds[0]].piece = { owner: 'p2', type: 'settlement' };
+    g.board.vertices[target.vertexIds[2]].piece = { owner: 'p3', type: 'settlement' };
 
-    handleMoveRobber(room, room.players[0], targetHex.id);
-    expect(room.phase).toBe('ROBBER_STEAL');
-    expect(room.robberVictims).toEqual(expect.arrayContaining(['p2', 'p3']));
+    const moved = dispatch(g, registry, { type: 'move_robber', playerId: 'p1', payload: { hexId: target.id } });
+    expect(moved.ok).toBe(true);
+    expect(g.phase).toBe('robber_steal');
+    expect(victimsOnHex(g, target.id, 'p1')).toEqual(expect.arrayContaining(['p2', 'p3']));
 
-    handleStealFromVictim(room, room.players[0], 'p3');
-    expect(room.phase).toBe('MAIN');
-    expect(room.players[0].resources.sheep).toBe(1);
+    const stolen = dispatch(g, registry, { type: 'steal', playerId: 'p1', payload: { victimId: 'p3' } });
+    expect(stolen.ok).toBe(true);
+    expect(g.phase).toBe('main');
+    expect(p1.resources.sheep).toBe(1);
     expect(p3.resources.sheep).toBe(2);
   });
-});
 
+  it('rejects actions from the wrong player and in the wrong phase', () => {
+    const g = newGame();
+    // Setup: only p1 may place the first settlement, and only a settlement.
+    const wrongPlayer = dispatch(g, registry, { type: 'build', playerId: 'p2', payload: { piece: 'settlement', loc: 0 } });
+    expect(wrongPlayer.ok).toBe(false);
+    const wrongPiece = dispatch(g, registry, { type: 'build', playerId: 'p1', payload: { piece: 'road', loc: 0 } });
+    expect(wrongPiece.ok).toBe(false);
+    const wrongPhase = dispatch(g, registry, { type: 'roll', playerId: 'p1', payload: {} });
+    expect(wrongPhase.ok).toBe(false);
+  });
+});

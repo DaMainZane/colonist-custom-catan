@@ -1,84 +1,61 @@
 # Log
 
-## Step 0: Skeleton deploy
-- Tagged the old version.
-- Chose Render as host.
-- Added `/health` route to `server.js`.
-- Added `engines.node >=18` to `package.json`.
-- Deployed the old game and tested it from phones.
+## Step 0: Skeleton deploy (done)
+- Tagged old version. Host: Render. Added `/health`. Deployed, tested on phones.
 
-## Step 1: Infrastructure
-### Server
-- Moved `server.js` to `legacy/server.js` as reference.
-- Split the server into TypeScript modules in `src/server/`.
-  - `constants.ts`, `util.ts`, `types.ts`
-  - `topology.ts`: board geometry and generation
-  - `rooms.ts`: room and player creation
-  - `rules.ts`: scoring, placement rules, trade ratios, setup flow
-  - `actions.ts`: build, roll, robber, trade, end turn
-  - `net.ts`: per-player state broadcast
-  - `socket.ts`: all socket handlers
-  - `bots/strategy.ts` and `bots/scheduler.ts`: bot AI and pacing
-  - `main.ts`: Express and Socket.io entry
-- Logic copied as-is. No behavior change.
-- Types are loose on purpose. Step 2 replaces this code.
-- Added `tsconfig.json` (non-strict).
-- Added scripts: `dev`, `build`, `start`, `typecheck`, `test`.
-- Added 9 vitest tests in `tests/` (topology, util, rules).
-- Added `Dockerfile`, `.dockerignore`, `.gitignore`, `render.yaml`.
-- Replaced `README.md` with a stub.
-- Checked: install, typecheck, tests, build and a dev bot game all pass.
+## Step 1: Infrastructure (done, 2026-10-23)
+- `server.js` and `index.html` split into TypeScript modules: `src/server/` and `src/client/`. Originals kept in `legacy/`.
+- esbuild bundles both: `dist/main.js` and `dist/public/app.js` (+ `app.css`).
+- Scripts: `dev`, `build`, `start`, `typecheck`, `test` (vitest).
+- Added `Dockerfile`, `.dockerignore`, `.gitignore`, `render.yaml`, stub README.
+- Render build: `npm install --include=dev && npm run build`.
+- Bot game verified in browser, deployed, tested from phones.
 
-### Client
-- Moved the old `index.html` to `legacy/index.html` as reference.
-- `public/index.html` is now markup only. It loads `/app.css` and `/app.js`.
-- CSS lives in `src/client/styles.css`, copied to `dist/public/app.css` by the build.
-- Split the inline script into TypeScript modules in `src/client/`.
-  - `constants.ts`, `types.ts`, `store.ts` (shared UI state), `globals.d.ts` (`io`)
-  - `socket.ts`, `audio.ts`, `icons.ts`
-  - `actions.ts`: lobby and turn actions
-  - `render/index.ts`: `renderAll`
-  - `render/board.ts`: SVG board, camera, hex/edge/vertex clicks
-  - `render/hand.ts`, `render/drawer.ts`, `render/trade.ts`, `render/sidebar.ts`
-  - `main.ts`: socket listeners, camera events, window exposure
-- esbuild bundles the client to `dist/public/app.js` (IIFE, browser). Config updated.
-- Render build command in `render.yaml` is already `npm install --include=dev && npm run build`.
-- Logic copied as-is, with these mechanical changes:
-  - Inline `onclick` handlers still work because `main.ts` assigns the handlers to `window`.
-  - Inline expressions that touched module state became small functions: `onHexEnter`, `adjustDiscard`, `adjustTradeWant`, `adjustTradeGive`.
-  - Scalar UI state moved to `store.ts` with setters. Object state is mutated in place.
-- Ran `npm install --include=dev`, `typecheck`, `build` and `dev` locally (PowerShell, using `if ($?)` chaining because `&&` is not supported in Windows PowerShell 5). No errors reported.
+## Setup tweaks (2026-10-23)
+- Server binds `0.0.0.0:3000`. SIGTERM cleanup in `esbuild.config.mjs`.
+- Added `.env.example`, `metadata.json`, OpenGraph tags. 11 tests pass.
 
-## Step 1 close-out (2026-10-23)
-- Confirmed a full bot game plays in the browser: lobby painting, build, trade, discard, gold, robber, pan/zoom.
-- Pushed, and confirmed the Render deploy builds and runs from phones.
-- Step 1 is complete. Step 2 (engine and base game) has not been started.
+## Gameplay and UX added (2026-10-23, legacy-style code, to port in Step 2)
+- Robber victim choice (`ROBBER_STEAL`), keeps `PreRobberPhase`.
+- Cursor-centered zoom, left-drag pan. Map radius up to 50.
+- Fog tiles: reveal on adjacent road, grant 1 resource or gold pick.
+- Port spacing rule (no ports on adjacent tiles).
+- Wheat color lightened.
+- Animations: piece drops, flying cards, robber move, steals, trades, dev cards, discards.
+- Rolled-hex highlight, overlapping card stacks, discard drawer, victory overlay with stats and rematch.
+- Synthesized sound effects in `audio.ts`.
+- Game speed setting (0.5x to 8x).
 
-## Environment Import & Setup (2026-10-23)
-- Imported repository and configured for Node.js runtime (removed `bun.lock`, verified npm dependencies).
-- Updated `src/server/main.ts` to bind explicitly to `0.0.0.0:3000`.
-- Added `SIGTERM` process cleanup handler in `esbuild.config.mjs`.
-- Added `.env.example`, `metadata.json`, and synced OpenGraph/description meta tags in `public/index.html`.
-- Verified build (`npm run build`), unit tests (`vitest run` — 11/11 passing), and dev server health check.
-- Paused here as requested; Step 2 has not been started yet.
+## Step 2: Engine and base game (in progress, 2026-10-24)
+Testing between sub-steps skipped on purpose. Run `npm run typecheck` before 2f.
+- 2a done: `src/shared/` core (RNG, palette, types, ctx, registry).
+- 2b done: topology and map generation as pure registry-driven functions (`topology.ts`, `mapgen.ts`).
+- 2c done: engine helpers, `dispatch` pipeline, `legalActions`, per-player views. Fixed a duplicate `startTurn` export.
+- 2d done: `src/packs/base/` (roads, settlements, cities, 5 dev cards, Longest Road, Largest Army, ports, phases, 14 actions). Added optional `DevCardDef.legal`.
+  - The `pick` phase and action live in base (Year of Plenty needs them). Gold and fog only add the tile and `pending.pick`.
+  - Robber steal choice (`robber_steal`) is in base, moved up from 2e. The engine has no bot special-casing, bots choose via `legal`.
+  - Setup picks (gold in the second round) now happen before the road, not after. Same outcome.
+  - `propose_trade` has no `legal`, so bots will not propose trades until 2g decides.
+- 2e done: `src/packs/gold/index.ts`, `src/packs/fog/index.ts`, `allPacks` in `src/packs/index.ts` (base, gold, fog).
+  - Gold: tile `gold` (numbered, no `produces`). `onProduce` adds `pending.pick` and emits `goldEarned`; base `settlePicks` opens the `pick` phase. Rule `tileCounts.gold: 2` (merged into base counts). Preset `goldRush` (max(5, total/3) gold).
+  - Fog: `afterMapGenerated` hides N numbered land tiles (`ext.hidden`, `ext.maskAs = 'fog'`), N = preset `extra.fogCount` or `rules.fogTiles` (default 0). Preset `fogIsland` (max(4, 42%)). Registered tile `fog` is only the masked look in `views.ts`.
+  - Fog reveal: `onBuild` for pieces listed in `rules.fogRevealBy` (default `['road']`, edge pieces only). Reveals hidden tiles on the edge and around both endpoints, then pays one production through `produceFromHex` (a card for resource tiles, a pick for gold). Setup roads reveal too.
+  - Real type and number stay in the hex while hidden (legacy re-rolled them on reveal). Hidden tiles are skipped by production, setup production and the robber already.
+  - Not yet done for gold/fog: client icons, lobby settings mapping (`goldTiles`, `fogTiles`, presets) in 2f.
+- 2f done (code written, not compiled yet): server adapter on the engine.
+  - `runtime.ts` (one registry, `rulesFromSettings`), `lobby.ts` (board generate/presets/paint on the engine board), `rooms.ts`, `game.ts` (`runAction`, `startGame`, `rematch`, engine events -> client effects), `view.ts` (engine state -> the legacy `gameState` shape), `net.ts`, `socket.ts` (every game action goes through `dispatch`), `main.ts`.
+  - The client was not touched: `view.ts` keeps the legacy shape (phase names, `building`/`road` on vertices/edges, `fog` flag, `logs`, `recentTransfers`). Hidden fog tiles are masked per viewer.
+  - Settings map: `goldTiles` -> `tileCounts.gold`, `desertTiles` -> `tileCounts.desert`, `fogTiles` -> `fogTiles`, presets `goldRush`/`fogIsland`/`archipelago`/`blank`.
+- 2g done (code written, not run yet): bot and sims.
+  - `src/server/bots/brain.ts`: pure `chooseBotAction(g, reg, pid, rand)`. Picks from `legalActions`, ported the Hard Bot heuristics (vertex/road/robber scoring, build plan, spare cards, trade evaluation). Checks every choice with `checkAction`, falls back to `end_turn` or the first legal action.
+  - `src/server/bots/scheduler.ts`: one pending bot step per room after each broadcast, delays scaled by game speed, 4.5 s wait on a bot's open offer. Hooked in by `initBots()` in `main.ts`.
+  - Bot proposer cancels its own offer once nobody is left pending (brain), so no special-casing in the engine.
+  - `src/server/bots/sim.ts`: `simulateGame({ seed, players, preset, rules })` with a seeded rand, checks card conservation each step, reports rejected actions and stalls.
+  - Tests rewritten for the engine: `tests/rules.test.ts`, `tests/topology.test.ts`; new `tests/sim.test.ts` (3 presets x 2 and 4 bots x 2 seeds, determinism, 6 bots on radius 4).
+  - Old server code (`src/server-legacy/`) is still in place. Delete it after typecheck, tests and one live game pass.
 
-## Gameplay & UX Updates (2026-10-23)
-- **Robber Victim Selection (`ROBBER_STEAL`):** When robbing a hex with 2 or more opposing players, the active player now chooses which opponent to rob via the inline drawer buttons, clicking the opponent's building on the robbed hex, or clicking the highlighted player card in the right sidebar. Preserved `PreRobberPhase` so playing a Knight before rolling returns to `ROLL` phase afterward.
-- **Cursor-Centered Zoom & Panning:** Updated wheel zoom (`0.01` to `5.0`) to anchor the world point directly beneath the cursor location, cached board bounds for instant zooming/panning on large maps, and added left-click ocean drag panning alongside right/middle/Alt drag.
-- **Max Map Radius 50:** Expanded board radius up to 50 tiles (`1`–`50`) in lobby settings and server validation, and increased Socket.IO `maxHttpBufferSize` to `10MB` for large boards.
-- **Colonist-Style Fog Mechanic:** Added Fog tiles (`fog` brush, `fogIsland` preset, and `fogTiles` setting) that hide tile resource types and number tokens (`?` cloud display). When a road is placed touching any fog tile, the tile is revealed (with a pop animation) and immediately grants 1 resource of that tile (or 1 Gold pick for Gold tiles) from the bank.
-- **Port Spacing Rule:** Updated `rebuildBoardTopology` and `paintPort` so ports can never spawn or be placed on two adjacent tiles (`hexDistance <= 1`).
-- **Lighter Yellow Wheat Color:** Changed Wheat tile, icon, and card colors (`#fff59d` / `#fff9c4`, border `#d4c028`) so Wheat is visually distinct from Gold tiles.
-- **Colonist-Style Piece Drop Animations:** Added drop-down bounce and impact ring animations (`piece-drop-anim` and `piece-impact-ring`) when placing roads, settlements, and cities.
-- **Restored Animations & UI from Previous Repo (`index_1dbfbfca.html`):**
-  - **Flying Resource Card Animation (`triggerFlyingResourceAnimations`):** Producing hexes spawn animated `.flying-res-card` cards that fly from the hex's SVG coordinates to `#myHandPanel` (for local player) or `#playerRow_<id>` in the right sidebar (for opponents/bots) on dice rolls, setup settlements, and fog reveals.
-  - **Rolled Hex Dark Highlight (`lastRollHexIds`):** Hexes matching the rolled dice sum display a Colonist-style dark translucent polygon highlight underneath their number token.
-  - **Overlapping Card Stacks (`buildOverlappingStackHtml`):** Resource and Dev cards in the player hand, discard tray, trade offer/request trays, and active trade modal render as overlapping card slices with corner count ribbons, and cards visually move out of the hand into the discard/trade tray when selected.
-  - **Colonist Discard Drawer & Sidebar Status:** Restored the `?` card header, `.discard-tray`, and `✔` confirm button in the discard drawer, plus `⚠️ Discarding...` status and red card-count badges when a player exceeds the discard limit.
-  - **Colonist Victory & Dice Stats Overlay (`#victoryOverlay`):** Added post-game victory fanfare, ranked standings, match timer & turn count, interactive Dice Rolls bar chart (`2`–`12`), Overview & Resource Stats table (`VP`, `Earned`, `Trades`, `Roads/Army`), Map/Replay inspection toggle (`#reopenVictoryBtn`), and `Play Again` (`rematchLobby`) support.
-- **Colonist-Style Robber, Steal, Trade, Dev Card Animations & Sound Effects:**
-  - **Robber Move & Landing Animation (`triggerRobberMoveAnimation`):** Moving the robber arcs a floating robber piece from the previous hex to the destination hex, followed by a heavy drop-bounce (`.robber-drop-anim`) and crimson shockwave ring (`.robber-impact-ring`).
-  - **Stolen Resource Card Animation (`triggerCardTransferAnimations`):** When a resource card is stolen via the Robber or Monopoly, the card flies from the victim to the thief (showing the true resource to the victim and thief, and a blue `?` `.card-mystery` card back to 3rd-party observers). When your own card is taken, `#myHandPanel` flashes red and shakes (`.hand-stolen-shake`) with a floating `-1 <Resource> Stolen!` badge.
-  - **Player-to-Player, Bank Trade, Dev Card & Discard Flight Animations (`recentTransfers`):** Added server-tracked `recentTransfers` and client-side flying card animations for player-to-player trades (bidirectional crossing card flights), maritime/bank trades (cards flying to/from `#bankBar`), buying Development Cards (`sheep`, `wheat`, `ore` flying to the bank and a `🃏` Dev Card flying from `#bankDevDeckItem` to the buyer), and 7-roll discards (discarded cards flying into the bank).
-  - **Synthesized Colonist Sound Effects (`src/client/audio.ts`):** Added multi-layered Web Audio sound effects for dice clattering + 7-roll robber horn (`playDiceRollSound`), wooden road clack (`playPlaceRoadSound`), settlement build pop (`playPlaceSettlementSound`), city upgrade triad (`playPlaceCitySound`), heavy robber placement thud (`playPlaceRobberSound`), card steal swipe/alert (`playStealCardSound`), 7-discard flutter (`playDiscardSound`), trade completion chime (`playTradeSound`), and development card draw shimmer (`playBuyDevCardSound`).
-- **Game Speed Adjust Setting (`gameSpeed`):** Added an adjustable Game Speed setting (`0.5x` to `8x`) in the in-game Settings Menu (`⚙️` / `⚡` top-left button with interactive range slider and `0.5x`, `1x`, `2x`, `4x`, `8x` preset buttons) as well as in the Lobby Toolbar header and Game Rules tab. Scales server-side bot turn delays, trade offer wait times, and client-side flying card / robber animation speeds in real time.
+## Next
+- Run `npm run typecheck`, then `npm test`. Nothing in 2a-2g has been compiled or run. Expect a round of small fixes.
+- If `sim.test.ts` reports a stall or a rejected action, the message names the phase and action.
+- Play one live game with bots in the browser, including gold and fog presets, then delete `src/server-legacy/`.
+- Then close out Step 2 in this log and start Step 3 (identity and persistence).
