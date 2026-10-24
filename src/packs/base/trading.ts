@@ -1,5 +1,72 @@
-// MODULE: trade helpers (bank ratios from ports, resource parsing, player trade execution) | USED BY: actions/bankTrade, actions/tradeOffers
+// MODULE: trade helpers (bank ratios from ports, resource parsing, multi-offer stack, player trade execution) | USED BY: actions/bankTrade, actions/tradeOffers, hooks
+import { getPlayer } from '../../shared';
 import type { Ctx, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
+
+export const MAX_OPEN_TRADES = 5;
+
+/** All currently open trade offers (newest first). */
+export function openTrades(g: GameState): TradeState[] {
+  if (!Array.isArray(g.trades)) {
+    g.trades = g.trade ? [g.trade] : [];
+  }
+  return g.trades;
+}
+
+/** Keeps `g.trade` pointing at the newest open offer (`g.trades[0] ?? null`). */
+export function syncPrimaryTrade(g: GameState): void {
+  const list = openTrades(g);
+  g.trade = list[0] ?? null;
+}
+
+function sameResources(a: Resources, b: Resources): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    if ((a[k] || 0) !== (b[k] || 0)) return false;
+  }
+  return true;
+}
+
+/** Pushes a new offer to the top of the stack (newest first), replacing any identical open offer by the same player. */
+export function pushTrade(g: GameState, trade: TradeState): void {
+  const list = openTrades(g).filter(
+    t => t.id !== trade.id && !(t.fromId === trade.fromId && sameResources(t.offer, trade.offer) && sameResources(t.request, trade.request))
+  );
+  list.unshift(trade);
+  if (list.length > MAX_OPEN_TRADES) list.length = MAX_OPEN_TRADES;
+  g.trades = list;
+  syncPrimaryTrade(g);
+}
+
+/** Removes one trade offer by id (or the top offer if omitted). */
+export function removeTrade(g: GameState, tradeId?: number): TradeState | null {
+  const list = openTrades(g);
+  if (list.length === 0) {
+    g.trade = null;
+    return null;
+  }
+  const idx = tradeId !== undefined ? list.findIndex(t => t.id === Number(tradeId)) : 0;
+  if (idx < 0) return null;
+  const [removed] = list.splice(idx, 1);
+  syncPrimaryTrade(g);
+  return removed ?? null;
+}
+
+/** Drops any open trade offers whose proposer no longer holds the offered cards. */
+export function pruneInvalidTrades(g: GameState): void {
+  if (!Array.isArray(g.trades)) {
+    if (g.trade) {
+      const proposer = getPlayer(g, g.trade.fromId);
+      if (!proposer || !holds(proposer, g.trade.offer)) g.trade = null;
+    }
+    g.trades = g.trade ? [g.trade] : [];
+    return;
+  }
+  g.trades = g.trades.filter(t => {
+    const proposer = getPlayer(g, t.fromId);
+    return !!proposer && holds(proposer, t.offer);
+  });
+  syncPrimaryTrade(g);
+}
 
 /** Bank ratio per resource for a player: bankRatio, improved by ports on owned pieces. */
 export function tradeRatios(g: GameState, reg: Registry, pid: Id): Record<string, number> {
@@ -58,6 +125,7 @@ export function executeTrade(ctx: Ctx, proposer: PlayerState, partner: PlayerSta
   }
   proposer.stats.trades = (proposer.stats.trades || 0) + 1;
   partner.stats.trades = (partner.stats.trades || 0) + 1;
-  g.trade = null;
+  removeTrade(g, trade.id);
+  pruneInvalidTrades(g);
   ctx.log(`🤝 ${proposer.name} traded with ${partner.name}!`, proposer.color);
 }

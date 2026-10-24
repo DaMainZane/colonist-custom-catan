@@ -12,6 +12,7 @@ export const endTurnAction: ActionDef = {
     p.newDevCards = [];
     p.pending.freeRoads = 0;
     g.trade = null;
+    g.trades = [];
     g.turnCount++;
     for (const hook of ctx.reg.hooks.onTurnEnd) hook(ctx);
 

@@ -296,11 +296,28 @@ svg#boardSvg:active { cursor: grabbing; }
   box-shadow: var(--shadow); display: none; max-width: 80vw; text-align: center;
 }
 
-/* ---------- Active trade offer (top right) ---------- */
-#activeTradeModal { position: absolute; top: 12px; right: 16px; width: 372px; display: none; flex-direction: column; gap: 6px; z-index: 50; }
+/* ---------- Active trade offer stack (top right) ---------- */
+#activeTradeModal {
+  position: absolute; top: 12px; right: 16px; width: 416px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 150px); display: none; flex-direction: column; gap: 6px; z-index: 50;
+}
 .trade-top-avatars {
-  background: var(--surface); border-radius: var(--r-lg); padding: 8px 12px; box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface); border-radius: var(--r-lg); padding: 7px 12px; box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.trade-top-avatars-list {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+}
+.trade-collapse-btn {
+  border: 0; background: var(--surface-2); color: var(--ink); border-radius: var(--r-sm);
+  height: 30px; min-width: 30px; padding: 0 7px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  transition: background 0.12s; flex-shrink: 0;
+}
+.trade-collapse-btn:hover { background: var(--surface-3); }
+.trade-count-pill {
+  font-size: 11px; font-weight: 800; background: var(--accent); color: var(--on-accent);
+  border-radius: 999px; padding: 1px 6px; line-height: 1.3;
 }
 .resp { position: relative; width: 36px; height: 36px; }
 .avatar {
@@ -315,21 +332,86 @@ svg#boardSvg:active { cursor: grabbing; }
 .resp .status.ok { background: var(--ok); }
 .resp .status.no { background: var(--danger); }
 .resp .status.wait::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
+
+.trade-offers-stack {
+  display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding-bottom: 2px;
+  scrollbar-gutter: stable;
+}
 .trade-offer-body {
-  background: var(--surface); border-radius: var(--r-lg); padding: 12px; box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: relative; overflow: hidden; flex-shrink: 0;
+  background: var(--surface); border-radius: var(--r-lg); padding: 10px 12px 13px; box-shadow: var(--shadow);
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
 }
-.trade-rows { display: flex; flex-direction: column; gap: 8px; }
-.trade-row { display: flex; align-items: center; gap: 10px; min-height: var(--card-h); flex-wrap: nowrap; }
+.trade-offer-body.trade-card-enter {
+  animation: tradeSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tradeSlideIn {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.trade-rows { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.trade-row { display: flex; align-items: center; gap: 8px; min-height: var(--card-h); flex-wrap: nowrap; }
+.trade-dir-badge {
+  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+}
+.trade-who-avatar {
+  width: 30px; height: 30px; font-size: 13px; box-shadow: 0 0 0 2px var(--surface-3);
+}
+.trade-who-group {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); color: var(--ink-dim);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.trade-arrow {
+  display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+}
+.trade-arrow.get { color: var(--ok); }
+.trade-arrow.give { color: var(--danger); }
+.trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .trade-row-label { flex-shrink: 0; width: 54px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
-.trade-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.act-circle {
-  width: 40px; height: 40px; border-radius: 50%; border: 0; color: #fff; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; background: var(--ok); transition: transform 0.1s;
+.trade-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; }
+
+/* Flat rounded-square responder & action boxes (Colonist layout in our matte token palette) */
+.trade-resp-box, .trade-act-btn {
+  width: 36px; height: 36px; border-radius: var(--r); border: 0;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: transform 0.1s, background 0.12s, opacity 0.12s;
 }
-.act-circle:hover { transform: scale(1.06); }
-.act-circle.no { background: var(--danger); }
-.act-circle.off { opacity: 0.4; cursor: not-allowed; transform: none; }
+.trade-resp-box.accepted {
+  background: var(--resp-color, var(--ok)); color: #fff; cursor: pointer;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--resp-color, var(--ok));
+}
+.trade-resp-box.accepted:hover { transform: translateY(-2px) scale(1.05); }
+.trade-resp-box.declined {
+  background: var(--surface-2); color: var(--ink-dim);
+  border: 2px solid var(--resp-color, var(--line)); opacity: 0.68;
+}
+.trade-resp-box.pending {
+  background: var(--surface-2); color: var(--ink-dim);
+  border: 2px dashed var(--resp-color, var(--line));
+}
+.trade-resp-box.pending .wait-dots {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--resp-color, var(--ink-dim));
+  animation: spotPulse 1.3s ease-in-out infinite;
+}
+
+.trade-act-btn { cursor: pointer; color: #fff; background: var(--surface-3); }
+.trade-act-btn:hover { transform: translateY(-1px); }
+.trade-act-btn.accept { background: var(--ok); }
+.trade-act-btn.accept.chosen { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ok); }
+.trade-act-btn.edit { background: var(--accent); color: var(--on-accent); }
+.trade-act-btn.decline, .trade-act-btn.cancel { background: var(--danger); color: #fff; }
+.trade-act-btn.off { opacity: 0.38; cursor: not-allowed; transform: none; }
+
+/* Per-offer time limit countdown bar along the bottom edge */
+.trade-timer-track {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3.5px;
+  background: var(--surface-3); overflow: hidden; pointer-events: none;
+}
+.trade-timer-fill {
+  width: 100%; height: 100%; background: var(--accent);
+  transform-origin: left center; transform: scaleX(1);
+}
+.trade-timer-fill.low { background: var(--danger); }
 
 /* ---------- Bottom-left sheet (trade, discard, gold, monopoly, robber victim) ---------- */
 #inlineDrawerWrap { position: absolute; bottom: 112px; left: 12px; display: none; align-items: flex-end; gap: 8px; z-index: 40; }
@@ -753,8 +835,10 @@ svg#boardSvg:active { cursor: grabbing; }
 .avatar.avatar-pick { cursor: pointer; transition: transform 0.12s ease; }
 .avatar.avatar-pick:hover { transform: scale(1.1); }
 
-/* ---------- Counter offer (edit mode of the trade popup) ---------- */
-.trade-counter-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-dim); padding: 2px 2px 4px; }
+/* ---------- Counter offer (edit mode of a trade card in the stack) ---------- */
+.trade-offer-body.trade-counter { flex-direction: column; align-items: stretch; gap: 8px; }
+.trade-counter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.trade-counter-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
 .trade-counter .trade-row { flex-wrap: wrap; gap: 6px; }
 .counter-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .counter-cell .mini-res-card { cursor: pointer; }
@@ -766,7 +850,6 @@ svg#boardSvg:active { cursor: grabbing; }
 .counter-step button:hover { border-color: var(--accent); color: var(--accent); }
 .counter-step span { min-width: 14px; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
 .counter-step span.on { color: var(--ink); }
-.act-circle.edit { background: var(--accent); color: var(--on-accent); }
 
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {

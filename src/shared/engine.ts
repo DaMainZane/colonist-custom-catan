@@ -90,6 +90,7 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
     diceStats: {},
     awards: Object.fromEntries([...reg.awards.keys()].map(id => [id, null])),
     trade: null,
+    trades: [],
     winner: null,
     log: [],
     ext: {}
@@ -178,6 +179,7 @@ export function checkWinner(ctx: Ctx): boolean {
     if (vp >= g.rules.vpToWin) {
       g.winner = { id: p.id, name: p.name, vp, color: p.color };
       g.trade = null;
+      g.trades = [];
       g.phaseStack = [];
       setPhase(ctx, 'gameover');
       ctx.log(`🏆 ${p.name} wins the game with ${vp} VP!`, p.color);

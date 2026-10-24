@@ -79,6 +79,12 @@ export function enginePlayer(room: Room, id: string): PlayerState | undefined {
 export function clearBotTimers(room: Room): void {
   if (room.botTimer) clearTimeout(room.botTimer);
   if (room.tradeTimer) clearTimeout(room.tradeTimer);
+  if (room.tradeTimers) {
+    for (const entry of room.tradeTimers.values()) {
+      if (entry.timer) clearTimeout(entry.timer);
+    }
+    room.tradeTimers.clear();
+  }
   room.botTimer = undefined;
   room.tradeTimer = undefined;
   room.tradeTimerFor = null;
