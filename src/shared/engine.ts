@@ -52,7 +52,7 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
   const players: PlayerState[] = seats.map((pi, idx) => ({
     id: pi.id,
     name: pi.name,
-    avatar: pi.isBot ? '🤖' : (pi.avatar ?? AVATARS[idx % AVATARS.length]),
+    avatar: pi.avatar ?? (pi.isBot ? '🤖' : AVATARS[idx % AVATARS.length]),
     color: PLAYER_COLORS[idx % PLAYER_COLORS.length],
     isBot: !!pi.isBot,
     difficulty: pi.difficulty ?? (pi.isBot ? 'ADVANCED HARD' : null),

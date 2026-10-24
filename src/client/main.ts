@@ -14,7 +14,8 @@ import {
   triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave
 } from './render/board';
-import { respondToTrade, confirmTradeWith, cancelTrade } from './render/trade';
+import { respondToTrade, confirmTradeWith, cancelTrade, startCounter, adjustCounter, sendCounter, cancelCounter } from './render/trade';
+import { initCursors } from './cursors';
 import { onClickHandResource, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
@@ -24,7 +25,7 @@ import { sendChat } from './render/sidebar';
 import {
   createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu, setGameSpeedValue,
   setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
-  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard
+  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
@@ -35,6 +36,7 @@ Object.assign(window as any, {
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
+  startCounter, adjustCounter, sendCounter, cancelCounter, cycleAvatar,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave
@@ -221,6 +223,7 @@ function init(): void {
     }
   }, true);
   stage.addEventListener('contextmenu', e => e.preventDefault());
+  initCursors();
 }
 
 if (document.readyState === 'loading') {

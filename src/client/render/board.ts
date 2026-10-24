@@ -136,21 +136,26 @@ function portMarkup(e: any, v1: any, v2: any, h: any, owned: boolean, isLobbyHos
   const tx = ex / eLen;
   const ty = ey / eLen;
 
-  // Two sturdy wooden piers anchored along the hex edge near v1 and v2, extending perpendicular to the hex face
-  const b1x = mx - tx * 28 + nx * 2.5;
-  const b1y = my - ty * 28 + ny * 2.5;
-  const b2x = mx + tx * 28 + nx * 2.5;
-  const b2y = my + ty * 28 + ny * 2.5;
+  // Two sturdy planked piers that run the full length of the coastal hex side (anchored near its two corners)
+  // and reach straight out along the outward normal. Narrower at the tip, like a landing.
+  const D0 = -4.5;                       // the drawn tile edge sits just inside the geometric edge
+  const D1 = 35;                         // pier tip
+  const hw0 = Math.max(14, eLen / 2 - 7);
+  const hw1 = hw0 * 0.55;
+  const b1x = mx - tx * hw0 + nx * D0;
+  const b1y = my - ty * hw0 + ny * D0;
+  const b2x = mx + tx * hw0 + nx * D0;
+  const b2y = my + ty * hw0 + ny * D0;
 
-  const t1x = mx - tx * 15 + nx * 35;
-  const t1y = my - ty * 15 + ny * 35;
-  const t2x = mx + tx * 15 + nx * 35;
-  const t2y = my + ty * 15 + ny * 35;
+  const t1x = mx - tx * hw1 + nx * D1;
+  const t1y = my - ty * hw1 + ny * D1;
+  const t2x = mx + tx * hw1 + nx * D1;
+  const t2y = my + ty * hw1 + ny * D1;
 
   // Cross-planks parallel to the hex edge
-  const planks = [11, 19, 27].map(d => {
-    const f = (d - 2.5) / (35 - 2.5);
-    const halfW = 28 * (1 - f) + 15 * f;
+  const planks = [7, 16, 25].map(d => {
+    const f = (d - D0) / (D1 - D0);
+    const halfW = hw0 * (1 - f) + hw1 * f;
     const px = mx + nx * d;
     const py = my + ny * d;
     return `<line class="port-plank" x1="${(px - tx * halfW).toFixed(1)}" y1="${(py - ty * halfW).toFixed(1)}" x2="${(px + tx * halfW).toFixed(1)}" y2="${(py + ty * halfW).toFixed(1)}" />`;
@@ -174,12 +179,12 @@ function portMarkup(e: any, v1: any, v2: any, h: any, owned: boolean, isLobbyHos
     <g data-paintable="${canPaintPort ? '1' : ''}" onclick="${canPaintPort ? `onEdgeInteract(${e.id})` : ''}" style="${canPaintPort ? 'cursor:pointer' : ''}">
       <polygon class="port-dock-apron" points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${t2x.toFixed(1)},${t2y.toFixed(1)} ${t1x.toFixed(1)},${t1y.toFixed(1)}" />
       ${planks}
-      <line class="port-pier-rim" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" />
-      <line class="port-pier-rim" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" />
-      <line class="port-pier" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" />
-      <line class="port-pier" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" />
-      <circle class="port-post" cx="${b1x.toFixed(1)}" cy="${b1y.toFixed(1)}" r="4.2" />
-      <circle class="port-post" cx="${b2x.toFixed(1)}" cy="${b2y.toFixed(1)}" r="4.2" />
+      <line class="port-pier-rim" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" style="stroke-width:11;stroke-linecap:round" />
+      <line class="port-pier-rim" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" style="stroke-width:11;stroke-linecap:round" />
+      <line class="port-pier" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" style="stroke-width:6.5;stroke-linecap:round" />
+      <line class="port-pier" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" style="stroke-width:6.5;stroke-linecap:round" />
+      <circle class="port-post" cx="${b1x.toFixed(1)}" cy="${b1y.toFixed(1)}" r="5.2" />
+      <circle class="port-post" cx="${b2x.toFixed(1)}" cy="${b2y.toFixed(1)}" r="5.2" />
       ${owned ? `<circle class="port-ring" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="24" />` : ''}
       <circle class="port-badge-outer" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="21" />
       <circle class="port-badge" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="17.5" style="fill:${badgeFill};stroke:${badgeBorder}" />

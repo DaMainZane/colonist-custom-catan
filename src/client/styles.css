@@ -748,6 +748,26 @@ svg#boardSvg:active { cursor: grabbing; }
 .btn svg.ui-icon, .act-btn svg.ui-icon, .nav-btn svg.ui-icon { pointer-events: none; }
 .menu-hint { font-size: 12px; color: var(--ink-dim); font-weight: 500; }
 
+/* ---------- Avatars (pictogram faces inside the coloured circle) ---------- */
+.avatar svg { width: 78%; height: 78%; display: block; flex-shrink: 0; }
+.avatar.avatar-pick { cursor: pointer; transition: transform 0.12s ease; }
+.avatar.avatar-pick:hover { transform: scale(1.1); }
+
+/* ---------- Counter offer (edit mode of the trade popup) ---------- */
+.trade-counter-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-dim); padding: 2px 2px 4px; }
+.trade-counter .trade-row { flex-wrap: wrap; gap: 6px; }
+.counter-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.counter-cell .mini-res-card { cursor: pointer; }
+.counter-step { display: flex; align-items: center; gap: 3px; }
+.counter-step button {
+  width: 18px; height: 18px; line-height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.counter-step button:hover { border-color: var(--accent); color: var(--accent); }
+.counter-step span { min-width: 14px; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
+.counter-step span.on { color: var(--ink); }
+.act-circle.edit { background: var(--accent); color: var(--on-accent); }
+
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

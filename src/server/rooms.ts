@@ -18,6 +18,11 @@ export function createLobbyPlayer(id: string, name: string, index: number, isBot
   };
 }
 
+/** First avatar nobody in the lobby is using yet (falls back to the first one if all are taken). */
+export function freeAvatar(room: Room): string {
+  return AVATARS.find(a => !room.lobbyPlayers.some(p => p.avatar === a)) ?? AVATARS[0];
+}
+
 export function createRoom(hostId: string, hostName: string): Room {
   let code = '';
   do {

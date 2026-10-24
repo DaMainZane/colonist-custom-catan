@@ -6,7 +6,8 @@ import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderBoard } from './board';
 import { uiIcon, dieFaceSvg } from '../icons';
-import { esc, initial } from '../util';
+import { esc } from '../util';
+import { avatarFace } from '../avatars';
 
 export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
@@ -69,7 +70,9 @@ export function renderAll(): void {
   const pill = document.getElementById('turnStatusPill')!;
   pill.classList.toggle('mine', isMyTurn && state.status !== 'LOBBY' && state.status !== 'GAMEOVER');
   if (state.status === 'LOBBY') {
-    pill.innerHTML = `Lobby · paint the map or add bots`;
+    pill.innerHTML = state.hostId === socket.id
+      ? `Lobby · paint the map or add bots`
+      : `Lobby · only the host edits · move your cursor, hold Shift for a laser`;
   } else if (state.status === 'GAMEOVER') {
     pill.innerHTML = `<strong>${esc(state.winner?.name)}</strong> won the game`;
   } else {
@@ -83,7 +86,7 @@ export function renderAll(): void {
       ROBBER_STEAL: 'Choose Player to Rob',
       MAIN: 'Turn'
     } as Record<string, string>)[state.phase] || state.phase;
-    pill.innerHTML = `<span class="avatar" style="background:${esc(current?.color)}">${initial(current?.name || '?')}</span> <strong>${esc(current?.name)}</strong> · ${phaseTxt}`;
+    pill.innerHTML = `<span class="avatar" style="background:${esc(current?.color)}">${avatarFace(current?.avatar, current?.name || '?')}</span> <strong>${esc(current?.name)}</strong> · ${phaseTxt}`;
   }
 
   const btn = (id: string) => document.getElementById(id) as HTMLButtonElement;
@@ -153,7 +156,7 @@ export function renderVictoryScreen(): void {
   document.getElementById('vicRanksList')!.innerHTML = ranked.map((p, idx) => `
     <div class="vic-rank-row ${idx === 0 ? 'winner' : ''}">
       <div class="who">
-        <span class="avatar p-avatar" style="background:${esc(p.color)}">${initial(p.name)}</span>
+        <span class="avatar p-avatar" style="background:${esc(p.color)}">${avatarFace(p.avatar, p.name)}</span>
         <span>${esc(p.name)}</span>
       </div>
       <span class="pts">${p.vp}</span>
@@ -192,7 +195,7 @@ export function renderVictoryScreen(): void {
         </div>
         ${ranked.map(p => `
           <div class="vic-table-row">
-            <span class="who"><span class="avatar p-avatar" style="background:${esc(p.color)}; width:24px; height:24px; font-size:11px">${initial(p.name)}</span>${esc(p.name)}</span>
+            <span class="who"><span class="avatar p-avatar" style="background:${esc(p.color)}; width:24px; height:24px; font-size:11px">${avatarFace(p.avatar, p.name)}</span>${esc(p.name)}</span>
             <span>${p.vp}</span>
             <span>${p.stats?.resourcesEarned || 0}</span>
             <span>${p.stats?.tradesMade || 0}</span>

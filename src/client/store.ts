@@ -23,6 +23,12 @@ export const tradeGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore
 export const tradeWant: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 export const discardSel: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 
+// Counter-offer draft (the trade popup's edit mode). Both sides are from my point of view.
+export let counterTradeId: number | null = null;
+export const counterGet: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+export const counterGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+export function setCounterTradeId(v: number | null): void { counterTradeId = v; }
+
 export function setState(s: GameState): void { state = s; }
 export function setSoundOn(v: boolean): void { soundOn = v; }
 export function setIsMouseDown(v: boolean): void { isMouseDown = v; }

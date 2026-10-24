@@ -10,7 +10,8 @@ import {
 } from '../store';
 import { renderAll } from './index';
 import { renderHand } from './hand';
-import { esc, initial } from '../util';
+import { esc } from '../util';
+import { avatarFace } from '../avatars';
 import { showToast } from '../ui';
 
 function myPlayer(): any {
@@ -156,7 +157,7 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       <div class="pick-row">
         ${victims.map((v: any) => `
           <button class="victim-btn" onclick="chooseRobberVictim('${esc(v.id)}')" title="Steal a card from ${esc(v.name)}">
-            <span class="avatar" style="background:${esc(v.color)}">${initial(v.name)}</span>
+            <span class="avatar" style="background:${esc(v.color)}">${avatarFace(v.avatar, v.name)}</span>
             <span>${esc(v.name)}</span>
             <span class="count">${uiIcon('cards', 14)}${v.resourceCount}</span>
           </button>

@@ -14,11 +14,16 @@
 - **Pass 2:** one "Join game" button (newest open lobby, no code shown), trade closes when all decline, trade popup order get/give, own VP shown as `8(9)` (`publicVp` in `view.ts` and client `PlayerView`), stable player list scroll, rolled tiles darken ~2 s, striped robber targets, glowing build spots, sand rim, bank-empty toast. Typecheck error (`publicVp` type) fixed.
 - **Pass 3:** drag-to-pan on tiles, sand under all land tiles, darker tile trim (`--trim-*`), rebuilt port markup aligned to the hex edge, roads merge into one line with hover longest-stretch tooltip, award banner and fanfare for Longest Road and Largest Army, bot chat lines (`src/server/bots/dialogue.ts`).
 - Passes 2 and 3 still need `npm run typecheck`, `npm test` and one live game.
+- **Pass 4 (items 1 to 4):**
+  - Port piers: full hex-side length, thicker (6.5 body, 11 rim), tapered to the badge, anchored on the drawn tile edge (`portMarkup` in `render/board.ts`).
+  - Counter trade: new engine action `counter_trade {offer, request}` (`tradeOffers.ts`, registered in `actions/index.ts`, added to the `main` phase). A responder's counter replaces the open trade with one from the counterer to the original proposer only. Client: swap button and editor in the trade popup (`render/trade.ts`, draft state in `store.ts`), socket event `counterTrade`. Bots never propose counters (no `legal`), but answer them.
+  - Avatars: pictogram faces in `src/client/avatars.ts`, keyed by the shared emoji ids. Shown in player list, turn pill, trade popup, robber picker, victory screen. Click your avatar in the lobby to cycle (`setAvatar` event, unique per lobby, host can change bots'). Bots now get animals (`engine.ts` no longer forces the robot), `freeAvatar` in `rooms.ts`.
+  - Host-only editing: lobby edits were already host-only on the server; `setGameSpeed` now host-only too. Client guards with a toast (`requireHost` in `actions.ts`). Lobby cursors and Shift laser trail in `src/client/cursors.ts` (`cursor` event, relayed volatile, lobby only).
+  - README module table updated.
+  - Not yet run: `npm run typecheck`, `npm test`, one live game with a human counter and a second browser for cursors.
 
 ## Remaining
-- Counter trade in the trade popup
 - Multiple trade popups (time limit, newest on top)
-- Host-only editing, others suggest with cursor and laser drag
 - Bot difficulty tiers (Main, Secondary, Overload)
 - Big-map optimization
 - New map generation types (islands, archipelago, lake, realistic)

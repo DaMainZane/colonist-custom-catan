@@ -73,6 +73,47 @@ export const respondTradeAction: ActionDef = {
   legal: () => [{ decision: 'accepted' }, { decision: 'declined' }]
 };
 
+/**
+ * A responder edits the open offer and sends it back. The offer is replaced by a new one from the countering player
+ * to the original proposer only (who can accept, decline or counter again).
+ * Payload is from the counterer's side: `offer` = what they give, `request` = what they want.
+ */
+export const counterTradeAction: ActionDef = {
+  type: 'counter_trade',
+  actor: isResponder,
+  validate(ctx, pid, payload) {
+    const { g, reg } = ctx;
+    if (!g.trade) return 'No active trade';
+    const offer = parseResources(reg, payload?.offer);
+    const request = parseResources(reg, payload?.request);
+    if (!offer || !request) return 'Invalid counter offer';
+    if (sumResources(offer) === 0 || sumResources(request) === 0) {
+      return 'Select at least 1 card to give and 1 card you want!';
+    }
+    if (!holds(getPlayer(g, pid)!, offer)) return "You don't have enough cards for that counter offer!";
+    return null;
+  },
+  apply(ctx, pid, payload) {
+    const { g, reg } = ctx;
+    const p = getPlayer(g, pid)!;
+    const previous = g.trade!;
+    const original = getPlayer(g, previous.fromId)!;
+    const offer = parseResources(reg, payload.offer)!;
+    const request = parseResources(reg, payload.request)!;
+
+    g.ext.base.tradeSeq++;
+    g.trade = {
+      id: g.ext.base.tradeSeq,
+      fromId: pid,
+      offer,
+      request,
+      responses: { [original.id]: 'pending' }
+    };
+    ctx.emit('tradeCountered', { playerId: pid, toId: original.id, offer, request });
+    ctx.log(`${p.avatar} ${p.name} counters ${original.name}: [${describe(offer)}] for [${describe(request)}]`, p.color);
+  }
+};
+
 export const confirmTradeAction: ActionDef = {
   type: 'confirm_trade',
   validate(ctx, pid, payload) {

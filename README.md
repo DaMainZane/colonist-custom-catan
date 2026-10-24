@@ -71,9 +71,19 @@ Status: 2a-2g written. Typecheck is clean and all 25 tests pass, including bot-v
 | `robbing.ts` | robber victims and seeded random steal |
 | `trading.ts` | bank ratios from ports, resource parsing, player trade execution |
 | `hooks.ts` | game start state, `settlePicks` after every action |
-| `actions/` | one file per action group: `build`, `roll`, `devCards` (buy/play), `bankTrade`, `tradeOffers` (propose/respond/confirm/cancel), `owed` (discard/pick), `robber` (move/steal), `endTurn` |
+| `actions/` | one file per action group: `build`, `roll`, `devCards` (buy/play), `bankTrade`, `tradeOffers` (propose/respond/counter/confirm/cancel), `owed` (discard/pick), `robber` (move/steal), `endTurn` |
 
-Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `bank_trade {give, get}`, `propose_trade {offer, request}`, `respond_trade {decision}`, `confirm_trade {partnerId?}`, `cancel_trade`, `discard {cards}`, `pick {resource}`, `move_robber {hexId}`, `steal {victimId}`, `end_turn`.
+Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `bank_trade {give, get}`, `propose_trade {offer, request}`, `respond_trade {decision}`, `counter_trade {offer, request}` (a responder edits the offer and sends it back to the proposer, replacing the open trade), `confirm_trade {partnerId?}`, `cancel_trade`, `discard {cards}`, `pick {resource}`, `move_robber {hexId}`, `steal {victimId}`, `end_turn`.
+
+### `src/client/` (lobby and trade extras)
+
+| File | What |
+|---|---|
+| `avatars.ts` | flat pictogram faces keyed by the shared avatar id (`AVATAR_CHOICES` mirrors `shared/palette.ts`), falls back to the name initial |
+| `cursors.ts` | lobby-only shared cursors and Shift laser trail on a canvas over the board; positions travel in board coordinates via the `cursor` socket event |
+| `render/trade.ts` | trade popup, including the counter-offer editor (`startCounter`, `adjustCounter`, `sendCounter`, `cancelCounter`) |
+
+Lobby rules: only the host edits (map painting, presets, settings, bots, start, game speed). Everyone picks their own avatar (click it in the player list; each avatar is used once per lobby, the host can change the bots').
 
 ### `src/packs/gold/` and `src/packs/fog/` (2e)
 

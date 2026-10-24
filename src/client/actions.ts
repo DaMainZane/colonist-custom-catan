@@ -6,6 +6,30 @@ import {
 } from './store';
 import { renderAll, renderVictoryScreen } from './render/index';
 import { showToast } from './ui';
+import { AVATAR_CHOICES } from './avatars';
+
+// Map and lobby editing belongs to the host. Everyone else points with a cursor (Shift = laser).
+function requireHost(what: string): boolean {
+  if (!state || state.hostId === socket.id) return true;
+  showToast(`Only the host can ${what}.`);
+  return false;
+}
+
+/** Click your avatar in the lobby to step to the next free one (the host can do it for bots). */
+export function cycleAvatar(playerId: string): void {
+  if (!state || state.status !== 'LOBBY') return;
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return;
+  const taken = new Set(state.players.filter(p => p.id !== playerId).map(p => p.avatar));
+  const start = AVATAR_CHOICES.indexOf(player.avatar);
+  for (let i = 1; i <= AVATAR_CHOICES.length; i++) {
+    const next = AVATAR_CHOICES[(start + i + AVATAR_CHOICES.length) % AVATAR_CHOICES.length];
+    if (taken.has(next)) continue;
+    socket.emit('setAvatar', { code: state.code, playerId, avatar: next });
+    playTone(540, 0.05);
+    return;
+  }
+}
 
 // ---------- Landing / lobby ----------
 
@@ -56,6 +80,7 @@ export function toggleGameMenu(forceShow?: boolean): void {
 
 export function setGameSpeedValue(speedVal: number | string): void {
   if (!state) return;
+  if (!requireHost('change the game speed')) { renderAll(); return; }
   const num = Math.max(0.25, Math.min(10, Number(speedVal) || 1));
   if (state.settings) state.settings.gameSpeed = num;
   socket.emit('setGameSpeed', { code: state.code, speed: num });
@@ -63,6 +88,7 @@ export function setGameSpeedValue(speedVal: number | string): void {
 }
 
 export function setBrush(type: string, value: string, btn?: HTMLElement): void {
+  if (!requireHost('edit the map')) return;
   const isSame = activeBrush.type === type && activeBrush.value === value;
   activeBrush.type = isSame ? '' : type;
   activeBrush.value = isSame ? '' : value;
@@ -73,12 +99,18 @@ export function setBrush(type: string, value: string, btn?: HTMLElement): void {
 
 export function applyPreset(preset: string): void {
   if (!state) return;
+  if (!requireHost('apply map presets')) return;
   socket.emit('applyMapPreset', { code: state.code, preset });
   playTone(520, 0.08);
 }
 
 export function pushSettings(): void {
-  if (!state || state.hostId !== socket.id) return;
+  if (!state) return;
+  if (state.hostId !== socket.id) {
+    showToast('Only the host can change settings.');
+    renderAll();
+    return;
+  }
   const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
   socket.emit('updateSettings', {
     code: state.code,
@@ -104,9 +136,9 @@ export function pushSettings(): void {
   });
 }
 
-export function addBot(): void { socket.emit('addBot', { code: state.code }); }
-export function removeBot(): void { socket.emit('removeBot', { code: state.code }); }
-export function startGame(): void { socket.emit('startGame', { code: state.code }); }
+export function addBot(): void { if (requireHost('add bots')) socket.emit('addBot', { code: state.code }); }
+export function removeBot(): void { if (requireHost('remove bots')) socket.emit('removeBot', { code: state.code }); }
+export function startGame(): void { if (requireHost('start the game')) socket.emit('startGame', { code: state.code }); }
 
 export function rematchLobby(): void {
   setHideVictoryOverlay(false);

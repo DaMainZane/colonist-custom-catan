@@ -1,9 +1,9 @@
 // MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | USED BY: server/main
 import type { Server } from 'socket.io';
-import { PLAYER_COLORS } from '../shared';
+import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
-import { clearBotTimers, createLobbyPlayer, createRoom, humanIds, addLobbyLog, rooms } from './rooms';
+import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
 import { newBoard, isPreset, paintHex, paintPort } from './lobby';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
@@ -60,6 +60,7 @@ export function registerSocketHandlers(io: Server): void {
       if (room.lobbyPlayers.length >= room.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
 
       const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
+      newP.avatar = freeAvatar(room);
       room.lobbyPlayers.push(newP);
       socket.join(room.code);
       addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
@@ -72,6 +73,7 @@ export function registerSocketHandlers(io: Server): void {
       const used = new Set(room.lobbyPlayers.map(p => p.name));
       const botName = BOT_NAMES.find(n => !used.has(n)) || `Bot ${room.lobbyPlayers.length}`;
       const bot = createLobbyPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.lobbyPlayers.length, true);
+      bot.avatar = freeAvatar(room);
       room.lobbyPlayers.push(bot);
       addLobbyLog(room, `🤖 ${bot.name} [ADVANCED HARD] added`, bot.color);
       broadcastRoom(room);
@@ -126,11 +128,38 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on('setGameSpeed', safe(({ code, speed }) => {
       const room = rooms[code];
-      if (!room) return;
+      if (!room || room.hostId !== socket.id) return;
       const num = Number(speed);
       if (!Number.isFinite(num) || num <= 0) return;
       room.settings.gameSpeed = Math.max(0.25, Math.min(10, num));
       broadcastRoom(room);
+    }));
+
+    // Avatars: everyone picks their own; the host can also pick for bots. Each avatar is used once per lobby.
+    socket.on('setAvatar', safe(({ code, playerId, avatar }) => {
+      const room = rooms[code];
+      if (!room || room.game || typeof avatar !== 'string' || !AVATARS.includes(avatar)) return;
+      const target = room.lobbyPlayers.find(p => p.id === (playerId || socket.id));
+      if (!target) return;
+      if (target.id !== socket.id && !(target.isBot && room.hostId === socket.id)) return;
+      if (room.lobbyPlayers.some(p => p.id !== target.id && p.avatar === avatar)) {
+        return socket.emit('errorMsg', 'That avatar is already taken.');
+      }
+      target.avatar = avatar;
+      broadcastRoom(room);
+    }));
+
+    // Lobby cursors: only the host edits, everyone else points with a cursor (Shift = laser). Relayed, never stored.
+    socket.on('cursor', safe(({ code, x, y, laser, hide }) => {
+      const room = rooms[code];
+      if (!room || room.game || !room.lobbyPlayers.some(p => p.id === socket.id)) return;
+      if (hide) {
+        socket.to(room.code).volatile.emit('cursor', { id: socket.id, hide: true });
+        return;
+      }
+      const nx = Number(x), ny = Number(y);
+      if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
+      socket.to(room.code).volatile.emit('cursor', { id: socket.id, x: nx, y: ny, laser: !!laser });
     }));
 
     socket.on('applyMapPreset', safe(({ code, preset }) => {
@@ -205,6 +234,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('bankTrade', safe(({ code, give, get }) => act(code, 'bank_trade', { give, get }, true)));
     socket.on('proposeTrade', safe(({ code, offer, request }) => act(code, 'propose_trade', { offer, request }, true)));
     socket.on('respondTrade', safe(({ code, decision }) => act(code, 'respond_trade', { decision }, true)));
+    socket.on('counterTrade', safe(({ code, offer, request }) => act(code, 'counter_trade', { offer, request }, true)));
     socket.on('confirmTradeWithPartner', safe(({ code, partnerId }) => act(code, 'confirm_trade', { partnerId }, true)));
 
     socket.on('cancelTrade', safe(({ code }) => {

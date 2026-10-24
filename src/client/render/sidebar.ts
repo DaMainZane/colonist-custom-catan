@@ -3,7 +3,8 @@ import { RESOURCES } from '../constants';
 import { getMiniSvg, uiIcon } from '../icons';
 import { socket } from '../socket';
 import { state } from '../store';
-import { esc, initial } from '../util';
+import { esc } from '../util';
+import { avatarFace } from '../avatars';
 
 // Log and chat are text the player may select and copy. Re-writing innerHTML on every game update
 // would wipe the selection, so each feed only re-renders when its content actually changed.
@@ -28,6 +29,12 @@ function renderFeed(el: HTMLElement, sig: string, lastSig: string, html: () => s
   el.innerHTML = html();
   if (stick) el.scrollTop = el.scrollHeight;
   return true;
+}
+
+// In the lobby everyone can change their own avatar, and the host can change the bots'.
+function canPickAvatar(p: any): boolean {
+  if (state.status !== 'LOBBY') return false;
+  return p.id === socket.id || (p.isBot && state.hostId === socket.id);
 }
 
 export function renderSidebar(): void {
@@ -90,7 +97,8 @@ export function renderSidebar(): void {
     <div class="p-row ${isTurn ? 'is-turn' : ''} ${isVictim ? 'can-rob' : ''}"
       id="playerRow_${esc(p.id)}"
       ${isVictim ? `onclick="chooseRobberVictim('${esc(p.id)}')" title="Click to rob ${esc(p.name)}"` : ''}>
-      <div class="avatar p-avatar" style="background:${esc(p.color)}">${initial(p.name)}</div>
+      <div class="avatar p-avatar ${canPickAvatar(p) ? 'avatar-pick' : ''}" style="background:${esc(p.color)}"
+        ${canPickAvatar(p) ? `onclick="cycleAvatar('${esc(p.id)}')" title="Click to change avatar"` : ''}>${avatarFace(p.avatar, p.name)}</div>
       <div>
         <div class="p-name"><span class="nm">${esc(p.name)}</span></div>
         <div class="p-sub">${tags}</div>
