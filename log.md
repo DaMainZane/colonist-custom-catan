@@ -66,6 +66,27 @@ Testing between sub-steps skipped on purpose. Run `npm run typecheck` before 2f.
 - Open: piece rim may change from light to black or gray, to be compared in the next preview.
 - Built in Step 4 (UI and phone together). No client code changed yet.
 
+## Backlog pass 1 (2026-10-24, easiest first, not compiled or tested yet)
+- Removed probability dots under tile numbers (`tokenMarkup` in `render/board.ts`).
+- 3:1 port badge and "any" palette swatches use `--token` so the dark label stays readable in dark mode.
+- Flying cards fade in about 90 ms right after landing instead of lingering.
+- Dark mode toggle added to the welcome page (`toggleTheme()` was already in the game nav).
+- No gold in normal games: gold pack default 0, `defaultSettings().goldTiles` 0, lobby field default 0. Gold Rush preset unchanged.
+- Lobby log no longer repeats the room code (the turn pill already shows it).
+
+## Backlog pass 2 (2026-10-24, not compiled or tested yet)
+- Join: the landing page has one "Join game" button. No code means the newest open lobby (`joinRoom` in `socket.ts`). Invite links (`?room=CODE`) still work through a hidden input. The lobby pill no longer shows the code.
+- Trade: when every responder declines, the engine closes the offer (`respond_trade` in `tradeOffers.ts`), so the window disappears.
+- Trade popup rows reordered to match the trade sheet (get on top, give below), label and cards forced onto one line.
+- VP: players see their own `8(9)` when a hidden VP card counts. Server sends `publicVp` per player (`view.ts`). Other players already only got public VP.
+- Player list keeps its scroll position across repaints, rows no longer shrink, stable scrollbar gutter.
+- Rolled tiles darken for about 2 s and fade back (timer keyed in `render/board.ts`, `.hex-rolled` in `styles.css`).
+- Robber targets: striped fill and pulsing dashed edge (`#targetStripes` pattern).
+- Glow and throb on buildable road spots, settlement spots and upgradable settlements.
+- Sandy beach rim under coastal tiles (`--sand` token, light and dark).
+- Bank trade shows a toast when the bank lacks the wanted resource (`executeBankTrade` in `drawer.ts`).
+- Needs a check: `npm run typecheck`, `npm test`, then one live game.
+
 ## Next
 - Delete `src/server-legacy/` (and `legacy/` when no longer wanted as reference), then close out Step 2.
 - Start Step 3 (identity and persistence) only when John says so.

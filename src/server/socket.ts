@@ -51,8 +51,11 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('joinRoom', safe(({ code, name }) => {
       const cleanCode = (code || '').trim().toUpperCase();
       const cleanName = (name || 'Settler').trim().substring(0, 16);
-      const room = rooms[cleanCode];
-      if (!room) return socket.emit('errorMsg', 'Room not found!');
+      // No code (the normal case for a private group): take the newest lobby that still has a seat.
+      const room = cleanCode
+        ? rooms[cleanCode]
+        : Object.values(rooms).reverse().find(r => !r.game && r.lobbyPlayers.length < r.settings.maxPlayers);
+      if (!room) return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
       if (room.game) return socket.emit('errorMsg', 'Game already started!');
       if (room.lobbyPlayers.length >= room.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
 

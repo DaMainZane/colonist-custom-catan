@@ -69,7 +69,7 @@ export function renderAll(): void {
   const pill = document.getElementById('turnStatusPill')!;
   pill.classList.toggle('mine', isMyTurn && state.status !== 'LOBBY' && state.status !== 'GAMEOVER');
   if (state.status === 'LOBBY') {
-    pill.innerHTML = `Room <strong>${esc(state.code)}</strong> · paint the map or add bots`;
+    pill.innerHTML = `Lobby · paint the map or add bots`;
   } else if (state.status === 'GAMEOVER') {
     pill.innerHTML = `<strong>${esc(state.winner?.name)}</strong> won the game`;
   } else {

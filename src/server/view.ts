@@ -74,7 +74,9 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
     stats: { resourcesEarned: p.stats.earned || 0, tradesMade: p.stats.trades || 0 },
-    vp: computeVP(g, registry, p, reveal)
+    vp: computeVP(g, registry, p, reveal),
+    // What other players see. Differs from `vp` only for the viewer's own hidden VP cards.
+    publicVp: computeVP(g, registry, p, over)
   };
 }
 

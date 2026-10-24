@@ -10,7 +10,7 @@ export const registry = createRegistry(allPacks);
 export function defaultSettings(): Settings {
   return {
     boardRadius: 2,
-    goldTiles: 2,
+    goldTiles: 0,
     desertTiles: 1,
     fogTiles: 0,
     vpToWin: 10,

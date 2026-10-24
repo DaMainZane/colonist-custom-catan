@@ -11,6 +11,7 @@ import {
 import { renderAll } from './index';
 import { renderHand } from './hand';
 import { esc, initial } from '../util';
+import { showToast } from '../ui';
 
 function myPlayer(): any {
   return state.players.find(p => p.id === socket.id);
@@ -247,6 +248,16 @@ export function confirmInlineAction(): void {
 }
 
 export function executeBankTrade(): void {
+  // The bank can only hand out what it still holds.
+  for (const r of RESOURCES) {
+    const want = tradeWant[r] || 0;
+    if (want > 0 && (state.bank?.[r] ?? 0) < want) {
+      const have = state.bank?.[r] ?? 0;
+      showToast(have === 0 ? `The bank has no ${RES_META[r].name} left.` : `The bank only has ${have} ${RES_META[r].name} left.`);
+      playTone(300, 0.1);
+      return;
+    }
+  }
   playTone(620, 0.1);
   socket.emit('bankTrade', { code: state.code, give: tradeGive, get: tradeWant });
   setDrawerMode(null);

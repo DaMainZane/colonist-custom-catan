@@ -11,8 +11,8 @@ export const goldPack: Pack = {
   id: 'gold',
   name: 'Gold',
   deps: ['base'],
-  // Deep-merged into base's tileCounts, so the board gets 2 gold tiles next to the 1 desert.
-  rules: { tileCounts: { gold: 2 } },
+  // Default is 0: plain games have no gold. Gold Rush (preset) or the lobby setting adds it.
+  rules: { tileCounts: { gold: 0 } },
   register(api) {
     api.tile({
       id: 'gold',

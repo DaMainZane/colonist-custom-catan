@@ -67,7 +67,11 @@ export function renderSidebar(): void {
   const canPickVictim = state.phase === 'ROBBER_STEAL' && state.currentPlayerId === socket.id;
   const victimSet = new Set<string>(state.robberVictims || []);
 
-  document.getElementById('playersStack')!.innerHTML = state.players.map((p, idx) => {
+  // innerHTML rebuilds reset the scroll position, which made the list jump. Keep it.
+  const stackEl = document.getElementById('playersStack')!;
+  const stackTop = stackEl.scrollTop;
+
+  stackEl.innerHTML = state.players.map((p, idx) => {
     const isVictim = canPickVictim && victimSet.has(p.id);
     const isTurn = idx === state.turnIndex && state.status !== 'LOBBY';
     const overLimit = p.resourceCount > state.settings.cardDiscardLimit;
@@ -79,6 +83,9 @@ export function renderSidebar(): void {
       state.largestArmyOwner === p.id ? '<span class="tag accent">Largest army</span>' : ''
     ].filter(Boolean).join('');
 
+    const pub = p.publicVp ?? p.vp;
+    const vpHtml = pub !== p.vp ? `${pub}<span class="vp-hidden" title="Your real score. Others see ${pub}.">(${p.vp})</span>` : `${p.vp}`;
+
     return `
     <div class="p-row ${isTurn ? 'is-turn' : ''} ${isVictim ? 'can-rob' : ''}"
       id="playerRow_${esc(p.id)}"
@@ -88,7 +95,7 @@ export function renderSidebar(): void {
         <div class="p-name"><span class="nm">${esc(p.name)}</span></div>
         <div class="p-sub">${tags}</div>
       </div>
-      <div class="p-vp">${p.vp}<small>VP</small></div>
+      <div class="p-vp">${vpHtml}<small>VP</small></div>
       <div class="p-stats">
         <span class="stat ${overLimit ? 'warn' : ''}" title="Resource cards">${uiIcon('cards', 14)}${p.resourceCount}</span>
         <span class="stat dev" title="Development cards">${uiIcon('devcard', 14)}${p.devCardCount}</span>
@@ -98,6 +105,7 @@ export function renderSidebar(): void {
     </div>
   `;
   }).join('');
+  stackEl.scrollTop = stackTop;
 }
 
 export function sendChat(): void {

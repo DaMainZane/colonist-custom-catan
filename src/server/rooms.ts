@@ -32,7 +32,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     lobbyPlayers: [createLobbyPlayer(hostId, hostName, 0, false)],
     board: newBoard(settings),
     game: null,
-    lobbyLog: [{ text: `Room ${code} created. Bots are set to ADVANCED HARD.`, color: '#1565c0' }],
+    lobbyLog: [{ text: `Lobby created. Bots are set to ADVANCED HARD.`, color: '#1565c0' }],
     chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add Hard Bots to start.' }],
     fx: { lastRollHexIds: [], recentProductions: [], recentTransfers: [] },
     startedAt: null,

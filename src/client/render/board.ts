@@ -24,6 +24,10 @@ const knownRoads = new Set<number>();
 const knownBuildings = new Map<number, string>();
 const knownFogHexes = new Set<number>();
 let knownRobberHexId: number | null = null;
+// Tiles that just produced go dark for a moment, then fade back. Keyed so repaints do not restart it.
+const ROLL_DIM_MS = 2000;
+let knownRollKey = '';
+let rollStart = 0;
 const pieceAnimTimestamps = new Map<string, number>();
 const ANIM_DURATION_MS = 420;
 
@@ -103,26 +107,22 @@ function insetPoints(h: any, inset: number): string {
   }).join(' ');
 }
 
-// Number token: circle with the number and probability dots (6 and 8 in the "hot" color).
+// Number token: circle with the number (6 and 8 in the "hot" color).
 function tokenMarkup(n: number): string {
   const hot = n === 6 || n === 8;
-  const pips = Math.max(0, 6 - Math.abs(7 - n));
   const ink = hot ? 'var(--token-hot)' : 'var(--token-ink)';
-  const dots = Array.from({ length: pips }, (_, i) =>
-    `<circle cx="${((i - (pips - 1) / 2) * 5).toFixed(1)}" cy="12" r="1.5"/>`
-  ).join('');
   return `
     <g transform="translate(0,22)">
       <circle r="19" style="fill:var(--token)"/>
-      <text class="token-text" y="4" font-size="21" style="fill:${ink}">${n}</text>
-      <g style="fill:${ink}">${dots}</g>
+      <text class="token-text" y="8" font-size="22" style="fill:${ink}">${n}</text>
     </g>`;
 }
 
 function portMarkup(e: any, v1: any, v2: any, sx: number, sy: number, owned: boolean, isLobbyHost: boolean): string {
   const any = e.port === '3:1';
   const kind: string = any ? 'any' : e.port;
-  const badgeFill = any ? 'var(--surface-3)' : (RES_META[kind]?.color || 'var(--surface-3)');
+  // The 3:1 badge uses the token color so its dark label stays readable in dark mode.
+  const badgeFill = any ? 'var(--token)' : (RES_META[kind]?.color || 'var(--token)');
   const label = any
     ? `<text class="port-text" x="${sx}" y="${sy + 4.5}" font-size="12.5">3:1</text>`
     : `${getBoardIconSvg(kind, sx, sy - 4, 0.52)}<text class="port-text" x="${sx}" y="${sy + 11}" font-size="9">2:1</text>`;
@@ -155,6 +155,13 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   }
 
   const now = performance.now();
+  if (state.phase !== 'ROLL') {
+    const rollKey = `${state.turnCount}|${(state.lastRollHexIds || []).join(',')}|${(state.lastDice || []).join(',')}`;
+    if (rollKey !== knownRollKey) { knownRollKey = rollKey; rollStart = now; }
+  }
+  const rollElapsed = now - rollStart;
+  const showRollDim = rollElapsed < ROLL_DIM_MS;
+  const rollDimStyle = `animation-delay: -${Math.max(0, Math.round(rollElapsed))}ms;`;
   let playedRoadSfx = false;
   let playedSettleSfx = false;
   let playedCitySfx = false;
@@ -211,7 +218,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   updateCameraViewBox();
 
-  let html = '';
+  let html = `<defs>
+    <pattern id="targetStripes" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="14" height="14" style="fill:var(--accent);fill-opacity:0.16" />
+      <rect width="6" height="14" style="fill:var(--accent);fill-opacity:0.5" />
+    </pattern>
+  </defs>`;
 
   // Shallow water around the land (one soft layer, no outlines).
   const coastalHexIds = new Set<number>();
@@ -223,6 +235,11 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     .map((h: any) => h.corners.map((c: any) => `${c.x},${c.y}`).join(' '));
   landPolys.forEach((pts: string) => {
     html += `<polygon points="${pts}" style="fill:var(--sea-shallow);stroke:var(--sea-shallow);stroke-width:46;stroke-linejoin:round" />`;
+  });
+
+  // Sandy beach: a narrow rim under the coastal tiles.
+  landPolys.forEach((pts: string) => {
+    html += `<polygon points="${pts}" style="fill:var(--sand);stroke:var(--sand);stroke-width:15;stroke-linejoin:round" />`;
   });
 
   const robberAnim = getPieceAnimAttrs('robber_move', now);
@@ -260,8 +277,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
             ${hasNumber ? tokenMarkup(h.number) : ''}
           </g>
         </g>
-        ${isRolledHex ? `<polygon class="hex-rolled" points="${inset}" />` : ''}
-        ${canClickRobber ? `<polygon class="hex-target" points="${inset}" />` : ''}
+        ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${inset}" style="${rollDimStyle}" />` : ''}
+        ${canClickRobber ? `<polygon class="hex-target" points="${inset}" style="fill:url(#targetStripes)" />` : ''}
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})">
@@ -596,7 +613,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
         }
 
         cardEl.className = `flying-res-card ${cardClass} ${isSteal ? 'stolen-card-flight' : ''}`;
-        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity ${flightMs}ms ease`;
+        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity 90ms ease-out`;
         cardEl.innerHTML = innerHtml;
         cardEl.style.left = `${startX + i * 7}px`;
         cardEl.style.top = `${startY - i * 5 + curveOffset}px`;
@@ -611,10 +628,11 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
           });
         });
 
+        // Land, then vanish at once (short fade, no lingering).
         setTimeout(() => {
           cardEl.style.opacity = '0';
-          setTimeout(() => cardEl.remove(), 200);
-        }, Math.max(180, flightMs - 40));
+          setTimeout(() => cardEl.remove(), 100);
+        }, flightMs);
       }, d);
     }
   });
@@ -658,7 +676,7 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
       setTimeout(() => {
         const cardEl = document.createElement('div');
         cardEl.className = `flying-res-card card-${prod.resource}`;
-        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity ${flightMs}ms ease`;
+        cardEl.style.transition = `left ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), top ${flightMs}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${flightMs}ms ease, opacity 90ms ease-out`;
         cardEl.innerHTML = getMiniSvg(prod.resource);
         cardEl.style.left = `${screenPt.x - 24 + (i * 8)}px`;
         cardEl.style.top = `${screenPt.y - 33 - (i * 6)}px`;
@@ -677,8 +695,8 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
 
         setTimeout(() => {
           cardEl.style.opacity = '0';
-          setTimeout(() => cardEl.remove(), 200);
-        }, Math.max(180, flightMs - 40));
+          setTimeout(() => cardEl.remove(), 100);
+        }, flightMs);
       }, d);
     }
   });

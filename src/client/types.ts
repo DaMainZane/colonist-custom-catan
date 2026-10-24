@@ -23,6 +23,8 @@ export interface PlayerView {
   citiesLeft: number;
   roadsLeft: number;
   vp: number;
+  /** What other players see (differs from `vp` only for your own hidden VP cards). */
+  publicVp?: number;
   stats?: {
     resourcesEarned: number;
     tradesMade: number;

@@ -57,6 +57,13 @@ export const respondTradeAction: ActionDef = {
     trade.responses[pid] = payload.decision;
     ctx.emit('tradeResponse', { playerId: pid, decision: payload.decision });
 
+    // Everyone declined: close the offer so the trade window goes away.
+    if (payload.decision === 'declined' && Object.values(trade.responses).every(r => r === 'declined')) {
+      g.trade = null;
+      ctx.emit('tradeCancelled', {});
+      return;
+    }
+
     // A bot proposer cannot click "confirm", so the first acceptance completes the trade.
     const proposer = getPlayer(g, trade.fromId)!;
     if (payload.decision === 'accepted' && proposer.isBot) {

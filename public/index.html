@@ -18,17 +18,16 @@
 
   <!-- 1. LANDING -->
   <div id="authScreen">
+    <button class="nav-btn auth-theme" onclick="toggleTheme()" title="Light or dark theme"><span data-icon="theme"></span></button>
     <div class="auth-card">
       <h1 class="brand"><span data-glyph="wood"></span> Colonist Custom</h1>
       <p>Bots, full trading and a custom map painter</p>
       <div class="stack">
         <input id="playerNameInput" class="text-input" type="text" placeholder="Nickname" maxlength="15" value="AvocadoMan" />
         <button class="btn primary" onclick="createRoom()"><span data-icon="plus" data-size="18"></span>Create game</button>
-        <div class="auth-divider">OR JOIN A ROOM</div>
-        <div style="display:flex; gap:8px;">
-          <input id="roomCodeInput" class="text-input" type="text" placeholder="ROOM CODE" style="text-transform:uppercase; text-align:center;" />
-          <button class="btn" style="min-width:84px;" onclick="joinRoom()">Join</button>
-        </div>
+        <!-- Filled from an invite link (?room=CODE). Otherwise Join takes the newest open lobby. -->
+        <input id="roomCodeInput" type="hidden" />
+        <button class="btn" onclick="joinRoom()"><span data-icon="users" data-size="18"></span>Join game</button>
       </div>
     </div>
   </div>
@@ -200,7 +199,7 @@
             </div>
             <div class="rule-group">
               <h4>Special tiles</h4>
-              <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="2" min="0" max="500" onchange="pushSettings()" /></label>
+              <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="0" min="0" max="500" onchange="pushSettings()" /></label>
               <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>
               <label class="field">Fog hexes<input id="setFog" type="number" class="num" value="0" min="0" max="2000" onchange="pushSettings()" /></label>
             </div>

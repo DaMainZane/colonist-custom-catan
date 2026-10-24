@@ -35,6 +35,7 @@
   /* sea and ports */
   --sea: var(--tile-water);
   --sea-shallow: #86b0bf;
+  --sand: #e8d9ab;
   --pier: #9a7b53;
 
   /* neutrals (light) */
@@ -82,6 +83,7 @@
   --ink-dim: #9d988c;
   --sea: #4b7584;
   --sea-shallow: #5d8696;
+  --sand: #a8946a;
   --pier: #b08f63;
   --danger: #e0604a;
   --ok: #6aa664;
@@ -174,6 +176,7 @@ input[type=range] { accent-color: var(--accent); cursor: pointer; }
 .auth-card .stack { display: flex; flex-direction: column; gap: 10px; }
 .auth-card .btn { min-height: 44px; font-size: 14px; }
 .auth-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-dim); margin: 6px 0 2px; }
+.auth-theme { position: absolute; top: 12px; right: 12px; }
 
 /* ---------- Game layout ---------- */
 #gameViewport { display: none; width: 100vw; height: 100vh; position: relative; overflow: hidden; }
@@ -258,7 +261,7 @@ svg#boardSvg:active { cursor: grabbing; }
 .t-wood { background: var(--tile-wood); } .t-brick { background: var(--tile-brick); } .t-sheep { background: var(--tile-sheep); }
 .t-wheat { background: var(--tile-wheat); } .t-ore { background: var(--tile-ore); } .t-gold { background: var(--tile-gold); }
 .t-desert { background: var(--tile-desert); } .t-fog { background: var(--tile-fog); } .t-water { background: var(--sea); color: #fff; }
-.t-any { background: var(--surface-3); color: var(--token-ink); }
+.t-any { background: var(--token); color: var(--token-ink); }
 
 .rules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .rule-group { display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); border-radius: var(--r); padding: 10px 12px; }
@@ -305,8 +308,8 @@ svg#boardSvg:active { cursor: grabbing; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .trade-rows { display: flex; flex-direction: column; gap: 8px; }
-.trade-row { display: flex; align-items: center; gap: 10px; min-height: var(--card-h); }
-.trade-row-label { width: 54px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+.trade-row { display: flex; align-items: center; gap: 10px; min-height: var(--card-h); flex-wrap: nowrap; }
+.trade-row-label { flex-shrink: 0; width: 54px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
 .trade-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .act-circle {
   width: 40px; height: 40px; border-radius: 50%; border: 0; color: #fff; cursor: pointer;
@@ -423,7 +426,7 @@ svg#boardSvg:active { cursor: grabbing; }
   position: fixed; width: var(--card-w); height: var(--card-h); border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center; z-index: 999; pointer-events: none;
   box-shadow: var(--shadow);
-  transition: left 0.72s cubic-bezier(0.22, 1, 0.36, 1), top 0.72s cubic-bezier(0.22, 1, 0.36, 1), transform 0.72s ease, opacity 0.72s ease;
+  transition: left 0.72s cubic-bezier(0.22, 1, 0.36, 1), top 0.72s cubic-bezier(0.22, 1, 0.36, 1), transform 0.72s ease, opacity 0.09s ease-out;
 }
 .flying-res-card svg.glyph { width: 30px; height: 30px; }
 .stolen-card-flight { box-shadow: 0 0 0 3px var(--danger), var(--shadow) !important; }
@@ -495,8 +498,9 @@ svg#boardSvg:active { cursor: grabbing; }
   width: 308px; height: 100vh; background: var(--bg); padding: 8px; display: flex; flex-direction: column;
   gap: 8px; z-index: 35;
 }
-.players-stack { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 52%; flex: 0 1 auto; }
+.players-stack { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 52%; flex: 0 1 auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .p-row {
+  flex-shrink: 0;
   background: var(--surface); border-radius: var(--r); padding: 8px 10px; display: grid;
   grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; position: relative;
   border-left: 3px solid transparent; transition: background 0.15s;
@@ -510,6 +514,7 @@ svg#boardSvg:active { cursor: grabbing; }
 .p-sub { font-size: 11px; color: var(--ink-dim); display: flex; gap: 6px; flex-wrap: wrap; min-height: 14px; }
 .p-vp { font-weight: 700; font-size: 20px; line-height: 1; text-align: right; }
 .p-vp small { display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-dim); margin-top: 2px; }
+.p-vp .vp-hidden { font-size: 13px; color: var(--ink-dim); margin-left: 2px; }
 .p-stats { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
 .stat {
   display: inline-flex; align-items: center; gap: 4px; background: var(--surface-3); border-radius: 6px;
@@ -543,27 +548,40 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 
 /* ---------- Board (SVG) ---------- */
-.hex-rolled { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linejoin: round; pointer-events: none; }
+/* Tiles that just produced go dark for about 2 s, then fade back (timing is driven from render/board.ts). */
+.hex-rolled { fill: #000; fill-opacity: 0; stroke: none; pointer-events: none; animation: rolledDim 2s ease-out both; }
+@keyframes rolledDim { 0%, 60% { fill-opacity: 0.5; } 100% { fill-opacity: 0; } }
+/* Robber targets: striped fill (pattern is defined in the board SVG) plus a pulsing dashed edge. */
 .hex-target {
-  fill: var(--accent); fill-opacity: 0.14; stroke: var(--accent); stroke-width: 4; stroke-dasharray: 10 6;
+  fill-opacity: 0.9; stroke: var(--accent); stroke-width: 5; stroke-dasharray: 10 6;
   stroke-linejoin: round; cursor: pointer; transition: fill-opacity 0.12s;
+  animation: targetPulse 1.4s ease-in-out infinite;
 }
-.hex-target:hover { fill-opacity: 0.32; }
+.hex-target:hover { fill-opacity: 1; stroke-width: 7; animation: none; }
+@keyframes targetPulse { 0%, 100% { stroke-opacity: 0.6; } 50% { stroke-opacity: 1; } }
 .port-pier { stroke: var(--pier); stroke-width: 4; stroke-linecap: round; fill: none; }
 .port-badge { stroke: var(--piece-rim); stroke-width: 2; }
 .port-ring { fill: none; stroke: var(--accent); stroke-width: 3; }
 .port-text { fill: var(--token-ink); font-weight: 800; text-anchor: middle; }
 .token-text { font-weight: 700; text-anchor: middle; }
 .spot-pulse {
-  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; cursor: pointer;
+  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; cursor: pointer; filter: drop-shadow(0 0 5px var(--accent));
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
 .spot-pulse:hover { opacity: 1; animation: none; transform: scale(1.15); }
 @keyframes spotPulse { 0%, 100% { opacity: 0.78; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1.08); } }
-.road-spot-line { stroke: var(--accent); stroke-opacity: 0.35; stroke-width: 12; stroke-linecap: round; }
-.road-spot-dot { fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; }
+.road-spot-line { stroke: var(--accent); stroke-opacity: 0.35; stroke-width: 12; stroke-linecap: round; animation: roadGlow 1.6s ease-in-out infinite; }
+.road-spot-dot {
+  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; filter: drop-shadow(0 0 5px var(--accent));
+  transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
+}
+@keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
 .target-ring { fill: none; stroke-width: 3; stroke-dasharray: 5 3; }
-.target-ring.upgrade { stroke: var(--accent); }
+.target-ring.upgrade {
+  stroke: var(--accent); filter: drop-shadow(0 0 5px var(--accent));
+  transform-box: fill-box; transform-origin: center; animation: ringThrob 1.4s ease-in-out infinite;
+}
+@keyframes ringThrob { 0%, 100% { opacity: 0.55; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.12); } }
 .target-ring.rob { stroke: var(--danger); }
 
 .piece-drop-anim { transform-origin: 0 0; animation: pieceDrop 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both; }

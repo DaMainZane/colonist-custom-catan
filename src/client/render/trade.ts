@@ -35,7 +35,7 @@ export function renderActiveTradeModal(me: any): void {
       </div>`;
   }).join('');
 
-  // Rows are shown from my point of view: first what I give, then what I get.
+  // Rows are shown from my point of view, same order as the trade sheet: what I get on top, what I give below.
   const giveHtml = stacksHtml(isMyOffer ? t.offer : t.request);
   const getHtml = stacksHtml(isMyOffer ? t.request : t.offer);
 
@@ -62,12 +62,12 @@ export function renderActiveTradeModal(me: any): void {
     <div class="trade-offer-body">
       <div class="trade-rows">
         <div class="trade-row">
-          <span class="trade-row-label">You give</span>
-          ${giveHtml}
-        </div>
-        <div class="trade-row">
           <span class="trade-row-label">You get</span>
           ${getHtml}
+        </div>
+        <div class="trade-row">
+          <span class="trade-row-label">You give</span>
+          ${giveHtml}
         </div>
       </div>
       <div class="trade-actions">${actionsHtml}</div>
