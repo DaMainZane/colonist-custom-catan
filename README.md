@@ -86,6 +86,6 @@ Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `
 
 ## Design
 
-The new UI direction is documented in [`Design UI Philosophy.md`](Design%20UI%20Philosophy.md): a Lichess-style shell where the board is the hero, flat geometric Mini Metro-style resource glyphs, and a muted Dorfromantik-style color palette, all driven by CSS design tokens. It is built in Step 4 (UI and phone).
+The new UI direction is documented in [`Design UI Philosophy.md`](Design%20UI%20Philosophy.md): a Lichess-style shell where the board is the hero, flat Mini Metro-style resource pictograms (recognizable shapes, not abstract ones) with prominent pieces, and a muted Dorfromantik-style color palette, all driven by CSS design tokens. It is built in Step 4 (UI and phone).
 
 Full README (architecture, modding, hosting) comes later in the plan.

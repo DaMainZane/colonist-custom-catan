@@ -60,8 +60,10 @@ Testing between sub-steps skipped on purpose. Run `npm run typecheck` before 2f.
 - Live bot games in the browser worked, including the gold and fog presets.
 
 ## Design direction (decided 2026-10-24)
-- New UI direction written up in `Design UI Philosophy.md`: Lichess shell (board is the hero, UI recedes) + Mini Metro assets (flat geometric glyphs) + Dorfromantik colors (muted, warm, matte). Dieter Rams monochrome style rejected.
+- New UI direction written up in `Design UI Philosophy.md`: Lichess shell (board is the hero, UI recedes) + Mini Metro-style flat assets drawn as recognizable pictograms + Dorfromantik colors (muted, warm, matte). Dieter Rams monochrome style rejected.
 - Findings on the current client: Colonist-style skin (gradients, 3D buttons, black outlines, illustrated icons, emoji avatars), with hex colors hardcoded across `styles.css`, `constants.ts`, `icons.ts` and `render/board.ts`. A design-token (CSS variable) layer comes first.
+- Icons revised after previews: first draft was abstract geometric glyphs, rejected as not recognizable. Approved: flat pictograms (pine tree, brick wall, sheep, wheat stalk, rock, ingots, cactus, cloud), and larger pieces (road bar, house, tower-plus-house city) with a light rim so they stand out on every tile color. Details and palette in `Design UI Philosophy.md`.
+- Open: piece rim may change from light to black or gray, to be compared in the next preview.
 - Built in Step 4 (UI and phone together). No client code changed yet.
 
 ## Next
