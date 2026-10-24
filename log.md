@@ -24,7 +24,7 @@
 
 ## Remaining
 - Multiple trade popups (time limit, newest on top)
-- Bot difficulty tiers (Main, Secondary, Overload)
+- Bot difficulty tiers (Main, Secondary, Overload) and bot addon system: design in `Bot AI Design.md`
 - Big-map optimization
 - New map generation types (islands, archipelago, lake, realistic)
 - Continent map shapes (heat map)
