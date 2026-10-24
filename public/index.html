@@ -140,7 +140,7 @@
         <div id="lobbyTabMap" class="dock-body">
           <div class="tool-row">
             <span class="tool-label">Tiles</span>
-            <button class="brush-btn swatch t-wood active" title="Wood" onclick="setBrush('terrain','wood',this)"><span data-glyph="wood"></span></button>
+            <button class="brush-btn swatch t-wood" title="Wood" onclick="setBrush('terrain','wood',this)"><span data-glyph="wood"></span></button>
             <button class="brush-btn swatch t-brick" title="Brick" onclick="setBrush('terrain','brick',this)"><span data-glyph="brick"></span></button>
             <button class="brush-btn swatch t-sheep" title="Sheep" onclick="setBrush('terrain','sheep',this)"><span data-glyph="sheep"></span></button>
             <button class="brush-btn swatch t-wheat" title="Wheat" onclick="setBrush('terrain','wheat',this)"><span data-glyph="wheat"></span></button>
@@ -230,6 +230,7 @@
 
       <!-- Board -->
       <svg id="boardSvg" viewBox="-500 -450 1000 900"></svg>
+      <div id="roadHoverTooltip" class="road-hover-tooltip"></div>
 
       <!-- Bottom-left sheet and trade confirm buttons -->
       <div id="inlineDrawerWrap">

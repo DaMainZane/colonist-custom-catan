@@ -14,8 +14,9 @@ export let camZoom = 1;
 export let camPanX = 0;
 export let camPanY = 0;
 export let isPanning = false;
+export let hasDraggedMap = false;
 
-export const activeBrush = { type: 'terrain', value: 'wood' };
+export const activeBrush = { type: '', value: '' };
 export const panStart = { x: 0, y: 0 };
 
 export const tradeGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
@@ -32,6 +33,7 @@ export function setHideVictoryOverlay(v: boolean): void { hideVictoryOverlay = v
 export function setCamZoom(v: number): void { camZoom = v; }
 export function setCamPan(x: number, y: number): void { camPanX = x; camPanY = y; }
 export function setIsPanning(v: boolean): void { isPanning = v; }
+export function setHasDraggedMap(v: boolean): void { hasDraggedMap = v; }
 
 export function clearRes(r: Resources): void {
   for (const k of Object.keys(r)) r[k] = 0;

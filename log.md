@@ -87,6 +87,29 @@ Testing between sub-steps skipped on purpose. Run `npm run typecheck` before 2f.
 - Bank trade shows a toast when the bank lacks the wanted resource (`executeBankTrade` in `drawer.ts`).
 - Needs a check: `npm run typecheck`, `npm test`, then one live game.
 
+## Backlog pass 3 (2026-10-24, easiest first)
+- Fixed map panning when pressing on tiles (`main.ts`, `store.ts`, `render/board.ts`): left-click dragging anywhere on the board (tiles, tokens, pieces, sand, or ocean) now pans the camera smoothly while preserving single-click actions (`hasDraggedMap` threshold). In the lobby, no brush is active by default (and clicking an active brush toggles it off), so dragging on tiles moves the map unless actively painting with a brush.
+- Sand border under all land tiles (`render/board.ts`): `--sea-shallow` and `--sand` base layers now render under all land tiles (`h.type !== 'water'`), filling inner inter-tile gaps with sand as well as the coastline.
+- Darker trim border on tiles (`styles.css`, `constants.ts`, `render/board.ts`): added `--trim-*` tokens (`--trim-wood`, `--trim-brick`, `--trim-sheep`, `--trim-wheat`, `--trim-ore`, `--trim-desert`, `--trim-gold`, `--trim-fog`) and rendered every land hex with a rounded darker border trim.
+- Trading Port UI rework (`portMarkup` in `render/board.ts`, `styles.css`): aligned ports strictly to the coastal hexagon edge using edge tangent `T` and outward normal `N`, with a timber dock apron, cross-planks, thick rimmed piers, mooring posts, and a double-ringed port badge with a `2:1` / `3:1` pill.
+- Auto-connecting roads + hover longest-stretch highlight & counter (`render/board.ts`, `styles.css`, `index.html`):
+  - Roads owned by the same player now extend to shared vertices (when unblocked by opponent buildings) and render in a unified rim layer + fill layer so connected segments merge into one continuous road.
+  - Hovering over any road highlights its connected network and pulses the longest continuous road stretch on the board while showing a floating tooltip with the player's longest stretch and total connected road count.
+- Epic animation for getting/taking Longest Road and Largest Army (`triggerAwardAnimation` in `render/board.ts`, `playAwardSound` in `audio.ts`, `main.ts`, `styles.css`): animated centerpiece banner with spinning rays, road/sword emblem, claimed vs. stolen callout, and brass fanfare when Longest Road or Largest Army changes hands.
+- Bot trash talk and dialogues (`src/server/bots/dialogue.ts`, `src/server/game.ts`): bots post contextual chat lines on 7-rolls, steals/getting robbed, Knight/Monopoly plays, city upgrades, trade completions, claiming/stealing Longest Road or Largest Army, and winning.
+
+## Remaining backlog (next passes)
+- [ ] Counter trade mechanic (inside the trade UI popup from opponent)
+- [ ] Allow multiple trade offer UI popups to exist (with time limit, newest offer on top pushing older trades down)
+- [ ] Make the host the only one that can edit (others can see and suggest using cursor and laser drag mechanic)
+- [ ] Bot difficulty tiers (Main - Secondary - Overload, GTFO-style)
+- [ ] Optimization for bigger maps
+- [ ] New map generation types (separate islands, archipelago, lake within land, realistic mountain ranges and resource clumps)
+- [ ] Map shape (continent shapes using heat map algorithm)
+- [ ] Custom presets (create, edit, removable vs. built-in unremovable with delete confirmation prompt)
+- [ ] Setting and Navigation UI rework
+- [ ] Board UI rework (buttons, chat, resources, split by use case)
+
 ## Next
 - Delete `src/server-legacy/` (and `legacy/` when no longer wanted as reference), then close out Step 2.
 - Start Step 3 (identity and persistence) only when John says so.

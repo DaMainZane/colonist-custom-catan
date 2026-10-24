@@ -177,6 +177,17 @@ export function playBuyDevCardSound(): void {
   });
 }
 
+// Triumphant brass fanfare when claiming or stealing Longest Road / Largest Army
+export function playAwardSound(isStolen = false): void {
+  if (!ensureAudio()) return;
+  playNoiseBurst(0.08, 900, 1.6, 0.14, 0);
+  const notes = isStolen ? [392.0, 466.16, 587.33, 783.99] : [392.0, 493.88, 587.33, 783.99];
+  notes.forEach((f, idx) => {
+    playPitchSweep(f * 0.99, f, 0.22, 'triangle', 0.14, idx * 0.085);
+    playPitchSweep(f * 0.5, f * 0.5, 0.24, 'sawtooth', 0.06, idx * 0.085);
+  });
+}
+
 export function toggleSound(): void {
   setSoundOn(!soundOn);
   document.getElementById('btnToggleSound')!.innerHTML = uiIcon(soundOn ? 'sound' : 'mute');

@@ -4,13 +4,15 @@ import { hydrateIcons } from './icons';
 import { toggleTheme, showToast } from './ui';
 import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
-  setState, setIsMouseDown, setIsPanning, setCamZoom, setCamPan, setDrawerMode,
+  activeBrush, hasDraggedMap,
+  setState, setIsMouseDown, setIsPanning, setHasDraggedMap, setCamZoom, setCamPan, setDrawerMode,
   setHideVictoryOverlay, clearRes
 } from './store';
 import { renderAll } from './render/index';
 import {
   rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations, triggerCardTransferAnimations,
-  onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
+  triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
+  onRoadHover, onRoadMove, onRoadLeave
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade } from './render/trade';
 import { onClickHandResource, onClickDevCard } from './render/hand';
@@ -34,7 +36,8 @@ Object.assign(window as any, {
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
-  onHexInteract, onHexEnter, onEdgeInteract, clickVertex, clickEdge
+  onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
+  onRoadHover, onRoadMove, onRoadLeave
 });
 
 function animateDice(sum?: number): void {
@@ -72,6 +75,9 @@ socket.on('errorMsg', (msg: string) => showToast(msg));
 socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
   const wasGameOver = state?.status === 'GAMEOVER';
+  const wasLobby = !state || state.status === 'LOBBY';
+  const prevLongestRoad = state?.longestRoadOwner || null;
+  const prevLargestArmy = state?.largestArmyOwner || null;
   const prevMe = state?.players?.find((p: any) => p.id === socket.id);
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
@@ -84,6 +90,19 @@ socket.on('gameState', (newState: any) => {
     playTone(523, 0.12);
     setTimeout(() => playTone(659, 0.12), 130);
     setTimeout(() => playTone(784, 0.22), 260);
+  }
+
+  if (!wasLobby && state.status !== 'LOBBY') {
+    if (state.longestRoadOwner && state.longestRoadOwner !== prevLongestRoad) {
+      const newOwner = state.players.find(p => p.id === state.longestRoadOwner);
+      const oldOwner = prevLongestRoad ? state.players.find(p => p.id === prevLongestRoad) : null;
+      triggerAwardAnimation('longestRoad', newOwner, oldOwner);
+    }
+    if (state.largestArmyOwner && state.largestArmyOwner !== prevLargestArmy) {
+      const newOwner = state.players.find(p => p.id === state.largestArmyOwner);
+      const oldOwner = prevLargestArmy ? state.players.find(p => p.id === prevLargestArmy) : null;
+      triggerAwardAnimation('largestArmy', newOwner, oldOwner);
+    }
   }
 
   const diceSum = (state.lastDice?.[0] || 0) + (state.lastDice?.[1] || 0);
@@ -120,6 +139,8 @@ function init(): void {
   if (params.get('room')) (document.getElementById('roomCodeInput') as HTMLInputElement).value = params.get('room')!;
 
   const stage = document.getElementById('boardStage')!;
+  const panOrigin = { x: 0, y: 0 };
+
   stage.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
     if (!state || !state.board) return;
@@ -150,9 +171,23 @@ function init(): void {
   }, { passive: false });
 
   stage.addEventListener('mousedown', (e: MouseEvent) => {
-    const isOceanOrStage = e.target === stage || (e.target as Element)?.id === 'boardSvg';
-    const canLeftPan = state && (state.status !== 'LOBBY' || isOceanOrStage);
-    if (e.button === 2 || e.button === 1 || e.altKey || (e.button === 0 && isOceanOrStage && canLeftPan)) {
+    const target = e.target as Element | null;
+    // Ignore clicks on floating UI panels inside boardStage (only pan when pressing on the SVG board or stage)
+    if (target && target !== stage && !target.closest('#boardSvg')) return;
+
+    const isLobbyPaintTarget = Boolean(
+      state &&
+      state.status === 'LOBBY' &&
+      state.hostId === socket.id &&
+      activeBrush.type &&
+      target?.closest('[data-paintable="1"]')
+    );
+
+    setHasDraggedMap(false);
+    panOrigin.x = e.clientX;
+    panOrigin.y = e.clientY;
+
+    if (e.button === 2 || e.button === 1 || e.altKey || (e.button === 0 && !isLobbyPaintTarget)) {
       setIsPanning(true);
       panStart.x = e.clientX;
       panStart.y = e.clientY;
@@ -162,6 +197,9 @@ function init(): void {
   });
   window.addEventListener('mousemove', (e: MouseEvent) => {
     if (isPanning && state && state.board) {
+      if (!hasDraggedMap && Math.hypot(e.clientX - panOrigin.x, e.clientY - panOrigin.y) > 4) {
+        setHasDraggedMap(true);
+      }
       const svg = document.getElementById('boardSvg')!;
       const rect = svg.getBoundingClientRect();
       const { contentW, contentH } = getBoardBounds();
@@ -175,6 +213,13 @@ function init(): void {
     }
   });
   window.addEventListener('mouseup', () => { setIsMouseDown(false); setIsPanning(false); });
+  stage.addEventListener('click', (e: MouseEvent) => {
+    if (hasDraggedMap) {
+      e.stopPropagation();
+      e.preventDefault();
+      setHasDraggedMap(false);
+    }
+  }, true);
   stage.addEventListener('contextmenu', e => e.preventDefault());
 }
 

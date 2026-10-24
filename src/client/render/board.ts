@@ -2,7 +2,7 @@
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
-import { getBoardIconSvg, getMiniSvg, getDevSvg, settlementMarkup, cityMarkup, robberMarkup } from '../icons';
+import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, robberMarkup } from '../icons';
 import {
   playTone,
   playPlaceRoadSound,
@@ -12,13 +12,15 @@ import {
   playStealCardSound,
   playDiscardSound,
   playTradeSound,
-  playBuyDevCardSound
+  playBuyDevCardSound,
+  playAwardSound
 } from '../audio';
 import { socket } from '../socket';
 import {
-  state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, setBuildModeValue,
+  state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap, setBuildModeValue,
   setCamZoom, setCamPan, getClientSpeed
 } from '../store';
+import { esc } from '../util';
 
 const knownRoads = new Set<number>();
 const knownBuildings = new Map<number, string>();
@@ -118,20 +120,69 @@ function tokenMarkup(n: number): string {
     </g>`;
 }
 
-function portMarkup(e: any, v1: any, v2: any, sx: number, sy: number, owned: boolean, isLobbyHost: boolean): string {
+// Trading port dock strictly aligned to the coastal hex edge (tangent T along v1->v2, outward normal N).
+function portMarkup(e: any, v1: any, v2: any, h: any, owned: boolean, isLobbyHost: boolean): string {
+  const mx = (v1.x + v2.x) / 2;
+  const my = (v1.y + v2.y) / 2;
+  const dx = mx - h.x;
+  const dy = my - h.y;
+  const nLen = Math.hypot(dx, dy) || 1;
+  const nx = dx / nLen;
+  const ny = dy / nLen;
+
+  const ex = v2.x - v1.x;
+  const ey = v2.y - v1.y;
+  const eLen = Math.hypot(ex, ey) || 1;
+  const tx = ex / eLen;
+  const ty = ey / eLen;
+
+  // Two sturdy wooden piers anchored along the hex edge near v1 and v2, extending perpendicular to the hex face
+  const b1x = mx - tx * 28 + nx * 2.5;
+  const b1y = my - ty * 28 + ny * 2.5;
+  const b2x = mx + tx * 28 + nx * 2.5;
+  const b2y = my + ty * 28 + ny * 2.5;
+
+  const t1x = mx - tx * 15 + nx * 35;
+  const t1y = my - ty * 15 + ny * 35;
+  const t2x = mx + tx * 15 + nx * 35;
+  const t2y = my + ty * 15 + ny * 35;
+
+  // Cross-planks parallel to the hex edge
+  const planks = [11, 19, 27].map(d => {
+    const f = (d - 2.5) / (35 - 2.5);
+    const halfW = 28 * (1 - f) + 15 * f;
+    const px = mx + nx * d;
+    const py = my + ny * d;
+    return `<line class="port-plank" x1="${(px - tx * halfW).toFixed(1)}" y1="${(py - ty * halfW).toFixed(1)}" x2="${(px + tx * halfW).toFixed(1)}" y2="${(py + ty * halfW).toFixed(1)}" />`;
+  }).join('');
+
+  const sx = mx + nx * 42;
+  const sy = my + ny * 42;
+
   const any = e.port === '3:1';
   const kind: string = any ? 'any' : e.port;
-  // The 3:1 badge uses the token color so its dark label stays readable in dark mode.
   const badgeFill = any ? 'var(--token)' : (RES_META[kind]?.color || 'var(--token)');
+  const badgeBorder = any ? 'var(--pier-dark)' : (RES_META[kind]?.border || 'var(--pier-dark)');
   const label = any
-    ? `<text class="port-text" x="${sx}" y="${sy + 4.5}" font-size="12.5">3:1</text>`
-    : `${getBoardIconSvg(kind, sx, sy - 4, 0.52)}<text class="port-text" x="${sx}" y="${sy + 11}" font-size="9">2:1</text>`;
+    ? `<text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 4.5).toFixed(1)}" font-size="13">3:1</text>`
+    : `${getBoardIconSvg(kind, Number(sx.toFixed(1)), Number((sy - 4.5).toFixed(1)), 0.56)}
+       <rect class="port-ratio-pill" x="${(sx - 13).toFixed(1)}" y="${(sy + 5).toFixed(1)}" width="26" height="12" rx="6" />
+       <text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 14).toFixed(1)}" font-size="8.8">2:1</text>`;
+
+  const canPaintPort = isLobbyHost && activeBrush.type === 'port';
   return `
-    <g onclick="${isLobbyHost ? `onEdgeInteract(${e.id})` : ''}" style="${isLobbyHost ? 'cursor:pointer' : ''}">
-      <line class="port-pier" x1="${v1.x}" y1="${v1.y}" x2="${sx}" y2="${sy}" />
-      <line class="port-pier" x1="${v2.x}" y1="${v2.y}" x2="${sx}" y2="${sy}" />
-      ${owned ? `<circle class="port-ring" cx="${sx}" cy="${sy}" r="21" />` : ''}
-      <circle class="port-badge" cx="${sx}" cy="${sy}" r="17" style="fill:${badgeFill}" />
+    <g data-paintable="${canPaintPort ? '1' : ''}" onclick="${canPaintPort ? `onEdgeInteract(${e.id})` : ''}" style="${canPaintPort ? 'cursor:pointer' : ''}">
+      <polygon class="port-dock-apron" points="${b1x.toFixed(1)},${b1y.toFixed(1)} ${b2x.toFixed(1)},${b2y.toFixed(1)} ${t2x.toFixed(1)},${t2y.toFixed(1)} ${t1x.toFixed(1)},${t1y.toFixed(1)}" />
+      ${planks}
+      <line class="port-pier-rim" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" />
+      <line class="port-pier-rim" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" />
+      <line class="port-pier" x1="${b1x.toFixed(1)}" y1="${b1y.toFixed(1)}" x2="${t1x.toFixed(1)}" y2="${t1y.toFixed(1)}" />
+      <line class="port-pier" x1="${b2x.toFixed(1)}" y1="${b2y.toFixed(1)}" x2="${t2x.toFixed(1)}" y2="${t2y.toFixed(1)}" />
+      <circle class="port-post" cx="${b1x.toFixed(1)}" cy="${b1y.toFixed(1)}" r="4.2" />
+      <circle class="port-post" cx="${b2x.toFixed(1)}" cy="${b2y.toFixed(1)}" r="4.2" />
+      ${owned ? `<circle class="port-ring" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="24" />` : ''}
+      <circle class="port-badge-outer" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="21" />
+      <circle class="port-badge" cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="17.5" style="fill:${badgeFill};stroke:${badgeBorder}" />
       ${label}
     </g>`;
 }
@@ -225,38 +276,36 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     </pattern>
   </defs>`;
 
-  // Shallow water around the land (one soft layer, no outlines).
-  const coastalHexIds = new Set<number>();
-  for (const e of edges) {
-    if (e.hexIds.length === 1) coastalHexIds.add(e.hexIds[0]);
-  }
-  const landPolys = hexes
-    .filter((h: any) => h.type !== 'water' && coastalHexIds.has(h.id))
+  // Shallow water and sandy border under ALL land tiles (not only outer coastal tiles).
+  const allLandPolys = hexes
+    .filter((h: any) => h.type !== 'water')
     .map((h: any) => h.corners.map((c: any) => `${c.x},${c.y}`).join(' '));
-  landPolys.forEach((pts: string) => {
+  allLandPolys.forEach((pts: string) => {
     html += `<polygon points="${pts}" style="fill:var(--sea-shallow);stroke:var(--sea-shallow);stroke-width:46;stroke-linejoin:round" />`;
   });
 
-  // Sandy beach: a narrow rim under the coastal tiles.
-  landPolys.forEach((pts: string) => {
-    html += `<polygon points="${pts}" style="fill:var(--sand);stroke:var(--sand);stroke-width:15;stroke-linejoin:round" />`;
+  // Sandy beach under all land tiles so both the coastline and inner tile gaps show sand.
+  allLandPolys.forEach((pts: string) => {
+    html += `<polygon points="${pts}" style="fill:var(--sand);stroke:var(--sand);stroke-width:16;stroke-linejoin:round" />`;
   });
 
   const robberAnim = getPieceAnimAttrs('robber_move', now);
+  const canPaintHex = isLobbyHost && (activeBrush.type === 'terrain' || activeBrush.type === 'number' || activeBrush.type === 'robber');
 
   for (const h of hexes) {
     if (h.type === 'water') {
       if (state.status === 'LOBBY') {
         const pts = h.corners.map((c: any) => `${c.x},${c.y}`).join(' ');
         html += `
-          <polygon points="${pts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;stroke-dasharray:6 4;cursor:pointer"
+          <polygon data-paintable="${canPaintHex ? '1' : ''}" points="${pts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;stroke-dasharray:6 4;cursor:${canPaintHex ? 'pointer' : 'grab'}"
             onmousedown="onHexInteract(${h.id}, event)" onmouseenter="onHexEnter(${h.id}, event)" />
         `;
       }
       continue;
     }
 
-    const inset = insetPoints(h, 6);
+    const tilePoly = insetPoints(h, 5.5);
+    const innerPoly = insetPoints(h, 7.5);
     const isFog = !!h.fog || h.type === 'fog';
     const tileType = isFog ? 'fog' : h.type;
     const meta = RES_META[tileType] || RES_META.desert;
@@ -267,18 +316,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     const glyph = hasNumber ? getBoardIconSvg(tileType, 0, -24, 1.45) : getBoardIconSvg(tileType, 0, 0, 1.9);
 
     html += `
-      <g style="${isLobbyHost || canClickRobber ? 'cursor:pointer' : ''}"
+      <g data-paintable="${canPaintHex ? '1' : ''}"
+         style="${canPaintHex || canClickRobber ? 'cursor:pointer' : ''}"
          onmousedown="onHexInteract(${h.id}, event)"
+         onclick="onHexClick(${h.id}, event)"
          onmouseenter="onHexEnter(${h.id}, event)">
-        <polygon points="${inset}" style="fill:${meta.color};stroke:${meta.color};stroke-width:6;stroke-linejoin:round" />
+        <polygon points="${tilePoly}" style="fill:${meta.color};stroke:${meta.border};stroke-width:4;stroke-linejoin:round" />
         <g transform="translate(${h.x}, ${h.y})">
           <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
             ${glyph}
             ${hasNumber ? tokenMarkup(h.number) : ''}
           </g>
         </g>
-        ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${inset}" style="${rollDimStyle}" />` : ''}
-        ${canClickRobber ? `<polygon class="hex-target" points="${inset}" style="fill:url(#targetStripes)" />` : ''}
+        ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${innerPoly}" style="${rollDimStyle}" />` : ''}
+        ${canClickRobber ? `<polygon class="hex-target" points="${innerPoly}" style="fill:url(#targetStripes)" />` : ''}
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})">
@@ -292,7 +343,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     `;
   }
 
-  // Ports (the ones you own are ringed in the accent color).
+  // Ports (aligned with hexagon edge; owned ones are ringed in the accent color).
   for (const e of edges) {
     if (e.hexIds.length !== 1) continue;
     const v1 = vertices[e.v1], v2 = vertices[e.v2];
@@ -300,45 +351,80 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
     const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
     const h = hexes[e.hexIds[0]];
-    const dx = mx - h.x, dy = my - h.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const sx = mx + (dx / len) * 44;
-    const sy = my + (dy / len) * 44;
 
     if (e.port) {
       const owned = [v1, v2].some((v: any) => v.building && v.building.owner === socket.id);
-      html += portMarkup(e, v1, v2, sx, sy, owned, isLobbyHost);
+      html += portMarkup(e, v1, v2, h, owned, isLobbyHost);
     } else if (isLobbyHost && activeBrush.type === 'port') {
       html += `
-        <circle cx="${mx}" cy="${my}" r="9" style="fill:rgba(255,255,255,0.5);stroke:var(--accent);stroke-width:2;cursor:pointer"
+        <circle data-paintable="1" cx="${mx}" cy="${my}" r="9" style="fill:rgba(255,255,255,0.5);stroke:var(--accent);stroke-width:2;cursor:pointer"
           onclick="onEdgeInteract(${e.id})" />
       `;
     }
   }
 
-  // Roads and road spots
+  // Roads: auto-connect adjacent roads of the same player into one continuous rimmed road.
+  let roadRimsHtml = '';
+  let roadBodiesHtml = '';
+  let roadHitsHtml = '';
+  let roadSpotsHtml = '';
+
   for (const e of edges) {
     const v1 = vertices[e.v1], v2 = vertices[e.v2];
     if (!v1 || !v2) continue;
     if (e.road) {
-      const owner = state.players.find(p => p.id === e.road);
+      const ownerId = e.road;
+      const owner = state.players.find(p => p.id === ownerId);
+      const col = owner?.color || '#888';
+
+      // Extend endpoint to vertex if another road of the same player meets there (and no enemy building blocks it)
+      const blocked1 = v1.building && v1.building.owner !== ownerId;
+      const blocked2 = v2.building && v2.building.owner !== ownerId;
+      const conn1 = !blocked1 && (
+        (v1.building && v1.building.owner === ownerId) ||
+        v1.edgeIds.some((oe: number) => oe !== e.id && edges[oe]?.road === ownerId)
+      );
+      const conn2 = !blocked2 && (
+        (v2.building && v2.building.owner === ownerId) ||
+        v2.edgeIds.some((oe: number) => oe !== e.id && edges[oe]?.road === ownerId)
+      );
+
+      const t1 = conn1 ? 0.0 : 0.08;
+      const t2 = conn2 ? 1.0 : 0.92;
+      const x1 = v1.x + (v2.x - v1.x) * t1;
+      const y1 = v1.y + (v2.y - v1.y) * t1;
+      const x2 = v1.x + (v2.x - v1.x) * t2;
+      const y2 = v1.y + (v2.y - v1.y) * t2;
+
       const mx = (v1.x + v2.x) / 2;
       const my = (v1.y + v2.y) / 2;
-      const hx = ((v2.x - v1.x) / 2) * 0.84;
-      const hy = ((v2.y - v1.y) / 2) * 0.84;
       const anim = getPieceAnimAttrs(`road_${e.id}`, now);
-      html += `
+
+      roadRimsHtml += `
         <g transform="translate(${mx}, ${my})">
           ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
           <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            <line x1="${-hx}" y1="${-hy}" x2="${hx}" y2="${hy}" style="stroke:var(--piece-rim);stroke-width:11;stroke-linecap:round" />
-            <line x1="${-hx}" y1="${-hy}" x2="${hx}" y2="${hy}" style="stroke:${owner?.color || '#888'};stroke-width:8;stroke-linecap:round" />
+            <line x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
+              style="stroke:var(--piece-rim);stroke-width:12;stroke-linecap:round" />
           </g>
-        </g>
-      `;
+        </g>`;
+
+      roadBodiesHtml += `
+        <g transform="translate(${mx}, ${my})">
+          <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+            <line x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
+              style="stroke:${col};stroke-width:8;stroke-linecap:round" />
+          </g>
+        </g>`;
+
+      roadHitsHtml += `
+        <line class="road-hit" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+          onmouseenter="onRoadHover(${e.id}, event)"
+          onmousemove="onRoadMove(event)"
+          onmouseleave="onRoadLeave()" />`;
     } else if (isMyTurn && canClientPlaceRoad(e, me)) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
-      html += `
+      roadSpotsHtml += `
         <g onclick="clickEdge(${e.id})" style="cursor:pointer">
           <line class="road-spot-line" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
           <circle class="road-spot-dot" cx="${mx}" cy="${my}" r="8" />
@@ -346,6 +432,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       `;
     }
   }
+
+  html += `<g id="roadRimsLayer">${roadRimsHtml}</g><g id="roadBodiesLayer">${roadBodiesHtml}</g><g id="roadHighlightLayer"></g><g id="roadHitsLayer">${roadHitsHtml}</g>${roadSpotsHtml}`;
 
   // Settlements, cities and settlement spots
   const robberVictimSet = new Set<string>(state.robberVictims || []);
@@ -411,22 +499,189 @@ export function onHexInteract(hexId: number, ev?: MouseEvent): void {
       });
       playTone(400, 0.04);
     }
-  } else if (state.phase === 'ROBBER' && state.players[state.turnIndex]?.id === socket.id) {
+  }
+}
+
+export function onHexClick(hexId: number, ev?: MouseEvent): void {
+  if (hasDraggedMap) return;
+  if (ev && (ev.button === 2 || ev.button === 1 || ev.altKey)) return;
+  if (state.status !== 'LOBBY' && state.phase === 'ROBBER' && state.players[state.turnIndex]?.id === socket.id) {
     socket.emit('clickHex', { code: state.code, hexId });
     playTone(260, 0.12);
   }
 }
 
-// Drag-painting: only paints while the mouse button is held.
+// Drag-painting: only paints while the mouse button is held in Lobby.
 export function onHexEnter(hexId: number, ev?: MouseEvent): void {
-  if (isMouseDown) onHexInteract(hexId, ev);
+  if (isMouseDown && state?.status === 'LOBBY') onHexInteract(hexId, ev);
 }
 
 export function onEdgeInteract(edgeId: number): void {
+  if (hasDraggedMap) return;
   if (state.status === 'LOBBY' && state.hostId === socket.id && activeBrush.type === 'port') {
     socket.emit('paintPort', { code: state.code, edgeId, portValue: activeBrush.value });
     playTone(520, 0.06);
   }
+}
+
+// Computes the connected road network containing `startEdgeId` and its longest continuous simple path (stretch).
+function analyzeRoadConnection(startEdgeId: number): {
+  ownerName: string;
+  ownerColor: string;
+  totalRoads: number;
+  longestStretch: number;
+  longestPathEdges: Set<number>;
+  componentEdges: number[];
+} | null {
+  if (!state?.board) return null;
+  const { edges, vertices } = state.board;
+  const startEdge = edges[startEdgeId];
+  if (!startEdge || !startEdge.road) return null;
+  const ownerId = startEdge.road;
+  const owner = state.players.find(p => p.id === ownerId);
+
+  // 1. BFS to find all roads in this connected component (respecting enemy buildings on vertices)
+  const compSet = new Set<number>([startEdgeId]);
+  const queue: number[] = [startEdgeId];
+  while (queue.length > 0) {
+    const curId = queue.shift()!;
+    const cur = edges[curId];
+    for (const vId of [cur.v1, cur.v2]) {
+      const v = vertices[vId];
+      if (!v) continue;
+      if (v.building && v.building.owner !== ownerId) continue;
+      for (const adjEdgeId of v.edgeIds) {
+        if (!compSet.has(adjEdgeId) && edges[adjEdgeId]?.road === ownerId) {
+          compSet.add(adjEdgeId);
+          queue.push(adjEdgeId);
+        }
+      }
+    }
+  }
+
+  // 2. DFS over the connected component to find the longest continuous stretch (simple path of edges)
+  let bestPath: number[] = [startEdgeId];
+  let bestIncludesHovered = true;
+  const used = new Set<number>();
+  const currentPath: number[] = [];
+
+  function dfs(vertexId: number, depth: number): void {
+    const includesHovered = currentPath.includes(startEdgeId);
+    if (
+      currentPath.length > bestPath.length ||
+      (currentPath.length === bestPath.length && includesHovered && !bestIncludesHovered)
+    ) {
+      bestPath = [...currentPath];
+      bestIncludesHovered = includesHovered;
+    }
+
+    const v = vertices[vertexId];
+    if (!v) return;
+    if (depth > 0 && v.building && v.building.owner !== ownerId) return;
+
+    for (const edgeId of v.edgeIds) {
+      if (used.has(edgeId) || !compSet.has(edgeId)) continue;
+      const edge = edges[edgeId];
+      if (!edge || edge.road !== ownerId) continue;
+      used.add(edgeId);
+      currentPath.push(edgeId);
+      dfs(edge.v1 === vertexId ? edge.v2 : edge.v1, depth + 1);
+      currentPath.pop();
+      used.delete(edgeId);
+    }
+  }
+
+  const endpoints = new Set<number>();
+  for (const eId of compSet) {
+    const e = edges[eId];
+    endpoints.add(e.v1);
+    endpoints.add(e.v2);
+  }
+  for (const vId of endpoints) dfs(vId, 0);
+
+  return {
+    ownerName: owner?.name || 'Player',
+    ownerColor: owner?.color || '#888',
+    totalRoads: compSet.size,
+    longestStretch: bestPath.length,
+    longestPathEdges: new Set(bestPath),
+    componentEdges: [...compSet]
+  };
+}
+
+export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
+  const info = analyzeRoadConnection(edgeId);
+  const hlLayer = document.getElementById('roadHighlightLayer');
+  const tooltip = document.getElementById('roadHoverTooltip');
+  if (!info || !hlLayer || !state?.board) return;
+
+  const { edges, vertices } = state.board;
+  let hlHtml = '';
+  for (const eId of info.componentEdges) {
+    const e = edges[eId];
+    const v1 = vertices[e.v1], v2 = vertices[e.v2];
+    if (!v1 || !v2) continue;
+    const isLongest = info.longestPathEdges.has(eId);
+    hlHtml += `<line class="${isLongest ? 'road-stretch-glow' : 'road-network-glow'}" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />`;
+  }
+  hlLayer.innerHTML = hlHtml;
+
+  if (tooltip) {
+    tooltip.innerHTML = `
+      <div class="rht-head"><span class="rht-dot" style="background:${info.ownerColor}"></span><span>${esc(info.ownerName)}</span></div>
+      <div class="rht-stats">Longest stretch: <strong>${info.longestStretch}</strong> · Connected: <strong>${info.totalRoads}</strong> ${info.totalRoads === 1 ? 'road' : 'roads'}</div>
+    `;
+    tooltip.style.display = 'flex';
+    if (ev) onRoadMove(ev);
+  }
+}
+
+export function onRoadMove(ev: MouseEvent): void {
+  const tooltip = document.getElementById('roadHoverTooltip');
+  if (!tooltip || tooltip.style.display === 'none') return;
+  const x = Math.min(window.innerWidth - 240, ev.clientX + 14);
+  const y = Math.max(12, ev.clientY - 48);
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+}
+
+export function onRoadLeave(): void {
+  const hlLayer = document.getElementById('roadHighlightLayer');
+  const tooltip = document.getElementById('roadHoverTooltip');
+  if (hlLayer) hlLayer.innerHTML = '';
+  if (tooltip) tooltip.style.display = 'none';
+}
+
+export function triggerAwardAnimation(
+  award: 'longestRoad' | 'largestArmy',
+  newOwner: any,
+  prevOwner: any
+): void {
+  if (!newOwner) return;
+  const isStolen = !!prevOwner && prevOwner.id !== newOwner.id;
+  playAwardSound(isStolen);
+
+  const isRoad = award === 'longestRoad';
+  const title = isRoad ? 'Longest Road' : 'Largest Army';
+  const kicker = isStolen ? `${title} Stolen!` : `${title} Claimed!`;
+  const sub = isStolen
+    ? `Taken from ${esc(prevOwner.name)} · ${isRoad ? `${newOwner.longestRoad ?? 5}+ roads` : `${newOwner.army ?? 3}+ knights`}`
+    : `${isRoad ? `${newOwner.longestRoad ?? 5} connected roads` : `${newOwner.army ?? 3} knights played`}`;
+
+  const banner = document.createElement('div');
+  banner.className = `award-epic-banner ${isStolen ? 'stolen' : ''}`;
+  banner.innerHTML = `
+    <div class="award-rays"></div>
+    <div class="award-badge-icon">${uiIcon(isRoad ? 'road' : 'sword', 24)}</div>
+    <div class="award-info">
+      <div class="award-kicker">${kicker}</div>
+      <div class="award-headline" style="color:${newOwner.color || 'var(--ink)'}">${esc(newOwner.name)}</div>
+      <div class="award-sub">${sub}</div>
+    </div>
+    <div class="award-vp-pill">+2 VP</div>
+  `;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.remove(), 2450);
 }
 
 export function canClientPlaceSettlement(v: any, me: any): boolean {

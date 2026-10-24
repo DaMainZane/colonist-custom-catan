@@ -1,6 +1,7 @@
 // MODULE: game runner (start/rematch, dispatch one action, turn engine events into client effects) | USED BY: server/socket, bots/scheduler
 import { PLAYER_COLORS, createGame, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
+import { emitBotDialogue } from './bots/dialogue';
 import { newBoard } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { registry, rulesFromSettings } from './runtime';
@@ -46,7 +47,10 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
   const g = room.game;
   if (!g) return { ok: false, error: 'No game in progress' };
   const res = dispatch(g, registry, { type, playerId, payload });
-  if (res.ok) recordEffects(room, res.events);
+  if (res.ok) {
+    recordEffects(room, res.events);
+    emitBotDialogue(room, playerId, type, res.events);
+  }
   else if (res.error.startsWith('Internal error')) console.error(`[engine] ${type} by ${playerId}: ${res.error}`);
   return res;
 }

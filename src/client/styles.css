@@ -32,11 +32,22 @@
   --glyph-desert: #6f8f55;
   --glyph-fog: #8f9ba3;
 
+  /* darker tile border trims */
+  --trim-wood: #42663e;
+  --trim-brick: #94462e;
+  --trim-sheep: #7c944e;
+  --trim-wheat: #b59538;
+  --trim-ore: #626d78;
+  --trim-desert: #b09c70;
+  --trim-gold: #a6761c;
+  --trim-fog: #98a3ab;
+
   /* sea and ports */
   --sea: var(--tile-water);
   --sea-shallow: #86b0bf;
   --sand: #e8d9ab;
   --pier: #9a7b53;
+  --pier-dark: #6e5434;
 
   /* neutrals (light) */
   --bg: #e4e0d5;
@@ -85,6 +96,7 @@
   --sea-shallow: #5d8696;
   --sand: #a8946a;
   --pier: #b08f63;
+  --pier-dark: #7a603e;
   --danger: #e0604a;
   --ok: #6aa664;
   --dev: #7b6790;
@@ -559,10 +571,16 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 .hex-target:hover { fill-opacity: 1; stroke-width: 7; animation: none; }
 @keyframes targetPulse { 0%, 100% { stroke-opacity: 0.6; } 50% { stroke-opacity: 1; } }
-.port-pier { stroke: var(--pier); stroke-width: 4; stroke-linecap: round; fill: none; }
-.port-badge { stroke: var(--piece-rim); stroke-width: 2; }
-.port-ring { fill: none; stroke: var(--accent); stroke-width: 3; }
+.port-dock-apron { fill: var(--pier-dark); fill-opacity: 0.32; stroke: none; }
+.port-pier-rim { stroke: var(--pier-dark); stroke-width: 9.5; stroke-linecap: round; fill: none; }
+.port-pier { stroke: var(--pier); stroke-width: 6; stroke-linecap: round; fill: none; }
+.port-plank { stroke: var(--pier-dark); stroke-width: 2.5; stroke-linecap: round; opacity: 0.75; }
+.port-post { fill: var(--pier); stroke: var(--pier-dark); stroke-width: 2; }
+.port-badge-outer { fill: var(--pier-dark); stroke: var(--piece-rim); stroke-width: 2.2; }
+.port-badge { stroke: var(--pier-dark); stroke-width: 1.8; }
+.port-ring { fill: none; stroke: var(--accent); stroke-width: 3.5; filter: drop-shadow(0 0 5px var(--accent)); }
 .port-text { fill: var(--token-ink); font-weight: 800; text-anchor: middle; }
+.port-ratio-pill { fill: var(--token); stroke: var(--pier-dark); stroke-width: 1.4; }
 .token-text { font-weight: 700; text-anchor: middle; }
 .spot-pulse {
   fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; cursor: pointer; filter: drop-shadow(0 0 5px var(--accent));
@@ -576,6 +594,87 @@ svg#boardSvg:active { cursor: grabbing; }
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
 @keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
+.road-hit { stroke: transparent; stroke-width: 20; stroke-linecap: round; cursor: pointer; pointer-events: stroke; }
+.road-network-glow {
+  stroke: var(--piece-rim); stroke-width: 15; stroke-linecap: round; stroke-opacity: 0.45;
+  pointer-events: none; transition: stroke-opacity 0.12s;
+}
+.road-stretch-glow {
+  stroke: #fff; stroke-width: 16; stroke-linecap: round; pointer-events: none;
+  filter: drop-shadow(0 0 8px var(--accent)) drop-shadow(0 0 3px #fff);
+  animation: roadStretchPulse 0.9s ease-in-out infinite;
+}
+@keyframes roadStretchPulse { 0%, 100% { stroke-opacity: 0.75; } 50% { stroke-opacity: 1; } }
+.road-hover-tooltip {
+  position: fixed; z-index: 1100; pointer-events: none;
+  background: var(--surface); color: var(--ink); border-radius: var(--r);
+  padding: 7px 11px; box-shadow: var(--shadow); border: 1.5px solid var(--accent);
+  display: none; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.road-hover-tooltip .rht-head { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12.5px; }
+.road-hover-tooltip .rht-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.road-hover-tooltip .rht-stats { color: var(--ink-dim); font-size: 11.5px; }
+.road-hover-tooltip .rht-stats strong { color: var(--ink); font-weight: 800; }
+
+/* Epic Longest Road / Largest Army award animation */
+.award-epic-banner {
+  position: fixed; top: 72px; left: 50%; transform: translateX(-50%) scale(0.75);
+  z-index: 1200; pointer-events: none;
+  background: var(--surface); color: var(--ink); border-radius: var(--r-lg);
+  padding: 14px 22px; min-width: 300px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.38), 0 0 0 3px var(--accent);
+  display: flex; align-items: center; gap: 14px; overflow: hidden;
+  animation: awardBannerPop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.award-epic-banner.stolen { box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42), 0 0 0 3px var(--danger); }
+.award-rays {
+  position: absolute; inset: -60%; background: conic-gradient(
+    from 0deg,
+    transparent 0deg 20deg,
+    rgba(217, 137, 59, 0.14) 20deg 40deg,
+    transparent 40deg 60deg,
+    rgba(217, 137, 59, 0.14) 60deg 80deg,
+    transparent 80deg 100deg,
+    rgba(217, 137, 59, 0.14) 100deg 120deg,
+    transparent 120deg 140deg,
+    rgba(217, 137, 59, 0.14) 140deg 160deg,
+    transparent 160deg 180deg,
+    rgba(217, 137, 59, 0.14) 180deg 200deg,
+    transparent 200deg 220deg,
+    rgba(217, 137, 59, 0.14) 220deg 240deg,
+    transparent 240deg 260deg,
+    rgba(217, 137, 59, 0.14) 260deg 280deg,
+    transparent 280deg 300deg,
+    rgba(217, 137, 59, 0.14) 300deg 320deg,
+    transparent 320deg 340deg,
+    rgba(217, 137, 59, 0.14) 340deg 360deg
+  );
+  animation: spinAwardRays 9s linear infinite; pointer-events: none;
+}
+.award-badge-icon {
+  position: relative; z-index: 1; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--surface), 0 0 14px var(--accent);
+}
+.award-epic-banner.stolen .award-badge-icon { background: var(--danger); color: #fff; box-shadow: 0 0 0 3px var(--surface), 0 0 14px var(--danger); }
+.award-info { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.award-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.award-epic-banner.stolen .award-kicker { color: var(--danger); }
+.award-headline { font-size: 16px; font-weight: 800; line-height: 1.15; }
+.award-sub { font-size: 12px; font-weight: 600; color: var(--ink-dim); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.award-vp-pill {
+  position: relative; z-index: 1; background: var(--accent); color: var(--on-accent);
+  font-weight: 800; font-size: 13px; padding: 5px 10px; border-radius: 999px; flex-shrink: 0;
+}
+@keyframes spinAwardRays { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes awardBannerPop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(0.7); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.05); }
+  20%, 82% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(0.92); }
+}
+
 .target-ring { fill: none; stroke-width: 3; stroke-dasharray: 5 3; }
 .target-ring.upgrade {
   stroke: var(--accent); filter: drop-shadow(0 0 5px var(--accent));

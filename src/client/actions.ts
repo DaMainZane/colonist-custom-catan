@@ -63,10 +63,12 @@ export function setGameSpeedValue(speedVal: number | string): void {
 }
 
 export function setBrush(type: string, value: string, btn?: HTMLElement): void {
-  activeBrush.type = type;
-  activeBrush.value = value;
+  const isSame = activeBrush.type === type && activeBrush.value === value;
+  activeBrush.type = isSame ? '' : type;
+  activeBrush.value = isSame ? '' : value;
   document.querySelectorAll('.brush-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  if (!isSame && btn) btn.classList.add('active');
+  renderAll();
 }
 
 export function applyPreset(preset: string): void {

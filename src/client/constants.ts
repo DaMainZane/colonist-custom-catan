@@ -4,14 +4,14 @@
 export const RESOURCES: string[] = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
 export const RES_META: Record<string, { color: string; border: string; name: string }> = {
-  wood:   { color: 'var(--tile-wood)',   border: 'var(--glyph-wood)',   name: 'Wood' },
-  brick:  { color: 'var(--tile-brick)',  border: 'var(--glyph-brick)',  name: 'Brick' },
-  sheep:  { color: 'var(--tile-sheep)',  border: 'var(--glyph-sheep)',  name: 'Sheep' },
-  wheat:  { color: 'var(--tile-wheat)',  border: 'var(--glyph-wheat)',  name: 'Wheat' },
-  ore:    { color: 'var(--tile-ore)',    border: 'var(--glyph-ore)',    name: 'Ore' },
-  desert: { color: 'var(--tile-desert)', border: 'var(--glyph-desert)', name: 'Desert' },
-  gold:   { color: 'var(--tile-gold)',   border: 'var(--glyph-gold)',   name: 'Gold' },
-  fog:    { color: 'var(--tile-fog)',    border: 'var(--glyph-fog)',    name: 'Fog' }
+  wood:   { color: 'var(--tile-wood)',   border: 'var(--trim-wood)',   name: 'Wood' },
+  brick:  { color: 'var(--tile-brick)',  border: 'var(--trim-brick)',  name: 'Brick' },
+  sheep:  { color: 'var(--tile-sheep)',  border: 'var(--trim-sheep)',  name: 'Sheep' },
+  wheat:  { color: 'var(--tile-wheat)',  border: 'var(--trim-wheat)',  name: 'Wheat' },
+  ore:    { color: 'var(--tile-ore)',    border: 'var(--trim-ore)',    name: 'Ore' },
+  desert: { color: 'var(--tile-desert)', border: 'var(--trim-desert)', name: 'Desert' },
+  gold:   { color: 'var(--tile-gold)',   border: 'var(--trim-gold)',   name: 'Gold' },
+  fog:    { color: 'var(--tile-fog)',    border: 'var(--trim-fog)',    name: 'Fog' }
 };
 
 export const DEV_META: Record<string, { name: string; desc: string }> = {
