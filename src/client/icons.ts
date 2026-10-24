@@ -136,7 +136,11 @@ const UI_ICONS: Record<string, string> = {
   waves: `<path d="M3 9q3-3 6 0t6 0 6 0M3 15q3-3 6 0t6 0 6 0"/>`,
   map: `<path d="M9 4L3.5 6v14L9 18l6 2 5.5-2V4L15 6zM9 4v14M15 6v14"/>`,
   home: `<path d="M4 11l8-7 8 7M6 10v10h12V10"/>`,
-  refresh: `<path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 7.5L4 11M5.5 15A7 7 0 0 0 18 16.5L20 13"/>`
+  refresh: `<path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 7.5L4 11M5.5 15A7 7 0 0 0 18 16.5L20 13"/>`,
+  arrowDown: `<path d="M12 5v14M6.5 13.5L12 19l5.5-5.5"/>`,
+  arrowUp: `<path d="M12 19V5M6.5 10.5L12 5l5.5 5.5"/>`,
+  chevronUp: `<path d="M6 15l6-6 6 6"/>`,
+  chevronDown: `<path d="M6 9l6 6 6-6"/>`
 };
 
 export function uiIcon(name: string, size = 20): string {

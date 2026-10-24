@@ -2,7 +2,7 @@
 import { checkAction, computeVP, getPlayer, legalActions, makeCtx } from '../../shared';
 import type { Ctx, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
-import { tradeRatios } from '../../packs/base/trading';
+import { openTrades, tradeRatios } from '../../packs/base/trading';
 import { getPips } from '../util';
 
 export interface BotMove { type: string; payload: any }
@@ -312,12 +312,11 @@ function decide(g: GameState, reg: Registry, p: PlayerState, legal: Legal[], ran
   const of = (type: string): Legal[] => legal.filter(a => a.type === type);
   const myTurn = g.players[g.turn]?.id === p.id;
 
-  // Answer a trade offer made to me.
-  const trade = g.trade;
-  if (trade && trade.fromId !== p.id && trade.responses[p.id] !== undefined) {
-    if (trade.responses[p.id] !== 'pending') return null;
-    const decision = evaluateTrade(g, reg, p, trade);
-    return { type: 'respond_trade', payload: { decision } };
+  // Answer any trade offer made to me.
+  const pendingTrade = openTrades(g).find(t => t.fromId !== p.id && t.responses[p.id] === 'pending');
+  if (pendingTrade) {
+    const decision = evaluateTrade(g, reg, p, pendingTrade);
+    return { type: 'respond_trade', payload: { tradeId: pendingTrade.id, decision } };
   }
 
   switch (g.phase) {
@@ -396,9 +395,10 @@ function mainPhase(g: GameState, reg: Registry, ctx: Ctx, p: PlayerState, legal:
   };
 
   // My own open offer: wait for answers, then take it down.
-  if (g.trade && g.trade.fromId === p.id) {
-    const waiting = Object.values(g.trade.responses).some(r => r === 'pending');
-    return waiting ? null : { type: 'cancel_trade', payload: {} };
+  const myTrade = openTrades(g).find(t => t.fromId === p.id);
+  if (myTrade) {
+    const waiting = Object.values(myTrade.responses).some(r => r === 'pending');
+    return waiting ? null : { type: 'cancel_trade', payload: { tradeId: myTrade.id } };
   }
 
   // 1. Development cards.

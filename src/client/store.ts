@@ -27,7 +27,9 @@ export const discardSel: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, or
 export let counterTradeId: number | null = null;
 export const counterGet: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 export const counterGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+export let tradesCollapsed = false;
 export function setCounterTradeId(v: number | null): void { counterTradeId = v; }
+export function setTradesCollapsed(v: boolean): void { tradesCollapsed = v; }
 
 export function setState(s: GameState): void { state = s; }
 export function setSoundOn(v: boolean): void { soundOn = v; }

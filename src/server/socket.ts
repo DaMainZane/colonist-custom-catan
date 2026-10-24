@@ -233,16 +233,18 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on('bankTrade', safe(({ code, give, get }) => act(code, 'bank_trade', { give, get }, true)));
     socket.on('proposeTrade', safe(({ code, offer, request }) => act(code, 'propose_trade', { offer, request }, true)));
-    socket.on('respondTrade', safe(({ code, decision }) => act(code, 'respond_trade', { decision }, true)));
-    socket.on('counterTrade', safe(({ code, offer, request }) => act(code, 'counter_trade', { offer, request }, true)));
-    socket.on('confirmTradeWithPartner', safe(({ code, partnerId }) => act(code, 'confirm_trade', { partnerId }, true)));
+    socket.on('respondTrade', safe(({ code, decision, tradeId }) => act(code, 'respond_trade', { decision, tradeId }, true)));
+    socket.on('counterTrade', safe(({ code, offer, request, tradeId }) => act(code, 'counter_trade', { offer, request, tradeId }, true)));
+    socket.on('confirmTradeWithPartner', safe(({ code, partnerId, tradeId }) => act(code, 'confirm_trade', { partnerId, tradeId }, true)));
 
-    socket.on('cancelTrade', safe(({ code }) => {
-      const trade = rooms[code]?.game?.trade;
+    socket.on('cancelTrade', safe(({ code, tradeId }) => {
+      const g = rooms[code]?.game;
+      const list = g?.trades ?? (g?.trade ? [g.trade] : []);
+      const trade = tradeId !== undefined && tradeId !== null ? list.find(t => t.id === Number(tradeId)) : list[0];
       if (!trade) return;
       // The proposer withdraws the offer, anyone else just declines it.
-      if (trade.fromId === socket.id) act(code, 'cancel_trade');
-      else act(code, 'respond_trade', { decision: 'declined' });
+      if (trade.fromId === socket.id) act(code, 'cancel_trade', { tradeId: trade.id });
+      else act(code, 'respond_trade', { decision: 'declined', tradeId: trade.id });
     }));
 
     socket.on('sendChat', safe(({ code, text }) => {

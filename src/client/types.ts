@@ -56,6 +56,9 @@ export interface TradeView {
   offer: Resources;
   request: Resources;
   responses: Record<string, string>;
+  createdAt?: number;
+  expiresAt?: number;
+  durationMs?: number;
 }
 
 export interface GameState {
@@ -82,6 +85,7 @@ export interface GameState {
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
   activeTrade: TradeView | null;
+  activeTrades?: TradeView[];
   winner: { id: string; name: string; vp: number; color: string } | null;
   logs: { text: string; color: string | null }[];
   chats: { sender: string; avatar: string; color: string; text: string }[];

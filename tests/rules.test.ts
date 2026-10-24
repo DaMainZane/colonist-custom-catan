@@ -156,4 +156,54 @@ describe('rules', () => {
     const wrongPhase = dispatch(g, registry, { type: 'roll', playerId: 'p1', payload: {} });
     expect(wrongPhase.ok).toBe(false);
   });
+
+  it('stacks multiple trade offers with newest on top and prunes offers when cards are spent', () => {
+    const g = newGame(3);
+    g.phase = 'main';
+    g.turnCount = 1;
+    const p1 = getPlayer(g, 'p1')!;
+    const p2 = getPlayer(g, 'p2')!;
+    const p3 = getPlayer(g, 'p3')!;
+    p1.resources.wood = 1;
+    p2.resources.brick = 1;
+    p3.resources.wheat = 1;
+
+    // Offer 1 (oldest)
+    expect(dispatch(g, registry, {
+      type: 'propose_trade',
+      playerId: 'p1',
+      payload: { offer: { wood: 1 }, request: { brick: 1, wheat: 1 } }
+    }).ok).toBe(true);
+
+    // Offer 2 (newest, pushed to top of g.trades)
+    expect(dispatch(g, registry, {
+      type: 'propose_trade',
+      playerId: 'p1',
+      payload: { offer: { wood: 1 }, request: { brick: 1 } }
+    }).ok).toBe(true);
+
+    expect(g.trades.length).toBe(2);
+    expect(g.trades[0].id).toBe(2);
+    expect(g.trades[1].id).toBe(1);
+    expect(g.trade?.id).toBe(2);
+
+    // p2 accepts Offer 2 specifically
+    expect(dispatch(g, registry, {
+      type: 'respond_trade',
+      playerId: 'p2',
+      payload: { tradeId: 2, decision: 'accepted' }
+    }).ok).toBe(true);
+
+    // p1 confirms Offer 2 with p2; Offer 1 is automatically pruned because p1 spent their only wood
+    expect(dispatch(g, registry, {
+      type: 'confirm_trade',
+      playerId: 'p1',
+      payload: { tradeId: 2, partnerId: 'p2' }
+    }).ok).toBe(true);
+
+    expect(p1.resources.wood).toBe(0);
+    expect(p1.resources.brick).toBe(1);
+    expect(g.trades.length).toBe(0);
+    expect(g.trade).toBeNull();
+  });
 });

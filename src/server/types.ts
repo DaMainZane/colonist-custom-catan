@@ -80,6 +80,8 @@ export interface Room {
   /** Trade id the bot-proposal timeout was scheduled for. */
   tradeTimerFor?: number | null;
   tradeTimer?: any;
+  /** Per-trade expiration timers and timestamps keyed by trade id. */
+  tradeTimers?: Map<number, { createdAt: number; expiresAt: number; durationMs: number; timer: any }>;
 }
 
 /** Legacy status strings the client switches on. */

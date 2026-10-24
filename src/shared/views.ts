@@ -51,6 +51,7 @@ export function playerView(g: GameState, reg: Registry, viewerId: Id): any {
     diceStats: g.diceStats,
     awards: g.awards,
     trade: g.trade,
+    trades: g.trades,
     winner: g.winner,
     log: g.log,
     ext: g.ext,

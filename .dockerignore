@@ -4,3 +4,4 @@ dist
 legacy
 *.md
 .env
+.aistudio

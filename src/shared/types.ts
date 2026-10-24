@@ -117,6 +117,8 @@ export interface GameState {
   /** award id -> holder player id */
   awards: Record<string, Id | null>;
   trade: TradeState | null;
+  /** All open trade offers, newest first (`trades[0]` mirrors `trade`). */
+  trades: TradeState[];
   winner: { id: Id; name: string; vp: number; color: string } | null;
   log: LogEntry[];
   /** Pack-owned game data, namespaced by pack id, e.g. ext.base. */

@@ -1,5 +1,6 @@
-// MODULE: bot scheduler (waits a game-speed-scaled delay, then lets one bot act, after every broadcast) | USED BY: server/main
+// MODULE: bot scheduler (waits a game-speed-scaled delay, then lets one bot act, after every broadcast) | USED BY: server/main, server/view
 import { getPlayer, legalActions } from '../../shared';
+import { openTrades } from '../../packs/base/trading';
 import { runAction } from '../game';
 import { broadcastRoom, setAfterBroadcast } from '../net';
 import { clearBotTimers } from '../rooms';
@@ -10,8 +11,10 @@ import { chooseBotAction } from './brain';
 /** Base delay per action type in ms (before the game-speed setting divides it). */
 const BASE_DELAY: Record<string, number> = { respond_trade: 450, discard: 450, pick: 400 };
 const DEFAULT_DELAY = 600;
-/** How long a human gets to answer a bot's trade offer. */
-const TRADE_WAIT = 4500;
+/** How long a human gets to answer a bot's trade offer (before game-speed scaling). */
+const BOT_TRADE_WAIT = 9000;
+/** Time limit for a human-proposed trade offer in the stack (ms). */
+const HUMAN_TRADE_WAIT = 20000;
 
 function delay(room: Room, baseMs: number): number {
   const speed = Math.max(0.25, Math.min(10, Number(room.settings?.gameSpeed) || 1));
@@ -33,21 +36,49 @@ function nextBotMove(room: Room): Move | null {
   return null;
 }
 
-/** A bot's open offer is withdrawn if humans have not answered after a while. */
-function watchBotTrade(room: Room): void {
+/**
+ * Ensures every open trade in `g.trades` has a running expiration timer and timestamp metadata,
+ * and cleans up timers for trades that were completed or cancelled.
+ */
+export function ensureTradeTimers(room: Room): void {
   const g = room.game;
-  const trade = g?.trade;
-  if (!g || !trade || room.tradeTimerFor === trade.id) return;
-  if (!getPlayer(g, trade.fromId)?.isBot) return;
+  if (!room.tradeTimers) room.tradeTimers = new Map();
+  const map = room.tradeTimers;
 
-  room.tradeTimerFor = trade.id;
-  if (room.tradeTimer) clearTimeout(room.tradeTimer);
-  room.tradeTimer = setTimeout(() => {
-    const open = room.game?.trade;
-    if (!open || open.id !== trade.id) return;
-    const res = runAction(room, trade.fromId, 'cancel_trade');
-    if (res.ok) broadcastRoom(room);
-  }, Math.max(1200, delay(room, TRADE_WAIT)));
+  if (!g || g.phase === 'gameover') {
+    for (const entry of map.values()) if (entry.timer) clearTimeout(entry.timer);
+    map.clear();
+    return;
+  }
+
+  const trades = openTrades(g);
+  const activeIds = new Set(trades.map(t => t.id));
+  for (const [id, entry] of map.entries()) {
+    if (!activeIds.has(id)) {
+      if (entry.timer) clearTimeout(entry.timer);
+      map.delete(id);
+    }
+  }
+
+  const now = Date.now();
+  for (const trade of trades) {
+    if (map.has(trade.id)) continue;
+    const isBotOffer = !!getPlayer(g, trade.fromId)?.isBot;
+    const durationMs = isBotOffer ? Math.max(2500, delay(room, BOT_TRADE_WAIT)) : HUMAN_TRADE_WAIT;
+    const createdAt = now;
+    const expiresAt = now + durationMs;
+    const timer = setTimeout(() => {
+      map.delete(trade.id);
+      const currG = room.game;
+      if (!currG) return;
+      const stillOpen = openTrades(currG).find(t => t.id === trade.id);
+      if (!stillOpen) return;
+      const res = runAction(room, stillOpen.fromId, 'cancel_trade', { tradeId: trade.id });
+      if (res.ok) broadcastRoom(room);
+    }, durationMs);
+
+    map.set(trade.id, { createdAt, expiresAt, durationMs, timer });
+  }
 }
 
 function runBotStep(room: Room): void {
@@ -79,7 +110,7 @@ export function scheduleBots(room: Room): void {
     clearBotTimers(room);
     return;
   }
-  watchBotTrade(room);
+  ensureTradeTimers(room);
   if (room.botTimer) return;
 
   const move = nextBotMove(room);

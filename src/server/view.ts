@@ -2,7 +2,8 @@
 import { computeVP, getPlayer, totalCards } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
-import { tradeRatios } from '../packs/base/trading';
+import { openTrades, tradeRatios } from '../packs/base/trading';
+import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
 import { registry } from './runtime';
 import type { Room } from './types';
@@ -125,20 +126,27 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     : room.settings.devKnights + room.settings.devVp + room.settings.devRoadBuilding +
       room.settings.devYearOfPlenty + room.settings.devMonopoly;
 
-  let activeTrade: any = null;
-  if (g?.trade) {
-    const from = getPlayer(g, g.trade.fromId);
-    activeTrade = {
-      id: g.trade.id,
-      fromId: g.trade.fromId,
-      fromName: from?.name,
-      fromAvatar: from?.avatar,
-      fromColor: from?.color,
-      offer: fillResources(g.trade.offer),
-      request: fillResources(g.trade.request),
-      responses: g.trade.responses
-    };
-  }
+  ensureTradeTimers(room);
+  const activeTrades = g
+    ? openTrades(g).map(t => {
+        const from = getPlayer(g, t.fromId);
+        const timerMeta = room.tradeTimers?.get(t.id);
+        return {
+          id: t.id,
+          fromId: t.fromId,
+          fromName: from?.name,
+          fromAvatar: from?.avatar,
+          fromColor: from?.color,
+          offer: fillResources(t.offer),
+          request: fillResources(t.request),
+          responses: t.responses,
+          createdAt: timerMeta?.createdAt ?? Date.now(),
+          expiresAt: timerMeta?.expiresAt ?? (Date.now() + 20000),
+          durationMs: timerMeta?.durationMs ?? 20000
+        };
+      })
+    : [];
+  const activeTrade = activeTrades[0] ?? null;
 
   const current = g ? g.players[g.turn] : room.lobbyPlayers[0];
   const robberVictims = g && g.phase === 'robber_steal' && current ? victimsOnHex(g, g.board.robberHexId, current.id) : [];
@@ -167,6 +175,7 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     longestRoadOwner: g ? g.awards.longestRoad ?? null : null,
     largestArmyOwner: g ? g.awards.largestArmy ?? null : null,
     activeTrade,
+    activeTrades,
     winner: g ? g.winner : null,
     logs: g ? g.log : room.lobbyLog,
     chats: room.chats
