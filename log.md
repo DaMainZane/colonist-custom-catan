@@ -54,8 +54,16 @@ Testing between sub-steps skipped on purpose. Run `npm run typecheck` before 2f.
   - Tests rewritten for the engine: `tests/rules.test.ts`, `tests/topology.test.ts`; new `tests/sim.test.ts` (3 presets x 2 and 4 bots x 2 seeds, determinism, 6 bots on radius 4).
   - Old server code (`src/server-legacy/`) is still in place. Delete it after typecheck, tests and one live game pass.
 
+### Step 2 verification (2026-10-24)
+- `npm run typecheck` found 6 errors, all `res.error` on `DispatchResult`. Cause: `tsconfig` has `strict: false`, so TS does not narrow the `ok: true | false` union. Fixed in `src/shared/engine.ts` by declaring `error` and `events` on both branches (`error?: undefined` / `events?: undefined`). Typecheck is clean.
+- `npm test`: 3 files, 25 tests pass (rules 8, topology 9, sim 8). The sim tests (standard, goldRush, fogIsland; 2 and 4 bots; determinism; 6 bots on radius 4) finish with no stalls, rejected actions or card-conservation breaks.
+- Live bot games in the browser worked, including the gold and fog presets.
+
+## Design direction (decided 2026-10-24)
+- New UI direction written up in `Design UI Philosophy.md`: Lichess shell (board is the hero, UI recedes) + Mini Metro assets (flat geometric glyphs) + Dorfromantik colors (muted, warm, matte). Dieter Rams monochrome style rejected.
+- Findings on the current client: Colonist-style skin (gradients, 3D buttons, black outlines, illustrated icons, emoji avatars), with hex colors hardcoded across `styles.css`, `constants.ts`, `icons.ts` and `render/board.ts`. A design-token (CSS variable) layer comes first.
+- Built in Step 4 (UI and phone together). No client code changed yet.
+
 ## Next
-- Run `npm run typecheck`, then `npm test`. Nothing in 2a-2g has been compiled or run. Expect a round of small fixes.
-- If `sim.test.ts` reports a stall or a rejected action, the message names the phase and action.
-- Play one live game with bots in the browser, including gold and fog presets, then delete `src/server-legacy/`.
-- Then close out Step 2 in this log and start Step 3 (identity and persistence).
+- Delete `src/server-legacy/` (and `legacy/` when no longer wanted as reference), then close out Step 2.
+- Start Step 3 (identity and persistence) only when John says so.

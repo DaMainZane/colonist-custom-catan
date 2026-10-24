@@ -15,7 +15,7 @@ npm run typecheck
 
 ## Layout
 
-- `src/server/` TypeScript server (bundled by esbuild to `dist/main.js`). Legacy rules, replaced in Step 2f/2g.
+- `src/server/` TypeScript server (bundled by esbuild to `dist/main.js`). Thin adapter over the engine, plus bots (`bots/`). The old rules code is in `src/server-legacy/` until it is deleted.
 - `src/shared/` pure engine, no sockets/DOM/timers. Runs on server and client.
 - `src/packs/` game content registered as packs (base game now, gold and fog next).
 - `src/client/` browser client.
@@ -33,7 +33,7 @@ npm run typecheck
 
 ## Modules
 
-Status: 2a-2e written (untested, by choice). 2f-2g not started. The old server code stays active until 2g.
+Status: 2a-2g written. Typecheck is clean and all 25 tests pass, including bot-vs-bot sims on the standard, goldRush and fogIsland presets. Live bot games work in the browser. `src/server-legacy/` is kept only until it is deleted.
 
 ### `src/shared/` (2a-2c)
 
@@ -83,5 +83,9 @@ Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `
 | `fog/index.ts` | hides tiles after map generation (`ext.hidden`), reveals them when a road is built next to them (rule `fogRevealBy`) and pays one production. Rule `fogTiles` (default 0). Preset `fogIsland` |
 
 `src/packs/index.ts` exports `allPacks` (base, gold, fog in load order).
+
+## Design
+
+The new UI direction is documented in [`Design UI Philosophy.md`](Design%20UI%20Philosophy.md): a Lichess-style shell where the board is the hero, flat geometric Mini Metro-style resource glyphs, and a muted Dorfromantik-style color palette, all driven by CSS design tokens. It is built in Step 4 (UI and phone).
 
 Full README (architecture, modding, hosting) comes later in the plan.
