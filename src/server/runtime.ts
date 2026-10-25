@@ -14,7 +14,7 @@ export function defaultSettings(): Settings {
     desertTiles: 1,
     fogTiles: 0,
     vpToWin: 10,
-    maxPlayers: 4,
+    maxPlayers: 8,
     cardDiscardLimit: 7,
     bankResourcePerType: 19,
     devKnights: 14,
@@ -30,6 +30,25 @@ export function defaultSettings(): Settings {
     turnIncrementSec: 0,
     tradeTimerSec: 20
   };
+}
+
+/** Bank and dev deck sizes of the standard 3-4 player game, the ones the lobby starts with. */
+const STANDARD_SUPPLY = { bankResourcePerType: 19, devKnights: 14, devVp: 5, devRoadBuilding: 2, devYearOfPlenty: 2, devMonopoly: 2 };
+
+/** Bigger tables get a bigger bank and dev deck (5-6 follows the real extension: 24 per resource, 34 dev cards). */
+function supplyFor(players: number): typeof STANDARD_SUPPLY {
+  if (players <= 4) return STANDARD_SUPPLY;
+  if (players <= 6) return { bankResourcePerType: 24, devKnights: 20, devVp: 5, devRoadBuilding: 3, devYearOfPlenty: 3, devMonopoly: 3 };
+  return { bankResourcePerType: 30, devKnights: 26, devVp: 5, devRoadBuilding: 4, devYearOfPlenty: 4, devMonopoly: 4 };
+}
+
+/**
+ * Settings for the game about to start. If the host left the bank and dev deck at the standard numbers,
+ * they grow with the real player count (not the seat limit). Anything the host changed is kept as is.
+ */
+export function settingsForPlayers(s: Settings, players: number): Settings {
+  const untouched = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => s[k] === STANDARD_SUPPLY[k]);
+  return untouched ? { ...s, ...supplyFor(players) } : s;
 }
 
 /** Overrides handed to createGame (it merges them over the registry defaults). */

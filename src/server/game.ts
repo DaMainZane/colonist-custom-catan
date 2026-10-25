@@ -5,7 +5,7 @@ import { emitBotDialogue, emitGameStartDialogue } from './bots/dialogue';
 import { noteBotEvents } from './bots/brain';
 import { newBoard } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
-import { registry, rulesFromSettings } from './runtime';
+import { registry, rulesFromSettings, settingsForPlayers } from './runtime';
 import { noteActionCompleted } from './turnClock';
 import type { LobbyPlayer, Room } from './types';
 
@@ -62,11 +62,13 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
 export function startGame(room: Room): string | null {
   if (room.game) return 'Game already started!';
   if (room.lobbyPlayers.length < 2) return 'Add at least 1 Bot or wait for a 2nd player!';
-  if (room.board.vertices.length < room.lobbyPlayers.length * 4) return 'Map needs more land tiles for this player count!';
+  // Up to 4 players keep the old loose check. Bigger tables need real room: 2 settlements each, ~4 blocked spots per settlement.
+  const need = room.lobbyPlayers.length > 4 ? room.lobbyPlayers.length * 8 : room.lobbyPlayers.length * 4;
+  if (room.board.vertices.length < need) return 'Map needs more land tiles for this player count!';
 
   room.game = createGame(registry, {
     players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, isBot: p.isBot, difficulty: p.difficulty })),
-    rules: rulesFromSettings(room.settings),
+    rules: rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length)),
     board: structuredClone(room.board),
     shuffleSeats: true
   });

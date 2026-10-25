@@ -1,12 +1,11 @@
 // MODULE: board generator (radius, tile counts, numbers, presets, ports) driven by the registry | USED BY: engine createGame, lobby preview, tests
 import type { Registry } from './registry';
+import { assignNumbers, buildNumberPool } from './numbers';
 import { rngNext, rngShuffle } from './rng';
 import type { RngState } from './rng';
 import { buildTopology } from './topology';
 import type { HexInit } from './topology';
 import type { Board, Rules } from './types';
-
-const NUMBER_POOL = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
 
 function clampInt(val: any, min: number, max: number, fallback: number): number {
   const n = Number(val);
@@ -46,20 +45,25 @@ export function generateBoard(reg: Registry, rules: Rules, rng: RngState, preset
   for (let i = 0; types.length < total; i++) types.push(baseIds[i % baseIds.length]);
   const shuffledTypes = rngShuffle(rng, types);
 
-  const numbers: number[] = [];
-  for (let i = 0; i < total; i++) numbers.push(NUMBER_POOL[i % NUMBER_POOL.length]);
-  const shuffledNumbers = rngShuffle(rng, numbers);
-
-  let numIdx = 0;
-  const inits: HexInit[] = coords.map((c, idx) => {
-    let type = shuffledTypes[idx] || baseIds[0];
-    if (preset?.waterChance && rngNext(rng) < preset.waterChance && (c.q !== 0 || c.r !== 0)) {
-      type = 'water';
-    }
-    const def = reg.tiles.get(type);
-    const number = def && def.land && def.numbered ? shuffledNumbers[numIdx++] : null;
-    return { q: c.q, r: c.r, type, number, ext: {} };
+  // Final tile types first (water chance may turn some into ocean), so the number pool matches the real count
+  // of numbered tiles. Before, the pool was sized by every hex, which handed out extra 2s on the standard board.
+  const finalTypes = coords.map((c, idx) => {
+    const type = shuffledTypes[idx] || baseIds[0];
+    if (preset?.waterChance && rngNext(rng) < preset.waterChance && (c.q !== 0 || c.r !== 0)) return 'water';
+    return type;
   });
+  const numberedIdx: number[] = [];
+  finalTypes.forEach((type, idx) => {
+    const def = reg.tiles.get(type);
+    if (def && def.land && def.numbered) numberedIdx.push(idx);
+  });
+  const placed = assignNumbers(numberedIdx.map(i => coords[i]), buildNumberPool(numberedIdx.length), rng);
+  const numberAt = new Map<number, number>();
+  numberedIdx.forEach((idx, k) => numberAt.set(idx, placed[k]));
+
+  const inits: HexInit[] = coords.map((c, idx) => ({
+    q: c.q, r: c.r, type: finalTypes[idx], number: numberAt.get(idx) ?? null, ext: {}
+  }));
 
   const extra = preset?.extra ? preset.extra(rules, total) : {};
   for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, rng, extra);

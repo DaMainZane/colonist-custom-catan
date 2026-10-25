@@ -645,6 +645,14 @@ svg#boardSvg:active { cursor: grabbing; }
 .tag.accent { background: var(--accent); color: var(--on-accent); }
 .p-avatar { width: 34px; height: 34px; font-size: 14px; }
 
+/* 6-8 players: tighter rows, taller list (log and chat shrink to make room) */
+.players-stack.dense { max-height: 66%; gap: 4px; }
+.players-stack.dense .p-row { padding: 5px 8px; gap: 3px 8px; }
+.players-stack.dense .p-avatar { width: 28px; height: 28px; }
+.players-stack.dense .p-vp { font-size: 17px; }
+.players-stack.dense .p-vp small { margin-top: 0; }
+.players-stack.dense .stat { padding: 2px 6px; font-size: 11.5px; }
+
 .bank-bar { background: var(--surface); border-radius: var(--r); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .bank-ico { color: var(--ink-dim); }
 .bank-item { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; }

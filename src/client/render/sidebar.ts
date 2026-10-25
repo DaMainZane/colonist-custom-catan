@@ -87,6 +87,8 @@ export function renderSidebar(): void {
   // innerHTML rebuilds reset the scroll position, which made the list jump. Keep it.
   const stackEl = document.getElementById('playersStack')!;
   const stackTop = stackEl.scrollTop;
+  // 6+ players: tighter rows so the whole table fits without a long scroll.
+  stackEl.classList.toggle('dense', state.players.length > 5);
 
   stackEl.innerHTML = state.players.map((p, idx) => {
     const isVictim = canPickVictim && victimSet.has(p.id);

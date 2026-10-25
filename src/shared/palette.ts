@@ -7,7 +7,7 @@ export const PLAYER_COLORS: string[] = [
   '#8e24aa', // Purple
   '#fdd835', // Yellow
   '#00acc1', // Cyan
-  '#f4511e'  // Coral
+  '#ec407a'  // Pink
 ];
 
 export const AVATARS: string[] = ['🦊', '🐼', '🦁', '🐸', '🐯', '🐙', '🦄', '🦅'];

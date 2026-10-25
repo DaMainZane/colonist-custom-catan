@@ -4,15 +4,24 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
-import { newBoard, isPreset, mergeSettings, paintHex, paintPort } from './lobby';
+import { newBoard, isPreset, mergeSettings, paintHex, paintPort, recommendedRadius } from './lobby';
 import { loadPreset, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
 import { registry } from './runtime';
 import { DEFAULT_TIER, TAKEOVER_TIER, normalizeTier, tierLabel } from './bots/tiers';
 import { reactToChat } from './bots/dialogue';
+import type { Room } from './types';
 
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
+
+/** Once the table passes 4 and the map radius is below what that many players need, tell the lobby once per size. */
+function noteCrowding(room: Room): void {
+  const n = room.lobbyPlayers.length;
+  const want = recommendedRadius(n);
+  if (n <= 4 || room.settings.boardRadius >= want) return;
+  addLobbyLog(room, `${n} players: map radius ${want}+ recommended (now ${room.settings.boardRadius}). Rules and cards tab, Map radius.`, null);
+}
 
 export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket) => {
@@ -65,6 +74,7 @@ export function registerSocketHandlers(io: Server): void {
       room.lobbyPlayers.push(newP);
       socket.join(room.code);
       addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
+      noteCrowding(room);
       broadcastRoom(room);
     }));
 
@@ -78,6 +88,7 @@ export function registerSocketHandlers(io: Server): void {
       bot.avatar = freeAvatar(room);
       room.lobbyPlayers.push(bot);
       addLobbyLog(room, `🤖 ${bot.name} [${tierLabel(tierId)}] added`, bot.color);
+      noteCrowding(room);
       broadcastRoom(room);
     }));
 

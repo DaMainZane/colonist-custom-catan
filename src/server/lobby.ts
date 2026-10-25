@@ -1,17 +1,22 @@
 // MODULE: lobby board tools (generate, presets, paint terrain/numbers/robber/ports) on the engine board | USED BY: server/socket, server/rooms
-import { buildTopology, createRng, generateBoard, hexDistance, randomSeed } from '../shared';
+import { REAL_NUMBER_POOL, buildTopology, createRng, generateBoard, hexDistance, randomSeed } from '../shared';
 import type { Board, HexInit } from '../shared';
 import { normalizeBotChat } from './bots/dialogue/events';
 import { fullRules, registry } from './runtime';
 import type { Settings } from './types';
 import { clamp } from './util';
 
-const NUMBERS = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+const NUMBERS = REAL_NUMBER_POOL;
 
 const isLand = (type: string): boolean => !!registry.tiles.get(type)?.land;
 
 export function newBoard(settings: Settings, preset = 'standard'): Board {
   return generateBoard(registry, fullRules(settings), createRng(randomSeed()), preset);
+}
+
+/** Smallest map radius that is comfortable for this many players (the default radius 2 fits 4). */
+export function recommendedRadius(players: number): number {
+  return players <= 4 ? 2 : players <= 6 ? 3 : 4;
 }
 
 export function isPreset(id: any): boolean {

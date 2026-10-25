@@ -37,6 +37,9 @@ export function renderAll(): void {
   if (selCards) selCards.value = String(curSpeed);
 
   const lobbyBar = document.getElementById('lobbyToolbar')!;
+  // "Back to lobby" means nothing while you are already there.
+  const backBtn = document.getElementById('btnBackToLobby');
+  if (backBtn) backBtn.style.display = state.status === 'LOBBY' ? 'none' : '';
   if (state.status === 'LOBBY') {
     const setVal = (id: string, v: any) => { (document.getElementById(id) as HTMLInputElement).value = v; };
     setVal('setRadius', s.boardRadius);

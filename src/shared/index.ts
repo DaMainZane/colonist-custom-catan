@@ -5,6 +5,7 @@ export * from './palette';
 export * from './ctx';
 export * from './registry';
 export * from './topology';
+export * from './numbers';
 export * from './mapgen';
 export * from './state';
 export * from './engine';

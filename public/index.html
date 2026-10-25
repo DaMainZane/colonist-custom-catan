@@ -71,7 +71,7 @@
         </div>
         <div class="menu-actions">
           <button class="btn sm" onclick="resetCamera()"><span data-icon="fit" data-size="16"></span>Fit board</button>
-          <button class="btn sm" onclick="rematchLobby()"><span data-icon="refresh" data-size="16"></span>Back to lobby</button>
+          <button class="btn sm" id="btnBackToLobby" onclick="rematchLobby()"><span data-icon="refresh" data-size="16"></span>Back to lobby</button>
         </div>
       </div>
 
@@ -206,7 +206,7 @@
               </label>
               <label class="field">Map radius (1-50)<input id="setRadius" type="number" class="num" value="2" min="1" max="50" onchange="pushSettings()" /></label>
               <label class="field">VP to win<input id="setVp" type="number" class="num" value="10" min="3" max="50" onchange="pushSettings()" /></label>
-              <label class="field">Max players<input id="setMaxP" type="number" class="num" value="4" min="2" max="8" onchange="pushSettings()" /></label>
+              <label class="field">Max players<input id="setMaxP" type="number" class="num" value="8" min="2" max="8" onchange="pushSettings()" /></label>
               <label class="field">Discard above<input id="setDiscard" type="number" class="num" value="7" min="3" max="50" onchange="pushSettings()" /></label>
             </div>
             <div class="rule-group">

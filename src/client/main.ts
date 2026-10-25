@@ -29,7 +29,7 @@ import { sendChat } from './render/sidebar';
 import {
   createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu, setGameSpeedValue,
   setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
-  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier
+  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
@@ -90,6 +90,8 @@ socket.on('gameState', (newState: any) => {
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
   setState(newState);
+  // Back in the lobby after a game: fold the menus away so nothing overlaps; the settings button reopens the dock.
+  if (!wasLobby && state.status === 'LOBBY') collapseLobbyUi();
   document.getElementById('authScreen')!.style.display = 'none';
   document.getElementById('gameViewport')!.style.display = 'flex';
 

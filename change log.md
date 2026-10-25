@@ -1,5 +1,17 @@
 # Change Log
 
+## 2026-10-25 (Pass 8: 8 players, number tokens, lobby overlap)
+### Added
+- `src/shared/numbers.ts`: real 18-token pool, `buildNumberPool(count)` for any board size, `assignNumbers` (no touching 6/8, equal numbers apart as a soft goal). `tests/numbers.test.ts`.
+- 8-player lobbies: default seats 8, 8th color is pink (was coral, too close to orange). `settingsForPlayers` (`runtime.ts`) grows bank and dev deck at game start (5-6: 24 per resource, 34 dev; 7-8: 30, 43) only if the host left them at standard. Lobby log hint when 5+ players sit on a map below the recommended radius (`recommendedRadius`: 2 / 3 / 4). Start check for 5+ players needs `players * 8` vertices (4 or fewer unchanged). Sidebar `dense` rows at 6+ players.
+
+### Changed
+- `mapgen.ts`: number pool is sized by the numbered tiles, not all hexes. Before, the standard board got a 19th token (an extra 2). 18 tiles = exactly the real pool. Other sizes use the real shares tilted slightly (2/12 x0.65, 3/11 x0.85, 5/9 x1.05, 6/8 x1.1): 2/12 about 3.7%, 3/11 about 9.8%, 6/8 about 12.7% each on big boards (real: 5.6%, 11.1%, 11.1%). Average pips per tile 3.22 to 3.40.
+- Game menu and lobby dock never open together. "Back to lobby" (and Play again) closes the menu and folds the dock; the settings button reopens it. "Back to lobby" button hidden while in the lobby (`btnBackToLobby`).
+
+### Notes
+- Not run in this session (no shell access to the repo): run `npm run typecheck` and `npm test`. The algorithm was checked standalone (no touching 6/8 on 900 boards at radius 2 to 4; best effort above radius 20).
+
 ## 2026-10-25 (Pass 7: bot dialogue)
 ### Added
 - New bot dialogue engine in `src/server/bots/dialogue/` (`index.ts`, `engine.ts`, `context.ts`, `events.ts`, `types.ts`) with the line data in `lines/` (`roll`, `robber`, `build`, `awards`, `trade`, `table`). `bots/dialogue.ts` is now a re-export, so `game.ts` and `socket.ts` imports did not change.

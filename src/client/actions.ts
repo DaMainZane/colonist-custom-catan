@@ -67,13 +67,31 @@ export function toggleLobbyToolbar(): void {
     return;
   }
   const el = document.getElementById('lobbyToolbar')!;
-  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  const show = el.style.display === 'none';
+  // The dock and the game menu sit in the same corner, so only one is open at a time.
+  if (show) {
+    const menu = document.getElementById('gameSettingsMenu');
+    if (menu) menu.style.display = 'none';
+  }
+  el.style.display = show ? 'flex' : 'none';
+}
+
+/** After "Back to lobby" (and Play again): close the game menu and fold the dock away. The settings button brings the dock back. */
+export function collapseLobbyUi(): void {
+  const menu = document.getElementById('gameSettingsMenu');
+  if (menu) menu.style.display = 'none';
+  const dock = document.getElementById('lobbyToolbar');
+  if (dock) dock.style.display = 'none';
 }
 
 export function toggleGameMenu(forceShow?: boolean): void {
   const menu = document.getElementById('gameSettingsMenu');
   if (!menu) return;
   const shouldShow = typeof forceShow === 'boolean' ? forceShow : menu.style.display === 'none';
+  if (shouldShow) {
+    const dock = document.getElementById('lobbyToolbar');
+    if (dock) dock.style.display = 'none';
+  }
   menu.style.display = shouldShow ? 'flex' : 'none';
   playTone(500, 0.05);
 }
