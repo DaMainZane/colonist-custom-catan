@@ -128,7 +128,27 @@ export function applyPreset(preset: string): void {
   playTone(520, 0.08);
 }
 
+let wheelSettingsTimer: any = null;
+let lastWheelEditAt = 0;
+
+export function isPendingSettingsPush(): boolean {
+  return wheelSettingsTimer !== null || (performance.now() - lastWheelEditAt < 260);
+}
+
+export function schedulePushSettings(): void {
+  lastWheelEditAt = performance.now();
+  if (wheelSettingsTimer !== null) clearTimeout(wheelSettingsTimer);
+  wheelSettingsTimer = setTimeout(() => {
+    wheelSettingsTimer = null;
+    pushSettings();
+  }, 110);
+}
+
 export function pushSettings(): void {
+  if (wheelSettingsTimer !== null) {
+    clearTimeout(wheelSettingsTimer);
+    wheelSettingsTimer = null;
+  }
   if (!state) return;
   if (state.hostId !== socket.id) {
     showToast('Only the host can change settings.');

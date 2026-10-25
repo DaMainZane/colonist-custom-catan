@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-10-26 06:36:12 (Pass 22: Big-map & zoom-out performance optimization, bot roll/card animation pacing fix & mouse-wheel scrolling on Rules/Cards numbers)
+### Optimized
+- **Zoom-Out & Large-Map Rendering / Panning Performance** (`src/client/render/board.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 06:36:12`:
+  - Split `#boardSvg` into persistent `<g>` layers (`#boardTerrainLayer`, `#boardHexDynamicLayer`, `#boardPortsLayer`, `#roadHighlightLayer`, `#roadRimsLayer`, `#roadBodiesLayer`, `#roadHitsLayer`, `#roadSpotsLayer`, `#boardVerticesLayer`) with dirty-key caching (`lastTerrainKey`, `lastPortsKey`, `lastPlacedRoadsKey`) and precomputed hex geometry (`ensureHexGeomCache`) so gameplay ticks never re-parse static hex tiles, terrain icons, tokens, or port bridges.
+  - Combined all shallow-water bank polygons into a single `<path>` and all sand beach polygons into a single `<path>` (reducing `2 × N` heavy `<polygon>` nodes to 2 `<path>` nodes on large maps).
+  - Removed expensive SVG `filter: drop-shadow(...)` blurs from `.port-ring`, `.spot-pulse`, `.road-spot-dot`, `.target-ring.upgrade`, and `.vertex-select-glow` in favor of crisp vector strokes, and disabled endless CSS pulse animations on large maps (`hexes > 30`).
+  - Coalesced camera pan/zoom updates into `requestAnimationFrame`, cached `getBoundingClientRect()` on drag start, added `.is-panning` on `#boardSvg` during drag to skip browser SVG pointer hit-testing and pause animations while moving around, and cached `analyzeRoadConnection()` in `roadAnalysisCache` (bounded at 4,000 DFS steps).
+
+### Fixed
+- **Premature Bot Actions During Roll & Card Delivery Animations** (`src/server/types.ts`, `src/server/game.ts`, `src/server/net.ts`, `src/server/bots/scheduler.ts`, `src/client/render/board.ts`) — `2026-10-26 06:36:12`:
+  - Added `animDelayMs` on `room.fx` and `animatingUntil` on `Room` (`1550ms` for resource-producing rolls, `1150ms` for setup production and card transfers/steals/monopoly/year-of-plenty/dev buys, `750ms` for robber movement, `700ms` for non-producing/7 rolls).
+  - Updated `scheduleBots()` to clear any pending timer and wait for `Math.max(0, room.animatingUntil - Date.now()) + thinkMs` before bots trade, rob, discard, or make moves, and added `peekNextBotDelay()` so bot board searches only run once when the timer fires.
+  - Updated client `triggerFlyingResourceAnimations()` and `triggerCardTransferAnimations()` to launch producing hexes in parallel (`180ms` roll lead-in + `30ms` per-hex stagger + `110ms` stack stagger, `780ms` flight) and coalesced `syncInFlightUi()` via `requestAnimationFrame` so cards always land in hands before the next bot action starts.
+
+### Added
+- **Mouse Wheel Scroll on Numbers in Rules & Cards Menu** (`src/client/main.ts`, `src/client/actions.ts`, `src/client/render/index.ts`, `src/client/styles.css`) — `2026-10-26 06:36:12`:
+  - Hovering over any number input (or its `.field` row) in the Rules and Cards menu (`#lobbyTabCards` / `#lobbyToolbar`) and scrolling the mouse wheel up or down increments or decrements the value by `step` (`5 × step` when holding `Shift`), clamped to `[min, max]`, with debounced settings sync (`schedulePushSettings`) and without zooming the background board.
+
 ## 2026-10-26 00:28:34 (Pass 21: Zoom-adaptive settlement & city scaling)
 ### Added
 - **Zoom-Adaptive Settlement & City Scaling** (`src/client/render/board.ts`, `src/client/icons.ts`, `src/client/styles.css`) — `2026-10-26 00:28:34`:

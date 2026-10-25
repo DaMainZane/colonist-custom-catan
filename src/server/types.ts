@@ -84,6 +84,7 @@ export interface Effects {
   lastRollHexIds: number[];
   recentProductions: RecentProduction[];
   recentTransfers: RecentTransfer[];
+  animDelayMs?: number;
 }
 
 export interface Room {
@@ -103,6 +104,8 @@ export interface Room {
   fx: Effects;
   startedAt: number | null;
   finishedAt: number | null;
+  /** Timestamp until which client roll/card/robber animations are still playing; bots wait until after this time. */
+  animatingUntil?: number;
   botTimer?: any;
   /** Trade id the bot-proposal timeout was scheduled for. */
   tradeTimerFor?: number | null;

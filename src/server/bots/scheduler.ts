@@ -120,6 +120,34 @@ function handleTurnExpiry(room: Room): void {
   broadcastRoom(room);
 }
 
+/** Fast O(players) check for whether any bot might act next, without scanning the board during broadcast. */
+function peekNextBotDelay(room: Room): { botId: string; baseMs: number } | null {
+  const g = room.game;
+  if (!g || g.phase === 'gameover') return null;
+  const trades = openTrades(g);
+  const order = [g.players[g.turn], ...g.players.filter((_, i) => i !== g.turn)];
+  for (const p of order) {
+    if (!p || !p.isBot) continue;
+    if (trades.some(t => t.fromId !== p.id && t.responses[p.id] === 'pending')) {
+      return { botId: p.id, baseMs: BASE_DELAY.respond_trade };
+    }
+    if (g.phase === 'discard') {
+      if ((p.pending.discard || 0) > 0) return { botId: p.id, baseMs: BASE_DELAY.discard };
+      continue;
+    }
+    if (g.phase === 'pick') {
+      if ((p.pending.pick || 0) > 0) return { botId: p.id, baseMs: BASE_DELAY.pick };
+      continue;
+    }
+    if (g.players[g.turn]?.id === p.id) {
+      const myTrade = trades.find(t => t.fromId === p.id);
+      if (myTrade && Object.values(myTrade.responses).some(r => r === 'pending')) continue;
+      return { botId: p.id, baseMs: DEFAULT_DELAY };
+    }
+  }
+  return null;
+}
+
 function runBotStep(room: Room): void {
   const g = room.game;
   if (!g || g.phase === 'gameover') return;
@@ -142,7 +170,7 @@ function runBotStep(room: Room): void {
   broadcastRoom(room); // schedules the next step
 }
 
-/** Called after every broadcast. At most one bot step is pending per room. */
+/** Called after every broadcast. At most one bot step is pending per room, gated by any active roll/card animation. */
 export function scheduleBots(room: Room): void {
   const g = room.game;
   if (!g || g.phase === 'gameover') {
@@ -151,14 +179,19 @@ export function scheduleBots(room: Room): void {
   }
   ensureTradeTimers(room);
   syncTurnClock(room);
-  if (room.botTimer) return;
+  if (room.botTimer) {
+    clearTimeout(room.botTimer);
+    room.botTimer = undefined;
+  }
 
-  const move = nextBotMove(room);
-  if (!move) return;
+  const peek = peekNextBotDelay(room);
+  if (!peek) return;
+  const animRemaining = Math.max(0, (room.animatingUntil || 0) - Date.now());
+  const thinkMs = delay(room, peek.baseMs * thinkFactor(room, peek.botId));
   room.botTimer = setTimeout(() => {
     room.botTimer = undefined;
     try { runBotStep(room); } catch (e) { console.error('[bots]', e); }
-  }, delay(room, (BASE_DELAY[move.type] ?? DEFAULT_DELAY) * thinkFactor(room, move.botId)));
+  }, animRemaining + thinkMs);
 }
 
 /** Hooks the scheduler into the broadcast. Call once at startup. */

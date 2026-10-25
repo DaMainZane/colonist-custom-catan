@@ -169,6 +169,12 @@ svg.glyph, svg.ui-icon { display: block; flex-shrink: 0; }
 .num {
   width: 58px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--line);
   background: var(--surface); color: var(--ink); text-align: center; font-weight: 700; font-size: 13px;
+  transition: border-color 0.12s;
+}
+.rule-group .field:hover input.num[type="number"],
+input.num[type="number"]:hover {
+  border-color: var(--accent);
+  cursor: ns-resize;
 }
 select.num { width: auto; padding: 0 6px; }
 input[type=range] { accent-color: var(--accent); cursor: pointer; }
@@ -188,7 +194,7 @@ input[type=range] { accent-color: var(--accent); cursor: pointer; }
 .auth-card p { color: var(--ink-dim); font-size: 13px; margin-bottom: 22px; }
 .auth-card .stack { display: flex; flex-direction: column; gap: 10px; }
 .auth-card .btn { min-height: 44px; font-size: 14px; }
-.auth-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-dim); margin: 6px 0 2px; }
+.auth-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-dim); margin-bottom: 2px; margin-top: 6px; }
 .auth-theme { position: absolute; top: 12px; right: 12px; }
 
 /* ---------- Game layout ---------- */
@@ -199,6 +205,11 @@ input[type=range] { accent-color: var(--accent); cursor: pointer; }
 }
 svg#boardSvg { width: 100%; height: 100%; cursor: grab; }
 svg#boardSvg:active { cursor: grabbing; }
+svg#boardSvg.is-panning,
+svg#boardSvg.is-panning * {
+  pointer-events: none !important;
+  animation-play-state: paused !important;
+}
 
 /* ---------- Navigation (left column) ---------- */
 .left-nav { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 45; }
@@ -682,9 +693,8 @@ svg#boardSvg:active { cursor: grabbing; }
 .vertex-select-glow {
   fill: url(#vertexSelectGlowGrad);
   stroke: #ffffff;
-  stroke-width: 2;
+  stroke-width: 2.5;
   pointer-events: none;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
 }
 
 /* ---------- Right sidebar ---------- */
@@ -769,19 +779,20 @@ svg#boardSvg:active { cursor: grabbing; }
 .port-post { fill: var(--pier); stroke: var(--pier-dark); stroke-width: 2; }
 .port-badge-outer { fill: var(--pier-dark); stroke: var(--piece-rim); stroke-width: 2.2; }
 .port-badge { stroke: var(--pier-dark); stroke-width: 1.8; }
-.port-ring { fill: none; stroke: var(--accent); stroke-width: 3.5; filter: drop-shadow(0 0 5px var(--accent)); }
+.port-ring { fill: none; stroke: var(--accent); stroke-width: 4; }
 .port-text { fill: var(--token-ink); font-weight: 800; text-anchor: middle; }
 .port-ratio-pill { fill: var(--token); stroke: var(--pier-dark); stroke-width: 1.4; }
 .token-text { font-weight: 700; text-anchor: middle; }
 .spot-pulse {
-  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; cursor: pointer; filter: drop-shadow(0 0 5px var(--accent));
+  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.8; cursor: pointer;
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
+.spot-pulse.spot-static { animation: none; }
 .spot-pulse:hover { opacity: 1; animation: none; transform: scale(1.15); }
 @keyframes spotPulse { 0%, 100% { opacity: 0.78; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1.08); } }
 .road-spot-line { stroke: var(--accent); stroke-opacity: 0.35; stroke-width: 12; stroke-linecap: round; animation: roadGlow 1.6s ease-in-out infinite; }
 .road-spot-dot {
-  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.5; filter: drop-shadow(0 0 5px var(--accent));
+  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.8;
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
 @keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
@@ -872,7 +883,7 @@ svg#boardSvg:active { cursor: grabbing; }
 
 .target-ring { fill: none; stroke-width: 3; stroke-dasharray: 5 3; }
 .target-ring.upgrade {
-  stroke: var(--accent); filter: drop-shadow(0 0 5px var(--accent));
+  stroke: var(--accent); stroke-width: 3.5;
   transform-box: fill-box; transform-origin: center; animation: ringThrob 1.4s ease-in-out infinite;
 }
 @keyframes ringThrob { 0%, 100% { opacity: 0.55; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.12); } }

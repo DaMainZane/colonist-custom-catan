@@ -12,6 +12,11 @@ import type { LobbyPlayer, Room } from './types';
 /** Engine events -> the one-shot effects the client animates (productions, card transfers, rolled hexes). */
 export function recordEffects(room: Room, events: GameEvent[]): void {
   const fx = room.fx;
+  let hasRolled = false;
+  let hasProduced = false;
+  let hasTransfer = false;
+  let hasRobberMove = false;
+
   for (const ev of events) {
     const d = ev.data ?? {};
     switch (ev.type) {
@@ -20,9 +25,11 @@ export function recordEffects(room: Room, events: GameEvent[]): void {
         break;
       case 'rolled':
         fx.lastRollHexIds = d.hexIds ?? [];
+        hasRolled = true;
         break;
       case 'produced':
         fx.recentProductions.push({ hexId: d.hexId, playerId: d.playerId, resource: d.resource, amount: d.amount });
+        hasProduced = true;
         break;
       case 'transferred':
         fx.recentTransfers.push({
@@ -33,14 +40,40 @@ export function recordEffects(room: Room, events: GameEvent[]): void {
           kind: d.kind === 'pick' ? 'gold' : d.kind,
           ...(d.secret ? { secretForOthers: true } : {})
         });
+        hasTransfer = true;
         break;
       case 'devBought':
         fx.recentTransfers.push({ from: 'bank', to: d.playerId, resource: 'dev', amount: 1, kind: 'buyDev' });
+        hasTransfer = true;
+        break;
+      case 'robberMoved':
+        hasRobberMove = true;
         break;
       case 'gameOver':
         room.finishedAt = Date.now();
         break;
     }
+  }
+
+  let animDelayMs = 0;
+  if (hasRolled && hasProduced) {
+    // Wait for dice shake + flying resource cards to land in all players' hands before any bot acts
+    animDelayMs = 1550;
+  } else if (hasProduced) {
+    // Setup settlement initial resource production flight
+    animDelayMs = 1150;
+  } else if (hasRolled) {
+    // Dice shake on a 7 roll or non-producing roll
+    animDelayMs = 700;
+  }
+  if (hasTransfer) {
+    animDelayMs = Math.max(animDelayMs, 1150);
+  }
+  if (hasRobberMove) {
+    animDelayMs = Math.max(animDelayMs, 750);
+  }
+  if (animDelayMs > 0) {
+    fx.animDelayMs = Math.max(fx.animDelayMs || 0, animDelayMs);
   }
 }
 
@@ -72,7 +105,8 @@ export function startGame(room: Room): string | null {
     board: structuredClone(room.board),
     shuffleSeats: true
   });
-  room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [] };
+  room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [], animDelayMs: 0 };
+  room.animatingUntil = 0;
   room.startedAt = Date.now();
   room.finishedAt = null;
   emitGameStartDialogue(room);
@@ -89,7 +123,8 @@ export function rematch(room: Room): void {
     }));
   }
   room.game = null;
-  room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [] };
+  room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [], animDelayMs: 0 };
+  room.animatingUntil = 0;
   room.startedAt = null;
   room.finishedAt = null;
   // A new map each rematch, unless the host locked the seed (then the same recipe gives the same map again).

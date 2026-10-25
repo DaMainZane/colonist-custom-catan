@@ -42,12 +42,40 @@ const ROBBER_DY = -8;
 
 let cachedBoundsKey = '';
 let cachedBounds = { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
+let lastBuildingScale = -1;
+let cameraRafPending = false;
+
+// Layer dirty-keys so gameplay updates (rolls, trades, builds, selections) do not rebuild static hex terrain or ports.
+let lastTerrainKey = '';
+let lastPortsKey = '';
+let lastPlacedRoadsKey = '';
+
+interface HexGeomCache {
+  rawPts: string;
+  pathSub: string;
+  tilePoly: string;
+  innerPoly: string;
+}
+let cachedGeomBoardKey = '';
+let hexGeomCache = new Map<number, HexGeomCache>();
+
+interface RoadConnInfo {
+  ownerName: string;
+  ownerColor: string;
+  totalRoads: number;
+  longestStretch: number;
+  longestPathEdges: Set<number>;
+  componentEdges: number[];
+}
+const roadAnalysisCache = new Map<number, RoadConnInfo>();
 
 export function getBoardBounds(): { centerX0: number; centerY0: number; contentW: number; contentH: number } {
   if (!state || !state.board || !state.board.hexes || state.board.hexes.length === 0) {
     return { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
   }
-  const key = `${state.code}_${state.status}_${state.board.hexes.length}`;
+  const firstHex = state.board.hexes[0];
+  const lastHex = state.board.hexes[state.board.hexes.length - 1];
+  const key = `${state.code}_${state.status}_${state.board.hexes.length}_${firstHex?.x ?? 0}_${lastHex?.x ?? 0}`;
   if (key === cachedBoundsKey) return cachedBounds;
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -88,14 +116,20 @@ export function updateCameraViewBox(): void {
   const baseH = contentH * camZoom;
   const baseX = (centerX0 - camPanX) - baseW / 2;
   const baseY = (centerY0 - camPanY) - baseH / 2;
-  svg.setAttribute('viewBox', `${baseX} ${baseY} ${baseW} ${baseH}`);
+  svg.setAttribute('viewBox', `${baseX.toFixed(1)} ${baseY.toFixed(1)} ${baseW.toFixed(1)} ${baseH.toFixed(1)}`);
 
-  // Scale settlements and cities up as the camera zooms out (or on larger boards) so they stay easy to spot.
+  // Scale settlements and cities up as the camera zooms out (or on larger boards), only touching style when scale changes.
   const zoomFactor = Math.max(camZoom, Math.max(baseW, baseH) / 720);
   const buildingScale = Math.min(2.35, 1.22 * Math.pow(Math.max(1, zoomFactor), 0.62));
-  svg.style.setProperty('--building-scale', buildingScale.toFixed(3));
+  if (Math.abs(buildingScale - lastBuildingScale) >= 0.015) {
+    lastBuildingScale = buildingScale;
+    const vLayer = document.getElementById('boardVerticesLayer') || svg;
+    vLayer.style.setProperty('--building-scale', buildingScale.toFixed(3));
+  }
 
-  positionBoardBuildPopup();
+  if (selectedBoardVertexId !== null || selectedBoardEdgeId !== null) {
+    positionBoardBuildPopup();
+  }
 }
 
 function getPieceAnimAttrs(key: string, now: number): { isAnimating: boolean; delayStyle: string } {
@@ -117,6 +151,76 @@ function insetPoints(h: any, inset: number): string {
     const k = Math.max(0, (len - inset) / len);
     return `${(h.x + dx * k).toFixed(1)},${(h.y + dy * k).toFixed(1)}`;
   }).join(' ');
+}
+
+function ensureHexGeomCache(hexes: any[]): void {
+  const first = hexes[0];
+  const last = hexes[hexes.length - 1];
+  const geomKey = `${state?.code || ''}_${hexes.length}_${first?.x ?? 0}_${first?.y ?? 0}_${last?.x ?? 0}_${last?.y ?? 0}`;
+  if (geomKey === cachedGeomBoardKey && hexGeomCache.size === hexes.length) return;
+  cachedGeomBoardKey = geomKey;
+  hexGeomCache = new Map();
+  for (const h of hexes) {
+    const rawPts = h.corners.map((c: any) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+    const pathSub = h.corners
+      .map((c: any, idx: number) => `${idx === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+      .join('') + 'Z';
+    hexGeomCache.set(h.id, {
+      rawPts,
+      pathSub,
+      tilePoly: insetPoints(h, 5.5),
+      innerPoly: insetPoints(h, 7.5)
+    });
+  }
+}
+
+function ensureBoardLayers(svg: HTMLElement): {
+  terrainLayer: HTMLElement;
+  portsLayer: HTMLElement;
+  hexDynamicLayer: HTMLElement;
+  roadRimsLayer: HTMLElement;
+  roadBodiesLayer: HTMLElement;
+  roadHitsLayer: HTMLElement;
+  roadSpotsLayer: HTMLElement;
+  verticesLayer: HTMLElement;
+} {
+  let terrainLayer = document.getElementById('boardTerrainLayer');
+  if (!terrainLayer || terrainLayer.parentElement !== svg) {
+    svg.innerHTML = `
+      <defs>
+        <radialGradient id="vertexSelectGlowGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+          <stop offset="55%" stop-color="#ffffff" stop-opacity="0.55" />
+          <stop offset="85%" stop-color="#ffffff" stop-opacity="0.82" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.98" />
+        </radialGradient>
+      </defs>
+      <g id="boardTerrainLayer"></g>
+      <g id="boardHexDynamicLayer"></g>
+      <g id="boardPortsLayer"></g>
+      <g id="roadHighlightLayer"></g>
+      <g id="roadRimsLayer"></g>
+      <g id="roadBodiesLayer"></g>
+      <g id="roadHitsLayer"></g>
+      <g id="roadSpotsLayer"></g>
+      <g id="boardVerticesLayer"></g>
+    `;
+    lastTerrainKey = '';
+    lastPortsKey = '';
+    lastPlacedRoadsKey = '';
+    lastBuildingScale = -1;
+    terrainLayer = document.getElementById('boardTerrainLayer')!;
+  }
+  return {
+    terrainLayer,
+    portsLayer: document.getElementById('boardPortsLayer')!,
+    hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
+    roadRimsLayer: document.getElementById('roadRimsLayer')!,
+    roadBodiesLayer: document.getElementById('roadBodiesLayer')!,
+    roadHitsLayer: document.getElementById('roadHitsLayer')!,
+    roadSpotsLayer: document.getElementById('roadSpotsLayer')!,
+    verticesLayer: document.getElementById('boardVerticesLayer')!
+  };
 }
 
 // Number token: circle with the number (6 and 8 in the "hot" color).
@@ -209,11 +313,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const isLobbyHost = state.status === 'LOBBY' && state.hostId === socket.id;
   const rolledHexSet = new Set<number>(state.lastRollHexIds || []);
 
+  ensureHexGeomCache(hexes);
+  const layers = ensureBoardLayers(svg);
+
   if (state.status === 'LOBBY') {
     knownRoads.clear();
     knownBuildings.clear();
     knownFogHexes.clear();
     pieceAnimTimestamps.clear();
+    roadAnalysisCache.clear();
     knownRobberHexId = robberHexId;
     for (const h of hexes) {
       if (h.fog || h.type === 'fog') knownFogHexes.add(h.id);
@@ -244,6 +352,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
 
+  let hasActiveFogAnim = false;
   for (const h of hexes) {
     const isFog = !!h.fog || h.type === 'fog';
     if (isFog) {
@@ -252,7 +361,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       knownFogHexes.delete(h.id);
       pieceAnimTimestamps.set(`fog_${h.id}`, now);
     }
+    if (!hasActiveFogAnim && getPieceAnimAttrs(`fog_${h.id}`, now).isAnimating) {
+      hasActiveFogAnim = true;
+    }
   }
+
+  let hasActiveRoadAnim = false;
   for (const e of edges) {
     if (e.road && !knownRoads.has(e.id)) {
       knownRoads.add(e.id);
@@ -261,6 +375,9 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         playedRoadSfx = true;
         playPlaceRoadSound();
       }
+    }
+    if (!hasActiveRoadAnim && e.road && getPieceAnimAttrs(`road_${e.id}`, now).isAnimating) {
+      hasActiveRoadAnim = true;
     }
   }
   for (const v of vertices) {
@@ -284,114 +401,171 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   updateCameraViewBox();
 
-  let html = `
-    <defs>
-      <radialGradient id="vertexSelectGlowGrad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
-        <stop offset="55%" stop-color="#ffffff" stop-opacity="0.55" />
-        <stop offset="85%" stop-color="#ffffff" stop-opacity="0.82" />
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.98" />
-      </radialGradient>
-    </defs>
-  `;
-
-  // Shallow water and sandy border under ALL land tiles (not only outer coastal tiles).
-  const allLandPolys = hexes
-    .filter((h: any) => h.type !== 'water')
-    .map((h: any) => h.corners.map((c: any) => `${c.x},${c.y}`).join(' '));
-  allLandPolys.forEach((pts: string) => {
-    html += `<polygon points="${pts}" style="fill:var(--sea-shallow);stroke:var(--sea-shallow);stroke-width:46;stroke-linejoin:round" />`;
-  });
-
-  // Sandy beach under all land tiles so both the coastline and inner tile gaps show sand.
-  allLandPolys.forEach((pts: string) => {
-    html += `<polygon points="${pts}" style="fill:var(--sand);stroke:var(--sand);stroke-width:16;stroke-linejoin:round" />`;
-  });
-
-  const robberAnim = getPieceAnimAttrs('robber_move', now);
+  // 1. Static / Terrain Layer: rebuilds only when board terrain/numbers/fog/lobby brush changes.
   const canPaintHex = isLobbyHost && (activeBrush.type === 'terrain' || activeBrush.type === 'number' || activeBrush.type === 'robber');
-
+  const terrainSigParts: string[] = [
+    cachedGeomBoardKey,
+    state.status,
+    canPaintHex ? '1' : '0',
+    hasActiveFogAnim ? String(Math.floor(now / 32)) : '0'
+  ];
   for (const h of hexes) {
-    if (h.type === 'water') {
-      if (state.status === 'LOBBY') {
-        const pts = h.corners.map((c: any) => `${c.x},${c.y}`).join(' ');
-        html += `
-          <polygon data-paintable="${canPaintHex ? '1' : ''}" points="${pts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;stroke-dasharray:6 4;cursor:${canPaintHex ? 'pointer' : 'grab'}"
-            onmousedown="onHexInteract(${h.id}, event)" onmouseenter="onHexEnter(${h.id}, event)" />
-        `;
-      }
-      continue;
+    const isFog = !!h.fog || h.type === 'fog';
+    terrainSigParts.push(`${isFog ? 'fog' : h.type}:${isFog ? '' : (h.number || '')}`);
+  }
+  const terrainKey = terrainSigParts.join('|');
+
+  if (terrainKey !== lastTerrainKey) {
+    lastTerrainKey = terrainKey;
+    let landPathD = '';
+    for (const h of hexes) {
+      if (h.type === 'water') continue;
+      const g = hexGeomCache.get(h.id);
+      if (g) landPathD += g.pathSub;
     }
 
-    const tilePoly = insetPoints(h, 5.5);
-    const innerPoly = insetPoints(h, 7.5);
-    const isFog = !!h.fog || h.type === 'fog';
-    const tileType = isFog ? 'fog' : h.type;
-    const meta = RES_META[tileType] || RES_META.desert;
-    const canClickRobber = isMyTurn && state.phase === 'ROBBER' && h.id !== robberHexId && !isFog;
-    const hasNumber = !isFog && !!h.number;
-    const isRolledHex = !isFog && rolledHexSet.has(h.id);
-    const fogAnim = getPieceAnimAttrs(`fog_${h.id}`, now);
-    const glyph = hasNumber ? getBoardIconSvg(tileType, 0, -24, 1.45) : getBoardIconSvg(tileType, 0, 0, 1.9);
+    let terrainHtml = '';
+    if (landPathD) {
+      // Single combined <path> for shallow water and single <path> for sand instead of 2*N separate polygons.
+      terrainHtml += `<path d="${landPathD}" style="fill:var(--sea-shallow);stroke:var(--sea-shallow);stroke-width:46;stroke-linejoin:round" />`;
+      terrainHtml += `<path d="${landPathD}" style="fill:var(--sand);stroke:var(--sand);stroke-width:16;stroke-linejoin:round" />`;
+    }
 
-    html += `
-      <g data-paintable="${canPaintHex ? '1' : ''}"
-         style="${canPaintHex || canClickRobber ? 'cursor:pointer' : ''}"
-         onmousedown="onHexInteract(${h.id}, event)"
-         onclick="onHexClick(${h.id}, event)"
-         onmouseenter="onHexEnter(${h.id}, event)">
-        <polygon points="${tilePoly}" style="fill:${meta.color};stroke:${meta.border};stroke-width:4;stroke-linejoin:round" />
-        <g transform="translate(${h.x}, ${h.y})">
-          <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
-            ${glyph}
-            ${hasNumber ? tokenMarkup(h.number) : ''}
-          </g>
-        </g>
-        ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${innerPoly}" style="${rollDimStyle}" />` : ''}
-        ${canClickRobber ? `<polygon class="hex-tint" points="${innerPoly}" /><polygon class="hex-target" points="${innerPoly}" />` : ''}
+    for (const h of hexes) {
+      const geom = hexGeomCache.get(h.id)!;
+      if (h.type === 'water') {
+        if (state.status === 'LOBBY') {
+          terrainHtml += `
+            <polygon data-paintable="${canPaintHex ? '1' : ''}" points="${geom.rawPts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;stroke-dasharray:6 4;cursor:${canPaintHex ? 'pointer' : 'grab'}"
+              onmousedown="onHexInteract(${h.id}, event)" onmouseenter="onHexEnter(${h.id}, event)" />
+          `;
+        }
+        continue;
+      }
 
-        ${h.id === robberHexId && !isFog ? `
-          <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})">
-            ${robberAnim.isAnimating ? `<circle cx="0" cy="0" r="24" class="robber-impact-ring" style="${robberAnim.delayStyle}" />` : ''}
-            <g class="${robberAnim.isAnimating ? 'robber-drop-anim' : ''}" style="${robberAnim.delayStyle}">
-              <g transform="scale(0.85)">${robberMarkup()}</g>
+      const isFog = !!h.fog || h.type === 'fog';
+      const tileType = isFog ? 'fog' : h.type;
+      const meta = RES_META[tileType] || RES_META.desert;
+      const hasNumber = !isFog && !!h.number;
+      const fogAnim = getPieceAnimAttrs(`fog_${h.id}`, now);
+      const glyph = hasNumber ? getBoardIconSvg(tileType, 0, -24, 1.45) : getBoardIconSvg(tileType, 0, 0, 1.9);
+
+      terrainHtml += `
+        <g data-paintable="${canPaintHex ? '1' : ''}"
+           style="${canPaintHex ? 'cursor:pointer' : ''}"
+           onmousedown="onHexInteract(${h.id}, event)"
+           onclick="onHexClick(${h.id}, event)"
+           onmouseenter="onHexEnter(${h.id}, event)">
+          <polygon points="${geom.tilePoly}" style="fill:${meta.color};stroke:${meta.border};stroke-width:4;stroke-linejoin:round" />
+          <g transform="translate(${h.x}, ${h.y})">
+            <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
+              ${glyph}
+              ${hasNumber ? tokenMarkup(h.number) : ''}
             </g>
           </g>
-        ` : ''}
-      </g>
-    `;
-  }
-
-  // Ports (aligned with hexagon edge; owned ones are ringed in the accent color).
-  for (const e of edges) {
-    if (e.hexIds.length !== 1) continue;
-    const v1 = vertices[e.v1], v2 = vertices[e.v2];
-    if (!v1 || !v2) continue;
-
-    const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
-    const h = hexes[e.hexIds[0]];
-
-    if (e.port) {
-      const owned = [v1, v2].some((v: any) => v.building && v.building.owner === socket.id);
-      html += portMarkup(e, v1, v2, h, owned, isLobbyHost);
-    } else if (isLobbyHost && activeBrush.type === 'port') {
-      html += `
-        <circle data-paintable="1" cx="${mx}" cy="${my}" r="9" style="fill:rgba(255,255,255,0.5);stroke:var(--accent);stroke-width:2;cursor:pointer"
-          onclick="onEdgeInteract(${e.id})" />
+        </g>
       `;
     }
+    layers.terrainLayer.innerHTML = terrainHtml;
   }
 
-  // Roads: auto-connect adjacent roads of the same player into one continuous rimmed road.
-  let roadRimsHtml = '';
-  let roadBodiesHtml = '';
-  let roadHitsHtml = '';
-  let roadSpotsHtml = '';
+  // 2. Dynamic Hex Overlay Layer: rolled hex dimming, robber target highlights, and the robber piece.
+  const robberAnim = getPieceAnimAttrs('robber_move', now);
+  let hexDynHtml = '';
+  const isRobberPhase = isMyTurn && state.phase === 'ROBBER';
+  for (const h of hexes) {
+    if (h.type === 'water') continue;
+    const isFog = !!h.fog || h.type === 'fog';
+    if (isFog) continue;
+    const geom = hexGeomCache.get(h.id)!;
+    const isRolledHex = showRollDim && rolledHexSet.has(h.id);
+    const canClickRobber = isRobberPhase && h.id !== robberHexId;
+    const hasRobber = h.id === robberHexId;
 
+    if (!isRolledHex && !canClickRobber && !hasRobber) continue;
+
+    if (isRolledHex) {
+      hexDynHtml += `<polygon class="hex-rolled" points="${geom.innerPoly}" style="${rollDimStyle}" />`;
+    }
+    if (canClickRobber) {
+      hexDynHtml += `
+        <g onclick="onHexClick(${h.id}, event)" style="cursor:pointer">
+          <polygon class="hex-tint" points="${geom.innerPoly}" />
+          <polygon class="hex-target" points="${geom.innerPoly}" />
+        </g>`;
+    }
+    if (hasRobber) {
+      hexDynHtml += `
+        <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})" style="pointer-events:none">
+          ${robberAnim.isAnimating ? `<circle cx="0" cy="0" r="24" class="robber-impact-ring" style="${robberAnim.delayStyle}" />` : ''}
+          <g class="${robberAnim.isAnimating ? 'robber-drop-anim' : ''}" style="${robberAnim.delayStyle}">
+            <g transform="scale(0.85)">${robberMarkup()}</g>
+          </g>
+        </g>`;
+    }
+  }
+  layers.hexDynamicLayer.innerHTML = hexDynHtml;
+
+  // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.
+  const canPaintPort = isLobbyHost && activeBrush.type === 'port';
+  const portsSigParts: string[] = [cachedGeomBoardKey, canPaintPort ? '1' : '0'];
   for (const e of edges) {
-    const v1 = vertices[e.v1], v2 = vertices[e.v2];
-    if (!v1 || !v2) continue;
-    if (e.road) {
+    if (e.hexIds.length !== 1) continue;
+    if (e.port) {
+      const v1 = vertices[e.v1], v2 = vertices[e.v2];
+      const owned = Boolean(v1 && v2 && [v1, v2].some((v: any) => v.building && v.building.owner === socket.id));
+      portsSigParts.push(`${e.id}:${e.port}:${owned ? '1' : '0'}`);
+    }
+  }
+  const portsKey = portsSigParts.join('|');
+  if (portsKey !== lastPortsKey) {
+    lastPortsKey = portsKey;
+    let portsHtml = '';
+    for (const e of edges) {
+      if (e.hexIds.length !== 1) continue;
+      const v1 = vertices[e.v1], v2 = vertices[e.v2];
+      if (!v1 || !v2) continue;
+
+      const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+      const h = hexes[e.hexIds[0]];
+
+      if (e.port) {
+        const owned = [v1, v2].some((v: any) => v.building && v.building.owner === socket.id);
+        portsHtml += portMarkup(e, v1, v2, h, owned, isLobbyHost);
+      } else if (canPaintPort) {
+        portsHtml += `
+          <circle data-paintable="1" cx="${mx}" cy="${my}" r="9" style="fill:rgba(255,255,255,0.5);stroke:var(--accent);stroke-width:2;cursor:pointer"
+            onclick="onEdgeInteract(${e.id})" />
+        `;
+      }
+    }
+    layers.portsLayer.innerHTML = portsHtml;
+  }
+
+  // 4. Placed Roads Layers: rebuilds only when placed roads, blocking buildings, or road drop animations change.
+  const placedRoadsSigParts: string[] = [
+    cachedGeomBoardKey,
+    hasActiveRoadAnim ? String(Math.floor(now / 32)) : '0'
+  ];
+  for (const e of edges) {
+    if (e.road) placedRoadsSigParts.push(`r${e.id}:${e.road}`);
+  }
+  for (const v of vertices) {
+    if (v.building) placedRoadsSigParts.push(`b${v.id}:${v.building.owner}`);
+  }
+  const placedRoadsKey = placedRoadsSigParts.join('|');
+
+  if (placedRoadsKey !== lastPlacedRoadsKey) {
+    lastPlacedRoadsKey = placedRoadsKey;
+    roadAnalysisCache.clear();
+    let roadRimsHtml = '';
+    let roadBodiesHtml = '';
+    let roadHitsHtml = '';
+
+    for (const e of edges) {
+      if (!e.road) continue;
+      const v1 = vertices[e.v1], v2 = vertices[e.v2];
+      if (!v1 || !v2) continue;
       const ownerId = e.road;
       const owner = state.players.find(p => p.id === ownerId);
       const col = owner?.color || '#888';
@@ -441,7 +615,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           onmouseenter="onRoadHover(${e.id}, event)"
           onmousemove="onRoadMove(event)"
           onmouseleave="onRoadLeave()" />`;
-    } else if (isMyTurn && canClientPlaceRoad(e, me)) {
+    }
+
+    layers.roadRimsLayer.innerHTML = roadRimsHtml;
+    layers.roadBodiesLayer.innerHTML = roadBodiesHtml;
+    layers.roadHitsLayer.innerHTML = roadHitsHtml;
+  }
+
+  // 5. Road Spots Layer (buildable and inspectable edges)
+  let roadSpotsHtml = '';
+  for (const e of edges) {
+    if (e.road) continue;
+    const v1 = vertices[e.v1], v2 = vertices[e.v2];
+    if (!v1 || !v2) continue;
+    if (isMyTurn && canClientPlaceRoad(e, me)) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
       const isSelectedEdge = selectedBoardEdgeId === e.id;
       roadSpotsHtml += `
@@ -462,11 +649,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       `;
     }
   }
+  layers.roadSpotsLayer.innerHTML = roadSpotsHtml;
 
-  html += `<g id="roadHighlightLayer"></g><g id="roadRimsLayer">${roadRimsHtml}</g><g id="roadBodiesLayer">${roadBodiesHtml}</g><g id="roadHitsLayer">${roadHitsHtml}</g>${roadSpotsHtml}`;
-
-  // Settlements, cities and settlement spots
+  // 6. Vertices Layer: settlements, cities, and settlement spots
   const robberVictimSet = new Set<string>(state.robberVictims || []);
+  let verticesHtml = '';
+  const staticSpots = vertices.length > 120;
   for (const v of vertices) {
     const isSelectedVertex = selectedBoardVertexId === v.id;
     if (v.building) {
@@ -484,7 +672,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const ringR = isCity ? 27 : 22;
       const anim = getPieceAnimAttrs(`${isCity ? 'city' : 'settlement'}_${v.id}`, now);
 
-      html += `
+      verticesHtml += `
         <g transform="translate(${v.x}, ${v.y})" onclick="${clickAttr}" style="${clickAttr ? 'cursor:pointer' : ''}">
           <g class="building-zoom-scale">
             ${anim.isAnimating ? `<circle cx="0" cy="0" r="${ringR + 4}" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
@@ -499,15 +687,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         </g>
       `;
     } else if (isMyTurn && canClientPlaceSettlement(v, me)) {
-      html += `
+      verticesHtml += `
         <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
           <circle cx="${v.x}" cy="${v.y}" r="20" fill="transparent" />
-          <circle cx="${v.x}" cy="${v.y}" r="11" class="spot-pulse" />
+          <circle cx="${v.x}" cy="${v.y}" r="11" class="spot-pulse${staticSpots ? ' spot-static' : ''}" />
           ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
         </g>
       `;
     } else if (canInspectSettlementSpot(v, me)) {
-      html += `
+      verticesHtml += `
         <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
           <circle cx="${v.x}" cy="${v.y}" r="18" fill="transparent" />
           ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
@@ -516,14 +704,18 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
 
-  svg.innerHTML = html;
+  layers.verticesLayer.innerHTML = verticesHtml;
   syncBoardBuildPopup();
 }
 
-// Updates camera viewBox immediately on pan/zoom/reset without reconstructing the SVG DOM.
+// Updates camera viewBox smoothly via requestAnimationFrame on pan/zoom without reconstructing the SVG DOM.
 export function rerenderBoard(): void {
-  if (!state) return;
-  updateCameraViewBox();
+  if (!state || cameraRafPending) return;
+  cameraRafPending = true;
+  requestAnimationFrame(() => {
+    cameraRafPending = false;
+    updateCameraViewBox();
+  });
 }
 
 export function resetCamera(): void {
@@ -570,15 +762,11 @@ export function onEdgeInteract(edgeId: number): void {
 }
 
 // Computes the connected road network containing `startEdgeId` and its longest continuous simple path (stretch).
-function analyzeRoadConnection(startEdgeId: number): {
-  ownerName: string;
-  ownerColor: string;
-  totalRoads: number;
-  longestStretch: number;
-  longestPathEdges: Set<number>;
-  componentEdges: number[];
-} | null {
+function analyzeRoadConnection(startEdgeId: number): RoadConnInfo | null {
   if (!state?.board) return null;
+  const cached = roadAnalysisCache.get(startEdgeId);
+  if (cached) return cached;
+
   const { edges, vertices } = state.board;
   const startEdge = edges[startEdgeId];
   if (!startEdge || !startEdge.road) return null;
@@ -604,13 +792,16 @@ function analyzeRoadConnection(startEdgeId: number): {
     }
   }
 
-  // 2. DFS over the connected component to find the longest continuous stretch (simple path of edges)
+  // 2. Bounded DFS over the connected component to find the longest continuous stretch (simple path of edges)
   let bestPath: number[] = [startEdgeId];
   let bestIncludesHovered = true;
   const used = new Set<number>();
   const currentPath: number[] = [];
+  let steps = 0;
+  const maxSteps = 4000;
 
   function dfs(vertexId: number, depth: number): void {
+    if (++steps > maxSteps) return;
     const includesHovered = currentPath.includes(startEdgeId);
     if (
       currentPath.length > bestPath.length ||
@@ -633,6 +824,7 @@ function analyzeRoadConnection(startEdgeId: number): {
       dfs(edge.v1 === vertexId ? edge.v2 : edge.v1, depth + 1);
       currentPath.pop();
       used.delete(edgeId);
+      if (steps > maxSteps) return;
     }
   }
 
@@ -642,9 +834,12 @@ function analyzeRoadConnection(startEdgeId: number): {
     endpoints.add(e.v1);
     endpoints.add(e.v2);
   }
-  for (const vId of endpoints) dfs(vId, 0);
+  for (const vId of endpoints) {
+    dfs(vId, 0);
+    if (steps > maxSteps) break;
+  }
 
-  return {
+  const result: RoadConnInfo = {
     ownerName: owner?.name || 'Player',
     ownerColor: owner?.color || '#888',
     totalRoads: compSet.size,
@@ -652,9 +847,12 @@ function analyzeRoadConnection(startEdgeId: number): {
     longestPathEdges: new Set(bestPath),
     componentEdges: [...compSet]
   };
+  roadAnalysisCache.set(startEdgeId, result);
+  return result;
 }
 
 export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
+  if (isMouseDown || hasDraggedMap) return;
   const info = analyzeRoadConnection(edgeId);
   const hlLayer = document.getElementById('roadHighlightLayer');
   const tooltip = document.getElementById('roadHoverTooltip');
@@ -680,6 +878,7 @@ export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
 }
 
 export function onRoadMove(ev: MouseEvent): void {
+  if (isMouseDown || hasDraggedMap) return;
   const tooltip = document.getElementById('roadHoverTooltip');
   if (!tooltip || tooltip.style.display === 'none') return;
   const x = Math.max(80, Math.min(window.innerWidth - 80, ev.clientX));
@@ -1045,7 +1244,9 @@ export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): 
   }, flightMs);
 }
 
-function syncInFlightUi(): void {
+let inFlightUiRaf = false;
+
+function syncInFlightUiImmediate(): void {
   if (!state) return;
   const me = state.players.find(p => p.id === socket.id);
   const current = state.players[state.turnIndex];
@@ -1053,6 +1254,15 @@ function syncInFlightUi(): void {
   renderHand(me, isMyTurn);
   renderSidebar();
   syncBoardBuildPopup();
+}
+
+function syncInFlightUi(): void {
+  if (!state || inFlightUiRaf) return;
+  inFlightUiRaf = true;
+  requestAnimationFrame(() => {
+    inFlightUiRaf = false;
+    syncInFlightUiImmediate();
+  });
 }
 
 function getTransferTargetEl(actorId: string, resource: string, kind: string): HTMLElement | null {
@@ -1074,9 +1284,8 @@ function getTransferTargetEl(actorId: string, resource: string, kind: string): H
 export function triggerCardTransferAnimations(transfers: any[]): void {
   if (!transfers || transfers.length === 0) return;
 
-  const speed = getClientSpeed();
-  const flightMs = Math.max(200, Math.round(720 / Math.sqrt(speed)));
-  const stepDelay = Math.max(25, Math.round(85 / speed));
+  const flightMs = 720;
+  const cardStackStepMs = 95;
 
   const hasSteal = transfers.some(t => t.kind === 'steal' || t.kind === 'monopoly');
   const iWasRobbed = transfers.some(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
@@ -1112,7 +1321,6 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
     }
   }
 
-  let delay = 0;
   let heldAny = false;
   transfers.forEach((tr, groupIdx) => {
     const fromEl = getTransferTargetEl(tr.from, tr.resource, tr.kind);
@@ -1130,13 +1338,14 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
     // Slight vertical offset so simultaneous bidirectional trade cards don't overlap identically
     const curveOffset = (groupIdx % 2 === 0 ? -1 : 1) * 14;
     const totalAmount = Math.max(1, tr.amount || 1);
-    const count = Math.min(totalAmount, 4);
+    const maxStack = transfers.length > 6 ? 2 : 3;
+    const count = Math.min(totalAmount, maxStack);
     const isIncomingToPlayer = Boolean(tr.to && tr.to !== 'bank');
 
     // If bankTrade or buyDev receiving from bank, add a slight beat after the payment cards fly in
     const baseGroupDelay = (tr.from === 'bank' && (tr.kind === 'bankTrade' || tr.kind === 'buyDev'))
-      ? Math.max(45, Math.round(170 / speed))
-      : 0;
+      ? 200
+      : Math.min(160, groupIdx * 40);
 
     for (let i = 0; i < count; i++) {
       const cardAmount = i === count - 1
@@ -1152,8 +1361,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
         }
       }
 
-      const d = delay + baseGroupDelay;
-      delay += stepDelay;
+      const d = baseGroupDelay + i * cardStackStepMs;
       setTimeout(() => {
         const cardEl = document.createElement('div');
         const isSteal = tr.kind === 'steal' || tr.kind === 'monopoly';
@@ -1204,7 +1412,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
   });
 
   if (heldAny) {
-    syncInFlightUi();
+    syncInFlightUiImmediate();
   }
 }
 
@@ -1214,13 +1422,16 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
   const ctm = svg.getScreenCTM();
   if (!ctm) return;
 
-  const speed = getClientSpeed();
-  const flightMs = Math.max(200, Math.round(720 / Math.sqrt(speed)));
-  const stepDelay = Math.max(30, Math.round(110 / speed));
+  // Short lead-in after dice shake so all producing hexes launch their cards together and finish before bots act.
+  const rollBeatMs = 180;
+  const flightMs = 780;
+  const cardStackStepMs = 110;
+  const maxVisualCardsPerProd = productions.length > 6 ? 1 : 2;
 
-  let delay = 0;
   let heldAny = false;
-  productions.forEach(prod => {
+  let soundBudget = 0;
+
+  productions.forEach((prod, prodIdx) => {
     const hex = state.board.hexes[prod.hexId];
     if (!hex) return;
 
@@ -1241,7 +1452,9 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
     const targetY = rect.top + rect.height / 2 - 33;
 
     const totalAmount = Math.max(1, prod.amount || 1);
-    const cardsToFly = Math.min(totalAmount, 3);
+    const cardsToFly = Math.min(totalAmount, maxVisualCardsPerProd);
+    const groupOffsetMs = Math.min(180, prodIdx * 30);
+
     for (let i = 0; i < cardsToFly; i++) {
       const cardAmount = i === cardsToFly - 1
         ? totalAmount - Math.floor(totalAmount / cardsToFly) * (cardsToFly - 1)
@@ -1250,8 +1463,11 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
       heldAny = true;
       addInFlightResource(prod.playerId, socket.id, prod.resource, cardAmount);
 
-      const d = delay;
-      delay += stepDelay;
+      const d = rollBeatMs + groupOffsetMs + i * cardStackStepMs;
+      const playChime = soundBudget < 5;
+      if (playChime) soundBudget++;
+      const chimeIdx = soundBudget;
+
       setTimeout(() => {
         const cardEl = document.createElement('div');
         cardEl.className = `flying-res-card card-${prod.resource}`;
@@ -1262,7 +1478,9 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
         cardEl.style.transform = 'scale(0.85)';
         document.body.appendChild(cardEl);
 
-        playTone(540 + i * 60, 0.06);
+        if (playChime) {
+          playTone(540 + chimeIdx * 45, 0.05);
+        }
 
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -1283,6 +1501,6 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
   });
 
   if (heldAny) {
-    syncInFlightUi();
+    syncInFlightUiImmediate();
   }
 }

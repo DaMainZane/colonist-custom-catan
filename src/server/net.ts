@@ -22,7 +22,12 @@ export function broadcastRoom(room: Room): void {
   if (io) {
     for (const id of humanIds(room)) io.to(id).emit('gameState', build(id));
   }
+  const animDelayMs = room.fx.animDelayMs || 0;
+  if (animDelayMs > 0) {
+    room.animatingUntil = Math.max(room.animatingUntil || 0, Date.now() + animDelayMs);
+  }
   room.fx.recentProductions = [];
   room.fx.recentTransfers = [];
+  room.fx.animDelayMs = 0;
   if (afterBroadcast) afterBroadcast(room);
 }

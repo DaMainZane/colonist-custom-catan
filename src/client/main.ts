@@ -1,5 +1,5 @@
 import { socket } from './socket';
-import { playDiceRollSound, playDiscardSound, playVictoryFanfareSound, playYourTurnSound, toggleSound } from './audio';
+import { playDiceRollSound, playDiscardSound, playTone, playVictoryFanfareSound, playYourTurnSound, toggleSound } from './audio';
 import { hydrateIcons } from './icons';
 import { toggleTheme, showToast, triggerVictoryConfetti, clearVictoryConfetti } from './ui';
 import {
@@ -32,7 +32,7 @@ import {
 import { sendChat } from './render/sidebar';
 import {
   createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
-  setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
+  setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi
 } from './actions';
 
@@ -167,8 +167,78 @@ function init(): void {
 
   const stage = document.getElementById('boardStage')!;
   const panOrigin = { x: 0, y: 0 };
+  let panSvgRect: DOMRect | null = null;
 
   stage.addEventListener('wheel', (e: WheelEvent) => {
+    const target = e.target as Element | null;
+
+    // Hovering a number input (or its field row) in the Rules and Cards menu scrolls the value up/down with the mouse wheel.
+    if (target && target.closest('#lobbyToolbar')) {
+      const fieldLabel = target.closest('.field');
+      const numInput = (
+        target instanceof HTMLInputElement && target.type === 'number'
+          ? target
+          : fieldLabel?.querySelector<HTMLInputElement>('input[type="number"]')
+      ) || null;
+
+      if (numInput) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.deltaY === 0) return;
+        if (state && state.hostId !== socket.id) {
+          showToast('Only the host can change settings.');
+          return;
+        }
+        const dir = e.deltaY < 0 ? 1 : -1;
+        const baseStep = Number(numInput.step) || 1;
+        const step = baseStep * (e.shiftKey ? 5 : 1);
+        const min = numInput.min !== '' ? Number(numInput.min) : -Infinity;
+        const max = numInput.max !== '' ? Number(numInput.max) : Infinity;
+        const cur = Number(numInput.value);
+        const startVal = Number.isFinite(cur) ? cur : (Number.isFinite(min) ? min : 0);
+        const next = Math.max(min, Math.min(max, startVal + dir * step));
+        if (next !== startVal) {
+          numInput.value = String(next);
+          playTone(dir > 0 ? 560 : 460, 0.025);
+          schedulePushSettings();
+        }
+        return;
+      }
+
+      // Also allow scrolling range sliders in the Map menu when hovered
+      const rangeWrap = target.closest('.map-land, .map-param');
+      const rangeInput = (
+        target instanceof HTMLInputElement && target.type === 'range'
+          ? target
+          : rangeWrap?.querySelector<HTMLInputElement>('input[type="range"]')
+      ) || null;
+      if (rangeInput && !rangeInput.disabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.deltaY === 0) return;
+        const dir = e.deltaY < 0 ? 1 : -1;
+        const step = Number(rangeInput.step) || 1;
+        const min = rangeInput.min !== '' ? Number(rangeInput.min) : 0;
+        const max = rangeInput.max !== '' ? Number(rangeInput.max) : 100;
+        const cur = Number(rangeInput.value) || 0;
+        const next = Math.max(min, Math.min(max, cur + dir * step));
+        if (next !== cur) {
+          rangeInput.value = String(next);
+          rangeInput.dispatchEvent(new Event('input', { bubbles: true }));
+          rangeInput.dispatchEvent(new Event('change', { bubbles: true }));
+          playTone(dir > 0 ? 560 : 460, 0.025);
+        }
+        return;
+      }
+
+      // Do not zoom the board while scrolling inside the lobby dock
+      return;
+    }
+
+    if (target && target.closest('#gameSettingsMenu, #inlineDrawerWrap, #activeTradeModal, #victoryOverlay, #myHandPanel')) {
+      return;
+    }
+
     e.preventDefault();
     if (!state || !state.board) return;
     const svg = document.getElementById('boardSvg')!;
@@ -218,6 +288,8 @@ function init(): void {
       setIsPanning(true);
       panStart.x = e.clientX;
       panStart.y = e.clientY;
+      const svg = document.getElementById('boardSvg');
+      panSvgRect = svg ? svg.getBoundingClientRect() : null;
     } else {
       setIsMouseDown(true);
     }
@@ -226,9 +298,12 @@ function init(): void {
     if (isPanning && state && state.board) {
       if (!hasDraggedMap && Math.hypot(e.clientX - panOrigin.x, e.clientY - panOrigin.y) > 4) {
         setHasDraggedMap(true);
+        const svg = document.getElementById('boardSvg');
+        if (svg) svg.classList.add('is-panning');
+        onRoadLeave();
       }
-      const svg = document.getElementById('boardSvg')!;
-      const rect = svg.getBoundingClientRect();
+      const rect = panSvgRect || document.getElementById('boardSvg')?.getBoundingClientRect();
+      if (!rect) return;
       const { contentW, contentH } = getBoardBounds();
       const worldPerPx = camZoom * Math.max(contentW / (rect.width || 1), contentH / (rect.height || 1));
       const dx = e.clientX - panStart.x;
@@ -239,7 +314,13 @@ function init(): void {
       rerenderBoard();
     }
   });
-  window.addEventListener('mouseup', () => { setIsMouseDown(false); setIsPanning(false); });
+  window.addEventListener('mouseup', () => {
+    setIsMouseDown(false);
+    setIsPanning(false);
+    panSvgRect = null;
+    const svg = document.getElementById('boardSvg');
+    if (svg) svg.classList.remove('is-panning');
+  });
   stage.addEventListener('click', (e: MouseEvent) => {
     if (hasDraggedMap) {
       e.stopPropagation();

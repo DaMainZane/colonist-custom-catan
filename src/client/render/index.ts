@@ -1,5 +1,6 @@
 import { socket } from '../socket';
 import { state, buildMode, victoryTab, hideVictoryOverlay } from '../store';
+import { isPendingSettingsPush } from '../actions';
 import { renderActiveTradeModal } from './trade';
 import { renderHand } from './hand';
 import { renderInlineDrawer } from './drawer';
@@ -28,27 +29,29 @@ export function renderAll(): void {
   const backBtn = document.getElementById('btnBackToLobby');
   if (backBtn) backBtn.style.display = state.status === 'LOBBY' ? 'none' : '';
   if (state.status === 'LOBBY') {
-    const setVal = (id: string, v: any) => { (document.getElementById(id) as HTMLInputElement).value = v; };
-    setVal('setRadius', s.boardRadius);
-    setVal('setVp', s.vpToWin);
-    setVal('setMaxP', s.maxPlayers);
-    setVal('setDiscard', s.cardDiscardLimit);
-    setVal('setTurnTime', s.turnTimerSec ?? 0);
-    setVal('setTurnInc', s.turnIncrementSec ?? 0);
-    setVal('setTradeTime', s.tradeTimerSec ?? 20);
-    if (document.getElementById('setBotChat')) setVal('setBotChat', s.botChat ?? 'normal');
-    setVal('setGold', s.goldTiles);
-    setVal('setDesert', s.desertTiles);
-    if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
-    setVal('setBankRes', s.bankResourcePerType);
-    setVal('setDevKnight', s.devKnights);
-    setVal('setDevVp', s.devVp);
-    setVal('setDevRb', s.devRoadBuilding);
-    setVal('setDevYop', s.devYearOfPlenty);
-    setVal('setDevMono', s.devMonopoly);
-    setVal('setMaxRoad', s.maxRoads);
-    setVal('setMaxSettle', s.maxSettlements);
-    setVal('setMaxCity', s.maxCities);
+    if (!isPendingSettingsPush()) {
+      const setVal = (id: string, v: any) => { (document.getElementById(id) as HTMLInputElement).value = v; };
+      setVal('setRadius', s.boardRadius);
+      setVal('setVp', s.vpToWin);
+      setVal('setMaxP', s.maxPlayers);
+      setVal('setDiscard', s.cardDiscardLimit);
+      setVal('setTurnTime', s.turnTimerSec ?? 0);
+      setVal('setTurnInc', s.turnIncrementSec ?? 0);
+      setVal('setTradeTime', s.tradeTimerSec ?? 20);
+      if (document.getElementById('setBotChat')) setVal('setBotChat', s.botChat ?? 'normal');
+      setVal('setGold', s.goldTiles);
+      setVal('setDesert', s.desertTiles);
+      if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
+      setVal('setBankRes', s.bankResourcePerType);
+      setVal('setDevKnight', s.devKnights);
+      setVal('setDevVp', s.devVp);
+      setVal('setDevRb', s.devRoadBuilding);
+      setVal('setDevYop', s.devYearOfPlenty);
+      setVal('setDevMono', s.devMonopoly);
+      setVal('setMaxRoad', s.maxRoads);
+      setVal('setMaxSettle', s.maxSettlements);
+      setVal('setMaxCity', s.maxCities);
+    }
     renderQuickStarts();
     renderMapMenu();
     renderPresetRow();
