@@ -1,5 +1,101 @@
 # Change Log
 
+## 2026-10-25 (Pass 16: Map Generation finishing pass)
+### Changed
+- `GEN_VERSION` is 2. John confirmed saved seeds do not need to replay across updates (presets keep the snapshot, and "same style, new seed" rolls a fresh one anyway). The recipe's `g` now tells an old seed apart from a current one, and the lobby shows the `older generator` tag for it. The version covers three changes that alter what a seed gives: the board loop redrawing tokens (Pass 14), the ring band below, and the `island_mix` perk existing.
+- `tests/mapbudget.test.ts`: limits are no longer ten times the targets. After reading the printed table (r8 and below: medians 4 to 24 ms; r20: medians 51 to 117 ms, hexagon slowest) they are median under 60 ms for radius 8 and below and under 300 ms for radius 20, board attempts at most 3.
+- Ring (`packs/base/map/shapes.ts`): from radius 4 up, the two rings next to the lagoon are always land when the land budget allows (the lagoon shrinks if it must), so the band is at least 2 tiles thick all the way round. Below radius 4, or when the land share is too low, the old band is kept.
+
+### Added
+- `thin-neck` warning (`mapcheck.ts`, `countPinches`, option `checkNecks`, switched on for the ring from radius 4): counts land tiles squeezed between water on two sides (their land neighbours form two or more arcs). It is a local test on purpose: a closed ring has no cut tile, so "removing one tile splits the land" never fires on a ring. A warning, not an error, so a ring is never refused for it.
+- `island_mix` perk ("Mixed islands", `shared/mapmix.ts`, flag `GenFlags.islandMix`): after the terrain style has placed the tiles, every landmass of 4 or more tiles that has fewer than two resource types swaps one tile with another landmass (random choice from the stream `seed:islandmix:<terrain attempt>`). The tile counts never change, a donor island of 4 or more tiles must still keep two resource types, and desert does not count as a resource. Three passes at most; an island that cannot be fixed (no other island has a resource to spare) keeps its `one-resource-island` warning. It appears in the menu's Perks column with no client change.
+- Menu: a Settings block under the two columns with one slider for every param of the active options except `land` (islands count, continents count, gap and stretch, lake share and count, river length, satellites, ragged amount, ring lagoon, gold and fog share if a pack declares them). Drawn from `mapOptions`, so a pack's new param appears without a client change. `mapParamInput` and `mapParamChange` in `client/mapmenu.ts`, registered on `window` in `main.ts`, CSS `.map-params` at the end of `styles.css`.
+- `tests/mapmix.test.ts`: `mixIslands` on hand-made cells (fixes a one-resource island, keeps counts, deterministic, refuses to strip a donor, leaves islets and single landmasses alone), the perk over many seeds (land and counts unchanged, never more lonely islands), the unfixable all-wood map, `countPinches` and the ring band on hand boards, generated rings from radius 4 to 8.
+
+### Notes
+- Written without a shell again: run `npm run typecheck; npm test`. Two existing tests were updated for this pass: the share code in `mapgen.test.ts` now uses `GEN_VERSION` instead of a literal `g=1`, and the perk list in `mapsettings.test.ts` includes `island_mix`.
+- Not checked in a browser: the whole map menu (Pass 15) and the new Settings block. Look at the open and close, the picks, the sliders (live number while dragging, one request on release), the seed row, presets, and the layout on a phone.
+- Still not built: the design's shape-stage `portPolicy` per shape beyond what ports per landmass already does, and a UI to hide the seed from non-hosts (parked in the design, section 5.8).
+
+## 2026-10-25 (Pass 15: Map Generation M6, lobby map menu)
+### Added (server)
+- `src/server/mapmenu.ts`: `mapOptionsView()` turns the registry's shapes, terrain styles, number styles and perks (id, label, description, stage, phase, slot, default, conflicts, requires and whether they are met, `secret`, params) and the quick starts into plain JSON. `socket.ts` sends it once per connection as the `mapOptions` event, so a pack that registers an option shows up in the menu with no client change.
+- Presets v2 (`src/server/presets.ts`): `CustomPreset.v` is 1 or 2; a v2 preset also holds `recipe` (null for a hand-painted map, Blank, or when saved without a recipe) and `genVersion`. `serializePreset(board, settings, name, meta?)` keeps the recipe only when the map is not `edited`. `loadPreset` returns `recipe` (cleaned by `makeRecipe`; a non-recipe becomes null). v1 presets load unchanged.
+- `applyLoadedPreset(room, loaded)`: the snapshot is the map, exactly as saved. With a recipe, the seed, picks, params and radius come back into the settings (through `mergeSettings`, so unknown ids and wild numbers are dropped or clamped) and `room.mapMeta` is rebuilt with a fresh `validateBoard` report, so the seed line stays meaningful. Without one, `mapMeta` is cleared as before.
+- `presetStyle(raw)` and `applyRecipeStyle(room, style)` (`lobby.ts`), and the `applyPresetStyle` event: a v2 preset's radius, picks and params with a fresh seed ("same style, new map").
+
+### Added (client)
+- `src/client/mapmenu.ts`, drawn into the new Map row of the lobby dock (`#mapRecipe`):
+  - A header line summarizing the active options ("Continent + Lake · Realistic · Fog") that opens the menu, and a Reroll button (host).
+  - The menu has two columns: Shape (slot members as radios, add-ons such as Lake, River, Satellites and Ragged coast as checkboxes, then the land slider) and Terrain, Numbers and Perks. Ticking sends only the new `mapPicks`; the server resolves slots and conflicts (the later pick wins). A slot's default is "nothing picked". Picking another base shape drops the stored land value so the new shape's own default applies.
+  - Seed line: the seed (click to copy), Copy code (the `hx1;...` share code), and for the host Edit (type a seed or paste a share code, Enter applies, Esc cancels), Lock (keep the seed on rematch) and Save as preset. Non-hosts see the seed read-only, Fog included (design 5.8).
+  - Report line from `mapMeta.report`: landmasses, spots, ports, fairness, plus tags for `edited by hand`, `older generator`, `best of N tries` (degraded), `small for N players` (2 spots per player against the biggest landmass), and error and note counts with the messages in the tooltip.
+  - A painted map is not replaced by accident: the first click on Reroll, a pick, the land slider or a seed change only warns, the second goes through (4 seconds).
+- The built-in preset chips are drawn from `mapOptions.quickStarts` (a fallback list shows until it arrives), so a pack's quick start appears without touching `index.html`. The Archipelago chip now reads "Archipelago" (the registered label).
+- A saved preset with a recipe gets a second small button, "same style, new seed".
+- `tests/mapmenu.test.ts`: the option list, the lobby view's `mapMeta`, presets v2 (save, load, v1 compatibility, hostile recipes, new seed).
+
+### Notes
+- Written without a shell: run `npm run typecheck; npm test`, then open the lobby and look at the menu (spacing and the dock height on a phone are guesses).
+- Not done: UI for params other than land (island count, lake share, fog share and so on are in the schema and the share code, as planned), greying options by `requires` is drawn but no v1 option uses it, and the menu does not mark which slot members a pick will replace beyond the tooltip.
+- `GEN_VERSION` is still 1 (see Pass 14).
+
+## 2026-10-25 (Pass 14: Map Generation M5, validation)
+### Added (step 1: the board loop)
+- `generateMap` runs stages 5 to 8 as an attempt and repeats it, up to `boardAttempts(radius)` times (12 up to radius 20, 4 up to 30, 2 above). The shape is chosen once and never changes. A pass is no errors and no `low-fairness` warning. If no attempt passes, the best one is kept (errors count most, then low fairness, then touching reds; ties keep the earlier attempt) and the report gets `degraded: true`. It never throws.
+- `report.stats.boardAttempts` (optional) is the number of attempts run; `stats.attempts` is still the shape stage's count.
+- Attempt 0 uses the same RNG streams and noise names as before, so a board that passes first time is unchanged. Later attempts draw the number stage from `seed:numbers:<attempt>`.
+- An error that another token layout cannot fix (`land-count`, `landmass-too-small`, `too-few-spots`, `no-land`) ends the loop at once: more attempts would only cost time. `resource-missing` is a terrain problem, so the next attempt also redraws the terrain (terrain attempt 1, 2, ...).
+- `tests/mapretry.test.ts`: attempt counts, degraded only when a check really failed, determinism, no crash over the shape x style x radius matrix, the no-pass case (35 wood), and that the land set and tile counts survive a retry.
+
+### Added (step 2: flags and per-shape checks)
+- `GenFlags` gained `balanceCheck` (default true) and `thinLand` (default 0.25). `balanced` and `feast_famine` set `balanceCheck: false` (the weak-resource warning has nothing to say there); `ragged` raises `thinLand` to 0.4 (a long broken coast is the point).
+- `requireConnected` is read now: `hexagon`, `continent` and `ring` declare it, `validateBoard` turns split land into a `not-connected` error when it is set. It is switched off while `satellites` is picked (islets are separate by design). The check is order independent because only some shapes ever set it. `not-connected` is a shape error, so it ends the board loop at once.
+- New warning `one-resource-island`: on split land, a landmass of 4 or more tiles whose tiles all give the same resource (terrain is dealt over the whole map, so a small island can end up with one).
+- `ValidateOptions` gained `requireConnected` and `thinLand`.
+- Not built from design section 6.8: the ring band thickness check (the generic thin-land warning covers a 1-wide band) and the "island of 4 or more tiles gets at least 2 resource types" option (only the warning exists).
+
+### Added (step 3: bots on every shape)
+- `simulateGame` takes `picks` (and `mapParams`): the board then comes from `generateMap` with the sim seed, like the lobby, instead of the legacy preset. `tests/mapsims.test.ts` plays 12 recipes (every shape, lake, river, satellites with ragged, realistic, balanced, feast or famine, gold, fog, clustered) with 3 bots on radius 4 and checks for no rejected action, no stall, no broken invariant. Whole-land recipes must finish; split-land ones may end with "no winner after N turns", since nobody can cross water before ships exist.
+
+### Added (step 4: budget)
+- `tests/mapbudget.test.ts` times `generateMap` (median of several seeds) for five recipes at radius 4, 8 and 20 and prints a table. The asserts are ten times looser than the targets (radius 8 within about 20 ms, radius 20 within about 100 ms): read the printed numbers, then tighten the limits. Above radius 20 the board loop runs fewer attempts (`boardAttempts`).
+
+### Notes
+- Deviation from design section 11: the loop redraws only the tokens (and the terrain on `resource-missing`), not terrain, extras and ports on every attempt. Fairness is a token property, and redrawing the terrain would break the stage independence of section 5.1 (a number style would change the tiles). Extras (fog) and ports keep their attempt-0 streams.
+- `GEN_VERSION` is not bumped. A board that failed the fairness check before now gets a redrawn token layout, so for those recipes the output differs from Pass 13. Bump it if saved seeds from before this pass must stay replayable.
+- Written without a shell: run `npm run typecheck; npm test`. A recipe that never passes builds up to 12 boards, which the budget test shows.
+- Not done: switching the start check from `players x 8` vertices to `spots` (design says wait until tests show they agree), and the lobby display of the report (M6; `mapMeta` already carries the report, `degraded` included).
+
+## 2026-10-25 (Pass 13: Map Generation M4, terrain and numbers)
+### Added (step 1: cell info, spread and clustered)
+- `CellInfo` is now `{ q, r, h, m, coastDist, landmass }`. `src/shared/mapcells.ts`: `buildCellInfo` (land cells in canvas order; `h` and `m` rank-normalized over the land cells; `coastDist` 0 on every land cell with fewer than 6 land neighbours; landmass index in discovery order), `cellNeighbours`, `rankNormalize`. `generateMap` builds it once and hands it to the terrain and number styles.
+- `runShape` returns `h` (the height field by canvas index), or `null` when the shape never drew one (hexagon, islands, archipelago, continents, the fallback). Then the cell info uses the terrain stage's own noise for height.
+- `src/shared/mapterrain.ts`: `swapPlace`, the swap-energy placement behind `spread` and `clustered`. Start from a shuffle, swap two cells, keep the swap when the same-type pair count moves the right way (or stays equal), keep a worse one with a chance that cools to 0 by the last sweep. Only swaps, so counts are preserved. Half of the proposals are local (a 2-step walk), so patches can move. `exp` is avoided: the chance of losing `d` pairs is `warmth` multiplied `d` times.
+- Terrain styles `spread` (param `spread.strength`, sweeps, default 8) and `clustered` (`clustered.strength`, default 12) in `src/packs/base/map/terrain.ts`. Strength 0 is the plain random board.
+- `tests/maptiles.test.ts`.
+
+### Added (step 2: number flags and `balanced`)
+- `assignNumbers(cells, pool, rng, opts)` takes `{ hotTouch, equalTouch, group }`. Defaults give the same tokens and RNG order as before. The swap loop is now `settleNumbers`, also exported. With `group`, a token only trades places with a tile of its own group.
+- `standard` and the fallback in `generateMap` pass the effective flags, so a pick with `ruleOverrides: { hotTouch: 'allow' }` really turns the 6/8 rule off. `requireConnected` is still read by nothing (a structural check, M5).
+- `dealBalanced`: best tokens first, each to the resource group with the lowest running pip total that still has a free tile, then shuffled inside the group; `settleNumbers` fixes touching reds inside groups only, so totals hold (best effort for 6/8). Gold is its own group. Registered as `balanced` in `src/packs/base/map/numbers.ts`.
+- Number styles now receive `type` on each cell (`CellInfo.type`, optional, set only for the number stage).
+
+### Added (step 3: `feast_famine`)
+- `dealByRichness` in `numbers.ts`: a low-frequency noise field over the numbered tiles is rank-normalized to 0..1, jittered by `mix`, and the pool (sorted by pips) is dealt by rank, best pips to the richest tiles. No settle pass. Registered as `feast_famine` with `ruleOverrides: { hotTouch: 'allow' }` and param `feast_famine.mix` (percent, default 25) in `src/packs/base/map/numbers.ts`.
+
+### Added (step 4: `realistic`)
+- `Habitat { h?, m?, weight? }` and an optional `TileDef.habitat` in `registry.ts`. Targets are on the 0..1 rank scale of `CellInfo.h` and `m`; leave one out for "any". Values follow design section 7: ore `h 0.9`, brick `h 0.65 m 0.35`, wood `h 0.5 m 0.8`, sheep `h 0.35 m 0.5`, wheat `h 0.25 m 0.3` (base pack, `content.ts`), desert `m 0` with weight 3 (driest cells), gold `h 0.85` with weight 2 (gold pack, next to the ore).
+- `habitatPlace` in `mapterrain.ts`: tile types with a habitat fill first, strictest first (`weight` high to low, then fewer tiles, then id); each takes the free cells with the smallest misfit `|h - target| + |m - target|`. Types without a habitat fill the leftovers in random order. Then `sweeps` rounds of swaps that only keep a swap when the total weighted misfit drops. Only swaps, so counts are preserved. A size mismatch falls back to a plain shuffle.
+- Terrain style `realistic` (param `realistic.sweeps`, default 3) in `packs/base/map/terrain.ts`. It reads each tile's habitat from the registry, so a pack's own tile is placed sensibly with no change here.
+- `habitatPlace` is exported from `shared/index.ts` (the pack imports it from there).
+- `tests/maptiles.test.ts`: habitat on every shipped tile, `habitatPlace` on synthetic cells (high ground high, dry tile on the driest cells, zero sweeps, size mismatch). The "every terrain style keeps the counts and the land" tests pick `realistic` up from the registry.
+
+### Notes
+- Written without a shell: run `npm run typecheck; npm test`. Design section 7 says `s < 0` spreads and `s > 0` clusters but also says to keep a swap when `E` drops; those two disagree. The code uses `E = -like x pairs` (`like = 1` clusters), so the behaviour matches the names.
+- M4 is complete. `GEN_VERSION` is untouched. The habitat values, the sweep default and the feast or famine noise frequency are starting guesses: judge them on the gallery script (`tools/mapgallery.ts`, still to do) before trusting them.
+- Next is M5 (checks, two-level retry, `spots`, report to the lobby, budget measurement, `requireConnected`).
+
 ## 2026-10-25 (Pass 12: Map Generation M3, shapes and ports per landmass)
 ### Added
 - `src/shared/mapshape.ts`: the land field the shape stage works on (`LandField`: heightfield, `locked`, `keep`, `river` and `sat` flags, one index per canvas cell), `fillHeight` (noise plus pull toward the center minus a soft rim penalty), `takeTop`, the exact count fix `fixCount` (add the best-ranked water cell next to land, or remove the worst-ranked coastal cell whose land neighbours form one unbroken arc, so land never splits), `cleanupField` (largest landmass, spikes, one-cell holes, exact count), `growBlobs` / `pickCenters` / `splitSizes` for multi-landmass shapes, and `runShape` (tweak, base, carve, scatter; up to 40 attempts, each with its own RNG stream and noise; falls back to the plain hexagon and never throws). Only `runShape`, `SHAPE_ATTEMPTS`, `MIN_LAND` and the types are exported from `shared/index.ts`; the generic helper names stay in `mapshape.ts`.

@@ -1,8 +1,10 @@
 // Shared mutable UI state. Scalars are `let` exports with setters (ES live bindings),
 // objects are const and mutated in place, so other modules can keep reading them directly.
-import type { GameState, Resources } from './types';
+import type { GameState, MapOptionsView, Resources } from './types';
 
 export let state: GameState | null = null;
+/** The map menu's options and quick starts, sent once per connection (null until they arrive). */
+export let mapOptions: MapOptionsView | null = null;
 export let soundOn = true;
 export let isMouseDown = false;
 export let buildMode: string | null = null;
@@ -32,6 +34,7 @@ export function setCounterTradeId(v: number | null): void { counterTradeId = v; 
 export function setTradesCollapsed(v: boolean): void { tradesCollapsed = v; }
 
 export function setState(s: GameState): void { state = s; }
+export function setMapOptions(v: MapOptionsView | null): void { mapOptions = v; }
 export function setSoundOn(v: boolean): void { soundOn = v; }
 export function setIsMouseDown(v: boolean): void { isMouseDown = v; }
 export function setBuildModeValue(v: string | null): void { buildMode = v; }

@@ -18,9 +18,15 @@ export interface GenFlags {
   equalTouch: 'avoid' | 'allow';
   /** One landmass only. */
   requireConnected: boolean;
+  /** Warn when a resource has under half the average pips. Off for styles that unbalance on purpose (feast or famine) or balance by design. */
+  balanceCheck: boolean;
+  /** Share of land tiles with 2 or fewer land neighbours above which the thin-land warning fires. A ragged coast raises it. */
+  thinLand: number;
+  /** Terrain fix-up: every island of 4 or more tiles gets at least two resource types (the `island_mix` perk). Off when absent. */
+  islandMix?: boolean;
 }
 
-export const DEFAULT_FLAGS: Readonly<GenFlags> = { hotTouch: 'forbid', equalTouch: 'avoid', requireConnected: false };
+export const DEFAULT_FLAGS: Readonly<GenFlags> = { hotTouch: 'forbid', equalTouch: 'avoid', requireConnected: false, balanceCheck: true, thinLand: 0.25 };
 
 export interface MapOptionBase {
   id: string;
@@ -55,8 +61,24 @@ export interface MapCtx {
   param(id: string): number;
 }
 
-/** One cell handed to a terrain or number style. Height, moisture and landmass arrive with the stages that need them (M3, M4). */
-export interface CellInfo { q: number; r: number }
+/**
+ * One land cell handed to a terrain or number style. Cells come in canvas order, land cells only (see `buildCellInfo`).
+ * Height and moisture are rank-normalized over the land cells, so a threshold means the same on every shape.
+ */
+export interface CellInfo {
+  q: number;
+  r: number;
+  /** Height 0..1: the shape's heightfield when it has one, else fresh noise. */
+  h: number;
+  /** Moisture 0..1: noise, wetter near the coast. */
+  m: number;
+  /** Steps to the nearest land cell that touches water. 0 on the coast itself. */
+  coastDist: number;
+  /** Landmass index, in discovery order over the canvas. */
+  landmass: number;
+  /** The tile type placed here. Only set for number styles (terrain is decided by then), absent for terrain styles. */
+  type?: string;
+}
 
 export interface ShapeOpDef extends MapOptionBase {
   stage: 'shape';

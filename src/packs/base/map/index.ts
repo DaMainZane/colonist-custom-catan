@@ -2,8 +2,10 @@
 import { assignNumbers, rngShuffle } from '../../../shared';
 import type { PackApi } from '../../../shared';
 import { registerShapes } from './shapes';
+import { registerTerrains } from './terrain';
+import { registerNumberStyles } from './numbers';
 
-/** The classic board as a recipe (the defaults of every slot), plus the M3 shapes. Terrain and number styles arrive in M4. */
+/** The classic board as a recipe (the defaults of every slot), plus the M3 shapes and the M4 terrain styles. Number styles follow in M4. */
 export function registerMapContent(api: PackApi): void {
   api.mapShape({
     id: 'hexagon',
@@ -12,7 +14,8 @@ export function registerMapContent(api: PackApi): void {
     stage: 'shape',
     phase: 'base',
     slot: 'shape',
-    default: true
+    default: true,
+    ruleOverrides: { requireConnected: true }
   });
 
   registerShapes(api);
@@ -27,6 +30,8 @@ export function registerMapContent(api: PackApi): void {
     place: (_cells, types, ctx) => rngShuffle(ctx.rng, types)
   });
 
+  registerTerrains(api);
+
   api.mapNumbers({
     id: 'standard',
     label: 'Standard',
@@ -34,7 +39,18 @@ export function registerMapContent(api: PackApi): void {
     stage: 'numbers',
     slot: 'numbers',
     default: true,
-    place: (cells, pool, ctx) => assignNumbers(cells, pool, ctx.rng)
+    place: (cells, pool, ctx) => assignNumbers(cells, pool, ctx.rng, { hotTouch: ctx.flags.hotTouch, equalTouch: ctx.flags.equalTouch })
+  });
+
+  registerNumberStyles(api);
+
+  // A perk with no tiles of its own: it only switches the terrain fix-up on (see shared/mapmix.ts).
+  api.mapPerk({
+    id: 'island_mix',
+    label: 'Mixed islands',
+    description: 'Every island of 4 or more tiles gets at least two resource types, so no island is stuck with one resource.',
+    stage: 'extras',
+    ruleOverrides: { islandMix: true }
   });
 
   api.quickStart({ id: 'standard', label: 'Standard', picks: [] });

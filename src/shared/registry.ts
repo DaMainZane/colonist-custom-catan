@@ -6,6 +6,13 @@ import type { GameState, Id, Resources, Rules } from './types';
 
 export interface ResourceDef { id: string; name: string; color: string; border: string; icon?: string; replace?: boolean }
 
+/**
+ * Where a tile likes to sit, for the `realistic` terrain style. `h` and `m` are targets on a 0..1 scale (height and
+ * moisture, rank-normalized over the land); leave one out for "any". `weight` is how strictly the tile wants its habitat
+ * (default 1): strict tiles are placed first and count more in the misfit that the swap sweeps reduce.
+ */
+export interface Habitat { h?: number; m?: number; weight?: number }
+
 export interface TileDef {
   id: string;
   name: string;
@@ -20,6 +27,8 @@ export interface TileDef {
   produces?: string;
   /** true = fills the board cyclically after special tiles (rules.tileCounts) are placed. */
   base?: boolean;
+  /** Placement hint for the `realistic` terrain style. A tile without one is placed randomly among the leftovers. */
+  habitat?: Habitat;
   /** Overrides default production, e.g. gold gives picks instead of cards. */
   onProduce?(ctx: Ctx, hex: any, ownerId: Id, amount: number): void;
   replace?: boolean;

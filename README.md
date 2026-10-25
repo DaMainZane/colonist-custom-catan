@@ -112,6 +112,24 @@ The host picks a tier per bot (dropdown next to the Bot button, or click the `Bo
 
 `src/packs/index.ts` exports `allPacks` (base, gold, fog in load order).
 
+### Map generation (M1 to M4)
+
+Design and status in [`Map Generation Design.md`](Map%20Generation%20Design.md). A map is a recipe (seed, radius, picks, params); `generateMap(reg, rules, recipe)` runs shape, terrain, numbers, extras, ports and check, each stage on its own RNG stream.
+
+| File | What |
+|---|---|
+| `shared/noise.ts` | seeded lattice value noise, `cellPoint` |
+| `shared/maprecipe.ts` | `GEN_VERSION`, `MapRecipe`, `stageRng`, share code encode and decode |
+| `shared/mapoptions.ts` | option types (shape ops, terrain and number styles, perks, quick starts), `GenFlags`, pick resolution (slots, conflicts, defaults), params |
+| `shared/mapshape.ts` | land field, exact land count, cleanup, multi-landmass blobs, `runShape` |
+| `shared/mapcells.ts` | per-cell height, moisture, coast distance, landmass for the styles |
+| `shared/mapterrain.ts` | `swapPlace` (spread, clustered) and `habitatPlace` (realistic) |
+| `shared/numbers.ts` | token pool, `assignNumbers` / `settleNumbers` with rule flags, `dealByRichness`, `dealBalanced` |
+| `shared/mapcheck.ts` | landmass detection, `validateBoard` and `MapReport` |
+| `packs/base/map/` | `shapes.ts` (hexagon, continent, ring, islands, archipelago, continents, lake, river, satellites, ragged), `terrain.ts` (spread, clustered, realistic), `numbers.ts` (feast_famine, balanced), `index.ts` (random, standard, quick starts) |
+
+A tile gets a `habitat` (`TileDef.habitat`) to be placed by `realistic`; a pack adds a tile or a style with no change to the generator.
+
 ## Design
 
 The new UI direction is documented in [`Design UI Philosophy.md`](Design%20UI%20Philosophy.md): a Lichess-style shell where the board is the hero, flat Mini Metro-style resource pictograms (recognizable shapes, not abstract ones) with prominent pieces, and a muted Dorfromantik-style color palette, all driven by CSS design tokens. It is built in Step 4 (UI and phone).

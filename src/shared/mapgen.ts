@@ -2,7 +2,7 @@
 import type { Registry } from './registry';
 import { createNoise } from './noise';
 import { assignNumbers, buildNumberPool } from './numbers';
-import { rngNext, rngShuffle } from './rng';
+import { createRng, rngNext, rngShuffle } from './rng';
 import type { RngState } from './rng';
 import { buildTopology } from './topology';
 import type { HexInit } from './topology';
@@ -10,10 +10,12 @@ import type { Board, Rules } from './types';
 import { makeRecipe, stageRng } from './maprecipe';
 import type { MapRecipe, MapStage } from './maprecipe';
 import { effectiveFlags, paramOf, resolveMapOptions, resolveParams } from './mapoptions';
-import type { DropReason, MapCtx, NumbersDef, PerkDef, ShapeOpDef, TerrainDef } from './mapoptions';
+import type { CellInfo, DropReason, MapCtx, NumbersDef, PerkDef, ShapeOpDef, TerrainDef } from './mapoptions';
 import { validateBoard } from './mapcheck';
 import type { MapIssue, MapReport } from './mapcheck';
 import { canvasCoords, runShape } from './mapshape';
+import { buildCellInfo } from './mapcells';
+import { mixIslands } from './mapmix';
 
 function clampInt(val: any, min: number, max: number, fallback: number): number {
   const n = Number(val);
@@ -107,6 +109,27 @@ export interface GeneratedMap {
   recipe: MapRecipe;
 }
 
+/** Board attempts for a radius (design section 11: 12 up to radius 20, fewer above, so a big board stays within its time budget). */
+export function boardAttempts(radius: number): number {
+  return radius <= 20 ? 12 : radius <= 30 ? 4 : 2;
+}
+
+/** Errors a new token layout (or terrain) can fix. Any other error comes from the shape and ends the loop. */
+const REDRAWABLE_ERRORS = new Set(['resource-missing', 'token-mismatch']);
+
+/** A pass is no errors and no low-fairness warning (design section 11). */
+function attemptPassed(report: MapReport): boolean {
+  return report.errors.length === 0 && !report.warnings.some(w => w.code === 'low-fairness');
+}
+
+/** Lower is better: errors dominate, then low fairness (worse = higher), then touching reds as a tiebreak. Ties keep the earlier attempt. */
+function attemptScore(report: MapReport): number {
+  let score = report.errors.length * 100;
+  if (report.warnings.some(w => w.code === 'low-fairness')) score += 10 + (0.5 - report.stats.fairness);
+  if (report.warnings.some(w => w.code === 'hot-touch')) score += 0.1;
+  return score;
+}
+
 const DROP_TEXT: Record<DropReason, string> = {
   unknown: 'is not available',
   unmet: 'needs a feature no pack provides',
@@ -142,12 +165,13 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
   const resolved = resolveMapOptions(reg, recipe.picks);
   const flags = effectiveFlags(resolved.options);
   const params = resolveParams(resolved.options, recipe.params);
-  const ctxFor = (stage: MapStage): MapCtx => ({
+  // Attempt 0 keeps the stream names of the single-pass generator, so a board that passes first time is unchanged.
+  const ctxFor = (stage: MapStage, attempt = 0): MapCtx => ({
     reg,
     rules,
     radius: recipe.radius,
-    rng: stageRng(seed, stage),
-    noise: createNoise(`${seed}:${stage}`),
+    rng: stageRng(seed, stage, attempt),
+    noise: createNoise(attempt === 0 ? `${seed}:${stage}` : `${seed}:${stage}:${attempt}`),
     flags,
     param: (id: string) => paramOf(resolved.options, params, id)
   });
@@ -170,8 +194,12 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
   if (shape.fallback) {
     warnings.push({ code: 'shape-fallback', message: 'No shape attempt passed the checks, so the plain hexagon was used. Try another seed or fewer options.' });
   }
-  const coords = canvas.filter((_, i) => shape.land[i] === 1);
-  const total = coords.length;
+  // Per-cell data for the terrain and number styles (land cells, canvas order): height, moisture, coast distance, landmass.
+  // The shape's height field reaches the terrain stage here; shapes that drew none fall back to the terrain stage's noise.
+  const cellsFor = (t: number): CellInfo[] =>
+    buildCellInfo({ radius: recipe.radius, canvas, land: shape.land, h: shape.h, noise: createNoise(t === 0 ? `${seed}:terrain` : `${seed}:terrain:${t}`) });
+  const cells0 = cellsFor(0);
+  const total = cells0.length;
 
   // Counts first: rules.tileCounts, then perks fill in what the Rules tab left at zero.
   const perks = resolved.options.filter((o): o is PerkDef => o.stage === 'extras');
@@ -187,59 +215,108 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     if (perk.extra) Object.assign(extra, perk.extra(rules, total, countsCtx));
   }
 
-  // 4 terrain: the multiset is fixed, the style only places it.
+  // 4 terrain: the multiset is fixed, the style only places it. Kept per terrain attempt (0 unless a resource went missing).
   const multiset = tileMultiset(reg, total, counts);
   const terrain = resolved.options.find((o): o is TerrainDef => o.stage === 'terrain');
-  let types = terrain ? terrain.place(coords, multiset, ctxFor('terrain')) : rngShuffle(stageRng(seed, 'terrain'), multiset);
-  if (!Array.isArray(types) || !sameMembers(types, multiset)) {
-    warnings.push({ code: 'terrain-invalid', message: `Terrain style "${terrain?.id}" changed the tile counts, so plain random placement was used.` });
-    types = rngShuffle(stageRng(seed, 'terrain'), multiset);
-  }
+  const terrainCache = new Map<number, { cells: CellInfo[]; types: string[]; warnings: MapIssue[] }>();
+  const terrainFor = (t: number) => {
+    const hit = terrainCache.get(t);
+    if (hit) return hit;
+    const cells = t === 0 ? cells0 : cellsFor(t);
+    const issues: MapIssue[] = [];
+    let types = terrain ? terrain.place(cells, multiset, ctxFor('terrain', t)) : rngShuffle(stageRng(seed, 'terrain', t), multiset);
+    if (!Array.isArray(types) || !sameMembers(types, multiset)) {
+      issues.push({ code: 'terrain-invalid', message: `Terrain style "${terrain?.id}" changed the tile counts, so plain random placement was used.` });
+      types = rngShuffle(stageRng(seed, 'terrain', t), multiset);
+    }
+    // The island_mix perk: swap tiles between landmasses so no island of 4 or more tiles has a single resource.
+    if (flags.islandMix) types = mixIslands(reg, cells, types, createRng(`${seed}:islandmix:${t}`));
+    const made = { cells, types, warnings: issues };
+    terrainCache.set(t, made);
+    return made;
+  };
 
-  // 5 numbers: pool sized by the numbered tiles.
-  const numberedIdx: number[] = [];
-  types.forEach((type, idx) => {
-    const def = reg.tiles.get(type);
-    if (def && def.land && def.numbered) numberedIdx.push(idx);
-  });
-  const numberedCells = numberedIdx.map(i => coords[i]);
-  const pool = buildNumberPool(numberedIdx.length);
   const numbering = resolved.options.find((o): o is NumbersDef => o.stage === 'numbers');
-  let tokens = numbering ? numbering.place(numberedCells, pool, ctxFor('numbers')) : assignNumbers(numberedCells, pool, stageRng(seed, 'numbers'));
-  if (!Array.isArray(tokens) || !sameMembers(tokens, pool)) {
-    warnings.push({ code: 'numbers-invalid', message: `Number style "${numbering?.id}" changed the tokens, so the standard placement was used.` });
-    tokens = assignNumbers(numberedCells, pool, stageRng(seed, 'numbers'));
+  const numberOpts = { hotTouch: flags.hotTouch, equalTouch: flags.equalTouch };
+
+  // Stages 5 to 8 for one attempt. The shape, the tile counts and (normally) the terrain stay as they are; only the
+  // number stage draws from a new stream per attempt, so an unlucky token layout never costs the host the map they liked.
+  const buildAttempt = (numAttempt: number, terrainAttempt: number) => {
+    const { cells, types, warnings: terrainIssues } = terrainFor(terrainAttempt);
+    const issues: MapIssue[] = [...terrainIssues];
+
+    // 5 numbers: pool sized by the numbered tiles.
+    const numberedIdx: number[] = [];
+    types.forEach((type, idx) => {
+      const def = reg.tiles.get(type);
+      if (def && def.land && def.numbered) numberedIdx.push(idx);
+    });
+    const numberedCells = numberedIdx.map(i => ({ ...cells[i], type: types[i] }));
+    const pool = buildNumberPool(numberedIdx.length);
+    let tokens = numbering ? numbering.place(numberedCells, pool, ctxFor('numbers', numAttempt)) : assignNumbers(numberedCells, pool, stageRng(seed, 'numbers', numAttempt), numberOpts);
+    if (!Array.isArray(tokens) || !sameMembers(tokens, pool)) {
+      issues.push({ code: 'numbers-invalid', message: `Number style "${numbering?.id}" changed the tokens, so the standard placement was used.` });
+      tokens = assignNumbers(numberedCells, pool, stageRng(seed, 'numbers', numAttempt), numberOpts);
+    }
+    const numberAt = new Map<number, number>();
+    numberedIdx.forEach((idx, k) => numberAt.set(idx, tokens[k]));
+
+    // Every canvas cell becomes a hex: land cells take the next type and token, the rest is water.
+    let ord = 0;
+    const inits: HexInit[] = canvas.map((c, i) => {
+      if (shape.land[i] !== 1) return { q: c.q, r: c.r, type: 'water', number: null, ext: shape.river[i] ? { river: true } : {} };
+      const idx = ord++;
+      return { q: c.q, r: c.r, type: types[idx], number: numberAt.get(idx) ?? null, ext: {} };
+    });
+
+    // 6 extras: each active perk, then the hooks that need no menu entry (fog hides tiles here). Same stream every attempt.
+    const extrasCtx = ctxFor('extras');
+    for (const perk of perks) perk.afterGenerated?.(inits, extrasCtx);
+    for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, extrasCtx.rng, extra);
+
+    // 7 topology and ports, 8 check.
+    // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports on the standard board).
+    const portRng = stageRng(seed, 'ports');
+    const autoPorts = rngShuffle(portRng, portPool(reg));
+    const portOffset = rngNext(portRng);
+    const board = buildTopology(inits, { isLand, autoPorts, portMode: 'coast', portOffset });
+    const report = validateBoard(board, reg, {
+      expectLand: total,
+      attempts: shape.attempts,
+      rng: stageRng(seed, 'check'),
+      hotTouch: flags.hotTouch,
+      balanceCheck: flags.balanceCheck,
+      thinLand: flags.thinLand,
+      // Shapes that must stay whole say so; satellite islets are separate by design, so they switch that off.
+      requireConnected: flags.requireConnected && !shapeOps.some(o => o.id === 'satellites'),
+      // A ring must not squeeze through a 1-wide neck (design 6.8). Only meaningful where the band can be 2 tiles wide.
+      checkNecks: shapeOps.some(o => o.id === 'ring') && recipe.radius >= 4,
+      // Satellite islets are small on purpose.
+      minLandmass: shapeOps.some(o => o.id === 'satellites') ? 1 : undefined
+    });
+    report.warnings.push(...warnings, ...issues);
+    return { board, report };
+  };
+
+  // Board loop: keep the shape, redraw the tokens until the checks pass; keep the best attempt if none does. Never throws.
+  const limit = boardAttempts(recipe.radius);
+  let terrainAttempt = 0;
+  let best: { board: Board; report: MapReport; score: number } | null = null;
+  let passed = false;
+  let ran = 0;
+  for (let a = 0; a < limit; a++) {
+    const built = buildAttempt(a, terrainAttempt);
+    ran++;
+    const score = attemptScore(built.report);
+    if (!best || score < best.score) best = { ...built, score };
+    if (attemptPassed(built.report)) { passed = true; break; }
+    // An error another token layout cannot fix (land count, landmass size, too few spots): more attempts would only cost time.
+    if (built.report.errors.some(e => !REDRAWABLE_ERRORS.has(e.code))) break;
+    // A resource with no tile is a terrain problem, so the next attempt also redraws the terrain.
+    if (built.report.errors.some(e => e.code === 'resource-missing')) terrainAttempt++;
   }
-  const numberAt = new Map<number, number>();
-  numberedIdx.forEach((idx, k) => numberAt.set(idx, tokens[k]));
-
-  // Every canvas cell becomes a hex: land cells take the next type and token, the rest is water.
-  let ord = 0;
-  const inits: HexInit[] = canvas.map((c, i) => {
-    if (shape.land[i] !== 1) return { q: c.q, r: c.r, type: 'water', number: null, ext: shape.river[i] ? { river: true } : {} };
-    const idx = ord++;
-    return { q: c.q, r: c.r, type: types[idx], number: numberAt.get(idx) ?? null, ext: {} };
-  });
-
-  // 6 extras: each active perk, then the hooks that need no menu entry (fog hides tiles here).
-  const extrasCtx = ctxFor('extras');
-  for (const perk of perks) perk.afterGenerated?.(inits, extrasCtx);
-  for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, extrasCtx.rng, extra);
-
-  // 7 topology and ports, 8 check.
-  // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports on the standard board).
-  const portRng = stageRng(seed, 'ports');
-  const autoPorts = rngShuffle(portRng, portPool(reg));
-  const portOffset = rngNext(portRng);
-  const board = buildTopology(inits, { isLand, autoPorts, portMode: 'coast', portOffset });
-  const report = validateBoard(board, reg, {
-    expectLand: total,
-    attempts: shape.attempts,
-    rng: stageRng(seed, 'check'),
-    hotTouch: flags.hotTouch,
-    // Satellite islets are small on purpose.
-    minLandmass: shapeOps.some(o => o.id === 'satellites') ? 1 : undefined
-  });
-  report.warnings.push(...warnings);
-  return { board, report, recipe };
+  const chosen = best!;
+  chosen.report.stats.boardAttempts = ran;
+  if (!passed) chosen.report.degraded = true;
+  return { board: chosen.board, report: chosen.report, recipe };
 }

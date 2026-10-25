@@ -996,6 +996,63 @@ svg#boardSvg:active { cursor: grabbing; }
 .counter-picker .mini-res-card { width: 40px; height: 48px; }
 .counter-picker .mini-res-card svg.glyph { width: 24px; height: 24px; }
 
+/* ---------- Lobby map menu (mapmenu.ts): summary, dropdown, seed line, report ---------- */
+.map-recipe-row { display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; }
+.map-recipe-row .tool-label { padding-top: 7px; }
+.map-recipe { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.map-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.map-toggle {
+  display: inline-flex; align-items: center; gap: 10px; max-width: 100%; min-height: 32px; padding: 0 12px;
+  border-radius: var(--r); border: 1px solid var(--line); background: transparent; color: inherit;
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.map-toggle:hover { border-color: var(--accent); }
+.map-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-caret {
+  width: 0; height: 0; flex-shrink: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid currentColor; transition: transform 0.15s ease; opacity: 0.7;
+}
+.map-toggle.open .map-caret { transform: rotate(180deg); }
+.map-seedline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.map-label { color: var(--ink-dim); font-weight: 600; }
+.map-seed {
+  padding: 3px 8px; border-radius: var(--r); border: 1px dashed var(--line); background: transparent; color: inherit;
+  font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.04em; cursor: copy;
+}
+.map-seed:hover { border-color: var(--accent); }
+.map-seed-input { flex: 1; min-width: 160px; max-width: 420px; }
+.map-muted { color: var(--ink-dim); font-size: 12px; }
+.map-report { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.map-tag {
+  display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  border: 1px solid var(--line); color: var(--ink-dim); cursor: help; white-space: nowrap;
+}
+.map-tag.warn { border-color: #b8860b; color: #b8860b; }
+.map-tag.danger { border-color: #b3382c; color: #b3382c; }
+.map-panel {
+  display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 4px 24px; padding: 8px 4px 4px;
+  max-height: 46vh; overflow-y: auto; border-top: 1px solid var(--line);
+}
+.map-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.map-col h5 { margin: 8px 0 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+.map-col h5:first-child { margin-top: 0; }
+.map-opt { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: var(--r); font-size: 13px; cursor: pointer; }
+.map-opt:hover { background: rgba(127, 127, 127, 0.12); }
+.map-opt.on { font-weight: 700; }
+.map-opt.off { opacity: 0.55; cursor: default; }
+.map-opt input { accent-color: var(--accent); margin: 0; flex-shrink: 0; }
+.map-land { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+.map-land input[type=range] { flex: 1; min-width: 80px; accent-color: var(--accent); }
+.map-land-val { min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+/* Sliders for every other param of the active options; spans both columns, one row each. */
+.map-params { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 2px 24px; margin-top: 6px; }
+.map-params h5 { grid-column: 1 / -1; margin: 8px 0 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+.map-param { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.map-param-name { flex: 0 1 46%; min-width: 0; line-height: 1.2; }
+.map-param input[type=range] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.map-param-val { min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .map-panel, .map-params { grid-template-columns: 1fr; } }
+
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

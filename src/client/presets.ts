@@ -56,7 +56,7 @@ export function renderPresetRow(): void {
   if (!box) return;
   const host = isHost();
   const list = host ? loadPresets() : [];
-  const signature = JSON.stringify([host, mode, confirmDeleteId, list.map(p => [p.id, p.name])]);
+  const signature = JSON.stringify([host, mode, confirmDeleteId, list.map(p => [p.id, p.name, !!p.recipe])]);
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -75,9 +75,14 @@ export function renderPresetRow(): void {
         </span>`;
     }
     const when = p.savedAt ? new Date(p.savedAt).toLocaleDateString() : '';
+    // A preset saved from a generated map (v2) keeps its recipe: the extra button applies the same style with a fresh seed.
+    const restyle = p.recipe
+      ? `<button type="button" class="chip-x" onclick="applyPresetStyle('${p.id}')" title="Same style, new seed">${uiIcon('refresh', 12)}</button>`
+      : '';
     return `
       <span class="chip-group">
         <button type="button" class="chip-btn" onclick="applyCustomPreset('${p.id}')" title="Load this map and its rules${when ? ` (saved ${esc(when)})` : ''}">${esc(p.name)}</button>
+        ${restyle}
         <button type="button" class="chip-x" onclick="askDeletePreset('${p.id}')" title="Delete this preset">${uiIcon('close', 12)}</button>
       </span>`;
   }).join('');
@@ -139,6 +144,16 @@ export function applyCustomPreset(id: string): void {
   const preset = loadPresets().find(p => p.id === id);
   if (!preset) { showToast('That preset is no longer saved in this browser.'); renderPresetRow(); return; }
   socket.emit('applyCustomPreset', { code: state.code, preset });
+  playTone(520, 0.08);
+}
+
+/** "New seed" on a v2 preset: the server applies the preset's radius, picks and params with a fresh seed. */
+export function applyPresetStyle(id: string): void {
+  if (!state || state.status !== 'LOBBY') return;
+  if (!isHost()) { showToast('Only the host can apply map presets.'); return; }
+  const preset = loadPresets().find(p => p.id === id);
+  if (!preset || !preset.recipe) { showToast('That preset has no map style to reuse.'); renderPresetRow(); return; }
+  socket.emit('applyPresetStyle', { code: state.code, preset: { recipe: preset.recipe } });
   playTone(520, 0.08);
 }
 

@@ -78,6 +78,18 @@ export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>
   room.mapMeta = undefined;
 }
 
+/**
+ * "New seed" on a saved preset: apply its style (radius, picks, params) and roll a fresh seed, so the host gets the same kind of map
+ * again. Picks and params go through the same validation as every other client message.
+ */
+export function applyRecipeStyle(
+  room: Pick<Room, 'settings' | 'board' | 'mapMeta'>,
+  style: { radius: number; picks: string[]; params: Record<string, number> }
+): void {
+  room.settings = mergeSettings({ boardRadius: style.radius, mapPicks: style.picks, mapParams: style.params, mapSeed: '' }, room.settings);
+  refreshMap(room);
+}
+
 /** Everything that decides the lobby map. When this changes the board is rebuilt; other settings leave painted edits alone. */
 export function recipeKey(s: Settings): string {
   const params = s.mapParams ?? {};

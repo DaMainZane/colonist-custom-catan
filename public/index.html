@@ -112,16 +112,18 @@
           </div>
         </div>
 
-        <!-- Presets: built-in ones are fixed, saved ones (host's browser) can be deleted after a confirmation -->
+        <!-- Presets: quick starts come from the registry (drawn by mapmenu.ts); saved ones (host's browser) can be deleted after a confirmation -->
         <div class="tool-row" id="presetRow">
           <span class="tool-label">Presets</span>
-          <button class="chip-btn" onclick="applyPreset('standard')">Standard</button>
-          <button class="chip-btn" onclick="applyPreset('goldRush')">Gold rush</button>
-          <button class="chip-btn" onclick="applyPreset('fogIsland')">Fog island</button>
-          <button class="chip-btn" onclick="applyPreset('archipelago')">Islands</button>
-          <button class="chip-btn" onclick="applyPreset('blank')">Blank ocean</button>
+          <span id="builtinPresets" class="tool-row"></span>
           <span class="tool-sep"></span>
           <span id="customPresets" class="tool-row"></span>
+        </div>
+
+        <!-- Map recipe: summary and dropdown (shape, style, perks), seed, report. Drawn by mapmenu.ts from the server's option list -->
+        <div class="map-recipe-row">
+          <span class="tool-label">Map</span>
+          <div id="mapRecipe" class="map-recipe"></div>
         </div>
 
         <!-- Tab 1: map painter -->

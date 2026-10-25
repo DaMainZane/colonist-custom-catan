@@ -4,8 +4,9 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
-import { applyMapStart, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap } from './lobby';
-import { loadPreset, serializePreset } from './presets';
+import { applyMapStart, applyRecipeStyle, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap } from './lobby';
+import { mapOptionsView } from './mapmenu';
+import { applyLoadedPreset, loadPreset, presetStyle, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
 import { registry } from './runtime';
@@ -25,6 +26,9 @@ function noteCrowding(room: Room): void {
 
 export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket) => {
+    // The map menu is drawn from the registry's options, so the client gets the list once per connection and caches it.
+    socket.emit('mapOptions', mapOptionsView());
+
     const safe = (fn: (data: any) => void) => (data: any = {}) => {
       try { fn(data); } catch (err) { console.error('Socket handler error:', err); }
     };
@@ -174,7 +178,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('savePreset', safe(({ code, name }) => {
       const room = hostLobbyRoom(code);
       if (!room) return;
-      socket.emit('presetSaved', { preset: serializePreset(room.board, room.settings, name) });
+      socket.emit('presetSaved', { preset: serializePreset(room.board, room.settings, name, room.mapMeta) });
     }));
 
     socket.on('applyCustomPreset', safe(({ code, preset }) => {
@@ -182,11 +186,20 @@ export function registerSocketHandlers(io: Server): void {
       if (!room) return;
       const loaded = loadPreset(preset, room.settings);
       if ('error' in loaded) return socket.emit('errorMsg', loaded.error);
-      room.settings = loaded.settings;
-      room.board = loaded.board;
-      // A snapshot, not a recipe: the seed no longer describes this board until presets v2 (M6).
-      room.mapMeta = undefined;
+      // The snapshot is the map. A preset with a recipe also brings back its seed and style (presets v2).
+      applyLoadedPreset(room, loaded);
       addLobbyLog(room, `Map preset "${loaded.name}" loaded`, null);
+      broadcastRoom(room);
+    }));
+
+    // "New seed" on a saved preset: the same style (radius, picks, params), a fresh seed.
+    socket.on('applyPresetStyle', safe(({ code, preset }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      const style = presetStyle(preset);
+      if (!style) return socket.emit('errorMsg', 'That preset has no map style to reuse.');
+      applyRecipeStyle(room, style);
+      addLobbyLog(room, 'Map style from a preset applied with a new seed', null);
       broadcastRoom(room);
     }));
 

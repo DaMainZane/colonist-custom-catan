@@ -76,7 +76,7 @@ describe('recipe', () => {
   it('round-trips through the share code', () => {
     const r = makeRecipe({ seed: '7K3F9Q2', radius: 4, picks: ['continent', 'lake', 'fog'], params: { land: 70, 'islands.count': 3 } });
     const code = encodeRecipe(r);
-    expect(code).toBe('hx1;g=1;r=4;picks=continent+lake+fog;islands.count=3;land=70;seed=7K3F9Q2');
+    expect(code).toBe(`hx1;g=${GEN_VERSION};r=4;picks=continent+lake+fog;islands.count=3;land=70;seed=7K3F9Q2`);
     const back = decodeRecipe(code);
     expect(back?.recipe).toEqual(r);
     expect(back?.dropped).toEqual([]);

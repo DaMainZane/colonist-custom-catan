@@ -5,8 +5,9 @@ import type { RngState } from './rng';
 /**
  * Bump on any change that alters the output for the same recipe (golden tests catch accidental ones).
  * A recipe carries the version it was made with; a mismatch means the seed may not give the same map.
+ * 2: the board loop redraws tokens per attempt, the ring keeps a 2-tile band, the `island_mix` perk exists.
  */
-export const GEN_VERSION = 1;
+export const GEN_VERSION = 2;
 
 export const SHARE_PREFIX = 'hx1';
 export const MIN_RADIUS = 1;

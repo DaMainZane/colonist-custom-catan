@@ -1,5 +1,5 @@
 // MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and map matrix) | USED BY: tests/sim.test.ts, tests/bots.test.ts
-import { createGame, dispatch } from '../../shared';
+import { createGame, dispatch, generateMap, mergeRules } from '../../shared';
 import type { GameState } from '../../shared';
 import { registry } from '../runtime';
 import { chooseBotAction, noteBotEvents } from './brain';
@@ -10,6 +10,10 @@ export interface SimOptions {
   seed: number;
   players?: number;
   preset?: string;
+  /** Map menu picks (shape, terrain and number styles, perks). When set, the board comes from `generateMap` instead of the legacy preset. */
+  picks?: string[];
+  /** Map params for `picks` (land, islands.count, ...). */
+  mapParams?: Record<string, number>;
   /** Rule overrides handed to createGame (merged over the registry defaults). */
   rules?: Record<string, any>;
   maxSteps?: number;
@@ -59,6 +63,12 @@ export function simulateGame(opts: SimOptions): SimResult {
   const rand = mulberry32(opts.seed);
   const tiers = opts.tiers && opts.tiers.length > 0 ? opts.tiers : ['secondary'];
 
+  // A recipe-built board (the lobby path), so the bots can be run on every shape. The seed text is derived from the sim seed.
+  const mergedRules = mergeRules(registry.rules, opts.rules ?? {});
+  const board = opts.picks
+    ? generateMap(registry, mergedRules, { seed: `SIM${opts.seed}`, picks: opts.picks, params: opts.mapParams, radius: mergedRules.boardRadius }).board
+    : undefined;
+
   const g = createGame(registry, {
     players: Array.from({ length: n }, (_, i) => ({
       id: `bot${i + 1}`,
@@ -68,7 +78,8 @@ export function simulateGame(opts: SimOptions): SimResult {
     })),
     rules: opts.rules,
     seed: opts.seed,
-    preset: opts.preset
+    preset: opts.preset,
+    board
   });
 
   let steps = 0;

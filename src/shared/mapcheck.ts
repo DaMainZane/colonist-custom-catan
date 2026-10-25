@@ -30,6 +30,8 @@ export interface MapReport {
     /** Pips of the 8th best spot divided by the best spot (4 players, 2 spots each). 0 when there are fewer than 8 spots. */
     fairness: number;
     attempts: number;
+    /** Board attempts the retry loop ran (token layouts tried on the chosen shape); absent for painted or loaded maps. */
+    boardAttempts?: number;
     genVersion: number;
   };
 }
@@ -89,6 +91,27 @@ export function findLandmasses(board: Board, isLandHex: (h: Hex) => boolean): La
 export type CellKind = 'land' | 'ocean' | 'lake';
 
 /**
+ * Land cells squeezed between water on two sides: their land neighbours form two or more separate arcs around them, so the
+ * land is one tile wide there (a neck that roads have to squeeze through). A closed ring has no cut cell (take one away and
+ * the rest is still a path), so the check is local. `ring(i)` lists the six neighbours of cell i in direction order, -1 outside the board.
+ */
+export function countPinches(count: number, land: (i: number) => boolean, ring: (i: number) => number[]): number {
+  let n = 0;
+  for (let i = 0; i < count; i++) {
+    if (!land(i)) continue;
+    const nb = ring(i);
+    let arcs = 0;
+    for (let k = 0; k < 6; k++) {
+      const a = nb[k] >= 0 && land(nb[k]);
+      const b = nb[(k + 1) % 6] >= 0 && land(nb[(k + 1) % 6]);
+      if (a && !b) arcs++;
+    }
+    if (arcs >= 2) n++;
+  }
+  return n;
+}
+
+/**
  * Water that reaches the canvas edge is ocean (the canvas border is open sea). Water that is walled in by
  * land is a lake. Indexed by hex id.
  */
@@ -135,11 +158,17 @@ function greedyPick(board: Board, order: number[], ok: boolean[]): number[] {
 export interface ValidateOptions {
   /** The land count the shape stage promised. Omit for painted or loaded maps. */
   expectLand?: number;
+  /** Warn about land tiles squeezed between water on two sides (a 1-wide neck). Used for the ring shape. Default false. */
+  checkNecks?: boolean;
   minLandmass?: number;
   /** 'forbid' (default) warns about touching 6/8, 'allow' skips that check. */
   hotTouch?: 'forbid' | 'allow';
   /** Warn when a resource has under half the average pips (default true; off for balanced styles). */
   balanceCheck?: boolean;
+  /** One landmass only: split land is an error (shapes that must stay whole). Default false. */
+  requireConnected?: boolean;
+  /** Thin-land warning limit: the share of land tiles with 2 or fewer land neighbours. Default 0.25. */
+  thinLand?: number;
   attempts?: number;
   /** Order source for the spot search, so the report is deterministic. */
   rng?: RngState;
@@ -223,6 +252,9 @@ export function validateBoard(board: Board, reg: Registry, opts: ValidateOptions
   if (land.landCount > 0 && Math.max(0, ...landmassSpots) < BASELINE_SPOTS) {
     errors.push({ code: 'too-few-spots', message: `The biggest landmass has ${Math.max(0, ...landmassSpots)} usable spots (needs ${BASELINE_SPOTS}).` });
   }
+  if (opts.requireConnected && land.landmassSize.length > 1) {
+    errors.push({ code: 'not-connected', message: `The land is split into ${land.landmassSize.length} landmasses, but this shape must stay in one piece.` });
+  }
   for (const res of Object.keys(pipsByResource)) {
     if (hexCount[res] === 0) errors.push({ code: 'resource-missing', message: `No tile produces ${res}.` });
   }
@@ -256,12 +288,17 @@ export function validateBoard(board: Board, reg: Registry, opts: ValidateOptions
     if (land.landOfHex[i] < 0) return;
     if (neighbours(i).filter(j => land.landOfHex[j] >= 0).length <= 2) thin++;
   });
-  if (land.landCount > 0 && thin / land.landCount > 0.25) {
+  if (land.landCount > 0 && thin / land.landCount > (opts.thinLand ?? 0.25)) {
     warnings.push({ code: 'thin-land', message: `${thin} of ${land.landCount} land tiles have 2 or fewer land neighbours.` });
   }
   land.landmassSize.forEach((size, i) => {
     if (size >= 6 && !portedLand.has(i)) warnings.push({ code: 'no-port', message: `Landmass ${i + 1} (${size} tiles) has no port.` });
   });
+  if (opts.checkNecks && land.landCount > 0) {
+    const ringOf = (i: number): number[] => DIRS.map(([dq, dr]) => at.get(`${hexes[i].q + dq},${hexes[i].r + dr}`) ?? -1);
+    const pinched = countPinches(hexes.length, i => land.landOfHex[i] >= 0, ringOf);
+    if (pinched > 0) warnings.push({ code: 'thin-neck', message: `${pinched} land tile${pinched === 1 ? ' is' : 's are'} squeezed between water on two sides (a 1-wide neck).` });
+  }
   if (opts.balanceCheck !== false) {
     const res = Object.keys(pipsByResource).filter(r => hexCount[r] > 0);
     const mean = res.length > 0 ? res.reduce((s, r) => s + pipsByResource[r], 0) / res.length : 0;
@@ -273,6 +310,15 @@ export function validateBoard(board: Board, reg: Registry, opts: ValidateOptions
   }
   if (land.landmassSize.length > 1) {
     warnings.push({ code: 'split-land', message: `The land is split into ${land.landmassSize.length} landmasses.` });
+    // Terrain is dealt over the whole map, so a 4+ tile island can end up with a single resource.
+    const kinds = land.landmassSize.map(() => new Set<string>());
+    hexes.forEach((h, i) => {
+      const m = land.landOfHex[i];
+      if (m >= 0 && !h.ext?.hidden) kinds[m].add(reg.tiles.get(h.type)?.produces ?? h.type);
+    });
+    land.landmassSize.forEach((size, i) => {
+      if (size >= 4 && kinds[i].size === 1) warnings.push({ code: 'one-resource-island', message: `Landmass ${i + 1} (${size} tiles) has only ${[...kinds[i]][0]}.` });
+    });
   }
 
   return {

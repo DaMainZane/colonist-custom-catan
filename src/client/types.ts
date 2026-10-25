@@ -138,4 +138,49 @@ export interface GameState {
   chats: { sender: string; avatar: string; color: string; text: string }[];
   tradeRatios: Resources;
   players: PlayerView[];
+  /** How the lobby map was made (lobby only; null for blank, snapshot and legacy boards). */
+  mapMeta?: MapMetaView | null;
+}
+
+// ---- Map menu (lobby) ----
+
+export interface MapParamView { id: string; label: string; min: number; max: number; step: number; default: number }
+
+export interface MapOptionView {
+  id: string;
+  label: string;
+  description: string;
+  stage: 'shape' | 'terrain' | 'numbers' | 'extras';
+  phase?: string;
+  slot?: string;
+  default: boolean;
+  conflicts: string[];
+  requires: string[];
+  met: boolean;
+  secret: boolean;
+  params: MapParamView[];
+}
+
+export interface MapOptionsView {
+  options: MapOptionView[];
+  quickStarts: { id: string; label: string; blank: boolean }[];
+}
+
+export interface MapIssueView { code: string; message: string }
+
+export interface MapMetaView {
+  recipe: { g: number; seed: string; radius: number; picks: string[]; params: Record<string, number> };
+  /** The one-line share code (`hx1;...`). */
+  code: string;
+  report: {
+    ok: boolean;
+    errors: MapIssueView[];
+    warnings: MapIssueView[];
+    degraded?: boolean;
+    stats: { land: number; landmasses: number[]; lakes: number; spots: number; landmassSpots?: number[]; ports: number; fairness: number; boardAttempts?: number };
+  };
+  /** A paint event touched the board, so the seed no longer describes it. */
+  edited: boolean;
+  /** Made by another generator version: the seed may now give a different map. */
+  otherVersion: boolean;
 }

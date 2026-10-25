@@ -13,6 +13,10 @@ export * from './mapcheck';
 // The land-field helpers have generic names, so only the entry points are public; the rest is imported from './mapshape'.
 export { MIN_LAND, SHAPE_ATTEMPTS, runShape } from './mapshape';
 export type { BlobSpec, LandField, ShapeInput, ShapeResult } from './mapshape';
+export { buildCellInfo, cellNeighbours, rankNormalize } from './mapcells';
+export type { CellSource } from './mapcells';
+export { habitatPlace, swapPlace } from './mapterrain';
+export { MIX_MIN_ISLAND, mixIslands } from './mapmix';
 export * from './mapgen';
 export * from './state';
 export * from './engine';

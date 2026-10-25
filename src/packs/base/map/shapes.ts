@@ -182,6 +182,7 @@ export function registerShapes(api: PackApi): void {
     stage: 'shape',
     phase: 'base',
     slot: 'shape',
+    ruleOverrides: { requireConnected: true },
     params: [landParam(70)],
     run(f) {
       f.single = true;
@@ -199,6 +200,7 @@ export function registerShapes(api: PackApi): void {
     phase: 'base',
     slot: 'shape',
     conflicts: ['lake'],
+    ruleOverrides: { requireConnected: true },
     params: [landParam(60), { id: 'ring.lagoon', label: 'Lagoon size', min: 10, max: 50, step: 5, default: 25 }],
     run(f, ctx) {
       f.single = true;
@@ -207,6 +209,14 @@ export function registerShapes(api: PackApi): void {
       const outside = (lr: number) => { let n = 0; for (let i = 0; i < f.size; i++) if (f.dist[i] > lr) n++; return n; };
       let lagoon = Math.max(1, Math.round((R * ctx.param('ring.lagoon')) / 100));
       while (lagoon > 1 && outside(lagoon) < f.baseTarget) lagoon--;
+      // From radius 4 up, the two rings next to the lagoon are always land when the land budget allows it, so the band is
+      // at least 2 tiles thick all the way round and roads never squeeze through a 1-wide neck (design 6.8).
+      const inner = (l: number) => 6 * (l + 1) + 6 * (l + 2);
+      let wide = R >= 4;
+      if (wide) {
+        while (lagoon > 1 && inner(lagoon) > f.baseTarget) lagoon--;
+        wide = inner(lagoon) <= f.baseTarget && lagoon + 2 <= R;
+      }
       limitLand(f, outside(lagoon));
       for (let i = 0; i < f.size; i++) if (f.dist[i] <= lagoon) f.locked[i] = 1;
       let cum = 0;
@@ -223,6 +233,7 @@ export function registerShapes(api: PackApi): void {
         f.h[i] -= (1.6 * Math.abs(f.dist[i] - mid)) / width;
         // The core of the band is always land, so the ring is closed and the lagoon stays enclosed.
         if (Math.abs(f.dist[i] - mid) <= 0.5) f.h[i] += 2;
+        if (wide && (f.dist[i] === lagoon + 1 || f.dist[i] === lagoon + 2)) f.h[i] += 2;
       }
       takeTop(f, f.baseTarget);
     }
@@ -386,6 +397,8 @@ export function registerShapes(api: PackApi): void {
     stage: 'shape',
     phase: 'tweak',
     conflicts: ['hexagon'],
+    // A long, broken coast is the point, so more thin land is fine.
+    ruleOverrides: { thinLand: 0.4 },
     params: [{ id: 'ragged.amount', label: 'Ruggedness (%)', min: 20, max: 100, step: 10, default: 80 }],
     run(f, ctx) {
       f.ragged = Math.max(0, Math.min(1, ctx.param('ragged.amount') / 100));

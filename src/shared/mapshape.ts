@@ -505,6 +505,11 @@ export interface ShapeResult {
   land: Uint8Array;
   /** 1 = water carved as a river. */
   river: Uint8Array;
+  /**
+   * The height field by canvas index, for terrain styles that want it (`realistic`). Null when the shape never drew
+   * one (hexagon, islands, archipelago, continents, the fallback): the terrain stage then uses its own noise.
+   */
+  h: number[] | null;
   attempts: number;
   /** The attempts all failed and the plain hexagon was used. */
   fallback: boolean;
@@ -574,10 +579,12 @@ export function runShape(input: ShapeInput): ShapeResult {
       const ctx = input.make(attempt);
       const f = createLandField(input.radius, ctx.noise, ctx.rng);
       if (tryShape(f, ctx, base, tweaks, carves, scatters)) {
-        return { land: f.land, river: f.river, attempts: attempt + 1, fallback: false };
+        // A shape that never called fillHeight leaves the field all zero: that means "no height", not "flat".
+        const drawn = f.h.some(v => v !== 0);
+        return { land: f.land, river: f.river, h: drawn ? f.h : null, attempts: attempt + 1, fallback: false };
       }
     }
   }
   const size = canvasCoords(input.radius).length;
-  return { land: new Uint8Array(size).fill(1), river: new Uint8Array(size), attempts: SHAPE_ATTEMPTS, fallback: !!base };
+  return { land: new Uint8Array(size).fill(1), river: new Uint8Array(size), h: null, attempts: SHAPE_ATTEMPTS, fallback: !!base };
 }

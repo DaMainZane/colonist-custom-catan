@@ -21,6 +21,8 @@ export const goldPack: Pack = {
       border: '#c9a227',
       land: true,
       numbered: true,
+      // Mountain gold: just below the ore, so the realistic style puts it next to the mountains.
+      habitat: { h: 0.85, weight: 2 },
       // No `produces`: gold never pays cards directly. It adds picks, and the base pack's
       // settlePicks (afterAction) opens the `pick` phase for whoever has pending.pick > 0.
       onProduce(ctx, hex, ownerId, amount) {

@@ -105,7 +105,7 @@ describe('registry map content', () => {
     expect([...registry.mapShapes.keys()]).toContain('hexagon');
     expect([...registry.mapTerrains.keys()]).toContain('random');
     expect([...registry.mapNumberings.keys()]).toContain('standard');
-    expect([...registry.mapPerks.keys()].sort()).toEqual(['fog', 'gold']);
+    expect([...registry.mapPerks.keys()].sort()).toEqual(['fog', 'gold', 'island_mix']);
     expect([...registry.quickStarts.keys()].sort()).toEqual(['archipelago', 'blank', 'fogIsland', 'goldRush', 'standard']);
     expect(registry.quickStarts.get('blank')?.blank).toBe(true);
   });
