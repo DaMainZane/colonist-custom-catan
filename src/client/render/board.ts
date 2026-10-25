@@ -329,7 +329,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           </g>
         </g>
         ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${innerPoly}" style="${rollDimStyle}" />` : ''}
-        ${canClickRobber ? `<polygon class="hex-target" points="${innerPoly}" />` : ''}
+        ${canClickRobber ? `<polygon class="hex-tint" points="${innerPoly}" /><polygon class="hex-target" points="${innerPoly}" />` : ''}
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})">

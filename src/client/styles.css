@@ -358,7 +358,7 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 .trade-offer-body {
   position: relative; overflow: hidden; flex-shrink: 0;
-  background: var(--surface); border-radius: var(--r-lg); padding: 30px 12px 12px; box-shadow: var(--shadow);
+  background: var(--surface); border-radius: var(--r-lg); padding: 10px 12px 13px; box-shadow: var(--shadow);
   display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
 }
 .trade-offer-body.trade-card-enter {
@@ -420,16 +420,16 @@ svg#boardSvg:active { cursor: grabbing; }
 .trade-act-btn.decline, .trade-act-btn.cancel { background: var(--danger); color: #fff; }
 .trade-act-btn.off { opacity: 0.38; cursor: not-allowed; transform: none; }
 
-/* Per-offer time limit: a pill-shaped bar across the top of each offer card (fill is sized from render/trade.ts) */
-.trade-timebar {
-  position: absolute; top: 9px; left: 12px; right: 12px; height: 13px; padding: 2px;
-  border: 1.5px solid var(--ink); border-radius: 999px; background: var(--surface); pointer-events: none;
+/* Per-offer time limit countdown bar along the bottom edge (fill width is set from render/trade.ts) */
+.trade-timer-track {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3.5px;
+  background: var(--surface-3); overflow: hidden; pointer-events: none;
 }
-.trade-timebar-fill {
-  height: 100%; width: 100%; border-radius: 999px; background: var(--ink);
-  filter: drop-shadow(-2px 3px 2px rgba(0, 0, 0, 0.22));
+.trade-timer-fill {
+  width: 100%; height: 100%; background: var(--accent);
+  transform-origin: left center; transform: scaleX(1);
 }
-.trade-timebar-fill.low { background: var(--danger); }
+.trade-timer-fill.low { background: var(--danger); }
 
 /* ---------- Bottom-left sheet (trade, discard, gold, monopoly, robber victim) ---------- */
 #inlineDrawerWrap { position: absolute; bottom: 112px; left: 12px; display: none; align-items: flex-end; gap: 8px; z-index: 40; }
@@ -663,15 +663,15 @@ svg#boardSvg:active { cursor: grabbing; }
 /* Tiles that just produced go dark for about 2 s, then fade back (timing is driven from render/board.ts). */
 .hex-rolled { fill: #000; fill-opacity: 0; stroke: none; pointer-events: none; animation: rolledDim 2s ease-out both; }
 @keyframes rolledDim { 0%, 60% { fill-opacity: 0.5; } 100% { fill-opacity: 0; } }
-/* Robber targets: nothing is drawn until the cursor is over a tile. That one tile takes a dark slate cast, a different
-   color from the amber build highlights. Touch screens have no hover, so they get a faint outline on every target. */
+/* Robber targets after a 7: every tile you can move the robber to takes a flat orange tint (no stripes) so the 7 is obvious.
+   The tile under the cursor then takes a dark slate cast on top, a different color from the amber build highlights. */
+.hex-tint { fill: var(--accent); fill-opacity: 0.36; stroke: none; pointer-events: none; }
 .hex-target {
   fill: var(--target-dark); fill-opacity: 0; stroke: var(--target-dark); stroke-opacity: 0; stroke-width: 4;
   stroke-linejoin: round; cursor: pointer; pointer-events: all;
   transition: fill-opacity 0.1s, stroke-opacity 0.1s;
 }
 .hex-target:hover { fill-opacity: 0.62; stroke-opacity: 0.9; }
-@media (hover: none) { .hex-target { stroke-opacity: 0.4; } }
 .port-dock-apron { fill: var(--pier-dark); fill-opacity: 0.32; stroke: none; }
 .port-pier-rim { stroke: var(--pier-dark); stroke-width: 9.5; stroke-linecap: round; fill: none; }
 .port-pier { stroke: var(--pier); stroke-width: 6; stroke-linecap: round; fill: none; }

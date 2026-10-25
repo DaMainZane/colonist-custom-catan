@@ -124,7 +124,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
       !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
     return `
       <div class="trade-offer-body trade-counter ${animCls}" data-trade-id="${t.id}">
-        <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
+        <div class="trade-timer-track" title="Time left"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
         <div class="trade-rows">
           <div class="counter-picker" title="Click a resource to ask for it">
             ${RESOURCES.map(r => `<div class="mini-res-card card-${r}" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}">${getMiniSvg(r)}</div>`).join('')}
@@ -188,7 +188,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
 
   return `
     <div class="trade-offer-body ${animCls}" data-trade-id="${t.id}">
-      <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
+      <div class="trade-timer-track" title="Time left"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
       <div class="trade-rows">
         <div class="trade-row" title="What you receive">
           <div class="trade-dir-badge get">
