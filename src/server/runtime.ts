@@ -25,7 +25,7 @@ export function defaultSettings(): Settings {
     maxSettlements: 5,
     maxCities: 4,
     maxRoads: 15,
-    gameSpeed: 1,
+    gameSpeed: 0.5,
     turnTimerSec: 0,
     turnIncrementSec: 0,
     tradeTimerSec: 20,

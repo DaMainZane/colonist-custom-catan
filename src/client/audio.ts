@@ -101,6 +101,15 @@ export function playDiceRollSound(sum?: number): void {
   }
 }
 
+// Warm two-note notification chime when the turn passes to you
+export function playYourTurnSound(): void {
+  if (!ensureAudio()) return;
+  playPitchSweep(587.33, 587.33, 0.13, 'triangle', 0.15, 0);
+  playPitchSweep(1174.66, 1174.66, 0.11, 'sine', 0.06, 0);
+  playPitchSweep(880.0, 880.0, 0.24, 'triangle', 0.17, 0.1);
+  playPitchSweep(1760.0, 1760.0, 0.18, 'sine', 0.06, 0.1);
+}
+
 // Crisp Colonist wooden block clack when placing a Road
 export function playPlaceRoadSound(): void {
   if (!ensureAudio()) return;

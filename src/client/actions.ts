@@ -96,15 +96,6 @@ export function toggleGameMenu(forceShow?: boolean): void {
   playTone(500, 0.05);
 }
 
-export function setGameSpeedValue(speedVal: number | string): void {
-  if (!state) return;
-  if (!requireHost('change the game speed')) { renderAll(); return; }
-  const num = Math.max(0.25, Math.min(10, Number(speedVal) || 1));
-  if (state.settings) state.settings.gameSpeed = num;
-  socket.emit('setGameSpeed', { code: state.code, speed: num });
-  playTone(560, 0.05);
-}
-
 export function setBrush(type: string, value: string, btn?: HTMLElement): void {
   if (!requireHost('edit the map')) return;
   const isSame = activeBrush.type === type && activeBrush.value === value;
@@ -152,8 +143,7 @@ export function pushSettings(): void {
       devMonopoly: val('setDevMono'),
       maxRoads: val('setMaxRoad'),
       maxSettlements: val('setMaxSettle'),
-      maxCities: val('setMaxCity'),
-      gameSpeed: val('setGameSpeed')
+      maxCities: val('setMaxCity')
     }
   });
 }

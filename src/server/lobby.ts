@@ -107,8 +107,7 @@ export function isPreset(id: any): boolean {
 export function mergeSettingsDetailed(input: any, old: Settings): { settings: Settings; dropped: string[] } {
   const s = input ?? {};
   const dropped: string[] = [];
-  const speed = Number(s.gameSpeed);
-  const gameSpeed = Number.isFinite(speed) && speed > 0 ? Math.max(0.25, Math.min(10, speed)) : (old.gameSpeed ?? 1);
+  const gameSpeed = old.gameSpeed ?? 0.5;
 
   let seedIn: any = s.mapSeed;
   let picksIn: any = s.mapPicks;
@@ -175,7 +174,7 @@ function portsOf(board: Board): Record<string, string> {
 /** Recomputes the topology from the hexes, keeping the given ports. */
 function rebuild(board: Board, ports: Record<string, string>): Board {
   const inits: HexInit[] = board.hexes.map(h => ({ q: h.q, r: h.r, type: h.type, number: h.number, ext: h.ext }));
-  return buildTopology(inits, { ports, isLand });
+  return buildTopology(inits, { ports, isLand, portMode: 'coast' });
 }
 
 function randomBaseTile(): string {

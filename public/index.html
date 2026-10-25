@@ -42,11 +42,8 @@
         <button class="nav-btn" id="btnToggleSound" onclick="toggleSound()" title="Sound"><span data-icon="sound"></span></button>
         <button class="nav-btn" onclick="toggleTheme()" title="Light or dark theme"><span data-icon="theme"></span></button>
         <button class="nav-btn" onclick="resetCamera()" title="Fit board to screen"><span data-icon="fit"></span></button>
-        <button class="nav-btn" id="btnQuickSpeed" onclick="toggleGameMenu()" title="Game speed">
-          <span data-icon="bolt"></span>
-          <span class="nav-badge" id="navSpeedBadge">1x</span>
-        </button>
-        <button class="nav-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Game menu"><span data-icon="sliders"></span></button>
+        <button class="nav-btn" id="btnQuickSpeed" onclick="toggleGameMenu()" title="Game menu"><span data-icon="home"></span></button>
+        <button class="nav-btn" id="btnToggleEditor" onclick="toggleLobbyToolbar()" title="Lobby settings"><span data-icon="sliders"></span></button>
       </div>
 
       <!-- In-game menu -->
@@ -54,20 +51,6 @@
         <div class="menu-head">
           <span>Game menu</span>
           <button class="icon-btn" onclick="toggleGameMenu(false)" title="Close"><span data-icon="close" data-size="18"></span></button>
-        </div>
-        <div class="menu-section">
-          <div class="row-between">
-            <span>Game and bot speed</span>
-            <span id="menuSpeedLabel" class="muted">1x (Normal)</span>
-          </div>
-          <input id="menuSpeedSlider" type="range" min="0.5" max="8" step="0.25" value="1" oninput="setGameSpeedValue(this.value)" />
-          <div class="speed-preset-row">
-            <button class="speed-preset-btn" data-speed="0.5" onclick="setGameSpeedValue(0.5)">0.5x</button>
-            <button class="speed-preset-btn active" data-speed="1" onclick="setGameSpeedValue(1)">1x</button>
-            <button class="speed-preset-btn" data-speed="2" onclick="setGameSpeedValue(2)">2x</button>
-            <button class="speed-preset-btn" data-speed="4" onclick="setGameSpeedValue(4)">4x</button>
-            <button class="speed-preset-btn" data-speed="8" onclick="setGameSpeedValue(8)">8x</button>
-          </div>
         </div>
         <div class="menu-actions">
           <button class="btn sm" onclick="resetCamera()"><span data-icon="fit" data-size="16"></span>Fit board</button>
@@ -118,14 +101,6 @@
             <button class="tab" id="tabBtnCards" onclick="switchLobbyTab('cards')">Rules and cards</button>
           </div>
           <div class="dock-actions">
-            <select id="setGameSpeedHeader" class="num" title="Game speed" onchange="setGameSpeedValue(this.value)">
-              <option value="0.5">0.5x Slow</option>
-              <option value="1" selected>1x Normal</option>
-              <option value="2">2x Fast</option>
-              <option value="4">4x Faster</option>
-              <option value="8">8x Blitz</option>
-            </select>
-            <span class="tool-sep"></span>
             <select id="botTier" class="num" title="Difficulty of the next bot (click a bot's tag in the player list to change it later)">
               <option value="main" selected>Main</option>
               <option value="secondary">Secondary</option>
@@ -196,15 +171,6 @@
           <div class="rules-grid">
             <div class="rule-group">
               <h4>Game</h4>
-              <label class="field">Speed
-                <select id="setGameSpeed" class="num" onchange="setGameSpeedValue(this.value)">
-                  <option value="0.5">0.5x Slow</option>
-                  <option value="1" selected>1x Normal</option>
-                  <option value="2">2x Fast</option>
-                  <option value="4">4x Faster</option>
-                  <option value="8">8x Blitz</option>
-                </select>
-              </label>
               <label class="field">Map radius (1-50)<input id="setRadius" type="number" class="num" value="2" min="1" max="50" onchange="pushSettings()" /></label>
               <label class="field">VP to win<input id="setVp" type="number" class="num" value="10" min="3" max="50" onchange="pushSettings()" /></label>
               <label class="field">Max players<input id="setMaxP" type="number" class="num" value="8" min="2" max="8" onchange="pushSettings()" /></label>

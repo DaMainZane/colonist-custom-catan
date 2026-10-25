@@ -810,10 +810,14 @@ svg#boardSvg:active { cursor: grabbing; }
   position: fixed; inset: 0; width: 100vw; height: 100vh;
   pointer-events: none; z-index: 1250;
 }
+#gameViewport.victory-modal-open #boardSvg,
+#gameViewport.victory-modal-open #boardSvg * {
+  animation-play-state: paused !important;
+}
 #victoryOverlay {
-  position: absolute; inset: 0; background: rgba(18, 22, 26, 0.9); z-index: 80; display: none;
+  position: absolute; inset: 0; background: #14181c; z-index: 80; display: none;
   flex-direction: column; align-items: center; justify-content: space-between; padding: 20px 28px; color: #ece8df;
-  backdrop-filter: blur(4px);
+  contain: layout paint;
 }
 #reopenVictoryBtn { position: absolute; top: 12px; right: 16px; z-index: 85; display: none; }
 .vic-top-bar { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -831,7 +835,7 @@ svg#boardSvg:active { cursor: grabbing; }
 .vic-tab {
   flex: 1; background: transparent; border: none; color: #a7a296; font-family: inherit;
   font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 10px 12px;
-  border-bottom: 3px solid transparent; transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  border-bottom: 3px solid transparent; transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
   white-space: nowrap; text-align: center;
 }
 .vic-tab:hover { color: #ece8df; background: rgba(255, 255, 255, 0.04); }
@@ -852,40 +856,32 @@ svg#boardSvg:active { cursor: grabbing; }
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 .vic-col-head {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px;
   color: #dcd7cc; text-align: center;
 }
 .vic-head-badge {
-  height: 36px; display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ece8df;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.vic-head-badge.primary {
+  background: rgba(217, 137, 59, 0.22);
+  border-color: rgba(217, 137, 59, 0.55);
+  color: #f4b16c;
+}
+.vic-head-badge svg.ui-icon {
+  width: 20px; height: 20px; display: block;
 }
 .vic-head-lbl {
   font-size: 10.5px; font-weight: 700; color: #a7a296; letter-spacing: 0.02em; white-space: nowrap;
 }
-.vic-trophy-head { color: #ece8df; display: inline-flex; align-items: center; justify-content: center; }
-
-.vic-tile-chip {
-  width: 34px; height: 34px; border-radius: 7px; background: rgba(108, 166, 196, 0.28);
-  border: 1.5px solid rgba(255, 255, 255, 0.55); display: inline-flex; flex-direction: column;
-  align-items: center; justify-content: center; color: #ece8df; position: relative;
-}
-.vic-tile-chip svg { width: 20px; height: 20px; }
-.vic-tile-chip.vp small {
-  font-size: 9px; font-weight: 800; line-height: 1; margin-bottom: -1px; color: #ffffff;
-}
-.vic-tile-chip.dev { background: rgba(124, 106, 166, 0.34); }
-.vic-tile-chip.award { background: rgba(108, 166, 196, 0.32); }
-
-.vic-res-chip {
-  width: 34px; height: 34px; border-radius: 7px; display: inline-flex;
-  align-items: center; justify-content: center; border: 1.5px solid rgba(255, 255, 255, 0.45);
-}
-.vic-res-chip svg.glyph { width: 22px; height: 22px; }
 
 .vic-matrix-body { display: flex; flex-direction: column; gap: 6px; }
 .vic-matrix-row {
   display: grid; align-items: center; gap: 6px; padding: 8px 14px;
   border-radius: var(--r); background: rgba(255, 255, 255, 0.05);
-  transition: background 0.12s ease;
 }
 .vic-matrix-row:hover { background: rgba(255, 255, 255, 0.09); }
 .vic-matrix-row.is-winner {

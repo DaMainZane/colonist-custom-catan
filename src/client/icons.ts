@@ -141,7 +141,16 @@ const UI_ICONS: Record<string, string> = {
   arrowUp: `<path d="M12 19V5M6.5 10.5L12 5l5.5 5.5"/>`,
   chevronUp: `<path d="M6 15l6-6 6 6"/>`,
   chevronDown: `<path d="M6 9l6 6 6-6"/>`,
-  trophy: `<path ${FILL} d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/>`
+  trophy: `<path ${FILL} d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/>`,
+  star: `<polygon ${FILL} points="12,3 14.8,8.8 21,9.6 16.5,14 17.6,20.2 12,17.2 6.4,20.2 7.5,14 3,9.6 9.2,8.8"/>`,
+  robber: `<circle ${FILL} cx="12" cy="6.5" r="3.5"/><path ${FILL} d="M6.5 20l1.5-8.5c0-2 1.8-3 4-3s4 1 4 3L17.5 20z"/>`,
+  gift: `<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 7h18v3H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3.5 1 5 1c1.5 0 5 1 5-1s-3.5-2-5 1"/>`,
+  crown: `<path ${FILL} d="M3.5 18L5 8l4.5 4L12 6l2.5 6L19 8l1.5 10z"/>`,
+  tree: `<path ${FILL} d="M12 3L6.5 10h3L5.5 16h5v5h3v-5h5l-4-6h3z"/>`,
+  bricks: `<rect x="3" y="5" width="8" height="4" rx="0.8" ${FILL}/><rect x="13" y="5" width="8" height="4" rx="0.8" ${FILL}/><rect x="3" y="10.5" width="5" height="4" rx="0.8" ${FILL}/><rect x="9.5" y="10.5" width="5" height="4" rx="0.8" ${FILL}/><rect x="16" y="10.5" width="5" height="4" rx="0.8" ${FILL}/><rect x="3" y="16" width="8" height="4" rx="0.8" ${FILL}/><rect x="13" y="16" width="8" height="4" rx="0.8" ${FILL}/>`,
+  wool: `<path ${FILL} d="M8.5 16a3.5 3.5 0 0 1-.8-6.9 4.5 4.5 0 0 1 8.6 0 3.5 3.5 0 0 1-.8 6.9z"/><path d="M9 16v3.5M15 16v3.5"/>`,
+  grain: `<path d="M12 21V5"/><ellipse ${FILL} cx="12" cy="5.5" rx="1.8" ry="3"/><ellipse ${FILL} cx="8.8" cy="10" rx="1.7" ry="2.8" transform="rotate(-28 8.8 10)"/><ellipse ${FILL} cx="15.2" cy="10" rx="1.7" ry="2.8" transform="rotate(28 15.2 10)"/><ellipse ${FILL} cx="8.8" cy="15" rx="1.7" ry="2.8" transform="rotate(-28 8.8 15)"/><ellipse ${FILL} cx="15.2" cy="15" rx="1.7" ry="2.8" transform="rotate(28 15.2 15)"/>`,
+  rock: `<polygon ${FILL} points="4,19 6.5,9 11,5 16.5,6 20,12 19,19"/>`
 };
 
 export function uiIcon(name: string, size = 20): string {

@@ -7,10 +7,13 @@ import { renderSidebar } from './sidebar';
 import { renderBoard } from './board';
 import { renderPresetRow } from '../presets';
 import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
-import { uiIcon, dieFaceSvg, getMiniSvg, getDevSvg, settlementMarkup, cityMarkup, robberMarkup } from '../icons';
+import { uiIcon, dieFaceSvg } from '../icons';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import type { PlayerView } from '../types';
+
+let lastVicRenderKey = '';
+let lastBoardGameOverKey = '';
 
 export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
@@ -18,24 +21,6 @@ export function renderAll(): void {
   const isMyTurn = !!current && current.id === socket.id;
 
   const s = state.settings || {};
-  const curSpeed = Number(s.gameSpeed) || 1;
-  const speedBadge = document.getElementById('navSpeedBadge');
-  if (speedBadge) speedBadge.textContent = `${curSpeed}x`;
-  const speedSlider = document.getElementById('menuSpeedSlider') as HTMLInputElement | null;
-  if (speedSlider) speedSlider.value = String(curSpeed);
-  const speedLabel = document.getElementById('menuSpeedLabel');
-  if (speedLabel) {
-    const desc = curSpeed < 1 ? 'Slow' : curSpeed === 1 ? 'Normal' : curSpeed <= 2 ? 'Fast' : curSpeed <= 4 ? 'Faster' : 'Blitz';
-    speedLabel.textContent = `${curSpeed}x (${desc})`;
-  }
-  document.querySelectorAll('.speed-preset-btn').forEach(btn => {
-    const bSpeed = Number((btn as HTMLElement).dataset.speed);
-    btn.classList.toggle('active', Math.abs(bSpeed - curSpeed) < 0.05);
-  });
-  const selHeader = document.getElementById('setGameSpeedHeader') as HTMLSelectElement | null;
-  if (selHeader) selHeader.value = String(curSpeed);
-  const selCards = document.getElementById('setGameSpeed') as HTMLSelectElement | null;
-  if (selCards) selCards.value = String(curSpeed);
 
   const lobbyBar = document.getElementById('lobbyToolbar')!;
   // "Back to lobby" means nothing while you are already there.
@@ -130,7 +115,15 @@ export function renderAll(): void {
   renderHand(me, isMyTurn);
   renderInlineDrawer(me, isMyTurn);
   renderSidebar();
-  renderBoard(me, isMyTurn);
+
+  const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
+  if (state.status !== 'GAMEOVER') {
+    lastBoardGameOverKey = '';
+    renderBoard(me, isMyTurn);
+  } else if (hideVictoryOverlay || lastBoardGameOverKey !== goKey) {
+    lastBoardGameOverKey = goKey;
+    renderBoard(me, isMyTurn);
+  }
 }
 
 interface VicCol {
@@ -149,7 +142,7 @@ function renderVicMatrix(ranked: PlayerView[], cols: VicCol[], showFooterTotal =
 
   const headCells = cols.map(c => `
     <div class="vic-col-head" title="${esc(c.title)}">
-      <div class="vic-head-badge">${c.headHtml}</div>
+      <div class="vic-head-badge ${c.primary ? 'primary' : ''}">${c.headHtml}</div>
       ${c.label ? `<span class="vic-head-lbl">${esc(c.label)}</span>` : ''}
     </div>
   `).join('');
@@ -205,25 +198,36 @@ function renderVicMatrix(ranked: PlayerView[], cols: VicCol[], showFooterTotal =
 export function renderVictoryScreen(): void {
   const overlay = document.getElementById('victoryOverlay');
   const reopenBtn = document.getElementById('reopenVictoryBtn');
+  const viewport = document.getElementById('gameViewport');
   if (!overlay || !reopenBtn) return;
 
   if (state.status !== 'GAMEOVER') {
     overlay.style.display = 'none';
     reopenBtn.style.display = 'none';
+    viewport?.classList.remove('victory-modal-open');
+    lastVicRenderKey = '';
     return;
   }
 
   if (hideVictoryOverlay) {
     overlay.style.display = 'none';
     reopenBtn.style.display = 'inline-flex';
+    viewport?.classList.remove('victory-modal-open');
     return;
   }
   overlay.style.display = 'flex';
   reopenBtn.style.display = 'none';
+  viewport?.classList.add('victory-modal-open');
 
   document.querySelectorAll<HTMLElement>('.vic-tab[data-vtab]').forEach(el => {
     el.classList.toggle('active', el.dataset.vtab === victoryTab);
   });
+
+  const vicKey = `${state.code || ''}:${state.finishedAt || 0}:${victoryTab}:${state.players.length}`;
+  if (lastVicRenderKey === vicKey) {
+    return;
+  }
+  lastVicRenderKey = vicKey;
 
   const ranked = [...state.players].sort((a, b) => b.vp - a.vp);
   const myRankIdx = ranked.findIndex(p => p.id === socket.id);
@@ -311,7 +315,7 @@ export function renderVictoryScreen(): void {
       {
         title: 'Total Resource Cards Gained',
         label: 'Total',
-        headHtml: uiIcon('cards', 22),
+        headHtml: uiIcon('cards', 20),
         get: p => {
           const r = rc(p);
           return r ? r.produced + r.tradedIn + r.stolen : (p.stats?.resourcesEarned || 0);
@@ -328,7 +332,7 @@ export function renderVictoryScreen(): void {
       {
         title: 'Gained from Dev Cards (Year of Plenty & Monopoly)',
         label: 'Dev Gain',
-        headHtml: `<span class="vic-tile-chip dev">${getDevSvg('yearOfPlenty')}</span>`,
+        headHtml: uiIcon('gift', 20),
         get: p => rc(p)?.devGain ?? 0
       },
       {
@@ -346,7 +350,7 @@ export function renderVictoryScreen(): void {
       {
         title: 'Stolen from Opponents (Robber & Monopoly)',
         label: 'Stolen',
-        headHtml: `<svg width="20" height="24" viewBox="-14 -24 28 40" aria-hidden="true">${robberMarkup()}</svg>`,
+        headHtml: uiIcon('robber', 20),
         get: p => rc(p)?.stolen ?? 0
       },
       {
@@ -371,7 +375,7 @@ export function renderVictoryScreen(): void {
       {
         title: 'Total Development Cards Bought',
         label: 'Bought',
-        headHtml: uiIcon('devbuy', 22),
+        headHtml: uiIcon('devbuy', 20),
         get: p => dc(p)?.bought ?? 0,
         primary: true,
         highlightMax: false
@@ -385,31 +389,31 @@ export function renderVictoryScreen(): void {
       {
         title: 'Knight Cards (Played + Held)',
         label: 'Knight',
-        headHtml: `<span class="vic-tile-chip dev">${getDevSvg('knight')}</span>`,
+        headHtml: uiIcon('sword', 20),
         get: p => dc(p)?.knight ?? p.knightsPlayed ?? 0
       },
       {
         title: 'Victory Point Cards (+1 VP)',
         label: '+1 VP',
-        headHtml: `<span class="vic-tile-chip vp"><small>+1</small>${getDevSvg('vp')}</span>`,
+        headHtml: uiIcon('star', 20),
         get: p => dc(p)?.vp ?? 0
       },
       {
         title: 'Road Building Cards (Played + Held)',
         label: 'Road Bldg',
-        headHtml: `<span class="vic-tile-chip dev">${getDevSvg('roadBuilding')}</span>`,
+        headHtml: uiIcon('road', 20),
         get: p => dc(p)?.roadBuilding ?? 0
       },
       {
         title: 'Year of Plenty Cards (Played + Held)',
         label: 'Plenty',
-        headHtml: `<span class="vic-tile-chip dev">${getDevSvg('yearOfPlenty')}</span>`,
+        headHtml: uiIcon('gift', 20),
         get: p => dc(p)?.yearOfPlenty ?? 0
       },
       {
         title: 'Monopoly Cards (Played + Held)',
         label: 'Monopoly',
-        headHtml: `<span class="vic-tile-chip dev">${getDevSvg('monopoly')}</span>`,
+        headHtml: uiIcon('crown', 20),
         get: p => dc(p)?.monopoly ?? 0
       }
     ], true);
@@ -430,13 +434,13 @@ export function renderVictoryScreen(): void {
       {
         title: 'Settlements Built',
         label: 'Settle',
-        headHtml: `<svg width="24" height="24" viewBox="-16 -16 32 32">${settlementMarkup('#5da2e6')}</svg>`,
+        headHtml: uiIcon('house', 20),
         get: p => ac(p)?.settlementsBuilt ?? 0
       },
       {
         title: 'Cities Built',
         label: 'Cities',
-        headHtml: `<svg width="26" height="24" viewBox="-18 -16 36 32">${cityMarkup('#5da2e6')}</svg>`,
+        headHtml: uiIcon('city', 20),
         get: p => ac(p)?.citiesBuilt ?? 0
       },
       {
@@ -448,13 +452,13 @@ export function renderVictoryScreen(): void {
       {
         title: 'Longest Continuous Road Length',
         label: 'Best Road',
-        headHtml: `<span class="vic-tile-chip award">${uiIcon('road', 18)}</span>`,
+        headHtml: uiIcon('trophy', 20),
         get: p => ac(p)?.longestRoad ?? p.longestRoadLength ?? 0
       },
       {
         title: 'Times Moved the Robber',
         label: 'Robber',
-        headHtml: `<svg width="20" height="24" viewBox="-14 -24 28 40" aria-hidden="true">${robberMarkup()}</svg>`,
+        headHtml: uiIcon('robber', 20),
         get: p => ac(p)?.robberMoves ?? 0
       },
       {
@@ -485,7 +489,7 @@ export function renderVictoryScreen(): void {
       {
         title: 'Total Resources Acquired',
         label: 'Total',
-        headHtml: uiIcon('cards', 22),
+        headHtml: uiIcon('cards', 20),
         get: p => br(p, 'wood') + br(p, 'brick') + br(p, 'sheep') + br(p, 'wheat') + br(p, 'ore'),
         primary: true,
         highlightMax: false
@@ -493,31 +497,31 @@ export function renderVictoryScreen(): void {
       {
         title: 'Wood Acquired',
         label: 'Wood',
-        headHtml: `<span class="vic-res-chip t-wood">${getMiniSvg('wood')}</span>`,
+        headHtml: uiIcon('tree', 20),
         get: p => br(p, 'wood')
       },
       {
         title: 'Brick Acquired',
         label: 'Brick',
-        headHtml: `<span class="vic-res-chip t-brick">${getMiniSvg('brick')}</span>`,
+        headHtml: uiIcon('bricks', 20),
         get: p => br(p, 'brick')
       },
       {
         title: 'Sheep Acquired',
         label: 'Sheep',
-        headHtml: `<span class="vic-res-chip t-sheep">${getMiniSvg('sheep')}</span>`,
+        headHtml: uiIcon('wool', 20),
         get: p => br(p, 'sheep')
       },
       {
         title: 'Wheat Acquired',
         label: 'Wheat',
-        headHtml: `<span class="vic-res-chip t-wheat">${getMiniSvg('wheat')}</span>`,
+        headHtml: uiIcon('grain', 20),
         get: p => br(p, 'wheat')
       },
       {
         title: 'Ore Acquired',
         label: 'Ore',
-        headHtml: `<span class="vic-res-chip t-ore">${getMiniSvg('ore')}</span>`,
+        headHtml: uiIcon('rock', 20),
         get: p => br(p, 'ore')
       }
     ], true);
@@ -530,7 +534,7 @@ export function renderVictoryScreen(): void {
     {
       title: 'Total Victory Points',
       label: 'Total VP',
-      headHtml: `<span class="vic-trophy-head">${uiIcon('trophy', 26)}</span>`,
+      headHtml: uiIcon('trophy', 20),
       get: p => p.vp,
       primary: true,
       highlightMax: false
@@ -538,33 +542,34 @@ export function renderVictoryScreen(): void {
     {
       title: 'Victory Points from Settlements (1 VP each)',
       label: 'Settle',
-      headHtml: `<svg width="28" height="28" viewBox="-16 -16 32 32">${settlementMarkup('#5da2e6')}</svg>`,
+      headHtml: uiIcon('house', 20),
       get: p => vpb(p)?.settlement ?? Math.max(0, 5 - (p.settlementsLeft ?? 5))
     },
     {
       title: 'Victory Points from Cities (2 VP each)',
       label: 'Cities',
-      headHtml: `<svg width="32" height="28" viewBox="-18 -16 36 32">${cityMarkup('#5da2e6')}</svg>`,
+      headHtml: uiIcon('city', 20),
       get: p => vpb(p)?.city ?? 0
     },
     {
       title: 'Victory Points from Development Cards (+1 VP each)',
       label: 'VP Cards',
-      headHtml: `<span class="vic-tile-chip vp"><small>+1</small>${uiIcon('trophy', 16)}</span>`,
+      headHtml: uiIcon('star', 20),
       get: p => vpb(p)?.devVp ?? 0
     },
     {
       title: 'Largest Army Award (2 VP)',
       label: 'Army',
-      headHtml: `<span class="vic-tile-chip award">${uiIcon('sword', 19)}</span>`,
+      headHtml: uiIcon('sword', 20),
       get: p => vpb(p)?.largestArmy ?? (state.largestArmyOwner === p.id ? 2 : 0)
     },
     {
       title: 'Longest Road Award (2 VP)',
       label: 'Road',
-      headHtml: `<span class="vic-tile-chip award">${uiIcon('road', 19)}</span>`,
+      headHtml: uiIcon('road', 20),
       get: p => vpb(p)?.longestRoad ?? (state.longestRoadOwner === p.id ? 2 : 0)
     }
   ]);
 }
+
 

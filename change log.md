@@ -6,7 +6,7 @@
 - `src/packs/base/map/shapes.ts`: base shapes `continent`, `ring`, `islands`, `archipelago`, `continents`; carve ops `lake` and `river`; scatter op `satellites`; tweak op `ragged`. `ShapeOpDef` gained `budget` (cells a carve or scatter op will remove or add, so the base builds the right number and the final land count is exact) and a typed `run(field, ctx)`.
 - `river` (from John's sketch): starts on a shore tile, each step goes through a random side of the current tile, a branch chance that grows with every step without a split. A step may only enter a tile whose only water neighbour is the channel it comes from and that keeps one arc of land around it, so a river is an inlet that never reaches the sea or a lake a second time and never cuts the land in two. River hexes are water with `ext.river`; they get no ports.
 - Params (clamped by the registry as before): `land` (30 to 90, per base shape), `ring.lagoon`, `islands.count`, `archipelago.count`, `continents.count`, `continents.gap`, `continents.stretch`, `lake.share`, `lake.count`, `river.length`, `satellites.count`, `ragged.amount`. Counts of 0 mean automatic.
-- `topology.ts`: `portMode: 'coast'` and `portOffset`. Ports per landmass on open-sea coast only (lake, lagoon and river shores excluded): about one port per 3.3 coast edges, split by coast length, at least 1 for a landmass of 6 or more tiles, 0 under 3 tiles, at most 1 under 6 tiles, spaced evenly along each coast, types dealt round-robin over the landmasses. Ordering uses a portable pseudo-angle (no `atan2`). The classic `'angle'` placement is untouched and still used for a board without water.
+- `topology.ts`: `portMode: 'coast'` and `portOffset`. Ports per landmass on open-sea coast only (lake, lagoon and river shores excluded): about one port per 3.3 coast edges, split by coast length, at least 1 for a landmass of 6 or more tiles, 0 under 3 tiles, at most 1 under 6 tiles, spaced evenly along each coast, types dealt round-robin over the landmasses. The coast is walked edge by edge (`walkCoast`), not sorted by angle, and a second pass fills any shortfall. Rules: one port per hex and none on a corner next to a port; ports on neighbouring hexes are allowed (the old no-neighbour rule capped the standard board at 6 ports, not 9). `generateMap` uses this for the plain hexagon too (9 ports on the standard board), and `loadPreset` and the lobby painter rebuild with `portMode: 'coast'` so saved and generated ports survive. The classic `'angle'` placement is untouched and still used by `generateBoard` (engine, sims).
 - Quick start `archipelago` (picks `['archipelago']`) replaces the old water-chance chip.
 - `tests/mapshapes.test.ts`.
 
@@ -58,6 +58,23 @@
 ### Notes
 - Verified in a scratch container with a mini registry: `tsc --noEmit` clean, 21/21 new tests pass. The full suite and `npm run typecheck` on the real repo were not run: please run both.
 - Found: today's port rules (one per hex, none on neighbouring hexes) cap the standard board at 6 ports, not 9. The design's 9 needs the M3 port rework.
+
+## 2026-10-25 (Pass 10b: Your-turn chime, unified victory icons, 0.5x speed lock & victory screen optimization)
+### Added
+- **Your Turn Sound Effect** (`src/client/audio.ts`, `src/client/main.ts`):
+  - Added `playYourTurnSound()` (warm two-note rising notification chime) that plays whenever an active game turn transitions from another player (or lobby) to the local player.
+- **Unified 24×24 Pictogram Icons for Victory Screen** (`src/client/icons.ts`, `src/client/render/index.ts`, `src/client/styles.css`):
+  - Added flat `UI_ICONS` (`star`, `robber`, `gift`, `crown`, `tree`, `bricks`, `wool`, `grain`, `rock`) so every column header across all 5 matrix tabs (`Overview`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) renders a uniform `20×20` `uiIcon(...)` inside an identical `34×34` `.vic-head-badge` container (with `.vic-head-badge.primary` accent styling on primary total columns).
+
+### Changed
+- **Game Speed Locked at `0.5x` & Speed UI Removed** (`src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/socket.ts`, `src/client/store.ts`, `src/client/actions.ts`, `src/client/main.ts`, `src/client/render/index.ts`, `public/index.html`):
+  - Default server and client `gameSpeed` is now locked at `0.5` (`0.5x`).
+  - Removed the navbar speed badge (`#navSpeedBadge`), settings menu speed slider & preset buttons, lobby toolbar speed selector (`#setGameSpeedHeader`), rules & cards speed selector (`#setGameSpeed`), and the `setGameSpeed` socket handler.
+- **Victory Screen & Confetti Performance Optimization** (`src/client/styles.css`, `src/client/render/index.ts`, `src/client/ui.ts`):
+  - Replaced `backdrop-filter: blur(4px)` on `#victoryOverlay` with a solid `#14181c` backdrop + `contain: layout paint`, eliminating full-viewport GPU blur recomputation over the SVG board.
+  - Added `#gameViewport.victory-modal-open #boardSvg * { animation-play-state: paused !important; }` to pause underlying SVG animations while the victory modal is open.
+  - Memoized `renderVictoryScreen()` (`lastVicRenderKey`) and skipped redundant `renderBoard()` rebuilds while `#victoryOverlay` covers the viewport.
+  - Streamlined `triggerVictoryConfetti()` to a 1x resolution cap (`<= 1280px`), 80 lightweight rectangle particles using direct `ctx.setTransform` + `fillRect`, and a 2.8s duration.
 
 ## 2026-10-25 (Pass 9: Victory screen 6-tab analytics & confetti celebration overlay)
 ### Added
