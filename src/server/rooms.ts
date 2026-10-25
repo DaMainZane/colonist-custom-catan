@@ -4,18 +4,20 @@ import type { PlayerState } from '../shared';
 import { newBoard } from './lobby';
 import { defaultSettings } from './runtime';
 import { clearTurnClock } from './turnClock';
+import { DEFAULT_TIER, tierLabel } from './bots/tiers';
+import type { TierId } from './bots/tiers';
 import type { LobbyPlayer, Room, RoomStatus } from './types';
 
 export const rooms: Record<string, Room> = {};
 
-export function createLobbyPlayer(id: string, name: string, index: number, isBot = false): LobbyPlayer {
+export function createLobbyPlayer(id: string, name: string, index: number, isBot = false, tier: TierId = DEFAULT_TIER): LobbyPlayer {
   return {
     id,
     name,
     avatar: isBot ? '🤖' : AVATARS[index % AVATARS.length],
     color: PLAYER_COLORS[index % PLAYER_COLORS.length],
     isBot,
-    difficulty: isBot ? 'ADVANCED HARD' : null
+    difficulty: isBot ? tierLabel(tier) : null
   };
 }
 
@@ -38,8 +40,8 @@ export function createRoom(hostId: string, hostName: string): Room {
     lobbyPlayers: [createLobbyPlayer(hostId, hostName, 0, false)],
     board: newBoard(settings),
     game: null,
-    lobbyLog: [{ text: `Lobby created. Bots are set to ADVANCED HARD.`, color: '#1565c0' }],
-    chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add Hard Bots to start.' }],
+    lobbyLog: [{ text: `Lobby created. New bots are ${tierLabel(DEFAULT_TIER)}; pick a tier next to the Bot button.`, color: '#1565c0' }],
+    chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add bots to start.' }],
     fx: { lastRollHexIds: [], recentProductions: [], recentTransfers: [] },
     startedAt: null,
     finishedAt: null

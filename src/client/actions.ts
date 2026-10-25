@@ -139,7 +139,25 @@ export function pushSettings(): void {
   });
 }
 
-export function addBot(): void { if (requireHost('add bots')) socket.emit('addBot', { code: state.code }); }
+const BOT_TIERS = ['main', 'secondary', 'overload'];
+
+export function addBot(): void {
+  if (!requireHost('add bots')) return;
+  const tier = (document.getElementById('botTier') as HTMLSelectElement | null)?.value || 'main';
+  socket.emit('addBot', { code: state.code, tier });
+}
+
+/** Host only, lobby only: click a bot's tier tag to step Main -> Secondary -> Overload -> Main. */
+export function cycleBotTier(playerId: string): void {
+  if (!state || state.status !== 'LOBBY') return;
+  if (!requireHost('change a bot\'s difficulty')) return;
+  const bot = state.players.find(p => p.id === playerId && p.isBot);
+  if (!bot) return;
+  const cur = BOT_TIERS.indexOf(String(bot.difficulty || '').toLowerCase());
+  const next = BOT_TIERS[(cur + 1) % BOT_TIERS.length];
+  socket.emit('setBotTier', { code: state.code, playerId, tier: next });
+  playTone(540, 0.05);
+}
 export function removeBot(): void { if (requireHost('remove bots')) socket.emit('removeBot', { code: state.code }); }
 export function startGame(): void { if (requireHost('start the game')) socket.emit('startGame', { code: state.code }); }
 

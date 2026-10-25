@@ -8,6 +8,7 @@ import { registry } from '../runtime';
 import { ensureGrace, setTurnExpiryHandler, syncTurnClock } from '../turnClock';
 import type { Room } from '../types';
 import { chooseBotAction } from './brain';
+import { tierFromDifficulty, tierProfile } from './tiers';
 
 /** Base delay per action type in ms (before the game-speed setting divides it). */
 const BASE_DELAY: Record<string, number> = { respond_trade: 450, discard: 450, pick: 400 };
@@ -23,6 +24,12 @@ function delay(room: Room, baseMs: number): number {
 }
 
 interface Move { botId: string; type: string; payload: any }
+
+/** Tier think-delay multiplier for one bot (Main 1.2x slower, Overload 0.8x faster). */
+function thinkFactor(room: Room, botId: string): number {
+  const bot = room.game ? getPlayer(room.game, botId) : undefined;
+  return tierProfile(tierFromDifficulty(bot?.difficulty)).thinkDelay;
+}
 
 /** The next bot step: the current player first, then any other bot that owes something (discard, pick, trade answer). */
 function nextBotMove(room: Room): Move | null {
@@ -151,7 +158,7 @@ export function scheduleBots(room: Room): void {
   room.botTimer = setTimeout(() => {
     room.botTimer = undefined;
     try { runBotStep(room); } catch (e) { console.error('[bots]', e); }
-  }, delay(room, BASE_DELAY[move.type] ?? DEFAULT_DELAY));
+  }, delay(room, (BASE_DELAY[move.type] ?? DEFAULT_DELAY) * thinkFactor(room, move.botId)));
 }
 
 /** Hooks the scheduler into the broadcast. Call once at startup. */

@@ -29,7 +29,7 @@ import { sendChat } from './render/sidebar';
 import {
   createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu, setGameSpeedValue,
   setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
-  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar
+  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
@@ -40,7 +40,7 @@ Object.assign(window as any, {
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
-  startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar,
+  startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier,
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset,
   askDeletePreset, cancelDeletePreset, deletePreset,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,

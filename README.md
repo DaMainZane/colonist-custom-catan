@@ -88,6 +88,19 @@ Lobby rules: only the host edits (map painting, presets, settings, bots, start, 
 
 Custom presets: `src/server/presets.ts` turns the lobby map (tiles, numbers, fog, ports, robber) and the rule settings (not seats or game speed) into JSON on `savePreset`, and validates and rebuilds it on `applyCustomPreset`. The server stores nothing. Saving under an existing name replaces that preset, which is how one is edited. `mergeSettings` in `src/server/lobby.ts` is the one place settings are clamped.
 
+### `src/server/bots/` (default bot)
+
+| File | What |
+|---|---|
+| `tiers.ts` | Main / Secondary / Overload as plain data (`TierProfile`), personalities, `spendThreshold`, tier parsing. A new tier is a new row |
+| `mapProfile.ts` | `MapProfile`: landmasses, gold share, average pips, port count; built once per board, refreshed when fog is revealed |
+| `brain.ts` | `chooseBotAction`: pure, reads the tier, the map profile and grudges (`noteBotEvents`). Always falls back to a legal action |
+| `scheduler.ts` | real-time delays (tier think delay), trade timeouts, turn-expiry hand-off |
+| `sim.ts` | bot-vs-bot games with a tier per seat, decision timing, `runLadder` (win rate per tier) |
+| `dialogue.ts` | bot chat, style follows the tier |
+
+The host picks a tier per bot (dropdown next to the Bot button, or click the `Bot · Tier` tag in the lobby). Details and status in [`Bot AI Design.md`](Bot%20AI%20Design.md). The addon system is not built yet.
+
 ### `src/packs/gold/` and `src/packs/fog/` (2e)
 
 | File | What |

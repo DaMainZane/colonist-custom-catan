@@ -1,5 +1,22 @@
 # Change Log
 
+## 2026-10-25 (Pass 6: default bot)
+### Added
+- Bot difficulty tiers **Main / Secondary / Overload**, chosen per bot. Host picks the tier in the dropdown next to the Bot button and can change it in the lobby by clicking the `Bot · Tier` tag. Socket events `addBot {tier}` and `setBotTier`. A bot that replaces a disconnected human is Secondary (closest to the old Hard bot).
+- `src/server/bots/tiers.ts`: tier profiles as plain data (noise, blunders, lookahead, setup and road planning, spend discipline, robber, trade, dev timing, awards, blocking, mercy, information, grudges, coordination, lockdown, fog, think delay, chat style) plus personalities (builder, road hog, port trader, dev rusher).
+- `src/server/bots/mapProfile.ts`: landmasses, gold share, average pips, port count, board size, built once per board and refreshed when fog is revealed.
+- Brain reads the tier and map profile: room to grow on islands, gold and fog valued from the map instead of flat numbers, cheap pre-scoring so big boards stay fast, boxed-in bots switch to cities, dev cards and trading, grudges from engine events (`noteBotEvents`), Overload lockdown on a human near winning.
+- Sim: `tiers` per seat, decision timing, `runLadder` (win rate per tier).
+- `tests/bots.test.ts`.
+
+### Changed
+- Bot chat style and think delay follow the tier.
+- Lobby log tells the host new bots are Main by default.
+
+### Notes
+- Not run in this session (no shell access to the repo): run `npm run typecheck` and `npm test`, then `runLadder` to tune the tier numbers. All numbers in `Bot AI Design.md` section 2 are starting guesses.
+- The bot addon system (`Bot AI Design.md` sections 4 to 6) is not started; it is the next bot step.
+
 ## 2026-10-25 (Pass 5)
 ### Added
 - Turn timer, set in the lobby under Rules and cards, Timers: turn time (0 = off), seconds added per completed action, and trade offer time. Humans only; bots are not timed. When the clock runs out the turn is passed, or the pending step is finished for them (roll, robber, discard, gold pick). The time left shows in the turn pill. Server: `src/server/turnClock.ts`, settings `turnTimerSec` / `turnIncrementSec` / `tradeTimerSec`. Client: `render/turnclock.ts`.
@@ -88,5 +105,5 @@
 ## Planned
 - Delete `src/server-legacy/` (and `legacy/` when not needed), then close Step 2.
 - Step 3 (identity and persistence) only when John says so.
-- Bot difficulty tiers (Main, Secondary, Overload) and bot addon system: `Bot AI Design.md`.
+- Bot difficulty tiers (Main, Secondary, Overload): done. Bot addon system (`Bot AI Design.md` sections 4 to 6), sim matrix and tier tuning: later.
 - More built-in presets, big-map optimization, new map generation types (islands, archipelago, lake, realistic), continent map shapes, settings and navigation UI rework, board UI rework.

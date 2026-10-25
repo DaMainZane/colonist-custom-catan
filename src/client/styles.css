@@ -858,6 +858,13 @@ svg#boardSvg:active { cursor: grabbing; }
 .avatar.avatar-pick { cursor: pointer; transition: transform 0.12s ease; }
 .avatar.avatar-pick:hover { transform: scale(1.1); }
 
+/* ---------- Bot difficulty tag (host clicks it in the lobby to change the tier) ---------- */
+.tag.tier-pick { cursor: pointer; }
+.tag.tier-pick:hover { filter: brightness(1.15); }
+.tag.tier-secondary { box-shadow: inset 0 0 0 1px var(--accent); }
+.tag.tier-overload { background: #7a2b2b; color: #fff; }
+#botTier { max-width: 110px; }
+
 /* ---------- Counter offer (edit mode of a trade card in the stack) ---------- */
 /* Same layout as a normal offer card (badge + cards rows on the left, buttons on the right); no text labels, like Colonist. */
 .trade-counter .trade-row { flex-wrap: nowrap; }

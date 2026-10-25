@@ -2,6 +2,7 @@
 import { PLAYER_COLORS, createGame, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
 import { emitBotDialogue } from './bots/dialogue';
+import { noteBotEvents } from './bots/brain';
 import { newBoard } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { registry, rulesFromSettings } from './runtime';
@@ -50,6 +51,7 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
   const res = dispatch(g, registry, { type, playerId, payload });
   if (res.ok) {
     recordEffects(room, res.events);
+    noteBotEvents(g, res.events);
     emitBotDialogue(room, playerId, type, res.events);
     noteActionCompleted(room, playerId);
   }

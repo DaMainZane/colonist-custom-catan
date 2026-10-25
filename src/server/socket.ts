@@ -9,6 +9,7 @@ import { loadPreset, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
 import { registry } from './runtime';
+import { DEFAULT_TIER, TAKEOVER_TIER, normalizeTier, tierLabel } from './bots/tiers';
 
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
 
@@ -66,15 +67,27 @@ export function registerSocketHandlers(io: Server): void {
       broadcastRoom(room);
     }));
 
-    socket.on('addBot', safe(({ code }) => {
+    socket.on('addBot', safe(({ code, tier }) => {
       const room = hostLobbyRoom(code);
       if (!room || room.lobbyPlayers.length >= room.settings.maxPlayers) return;
+      const tierId = normalizeTier(tier) ?? DEFAULT_TIER;
       const used = new Set(room.lobbyPlayers.map(p => p.name));
       const botName = BOT_NAMES.find(n => !used.has(n)) || `Bot ${room.lobbyPlayers.length}`;
-      const bot = createLobbyPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.lobbyPlayers.length, true);
+      const bot = createLobbyPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.lobbyPlayers.length, true, tierId);
       bot.avatar = freeAvatar(room);
       room.lobbyPlayers.push(bot);
-      addLobbyLog(room, `🤖 ${bot.name} [ADVANCED HARD] added`, bot.color);
+      addLobbyLog(room, `🤖 ${bot.name} [${tierLabel(tierId)}] added`, bot.color);
+      broadcastRoom(room);
+    }));
+
+    // The host picks a tier per bot: when adding it, or by clicking the tier tag in the player list.
+    socket.on('setBotTier', safe(({ code, playerId, tier }) => {
+      const room = hostLobbyRoom(code);
+      const tierId = normalizeTier(tier);
+      if (!room || !tierId) return;
+      const bot = room.lobbyPlayers.find(p => p.id === playerId && p.isBot);
+      if (!bot) return;
+      bot.difficulty = tierLabel(tierId);
       broadcastRoom(room);
     }));
 
@@ -279,9 +292,9 @@ export function registerSocketHandlers(io: Server): void {
           const p = g.players.find(pl => pl.id === socket.id);
           if (!p) continue;
           p.isBot = true;
-          p.difficulty = 'ADVANCED HARD';
+          p.difficulty = tierLabel(TAKEOVER_TIER);
           if (!p.name.includes('(Bot)')) p.name += ' (Bot)';
-          g.log.push({ text: `🤖 ${p.name} disconnected — Hard Bot took over.`, color: p.color });
+          g.log.push({ text: `🤖 ${p.name} disconnected — a ${tierLabel(TAKEOVER_TIER)} bot took over.`, color: p.color });
           if (g.log.length > 80) g.log.shift();
 
           const humans = humanIds(room);

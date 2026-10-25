@@ -1,8 +1,10 @@
-// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants) | USED BY: tests/sim.test.ts
+// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and map matrix) | USED BY: tests/sim.test.ts, tests/bots.test.ts
 import { createGame, dispatch } from '../../shared';
 import type { GameState } from '../../shared';
 import { registry } from '../runtime';
-import { chooseBotAction } from './brain';
+import { chooseBotAction, noteBotEvents } from './brain';
+import { TIER_IDS, normalizeTier, tierFromDifficulty, tierLabel } from './tiers';
+import type { TierId } from './tiers';
 
 export interface SimOptions {
   seed: number;
@@ -12,15 +14,20 @@ export interface SimOptions {
   rules?: Record<string, any>;
   maxSteps?: number;
   maxTurns?: number;
+  /** Tier per seat, repeated if shorter than the table. Default: every bot is Secondary (the old Hard bot). */
+  tiers?: (TierId | string)[];
 }
 
 export interface SimResult {
   finished: boolean;
   winner: string | null;
+  winnerTier: TierId | null;
   turns: number;
   steps: number;
   /** First problem found (rejected action, stall, broken invariant), or null. */
   error: string | null;
+  /** Time spent choosing actions (ms): total, the slowest single decision, and how many were made. */
+  decisionMs: { total: number; max: number; count: number };
   game: GameState;
 }
 
@@ -50,21 +57,30 @@ export function simulateGame(opts: SimOptions): SimResult {
   const maxSteps = opts.maxSteps ?? 60000;
   const maxTurns = opts.maxTurns ?? 1000;
   const rand = mulberry32(opts.seed);
+  const tiers = opts.tiers && opts.tiers.length > 0 ? opts.tiers : ['secondary'];
 
   const g = createGame(registry, {
-    players: Array.from({ length: n }, (_, i) => ({ id: `bot${i + 1}`, name: `Bot ${i + 1}`, isBot: true })),
+    players: Array.from({ length: n }, (_, i) => ({
+      id: `bot${i + 1}`,
+      name: `Bot ${i + 1}`,
+      isBot: true,
+      difficulty: tierLabel(normalizeTier(tiers[i % tiers.length]) ?? 'secondary')
+    })),
     rules: opts.rules,
     seed: opts.seed,
     preset: opts.preset
   });
 
   let steps = 0;
+  const timing = { total: 0, max: 0, count: 0 };
   const result = (error: string | null): SimResult => ({
     finished: g.phase === 'gameover',
     winner: g.winner ? g.winner.id : null,
+    winnerTier: g.winner ? tierFromDifficulty(g.players.find(p => p.id === g.winner!.id)?.difficulty) : null,
     turns: g.turnCount,
     steps,
     error,
+    decisionMs: timing,
     game: g
   });
 
@@ -76,10 +92,16 @@ export function simulateGame(opts: SimOptions): SimResult {
     const order = [g.players[g.turn], ...g.players.filter((_, i) => i !== g.turn)];
     let acted = false;
     for (const p of order) {
+      const t0 = performance.now();
       const move = chooseBotAction(g, registry, p.id, rand);
+      const ms = performance.now() - t0;
+      timing.total += ms;
+      timing.count++;
+      if (ms > timing.max) timing.max = ms;
       if (!move) continue;
       const res = dispatch(g, registry, { type: move.type, playerId: p.id, payload: move.payload });
       if (!res.ok) return result(`${p.id} ${move.type} rejected in phase ${g.phase}: ${res.error}`);
+      noteBotEvents(g, res.events);
       acted = true;
       steps++;
       break;
@@ -90,4 +112,68 @@ export function simulateGame(opts: SimOptions): SimResult {
     if (broken) return result(broken);
   }
   return result(null);
+}
+
+// ---- Tier ladder and map matrix ----------------------------------------------------------------------
+
+export interface LadderOptions {
+  seeds: number[];
+  players?: number;
+  preset?: string;
+  rules?: Record<string, any>;
+  /** Tiers at the table, rotated between seeds so no tier always sits in the same seat. Default: all three. */
+  tiers?: TierId[];
+  maxTurns?: number;
+}
+
+export interface LadderResult {
+  games: number;
+  finished: number;
+  errors: string[];
+  winsByTier: Record<TierId, number>;
+  /** Wins per game seated at the table, per tier (what the tuning targets compare). */
+  winRateByTier: Record<TierId, number>;
+  avgTurns: number;
+  avgDecisionMs: number;
+  maxDecisionMs: number;
+}
+
+/** Plays the same table many times with the tiers rotated between seats, and reports who wins. */
+export function runLadder(opts: LadderOptions): LadderResult {
+  const tiers = opts.tiers && opts.tiers.length > 0 ? opts.tiers : TIER_IDS;
+  const players = opts.players ?? Math.max(tiers.length, 3);
+  const winsByTier: Record<TierId, number> = { main: 0, secondary: 0, overload: 0 };
+  const seated: Record<TierId, number> = { main: 0, secondary: 0, overload: 0 };
+  const errors: string[] = [];
+  let finished = 0;
+  let turns = 0;
+  let ms = 0;
+  let decisions = 0;
+  let maxMs = 0;
+
+  opts.seeds.forEach((seed, k) => {
+    const seats = Array.from({ length: players }, (_, i) => tiers[(i + k) % tiers.length]);
+    for (const t of seats) seated[t]++;
+    const r = simulateGame({ seed, players, preset: opts.preset, rules: opts.rules, tiers: seats, maxTurns: opts.maxTurns });
+    turns += r.turns;
+    ms += r.decisionMs.total;
+    decisions += r.decisionMs.count;
+    maxMs = Math.max(maxMs, r.decisionMs.max);
+    if (r.error) errors.push(`seed ${seed}: ${r.error}`);
+    if (r.finished && r.winnerTier) { finished++; winsByTier[r.winnerTier]++; }
+  });
+
+  const winRateByTier = { main: 0, secondary: 0, overload: 0 } as Record<TierId, number>;
+  for (const t of TIER_IDS) winRateByTier[t] = seated[t] > 0 ? winsByTier[t] / seated[t] : 0;
+  const games = opts.seeds.length;
+  return {
+    games,
+    finished,
+    errors,
+    winsByTier,
+    winRateByTier,
+    avgTurns: games > 0 ? turns / games : 0,
+    avgDecisionMs: decisions > 0 ? ms / decisions : 0,
+    maxDecisionMs: maxMs
+  };
 }

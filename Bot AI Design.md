@@ -1,6 +1,23 @@
 # Bot AI Design
 
-Design notes for bot difficulty tiers, map-aware play and the bot addon system. Written during Step 2f/2g. Nothing here is implemented yet except where marked.
+Design notes for bot difficulty tiers, map-aware play and the bot addon system. Written during Step 2f/2g.
+
+## Status
+
+**Default bot: done (this session).** Sections 1 to 3 are implemented in `src/server/bots/`:
+
+- `tiers.ts`: the Main / Secondary / Overload profiles as plain data, personalities, `spendThreshold`, tier parsing.
+- `mapProfile.ts`: the `MapProfile` (landmasses, gold share, average pips, port count, hidden tiles), built once per board.
+- `brain.ts`: reads the tier and the map profile. Tier names are never checked in the brain, only profile numbers (a few Overload-only touches use `tier.id`).
+- Per-bot tier choice: `addBot` takes a tier, `setBotTier` changes it in the lobby (host only). A bot that replaces a disconnected human is Secondary.
+- `sim.ts`: `tiers` per seat and `runLadder` (win rate per tier).
+- `dialogue.ts` chat style and `scheduler.ts` think delay follow the tier.
+- Client: tier picker next to the Bot button, clickable `Bot · Tier` tag in the player list.
+- `tests/bots.test.ts`.
+
+**Not done (later):** sections 4 to 6 (the addon system: channels, shadow prices, plan arbiter, `api.bot`), the full sim matrix (section 3), and tuning the win-rate ladder. Numbers in section 2 are still starting guesses until the ladder has been run on the live code.
+
+Original note: nothing below was implemented when this was first written, except where marked.
 
 ## 1. Goals
 
@@ -66,9 +83,9 @@ All numbers are starting guesses. The bot-vs-bot sims tune them.
 - **Personality layer:** builder, road-hog, port-trader or dev rusher, applied on top of any tier.
 - **Adaptive pressure:** Main eases off when far ahead, Overload presses harder when behind.
 
-### Open question
+### Open question (resolved)
 
-Should the host pick the tier **per bot** when adding it (one table can mix Main, Secondary and Overload), or one tier for all bots in the room? Recommendation: per bot. It costs a small change to the `addBot` socket payload and the lobby UI.
+Per bot. The host picks the tier when adding a bot (dropdown next to the Bot button) and can change it later by clicking the bot's tag in the player list.
 
 ## 3. How the first design changes for map variation
 

@@ -1,9 +1,11 @@
-// MODULE: contextual bot trash talk and chat reactions on game events | USED BY: server/game
+// MODULE: contextual bot trash talk and chat reactions on game events (style follows the bot's tier) | USED BY: server/game
 import type { GameEvent, PlayerState } from '../../shared';
 import type { Room } from '../types';
+import { tierFromDifficulty, tierProfile } from './tiers';
 
 const lastChatAt = new Map<string, number>();
 
+/** Friendly lines (Main). Secondary and Overload use their own sets below and fall back to these. */
 const LINES = {
   rolledSeven: [
     'Seven! Pay the tax, everyone.',
@@ -60,8 +62,44 @@ const LINES = {
   ]
 };
 
+type LineKey = keyof typeof LINES;
+
+const STYLE_LINES: Record<'neutral' | 'cold', Partial<Record<LineKey, string[]>>> = {
+  neutral: {
+    rolledSeven: ['Seven.', 'Robber time.', 'Discard if you are over the limit.'],
+    robbedVictim: ['Noted.', 'That hurt.', 'Targeting me was a choice.'],
+    robberThief: ['Taking one.', 'Standard play.', 'Robber placement was efficient.'],
+    monopoly: ['Monopoly.', 'Collecting.'],
+    knight: ['Knight played.', 'Robber moves.'],
+    longestRoad: ['Longest Road.', 'Road length secured.'],
+    largestArmy: ['Largest Army.', 'Army secured.'],
+    cityBuilt: ['City built.', 'Upgraded.'],
+    tradeCompleted: ['Trade done.', 'Accepted.'],
+    wonGame: ['Game over.', 'GG.']
+  },
+  cold: {
+    rolledSeven: ['Seven. Count your cards.', 'The robber answers to me.', 'Some of you are about to lose half your hand.'],
+    robbedVictim: ['That was a mistake.', 'I keep a list.', 'You will regret it.'],
+    robberThief: ['Yours now mine.', 'You made this easy.', 'Predictable.'],
+    monopoly: ['Everything you held was already mine.', 'Hand it over.'],
+    knight: ['The robber moves where I say.', 'Another step closer.'],
+    longestRoad: ['The road is mine. Try to take it.', 'Your roads are in my way.'],
+    largestArmy: ['The army is mine.', 'Resistance is inefficient.'],
+    cityBuilt: ['Expansion continues.', 'Production doubles. Yours will not.'],
+    tradeCompleted: ['Acceptable.', 'You needed that more than I did.'],
+    wonGame: ['As calculated.', 'You were never ahead.']
+  }
+};
+
 function pick(list: string[]): string {
   return list[Math.floor(Math.random() * list.length)];
+}
+
+/** One line for this bot: the set for its tier's chat style, or the friendly set when that style has none for the event. */
+function say(bot: PlayerState, key: LineKey): string {
+  const style = tierProfile(tierFromDifficulty(bot.difficulty)).chat;
+  const pool = style === 'friendly' ? undefined : STYLE_LINES[style][key];
+  return pick(pool && pool.length > 0 ? pool : LINES[key]);
 }
 
 function pushBotChat(room: Room, bot: PlayerState, text: string, force = false): void {
@@ -89,7 +127,7 @@ export function emitBotDialogue(room: Room, actorId: string, actionType: string,
     if (ev.type === 'gameOver') {
       const winner = g.players.find(p => p.id === d.playerId);
       if (winner?.isBot) {
-        pushBotChat(room, winner, pick(LINES.wonGame), true);
+        pushBotChat(room, winner, say(winner, 'wonGame'), true);
       }
       return;
     }
@@ -97,39 +135,38 @@ export function emitBotDialogue(room: Room, actorId: string, actionType: string,
     if (ev.type === 'awardChanged') {
       const holder = g.players.find(p => p.id === d.playerId);
       if (holder?.isBot) {
-        const pool = d.award === 'longestRoad' ? LINES.longestRoad : LINES.largestArmy;
-        pushBotChat(room, holder, pick(pool), true);
+        pushBotChat(room, holder, say(holder, d.award === 'longestRoad' ? 'longestRoad' : 'largestArmy'), true);
       }
     }
 
     if (ev.type === 'devPlayed' && actor?.isBot) {
       if (d.card === 'monopoly') {
-        pushBotChat(room, actor, pick(LINES.monopoly), true);
+        pushBotChat(room, actor, say(actor, 'monopoly'), true);
       } else if (d.card === 'knight' && Math.random() < 0.45) {
-        pushBotChat(room, actor, pick(LINES.knight));
+        pushBotChat(room, actor, say(actor, 'knight'));
       }
     }
 
     if (ev.type === 'rolled' && d.sum === 7 && actor?.isBot && Math.random() < 0.55) {
-      pushBotChat(room, actor, pick(LINES.rolledSeven));
+      pushBotChat(room, actor, say(actor, 'rolledSeven'));
     }
 
     if (ev.type === 'transferred' && d.kind === 'steal') {
       const victim = g.players.find(p => p.id === d.from);
       const thief = g.players.find(p => p.id === d.to);
       if (victim?.isBot && Math.random() < 0.65) {
-        pushBotChat(room, victim, pick(LINES.robbedVictim));
+        pushBotChat(room, victim, say(victim, 'robbedVictim'));
       } else if (thief?.isBot && Math.random() < 0.5) {
-        pushBotChat(room, thief, pick(LINES.robberThief));
+        pushBotChat(room, thief, say(thief, 'robberThief'));
       }
     }
 
     if (ev.type === 'built' && d.piece === 'city' && actor?.isBot && Math.random() < 0.5) {
-      pushBotChat(room, actor, pick(LINES.cityBuilt));
+      pushBotChat(room, actor, say(actor, 'cityBuilt'));
     }
   }
 
   if (actionType === 'confirm_trade' && actor?.isBot && Math.random() < 0.45) {
-    pushBotChat(room, actor, pick(LINES.tradeCompleted));
+    pushBotChat(room, actor, say(actor, 'tradeCompleted'));
   }
 }

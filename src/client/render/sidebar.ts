@@ -37,6 +37,16 @@ function canPickAvatar(p: any): boolean {
   return p.id === socket.id || (p.isBot && state.hostId === socket.id);
 }
 
+/** "Bot · Main" tag. In the lobby the host clicks it to change that bot's difficulty. */
+function botTag(p: any): string {
+  const label = p.difficulty ? String(p.difficulty) : '';
+  const key = label.toLowerCase();
+  const text = label ? `Bot · ${esc(label)}` : 'Bot';
+  const pick = state.status === 'LOBBY' && state.hostId === socket.id && !!label;
+  return `<span class="tag tier-${esc(key)} ${pick ? 'tier-pick' : ''}"
+    ${pick ? `onclick="cycleBotTier('${esc(p.id)}')" title="Click to change difficulty"` : `title="Bot difficulty: ${esc(label || 'unknown')}"`}>${text}</span>`;
+}
+
 export function renderSidebar(): void {
   const logEl = document.getElementById('logSection')!;
   const logs: any[] = state.logs || [];
@@ -83,7 +93,7 @@ export function renderSidebar(): void {
     const isTurn = idx === state.turnIndex && state.status !== 'LOBBY';
     const overLimit = p.resourceCount > state.settings.cardDiscardLimit;
     const tags = [
-      p.isBot ? '<span class="tag">Bot</span>' : '',
+      p.isBot ? botTag(p) : '',
       isVictim ? '<span class="tag danger">Rob</span>' : '',
       p.discardPending > 0 ? '<span class="tag danger">Discarding</span>' : '',
       state.longestRoadOwner === p.id ? '<span class="tag accent">Longest road</span>' : '',
