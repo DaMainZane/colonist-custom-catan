@@ -1,5 +1,5 @@
 import { socket } from './socket';
-import { playDiceRollSound, playDiscardSound, playVictoryFanfareSound, toggleSound } from './audio';
+import { playDiceRollSound, playDiscardSound, playVictoryFanfareSound, playYourTurnSound, toggleSound } from './audio';
 import { hydrateIcons } from './icons';
 import { toggleTheme, showToast, triggerVictoryConfetti, clearVictoryConfetti } from './ui';
 import {
@@ -27,7 +27,7 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
-  createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu, setGameSpeedValue,
+  createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
   setBrush, applyPreset, pushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi
 } from './actions';
@@ -35,7 +35,7 @@ import {
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
-  setGameSpeedValue, switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
+  switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
@@ -84,6 +84,7 @@ socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
   const wasGameOver = state?.status === 'GAMEOVER';
   const wasLobby = !state || state.status === 'LOBBY';
+  const wasMyTurn = Boolean(state && state.status !== 'LOBBY' && state.status !== 'GAMEOVER' && state.currentPlayerId === socket.id);
   const prevLongestRoad = state?.longestRoadOwner || null;
   const prevLargestArmy = state?.largestArmyOwner || null;
   const prevMe = state?.players?.find((p: any) => p.id === socket.id);
@@ -97,6 +98,11 @@ socket.on('gameState', (newState: any) => {
   }
   document.getElementById('authScreen')!.style.display = 'none';
   document.getElementById('gameViewport')!.style.display = 'flex';
+
+  const isNowMyTurn = Boolean(state.status !== 'LOBBY' && state.status !== 'GAMEOVER' && state.currentPlayerId === socket.id);
+  if (!wasMyTurn && isNowMyTurn) {
+    playYourTurnSound();
+  }
 
   if (!wasGameOver && state.status === 'GAMEOVER') {
     setHideVictoryOverlay(false);

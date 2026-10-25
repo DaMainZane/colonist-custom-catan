@@ -48,6 +48,6 @@ export function clearRes(r: Resources): void {
 }
 
 export function getClientSpeed(): number {
-  const s = Number(state?.settings?.gameSpeed);
-  return Number.isFinite(s) && s > 0 ? Math.max(0.25, Math.min(10, s)) : 1;
+  return 0.5;
 }
+

@@ -33,13 +33,11 @@ interface ConfettiPiece {
   w: number;
   h: number;
   color: string;
-  shape: 'rect' | 'hex' | 'circle';
   angle: number;
   vAngle: number;
   tilt: number;
   vTilt: number;
   alpha: number;
-  decay: number;
 }
 
 let confettiRafId = 0;
@@ -67,115 +65,82 @@ export function triggerVictoryConfetti(winnerColor?: string): void {
     return;
   }
 
-  const resize = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  };
-  resize();
+  // Render at 1x CSS pixel resolution (max 1280px wide) so high-DPI screens never lag
+  const scale = Math.min(1, 1280 / Math.max(1, window.innerWidth));
+  canvas.width = Math.round(window.innerWidth * scale);
+  canvas.height = Math.round(window.innerHeight * scale);
 
   const palette = [
     winnerColor || '#d9893b',
-    '#d9893b', // Accent amber
-    '#e2c56b', // Wheat gold
-    '#a9c27a', // Meadow green
-    '#5f8a5a', // Forest pine
-    '#c0674a', // Clay brick
-    '#6ca6c4', // Harbor blue
-    '#f4f1ea'  // Warm cream
+    '#d9893b',
+    '#e2c56b',
+    '#a9c27a',
+    '#5f8a5a',
+    '#c0674a',
+    '#6ca6c4',
+    '#f4f1ea'
   ];
 
-  const shapes: ConfettiPiece['shape'][] = ['rect', 'rect', 'hex', 'circle'];
   const pieces: ConfettiPiece[] = [];
-
-  const spawnBurst = (originX: number, originY: number, count: number, spreadRad: number, baseAngle: number, speedMult = 1) => {
+  const spawnBurst = (originX: number, originY: number, count: number, spreadRad: number, baseAngle: number) => {
     for (let i = 0; i < count; i++) {
       const a = baseAngle + (Math.random() - 0.5) * spreadRad;
-      const speed = (9 + Math.random() * 15) * speedMult;
+      const speed = (8 + Math.random() * 12) * scale;
       pieces.push({
-        x: originX + (Math.random() - 0.5) * 36,
-        y: originY + (Math.random() - 0.5) * 24,
+        x: originX + (Math.random() - 0.5) * 24,
+        y: originY + (Math.random() - 0.5) * 16,
         vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed - 2,
-        w: 7 + Math.random() * 7,
-        h: 5 + Math.random() * 6,
+        vy: Math.sin(a) * speed - 1.5 * scale,
+        w: (7 + Math.random() * 6) * scale,
+        h: (4 + Math.random() * 5) * scale,
         color: palette[i % palette.length],
-        shape: shapes[i % shapes.length],
         angle: Math.random() * Math.PI * 2,
-        vAngle: (Math.random() - 0.5) * 0.16,
+        vAngle: (Math.random() - 0.5) * 0.14,
         tilt: Math.random() * Math.PI * 2,
-        vTilt: 0.08 + Math.random() * 0.14,
-        alpha: 1,
-        decay: 0.0032 + Math.random() * 0.0028
+        vTilt: 0.08 + Math.random() * 0.12,
+        alpha: 1
       });
     }
   };
 
   const W = canvas.width;
   const H = canvas.height;
-  // Left & right side cannons + top center shower when VP threshold is reached
-  spawnBurst(W * 0.14, H * 0.72, 65, 0.9, -Math.PI * 0.36, 1.15);
-  spawnBurst(W * 0.86, H * 0.72, 65, 0.9, -Math.PI * 0.64, 1.15);
-  spawnBurst(W * 0.5, H * 0.18, 55, Math.PI * 1.2, -Math.PI * 0.5, 0.85);
+  spawnBurst(W * 0.15, H * 0.68, 28, 0.85, -Math.PI * 0.36);
+  spawnBurst(W * 0.85, H * 0.68, 28, 0.85, -Math.PI * 0.64);
+  spawnBurst(W * 0.5, H * 0.2, 24, Math.PI, -Math.PI * 0.5);
 
   const startTime = performance.now();
-  let secondWaveSpawned = false;
-
-  const drawHex = (r: number) => {
-    ctx.beginPath();
-    for (let k = 0; k < 6; k++) {
-      const th = (Math.PI / 3) * k;
-      const px = Math.cos(th) * r;
-      const py = Math.sin(th) * r;
-      if (k === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-  };
+  const grav = 0.25 * scale;
 
   const tick = (now: number) => {
     const elapsed = now - startTime;
-    if (!secondWaveSpawned && elapsed > 380) {
-      secondWaveSpawned = true;
-      spawnBurst(canvas.width * 0.3, canvas.height * 0.25, 40, Math.PI, -Math.PI * 0.5, 0.8);
-      spawnBurst(canvas.width * 0.7, canvas.height * 0.25, 40, Math.PI, -Math.PI * 0.5, 0.8);
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
 
     let alive = 0;
-    for (const p of pieces) {
-      if (p.alpha <= 0.02 || p.y > canvas.height + 40) continue;
+    for (let i = 0; i < pieces.length; i++) {
+      const p = pieces[i];
+      if (p.alpha <= 0.03 || p.y > H + 20) continue;
       alive++;
 
       p.x += p.vx;
       p.y += p.vy;
       p.vx *= 0.985;
-      p.vy = p.vy * 0.985 + 0.28; // gravity
+      p.vy = p.vy * 0.985 + grav;
       p.angle += p.vAngle;
       p.tilt += p.vTilt;
-      if (elapsed > 2200) p.alpha = Math.max(0, p.alpha - p.decay * 1.8);
+      if (elapsed > 1600) p.alpha -= 0.018;
 
-      ctx.save();
+      const cosA = Math.cos(p.angle);
+      const sinA = Math.sin(p.angle);
+      const tiltScale = Math.cos(p.tilt);
       ctx.globalAlpha = p.alpha;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      ctx.scale(1, Math.cos(p.tilt));
       ctx.fillStyle = p.color;
-
-      if (p.shape === 'hex') {
-        drawHex(p.w * 0.55);
-      } else if (p.shape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(0, 0, p.w * 0.45, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-      }
-      ctx.restore();
+      ctx.setTransform(cosA, sinA, -sinA * tiltScale, cosA * tiltScale, p.x, p.y);
+      ctx.fillRect(-p.w * 0.5, -p.h * 0.5, p.w, p.h);
     }
 
-    if (alive > 0 && elapsed < 5200) {
+    if (alive > 0 && elapsed < 2800) {
       confettiRafId = requestAnimationFrame(tick);
     } else {
       clearVictoryConfetti();
@@ -184,4 +149,5 @@ export function triggerVictoryConfetti(winnerColor?: string): void {
 
   confettiRafId = requestAnimationFrame(tick);
 }
+
 

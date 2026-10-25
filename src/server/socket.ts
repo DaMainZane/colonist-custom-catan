@@ -129,15 +129,6 @@ export function registerSocketHandlers(io: Server): void {
       broadcastRoom(room);
     }));
 
-    socket.on('setGameSpeed', safe(({ code, speed }) => {
-      const room = rooms[code];
-      if (!room || room.hostId !== socket.id) return;
-      const num = Number(speed);
-      if (!Number.isFinite(num) || num <= 0) return;
-      room.settings.gameSpeed = Math.max(0.25, Math.min(10, num));
-      broadcastRoom(room);
-    }));
-
     // Avatars: everyone picks their own; the host can also pick for bots. Each avatar is used once per lobby.
     socket.on('setAvatar', safe(({ code, playerId, avatar }) => {
       const room = rooms[code];
