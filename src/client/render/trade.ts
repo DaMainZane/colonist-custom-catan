@@ -94,7 +94,7 @@ function counterStacksHtml(side: 'get' | 'give', counts: Record<string, number>)
       `adjustCounter('${side}','${r}',-1)`, `${RES_META[r].name}: click to remove one`
     )
   ).join('');
-  return html || `<span class="trade-empty-hint">${side === 'give' ? 'Click your cards to offer them' : 'Pick what you want below'}</span>`;
+  return html;
 }
 
 // Redraws the editor and the hand (cards placed in the counter leave the hand view, like in the trade drawer).
@@ -109,42 +109,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
   const editing = counterTradeId === t.id && !isMyOffer;
   const animCls = isNew ? 'trade-card-enter' : '';
 
-  if (editing) {
-    const mine = me || myPlayerView();
-    const canSend = sum(counterGive) > 0 && sum(counterGet) > 0 &&
-      !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
-    return `
-      <div class="trade-offer-body trade-counter ${animCls}" data-trade-id="${t.id}">
-        <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
-        <div class="trade-counter-head">
-          <div class="trade-counter-title">${uiIcon('swap', 14)} Counter offer to ${esc(t.fromName)}</div>
-          <div class="trade-actions">
-            <button class="trade-act-btn accept ${canSend ? '' : 'off'}" ${canSend ? `onclick="sendCounter(${t.id})"` : 'disabled'}
-              title="${canSend ? 'Send counter offer' : 'Pick cards you give (that you hold) and cards you get'}">${uiIcon('check', 18)}</button>
-            <button class="trade-act-btn cancel" onclick="cancelCounter()" title="Back to the offer">${uiIcon('close', 18)}</button>
-          </div>
-        </div>
-        <div class="trade-rows">
-          <div class="trade-row">
-            <span class="trade-row-label">You get</span>
-            <div class="trade-cards-line">${counterStacksHtml('get', counterGet)}</div>
-          </div>
-          <div class="trade-row">
-            <span class="trade-row-label">You give</span>
-            <div class="trade-cards-line">${counterStacksHtml('give', counterGive)}</div>
-          </div>
-        </div>
-        <div class="counter-picker">
-          <span class="counter-picker-label">Ask for</span>
-          ${RESOURCES.map(r => `<div class="mini-res-card card-${r}" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}">${getMiniSvg(r)}</div>`).join('')}
-        </div>
-      </div>`;
-  }
-
-  // Rows are shown from the viewer's perspective: what I get on top (↓), what I give below (↑).
-  const giveHtml = stacksHtml(isMyOffer ? t.offer : t.request);
-  const getHtml = stacksHtml(isMyOffer ? t.request : t.offer);
-
+  // Row badges (who + arrow) are shared by the offer view and the counter editor, like Colonist.
   const topWhoHtml = isMyOffer
     ? `<span class="trade-who-group" title="From another player">${uiIcon('users', 18)}</span>`
     : `<span class="avatar trade-who-avatar" style="background:${esc(t.fromColor)}" title="From ${esc(t.fromName)}">${avatarFace(t.fromAvatar, t.fromName)}</span>`;
@@ -152,6 +117,44 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
   const bottomWhoHtml = me
     ? `<span class="avatar trade-who-avatar" style="background:${esc(me.color)}" title="You (${esc(me.name)})">${avatarFace(me.avatar, me.name)}</span>`
     : `<span class="trade-who-group">${uiIcon('users', 18)}</span>`;
+
+  if (editing) {
+    const mine = me || myPlayerView();
+    const canSend = sum(counterGive) > 0 && sum(counterGet) > 0 &&
+      !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
+    return `
+      <div class="trade-offer-body trade-counter ${animCls}" data-trade-id="${t.id}">
+        <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
+        <div class="trade-rows">
+          <div class="counter-picker" title="Click a resource to ask for it">
+            ${RESOURCES.map(r => `<div class="mini-res-card card-${r}" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}">${getMiniSvg(r)}</div>`).join('')}
+          </div>
+          <div class="trade-row" title="What you receive (click a card to remove one)">
+            <div class="trade-dir-badge get">
+              ${topWhoHtml}
+              <span class="trade-arrow get">${uiIcon('arrowDown', 15)}</span>
+            </div>
+            <div class="trade-cards-line">${counterStacksHtml('get', counterGet)}</div>
+          </div>
+          <div class="trade-row" title="What you give (click your hand cards to add, click here to remove)">
+            <div class="trade-dir-badge give">
+              ${bottomWhoHtml}
+              <span class="trade-arrow give">${uiIcon('arrowUp', 15)}</span>
+            </div>
+            <div class="trade-cards-line">${counterStacksHtml('give', counterGive)}</div>
+          </div>
+        </div>
+        <div class="trade-actions">
+          <button class="trade-act-btn accept ${canSend ? '' : 'off'}" ${canSend ? `onclick="sendCounter(${t.id})"` : 'disabled'}
+            title="${canSend ? 'Send counter offer' : 'Pick cards you give (that you hold) and cards you get'}">${uiIcon('check', 18)}</button>
+          <button class="trade-act-btn cancel" onclick="cancelCounter()" title="Back to the offer">${uiIcon('close', 18)}</button>
+        </div>
+      </div>`;
+  }
+
+  // Rows are shown from the viewer's perspective: what I get on top (↓), what I give below (↑).
+  const giveHtml = stacksHtml(isMyOffer ? t.offer : t.request);
+  const getHtml = stacksHtml(isMyOffer ? t.request : t.offer);
 
   let actionsHtml = '';
   if (isMyOffer) {

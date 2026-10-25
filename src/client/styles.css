@@ -386,7 +386,6 @@ svg#boardSvg:active { cursor: grabbing; }
 .trade-arrow.get { color: var(--ok); }
 .trade-arrow.give { color: var(--danger); }
 .trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.trade-row-label { flex-shrink: 0; min-width: 64px; white-space: nowrap; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
 .trade-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; }
 
 /* Flat rounded-square responder & action boxes (Colonist layout in our matte token palette) */
@@ -856,14 +855,10 @@ svg#boardSvg:active { cursor: grabbing; }
 .avatar.avatar-pick:hover { transform: scale(1.1); }
 
 /* ---------- Counter offer (edit mode of a trade card in the stack) ---------- */
-.trade-offer-body.trade-counter { flex-direction: column; align-items: stretch; gap: 8px; }
-.trade-counter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.trade-counter-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
-.trade-counter .trade-row { flex-wrap: wrap; gap: 8px; }
-.trade-empty-hint { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
-/* Strip of resources to ask for (click one to add it to "You get") */
+/* Same layout as a normal offer card (badge + cards rows on the left, buttons on the right); no text labels, like Colonist. */
+.trade-counter .trade-row { flex-wrap: nowrap; }
+/* Strip of resources to ask for (click one to add it to the top row) */
 .counter-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.counter-picker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); min-width: 64px; }
 .counter-picker .mini-res-card { width: 40px; height: 48px; }
 .counter-picker .mini-res-card svg.glyph { width: 24px; height: 24px; }
 
