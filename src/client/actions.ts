@@ -187,8 +187,9 @@ export function rematchLobby(): void {
 
 export function switchVictoryTab(tab: string): void {
   setVictoryTab(tab);
-  document.getElementById('vicTabDice')?.classList.toggle('active', tab === 'dice');
-  document.getElementById('vicTabOverview')?.classList.toggle('active', tab === 'overview');
+  document.querySelectorAll<HTMLElement>('.vic-tab[data-vtab]').forEach(el => {
+    el.classList.toggle('active', el.dataset.vtab === tab);
+  });
   renderVictoryScreen();
 }
 

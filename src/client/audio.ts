@@ -188,7 +188,28 @@ export function playAwardSound(isStolen = false): void {
   });
 }
 
+// Confetti pop + celebratory victory fanfare chord progression when a player reaches the VP threshold
+export function playVictoryFanfareSound(): void {
+  if (!ensureAudio()) return;
+  // Dual confetti cannon pops
+  playNoiseBurst(0.09, 1400, 1.5, 0.16, 0);
+  playNoiseBurst(0.09, 1750, 1.6, 0.14, 0.18);
+  // Rising C-major -> G -> C6 fanfare
+  const fanfare: { freq: number; delay: number; dur: number; vol: number }[] = [
+    { freq: 523.25, delay: 0.02, dur: 0.14, vol: 0.13 },
+    { freq: 659.25, delay: 0.13, dur: 0.14, vol: 0.13 },
+    { freq: 783.99, delay: 0.24, dur: 0.16, vol: 0.14 },
+    { freq: 1046.5, delay: 0.37, dur: 0.42, vol: 0.16 },
+    { freq: 783.99, delay: 0.37, dur: 0.42, vol: 0.1 },
+    { freq: 659.25, delay: 0.37, dur: 0.42, vol: 0.09 }
+  ];
+  for (const n of fanfare) {
+    playPitchSweep(n.freq * 0.995, n.freq, n.dur, 'triangle', n.vol, n.delay);
+  }
+}
+
 export function toggleSound(): void {
   setSoundOn(!soundOn);
   document.getElementById('btnToggleSound')!.innerHTML = uiIcon(soundOn ? 'sound' : 'mute');
 }
+

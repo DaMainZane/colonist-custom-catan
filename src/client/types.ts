@@ -28,6 +28,49 @@ export interface PlayerView {
   stats?: {
     resourcesEarned: number;
     tradesMade: number;
+    vpBreakdown?: {
+      settlement: number;
+      city: number;
+      devVp: number;
+      largestArmy: number;
+      longestRoad: number;
+    };
+    resCards?: {
+      produced: number;
+      tradedIn: number;
+      tradedOut: number;
+      stolen: number;
+      robbed: number;
+      discarded: number;
+      devGain: number;
+    };
+    devCards?: {
+      bought: number;
+      played: number;
+      knight: number;
+      vp: number;
+      roadBuilding: number;
+      yearOfPlenty: number;
+      monopoly: number;
+    };
+    activity?: {
+      turns: number;
+      rolls: number;
+      sevens: number;
+      roadsOnBoard: number;
+      settlementsOnBoard: number;
+      citiesOnBoard: number;
+      roadsBuilt: number;
+      settlementsBuilt: number;
+      citiesBuilt: number;
+      robberMoves: number;
+      tradesProposed: number;
+      playerTrades: number;
+      bankTrades: number;
+      longestRoad: number;
+      knightsPlayed: number;
+    };
+    byResource?: Record<string, number>;
   };
 }
 

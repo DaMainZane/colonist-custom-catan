@@ -1,7 +1,7 @@
 import { socket } from './socket';
-import { playTone, playDiceRollSound, playDiscardSound, toggleSound } from './audio';
+import { playDiceRollSound, playDiscardSound, playVictoryFanfareSound, toggleSound } from './audio';
 import { hydrateIcons } from './icons';
-import { toggleTheme, showToast } from './ui';
+import { toggleTheme, showToast, triggerVictoryConfetti, clearVictoryConfetti } from './ui';
 import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   activeBrush, hasDraggedMap,
@@ -91,15 +91,17 @@ socket.on('gameState', (newState: any) => {
 
   setState(newState);
   // Back in the lobby after a game: fold the menus away so nothing overlaps; the settings button reopens the dock.
-  if (!wasLobby && state.status === 'LOBBY') collapseLobbyUi();
+  if (!wasLobby && state.status === 'LOBBY') {
+    collapseLobbyUi();
+    clearVictoryConfetti();
+  }
   document.getElementById('authScreen')!.style.display = 'none';
   document.getElementById('gameViewport')!.style.display = 'flex';
 
   if (!wasGameOver && state.status === 'GAMEOVER') {
     setHideVictoryOverlay(false);
-    playTone(523, 0.12);
-    setTimeout(() => playTone(659, 0.12), 130);
-    setTimeout(() => playTone(784, 0.22), 260);
+    playVictoryFanfareSound();
+    triggerVictoryConfetti(state.winner?.color);
   }
 
   if (!wasLobby && state.status !== 'LOBBY') {

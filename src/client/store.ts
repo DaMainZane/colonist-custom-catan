@@ -7,7 +7,7 @@ export let soundOn = true;
 export let isMouseDown = false;
 export let buildMode: string | null = null;
 export let drawerMode: string | null = null;
-export let victoryTab = 'dice';
+export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
 
 export let camZoom = 1;

@@ -1,5 +1,22 @@
 # Change Log
 
+## 2026-10-25 (Pass 9: Victory screen 6-tab analytics & confetti celebration overlay)
+### Added
+- **Victory Confetti Animation Overlay & Fanfare** (`src/client/ui.ts`, `src/client/audio.ts`, `src/client/main.ts`, `src/client/styles.css`):
+  - Full-screen non-blocking canvas confetti simulation (`triggerVictoryConfetti` / `clearVictoryConfetti` on `#confettiOverlay`) triggered when a player hits the victory point threshold (`GAMEOVER`).
+  - Dual side cannons + overhead burst with 3D tumbling rectangles, hex tiles, and circles colored in the winner's signature color and the warm Dorfromantik palette; respects `prefers-reduced-motion` and cleans up automatically or on returning to the lobby.
+  - Synthesized dual-cannon pop and rising chord fanfare (`playVictoryFanfareSound` in `src/client/audio.ts`).
+- **6-Tab Post-Game Victory Screen** (`public/index.html`, `src/client/render/index.ts`, `src/client/styles.css`, `src/client/actions.ts`, `src/client/store.ts`):
+  - **Overview** (default tab): Ranked player matrix with Total VP (trophy), Settlements VP, Cities VP, +1 VP Dev Cards, Largest Army VP, and Longest Road VP, with circular leader highlights (`.vic-num.best`) on the highest nonzero value in each category column.
+  - **Dice Stats**: 2–12 histogram (hot 6/8 and slate 7 styling), summary strip (total rolls, 7s count & percentage, most frequent roll), and per-player 7s rolled chips.
+  - **Res Card Stats**: Per-player resource flow matrix (Total Gained, Dice/Gold Produced, Dev Card Gain, Traded In, Traded Out, Stolen, Robbed, and Discarded on 7s) + Table Total row.
+  - **Dev Card Stats**: Per-player Dev Card breakdown (Bought, Played, Knight, +1 VP, Road Building, Year of Plenty, Monopoly) + Table Total row.
+  - **Activity Stats**: Per-player activity matrix (Turns, Settlements Built, Cities Built, Roads Built, Best Road Length, Robber Moves, Player Trades, Bank Trades, Offers Proposed) + Table Total row.
+  - **Resource Stats**: Per-player resource breakdown using flat resource pictograms (Total, Wood, Brick, Sheep, Wheat, Ore) + Table Total row.
+- **Engine & View Stats Tracking** (`src/packs/base/hooks.ts`, `src/server/view.ts`, `src/client/types.ts`):
+  - `recordActionStats` hook in `packs/base/hooks.ts` records per-player production, picks, steals, robberies, discards, player/bank trade flows, dev card usage, builds, robber moves, turns, and per-resource totals from engine events without touching RNG.
+  - Verified with `npm run typecheck` and `npm test` (88/88 passing tests across 7 test suites).
+
 ## 2026-10-25 (Pass 8: 8 players, number tokens, lobby overlap)
 ### Added
 - `src/shared/numbers.ts`: real 18-token pool, `buildNumberPool(count)` for any board size, `assignNumbers` (no touching 6/8, equal numbers apart as a soft goal). `tests/numbers.test.ts`.

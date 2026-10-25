@@ -70,18 +70,20 @@ Status: 2a-2g written. Typecheck is clean and all 25 tests pass, including bot-v
 | `picks.ts` | pending picks: enters/leaves the `pick` phase after every action |
 | `robbing.ts` | robber victims and seeded random steal |
 | `trading.ts` | bank ratios from ports, resource parsing, player trade execution |
-| `hooks.ts` | game start state, `settlePicks` after every action |
+| `hooks.ts` | game start state, per-action stats tracking (`recordActionStats`), trade pruning, `settlePicks` after every action |
 | `actions/` | one file per action group: `build`, `roll`, `devCards` (buy/play), `bankTrade`, `tradeOffers` (propose/respond/counter/confirm/cancel), `owed` (discard/pick), `robber` (move/steal), `endTurn` |
 
 Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `bank_trade {give, get}`, `propose_trade {offer, request}`, `respond_trade {decision, tradeId?}`, `counter_trade {offer, request, tradeId?}` (a responder edits an offer and sends it back to the proposer at the top of the stack), `confirm_trade {partnerId?, tradeId?}`, `cancel_trade {tradeId?}`, `discard {cards}`, `pick {resource}`, `move_robber {hexId}`, `steal {victimId}`, `end_turn`.
 
-### `src/client/` (lobby and trade extras)
+### `src/client/` (lobby, trade, and post-game UI)
 
 | File | What |
 |---|---|
 | `avatars.ts` | flat pictogram faces keyed by the shared avatar id (`AVATAR_CHOICES` mirrors `shared/palette.ts`), falls back to the name initial |
 | `cursors.ts` | lobby-only shared cursors and Shift laser trail on a canvas over the board; positions travel in board coordinates via the `cursor` socket event |
 | `render/trade.ts` | stacked multi-offer trade UI (newest on top, per-offer countdown bar, collapsible header, aligned responder boxes) and counter-offer editor |
+| `render/index.ts` | top-level render coordinator and 6-tab post-game victory screen (`Overview`, `Dice Stats`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) with leader highlights |
+| `ui.ts` | theme switcher, toast banner, and full-screen canvas victory confetti animation (`triggerVictoryConfetti`) |
 | `presets.ts` | custom map presets: list kept in the host's `localStorage`, preset row in the lobby dock (save, load, delete with confirmation). Built-in presets stay fixed chips in `index.html` |
 
 Lobby rules: only the host edits (map painting, presets, settings, bots, start, game speed). Everyone picks their own avatar (click it in the player list; each avatar is used once per lobby, the host can change the bots').

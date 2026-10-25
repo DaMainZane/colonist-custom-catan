@@ -54,6 +54,23 @@ function fillResources(partial: Record<string, number>): Record<string, number> 
 function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: boolean): any {
   const self = p.id === viewerId;
   const reveal = self || over;
+
+  let settlementsOnBoard = 0;
+  let citiesOnBoard = 0;
+  for (const v of g.board.vertices) {
+    if (v.piece?.owner !== p.id) continue;
+    if (v.piece.type === 'settlement') settlementsOnBoard++;
+    else if (v.piece.type === 'city') citiesOnBoard++;
+  }
+  let roadsOnBoard = 0;
+  for (const e of g.board.edges) {
+    if (e.piece?.owner === p.id && e.piece.type === 'road') roadsOnBoard++;
+  }
+
+  const allHeldDevs = [...p.devCards, ...p.newDevCards];
+  const heldCount = (cardId: string) => allHeldDevs.filter(c => c === cardId).length;
+  const vpCards = reveal ? heldCount('vp') : 0;
+
   return {
     id: p.id,
     name: p.name,
@@ -64,8 +81,8 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     resourceCount: totalCards(p),
     resources: reveal ? p.resources : undefined,
     devCardCount: p.devCards.length + p.newDevCards.length,
-    devCards: self ? p.devCards : undefined,
-    newDevCards: self ? p.newDevCards : undefined,
+    devCards: reveal ? p.devCards : undefined,
+    newDevCards: reveal ? p.newDevCards : undefined,
     knightsPlayed: p.stats.knightsPlayed || 0,
     longestRoadLength: p.stats.longestRoad || 0,
     goldPending: p.pending.pick || 0,
@@ -75,7 +92,59 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     settlementsLeft: p.pieces.settlement ?? 0,
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
-    stats: { resourcesEarned: p.stats.earned || 0, tradesMade: p.stats.trades || 0 },
+    stats: {
+      resourcesEarned: p.stats.earned || 0,
+      tradesMade: p.stats.trades || 0,
+      vpBreakdown: {
+        settlement: settlementsOnBoard,
+        city: citiesOnBoard * 2,
+        devVp: vpCards,
+        largestArmy: g.awards.largestArmy === p.id ? 2 : 0,
+        longestRoad: g.awards.longestRoad === p.id ? 2 : 0
+      },
+      resCards: {
+        produced: p.stats.resProduced || 0,
+        tradedIn: p.stats.resTradedIn || 0,
+        tradedOut: p.stats.resTradedOut || 0,
+        stolen: p.stats.resStolen || 0,
+        robbed: p.stats.resRobbed || 0,
+        discarded: p.stats.resDiscarded || 0,
+        devGain: p.stats.resDevGain || 0
+      },
+      devCards: {
+        bought: p.stats.devsBought || 0,
+        played: p.stats.devsPlayed || 0,
+        knight: (p.stats.devPlayed_knight || 0) + (reveal ? heldCount('knight') : 0),
+        vp: vpCards,
+        roadBuilding: (p.stats.devPlayed_roadBuilding || 0) + (reveal ? heldCount('roadBuilding') : 0),
+        yearOfPlenty: (p.stats.devPlayed_yearOfPlenty || 0) + (reveal ? heldCount('yearOfPlenty') : 0),
+        monopoly: (p.stats.devPlayed_monopoly || 0) + (reveal ? heldCount('monopoly') : 0)
+      },
+      activity: {
+        turns: Math.max(1, p.stats.turnsTaken || 0),
+        rolls: p.stats.rollsCount || 0,
+        sevens: p.stats.sevensRolled || 0,
+        roadsOnBoard,
+        settlementsOnBoard,
+        citiesOnBoard,
+        roadsBuilt: p.stats.built_road || roadsOnBoard,
+        settlementsBuilt: p.stats.built_settlement || settlementsOnBoard,
+        citiesBuilt: p.stats.built_city || citiesOnBoard,
+        robberMoves: p.stats.robberMoves || 0,
+        tradesProposed: p.stats.tradesProposed || 0,
+        playerTrades: p.stats.playerTrades || 0,
+        bankTrades: p.stats.bankTrades || 0,
+        longestRoad: p.stats.longestRoad || 0,
+        knightsPlayed: p.stats.knightsPlayed || 0
+      },
+      byResource: {
+        wood: p.stats.res_wood || 0,
+        brick: p.stats.res_brick || 0,
+        sheep: p.stats.res_sheep || 0,
+        wheat: p.stats.res_wheat || 0,
+        ore: p.stats.res_ore || 0
+      }
+    },
     vp: computeVP(g, registry, p, reveal),
     // What other players see. Differs from `vp` only for the viewer's own hidden VP cards.
     publicVp: computeVP(g, registry, p, over)
@@ -104,7 +173,19 @@ function lobbyPlayerView(room: Room, p: Room['lobbyPlayers'][number]): any {
     settlementsLeft: room.settings.maxSettlements,
     citiesLeft: room.settings.maxCities,
     roadsLeft: room.settings.maxRoads,
-    stats: { resourcesEarned: 0, tradesMade: 0 },
+    stats: {
+      resourcesEarned: 0,
+      tradesMade: 0,
+      vpBreakdown: { settlement: 0, city: 0, devVp: 0, largestArmy: 0, longestRoad: 0 },
+      resCards: { produced: 0, tradedIn: 0, tradedOut: 0, stolen: 0, robbed: 0, discarded: 0, devGain: 0 },
+      devCards: { bought: 0, played: 0, knight: 0, vp: 0, roadBuilding: 0, yearOfPlenty: 0, monopoly: 0 },
+      activity: {
+        turns: 0, rolls: 0, sevens: 0, roadsOnBoard: 0, settlementsOnBoard: 0, citiesOnBoard: 0,
+        roadsBuilt: 0, settlementsBuilt: 0, citiesBuilt: 0, robberMoves: 0, tradesProposed: 0,
+        playerTrades: 0, bankTrades: 0, longestRoad: 0, knightsPlayed: 0
+      },
+      byResource: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }
+    },
     vp: 0
   };
 }

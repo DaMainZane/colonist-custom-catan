@@ -205,5 +205,12 @@ describe('rules', () => {
     expect(p1.resources.brick).toBe(1);
     expect(g.trades.length).toBe(0);
     expect(g.trade).toBeNull();
+    expect(p1.stats.tradesProposed).toBe(2);
+    expect(p1.stats.playerTrades).toBe(1);
+    expect(p2.stats.playerTrades).toBe(1);
+    expect(p1.stats.resTradedOut).toBe(1);
+    expect(p1.stats.resTradedIn).toBe(1);
+    expect(p1.stats.res_brick).toBe(1);
   });
 });
+

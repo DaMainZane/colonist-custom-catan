@@ -140,7 +140,8 @@ const UI_ICONS: Record<string, string> = {
   arrowDown: `<path d="M12 5v14M6.5 13.5L12 19l5.5-5.5"/>`,
   arrowUp: `<path d="M12 19V5M6.5 10.5L12 5l5.5 5.5"/>`,
   chevronUp: `<path d="M6 15l6-6 6 6"/>`,
-  chevronDown: `<path d="M6 9l6 6 6-6"/>`
+  chevronDown: `<path d="M6 9l6 6 6-6"/>`,
+  trophy: `<path ${FILL} d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/>`
 };
 
 export function uiIcon(name: string, size = 20): string {

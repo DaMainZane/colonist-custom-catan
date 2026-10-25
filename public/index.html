@@ -78,30 +78,31 @@
       <!-- Reopen victory stats when inspecting the map after the game -->
       <button id="reopenVictoryBtn" class="btn" onclick="toggleVictoryMapInspect(false)"><span data-icon="users" data-size="18"></span>Show results</button>
 
-      <!-- Victory and dice stats -->
+      <!-- Victory and post-game stats -->
       <div id="victoryOverlay">
         <div class="vic-top-bar">
           <div class="vic-spacer"></div>
           <div class="vic-center">
             <div class="vic-logo-badge">COLONIST CUSTOM</div>
-            <h2 id="vicTitleText" class="vic-title">You are 1st!</h2>
+            <h2 id="vicTitleText" class="vic-title">Victory!</h2>
             <p id="vicSubText" class="vic-sub">Time: 00:00 - Turns: 0</p>
           </div>
           <div class="vic-side">
-            <button class="btn vic-btn-dark" onclick="toggleVictoryMapInspect(true)"><span data-icon="map" data-size="18"></span>View map</button>
+            <button class="btn vic-btn-dark" onclick="toggleVictoryMapInspect(true)"><span data-icon="map" data-size="18"></span>Map / Replay</button>
             <button class="btn primary" onclick="copyInviteLink()"><span data-icon="link" data-size="18"></span>Share</button>
           </div>
         </div>
 
         <div class="vic-tabs">
-          <div class="vic-tab active" id="vicTabDice" onclick="switchVictoryTab('dice')">Dice stats</div>
-          <div class="vic-tab" id="vicTabOverview" onclick="switchVictoryTab('overview')">Overview</div>
+          <button class="vic-tab active" data-vtab="overview" onclick="switchVictoryTab('overview')">Overview</button>
+          <button class="vic-tab" data-vtab="dice" onclick="switchVictoryTab('dice')">Dice Stats</button>
+          <button class="vic-tab" data-vtab="res_cards" onclick="switchVictoryTab('res_cards')">Res Card Stats</button>
+          <button class="vic-tab" data-vtab="dev_cards" onclick="switchVictoryTab('dev_cards')">Dev Card Stats</button>
+          <button class="vic-tab" data-vtab="activity" onclick="switchVictoryTab('activity')">Activity Stats</button>
+          <button class="vic-tab" data-vtab="resources" onclick="switchVictoryTab('resources')">Resource Stats</button>
         </div>
 
-        <div class="vic-body">
-          <div class="vic-ranks" id="vicRanksList"></div>
-          <div class="dice-chart-box" id="vicChartContainer"></div>
-        </div>
+        <div class="vic-body" id="vicChartContainer"></div>
 
         <div class="vic-actions">
           <button class="btn vic-btn-dark" onclick="window.location.reload()"><span data-icon="home" data-size="18"></span>Home</button>
