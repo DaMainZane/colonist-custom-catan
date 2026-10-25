@@ -17,9 +17,12 @@ import {
 } from '../audio';
 import { socket } from '../socket';
 import {
-  state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap, setBuildModeValue,
-  setCamZoom, setCamPan, getClientSpeed
+  state, buildMode, selectedBoardVertexId, selectedBoardEdgeId, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
+  setBuildModeValue, setSelectedBoardVertexId, setSelectedBoardEdgeId, setCamZoom, setCamPan, getClientSpeed,
+  addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev, inFlightHandResources
 } from '../store';
+import { renderHand, renderRecipeStripHtml } from './hand';
+import { renderSidebar } from './sidebar';
 import { esc } from '../util';
 
 const knownRoads = new Set<number>();
@@ -86,6 +89,13 @@ export function updateCameraViewBox(): void {
   const baseX = (centerX0 - camPanX) - baseW / 2;
   const baseY = (centerY0 - camPanY) - baseH / 2;
   svg.setAttribute('viewBox', `${baseX} ${baseY} ${baseW} ${baseH}`);
+
+  // Scale settlements and cities up as the camera zooms out (or on larger boards) so they stay easy to spot.
+  const zoomFactor = Math.max(camZoom, Math.max(baseW, baseH) / 720);
+  const buildingScale = Math.min(2.35, 1.22 * Math.pow(Math.max(1, zoomFactor), 0.62));
+  svg.style.setProperty('--building-scale', buildingScale.toFixed(3));
+
+  positionBoardBuildPopup();
 }
 
 function getPieceAnimAttrs(key: string, now: number): { isAnimating: boolean; delayStyle: string } {
@@ -274,7 +284,16 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   updateCameraViewBox();
 
-  let html = '';
+  let html = `
+    <defs>
+      <radialGradient id="vertexSelectGlowGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+        <stop offset="55%" stop-color="#ffffff" stop-opacity="0.55" />
+        <stop offset="85%" stop-color="#ffffff" stop-opacity="0.82" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.98" />
+      </radialGradient>
+    </defs>
+  `;
 
   // Shallow water and sandy border under ALL land tiles (not only outer coastal tiles).
   const allLandPolys = hexes
@@ -424,10 +443,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           onmouseleave="onRoadLeave()" />`;
     } else if (isMyTurn && canClientPlaceRoad(e, me)) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+      const isSelectedEdge = selectedBoardEdgeId === e.id;
       roadSpotsHtml += `
-        <g onclick="clickEdge(${e.id})" style="cursor:pointer">
+        <g onclick="clickEdge(${e.id}, event)" style="cursor:pointer">
           <line class="road-spot-line" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
           <circle class="road-spot-dot" cx="${mx}" cy="${my}" r="8" />
+          ${isSelectedEdge ? `<circle cx="${mx}" cy="${my}" r="20" class="vertex-select-glow" />` : ''}
+        </g>
+      `;
+    } else if (canInspectRoadSpot(e, me)) {
+      const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+      const isSelectedEdge = selectedBoardEdgeId === e.id;
+      roadSpotsHtml += `
+        <g onclick="clickEdge(${e.id}, event)" style="cursor:pointer">
+          <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="transparent" stroke-width="18" stroke-linecap="round" />
+          ${isSelectedEdge ? `<circle cx="${mx}" cy="${my}" r="20" class="vertex-select-glow" />` : ''}
         </g>
       `;
     }
@@ -438,41 +468,56 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   // Settlements, cities and settlement spots
   const robberVictimSet = new Set<string>(state.robberVictims || []);
   for (const v of vertices) {
+    const isSelectedVertex = selectedBoardVertexId === v.id;
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
-      const canUpgrade = isMyTurn && state.phase === 'MAIN' && v.building.owner === socket.id &&
-        v.building.type === 'settlement' && me.resources.wheat >= 2 && me.resources.ore >= 3 && me.citiesLeft > 0;
+      const isMySettlement = v.building.owner === socket.id && v.building.type === 'settlement';
+      const canUpgrade = isMyTurn && state.phase === 'MAIN' && isMySettlement &&
+        me && me.resources.wheat >= 2 && me.resources.ore >= 3 && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
-      const isClickable = canUpgrade || canRobThisBuilding;
       const isCity = v.building.type === 'city';
-      const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id})` : '';
+      const canInspectUpgrade = !isCity && isMySettlement && state.status !== 'LOBBY' && state.status !== 'GAMEOVER' && !canRobThisBuilding;
+      const isClickable = canUpgrade || canRobThisBuilding || canInspectUpgrade;
+      const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id}, event)` : '';
       const ringR = isCity ? 27 : 22;
       const anim = getPieceAnimAttrs(`${isCity ? 'city' : 'settlement'}_${v.id}`, now);
 
       html += `
         <g transform="translate(${v.x}, ${v.y})" onclick="${clickAttr}" style="${clickAttr ? 'cursor:pointer' : ''}">
-          ${anim.isAnimating ? `<circle cx="0" cy="0" r="${ringR + 4}" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
-          ${clickAttr ? `<circle r="${ringR + 2}" fill="transparent" />` : ''}
-          ${canRobThisBuilding ? `<circle r="${ringR}" class="target-ring rob" />` : ''}
-          ${!isCity && canUpgrade && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
-          <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            ${isCity ? cityMarkup(col) : settlementMarkup(col)}
+          <g class="building-zoom-scale">
+            ${anim.isAnimating ? `<circle cx="0" cy="0" r="${ringR + 4}" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+            ${clickAttr ? `<circle r="${ringR + 2}" fill="transparent" />` : ''}
+            ${canRobThisBuilding ? `<circle r="${ringR}" class="target-ring rob" />` : ''}
+            ${!isCity && canUpgrade && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+              ${isCity ? cityMarkup(col) : settlementMarkup(col)}
+            </g>
+            ${isSelectedVertex ? `<circle cx="0" cy="4" r="20" class="vertex-select-glow" />` : ''}
           </g>
         </g>
       `;
     } else if (isMyTurn && canClientPlaceSettlement(v, me)) {
       html += `
-        <g onclick="clickVertex(${v.id})" style="cursor:pointer">
+        <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
           <circle cx="${v.x}" cy="${v.y}" r="20" fill="transparent" />
           <circle cx="${v.x}" cy="${v.y}" r="11" class="spot-pulse" />
+          ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
+        </g>
+      `;
+    } else if (canInspectSettlementSpot(v, me)) {
+      html += `
+        <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
+          <circle cx="${v.x}" cy="${v.y}" r="18" fill="transparent" />
+          ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
         </g>
       `;
     }
   }
 
   svg.innerHTML = html;
+  syncBoardBuildPopup();
 }
 
 // Updates camera viewBox immediately on pan/zoom/reset without reconstructing the SVG DOM.
@@ -628,10 +673,7 @@ export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
   hlLayer.innerHTML = `<g class="road-glow-net">${netHtml}</g><g class="road-glow-best">${bestHtml}</g>`;
 
   if (tooltip) {
-    tooltip.innerHTML = `
-      <div class="rht-head"><span class="rht-dot" style="background:${info.ownerColor}"></span><span>${esc(info.ownerName)}</span></div>
-      <div class="rht-stats">Longest stretch: <strong>${info.longestStretch}</strong> · Connected: <strong>${info.totalRoads}</strong> ${info.totalRoads === 1 ? 'road' : 'roads'}</div>
-    `;
+    tooltip.textContent = `Road Length: ${info.longestStretch}`;
     tooltip.style.display = 'flex';
     if (ev) onRoadMove(ev);
   }
@@ -640,8 +682,8 @@ export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
 export function onRoadMove(ev: MouseEvent): void {
   const tooltip = document.getElementById('roadHoverTooltip');
   if (!tooltip || tooltip.style.display === 'none') return;
-  const x = Math.min(window.innerWidth - 240, ev.clientX + 14);
-  const y = Math.max(12, ev.clientY - 48);
+  const x = Math.max(80, Math.min(window.innerWidth - 80, ev.clientX));
+  const y = Math.max(48, ev.clientY - 16);
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;
 }
@@ -685,6 +727,17 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
+export function canInspectSettlementSpot(v: any, me: any): boolean {
+  if (!me || !state?.board) return false;
+  if (state.status === 'LOBBY' || state.status === 'GAMEOVER') return false;
+  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') return false;
+  if (v.building) return false;
+  for (const adjId of v.adjacentVertices) {
+    if (state.board.vertices[adjId]?.building) return false;
+  }
+  return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
+}
+
 export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (!me || me.settlementsLeft <= 0) return false;
   for (const adjId of v.adjacentVertices) {
@@ -693,8 +746,27 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (state.phase === 'SETUP_SETTLEMENT') return true;
   if (state.phase !== 'MAIN') return false;
   if (buildMode && buildMode !== 'settlement') return false;
-  if (me.resources.wood < 1 || me.resources.brick < 1 || me.resources.sheep < 1 || me.resources.wheat < 1) return false;
+  const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
+  const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
+  const sheep = Math.max(0, (me.resources.sheep || 0) - (inFlightHandResources.sheep || 0));
+  const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
+  if (wood < 1 || brick < 1 || sheep < 1 || wheat < 1) return false;
   return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
+}
+
+export function canInspectRoadSpot(e: any, me: any): boolean {
+  if (!me || !state?.board) return false;
+  if (state.status === 'LOBBY' || state.status === 'GAMEOVER') return false;
+  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') return false;
+  if (e.road) return false;
+  for (const vId of [e.v1, e.v2]) {
+    const v = state.board.vertices[vId];
+    if (!v) continue;
+    if (v.building && v.building.owner === socket.id) return true;
+    if (v.building && v.building.owner !== socket.id) continue;
+    if (v.edgeIds.some((oe: number) => state.board.edges[oe]?.road === socket.id)) return true;
+  }
+  return false;
 }
 
 export function canClientPlaceRoad(e: any, me: any): boolean {
@@ -704,7 +776,9 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
   }
   if (state.phase !== 'MAIN') return false;
   if (buildMode && buildMode !== 'road' && me.freeRoads === 0) return false;
-  const canAfford = me.freeRoads > 0 || (me.resources.wood >= 1 && me.resources.brick >= 1);
+  const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
+  const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
+  const canAfford = me.freeRoads > 0 || (wood >= 1 && brick >= 1);
   if (!canAfford) return false;
 
   for (const vId of [e.v1, e.v2]) {
@@ -717,12 +791,211 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
   return false;
 }
 
-export function clickVertex(vertexId: number): void {
+export function positionBoardBuildPopup(): void {
+  const popup = document.getElementById('boardBuildPopup');
+  if (!popup || (selectedBoardVertexId === null && selectedBoardEdgeId === null) || !state?.board) return;
+  const svg = document.getElementById('boardSvg') as unknown as SVGSVGElement | null;
+  const stage = document.getElementById('boardStage');
+  if (!svg || !stage) return;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return;
+
+  let targetX = 0;
+  let targetY = 0;
+  if (selectedBoardVertexId !== null) {
+    const v = state.board.vertices[selectedBoardVertexId];
+    if (!v) return;
+    targetX = v.x;
+    targetY = v.y;
+  } else if (selectedBoardEdgeId !== null) {
+    const e = state.board.edges[selectedBoardEdgeId];
+    const v1 = e ? state.board.vertices[e.v1] : null;
+    const v2 = e ? state.board.vertices[e.v2] : null;
+    if (!v1 || !v2) return;
+    targetX = (v1.x + v2.x) / 2;
+    targetY = (v1.y + v2.y) / 2;
+  }
+
+  const pt = svg.createSVGPoint();
+  pt.x = targetX;
+  pt.y = targetY;
+  const screenPt = pt.matrixTransform(ctm);
+  const stageRect = stage.getBoundingClientRect();
+  popup.style.left = `${screenPt.x - stageRect.left}px`;
+  popup.style.top = `${screenPt.y - stageRect.top - 22}px`;
+}
+
+export function syncBoardBuildPopup(): void {
+  const popup = document.getElementById('boardBuildPopup');
+  if (!popup) return;
+  if ((selectedBoardVertexId === null && selectedBoardEdgeId === null) || !state?.board || state.status === 'LOBBY' || state.status === 'GAMEOVER') {
+    popup.style.display = 'none';
+    return;
+  }
+
+  const me = state.players.find(p => p.id === socket.id);
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+  if (!me) {
+    setSelectedBoardVertexId(null);
+    setSelectedBoardEdgeId(null);
+    popup.style.display = 'none';
+    return;
+  }
+
+  if (selectedBoardEdgeId !== null) {
+    const e = state.board.edges[selectedBoardEdgeId];
+    if (!e || e.road || !canInspectRoadSpot(e, me)) {
+      setSelectedBoardEdgeId(null);
+      popup.style.display = 'none';
+      return;
+    }
+    const canBuildRoad = isMyTurn && state.phase === 'MAIN' && canClientPlaceRoad(e, me);
+    popup.innerHTML = `
+      ${me.freeRoads > 0 ? '' : renderRecipeStripHtml('road', me)}
+      <button class="board-build-btn" ${canBuildRoad ? `onclick="confirmBoardEdgeBuild(${e.id})"` : 'disabled'}>
+        <span class="board-build-badge">${me.roadsLeft}</span>
+        ${uiIcon('road', 28)}
+      </button>
+    `;
+    popup.style.display = 'flex';
+    positionBoardBuildPopup();
+    return;
+  }
+
+  const v = state.board.vertices[selectedBoardVertexId!];
+  if (!v) {
+    setSelectedBoardVertexId(null);
+    popup.style.display = 'none';
+    return;
+  }
+
+  const isMySettlement = Boolean(v.building && v.building.owner === socket.id && v.building.type === 'settlement');
+  const isSettleSpot = !v.building && canInspectSettlementSpot(v, me);
+  if (!isMySettlement && !isSettleSpot) {
+    setSelectedBoardVertexId(null);
+    popup.style.display = 'none';
+    return;
+  }
+
+  const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
+  const ore = Math.max(0, (me.resources.ore || 0) - (inFlightHandResources.ore || 0));
+
+  if (isMySettlement) {
+    const canBuildCity = isMyTurn && state.phase === 'MAIN' && wheat >= 2 && ore >= 3 && me.citiesLeft > 0;
+    popup.innerHTML = `
+      ${renderRecipeStripHtml('city', me)}
+      <button class="board-build-btn" ${canBuildCity ? `onclick="confirmBoardVertexBuild(${v.id})"` : 'disabled'}>
+        <span class="board-build-badge">${me.citiesLeft}</span>
+        ${uiIcon('city', 28)}
+      </button>
+    `;
+  } else {
+    const canBuildSettle = isMyTurn && state.phase === 'MAIN' && canClientPlaceSettlement(v, me);
+    popup.innerHTML = `
+      ${renderRecipeStripHtml('settlement', me)}
+      <button class="board-build-btn" ${canBuildSettle ? `onclick="confirmBoardVertexBuild(${v.id})"` : 'disabled'}>
+        <span class="board-build-badge">${me.settlementsLeft}</span>
+        ${uiIcon('house', 28)}
+      </button>
+    `;
+  }
+
+  popup.style.display = 'flex';
+  positionBoardBuildPopup();
+}
+
+export function closeBoardBuildPopup(): void {
+  if (selectedBoardVertexId === null && selectedBoardEdgeId === null) return;
+  setSelectedBoardVertexId(null);
+  setSelectedBoardEdgeId(null);
+  const me = state?.players?.find(p => p.id === socket.id);
+  const isMyTurn = state?.players?.[state.turnIndex]?.id === socket.id;
+  renderBoard(me, Boolean(isMyTurn));
+}
+
+export function confirmBoardVertexBuild(vertexId: number): void {
+  setSelectedBoardVertexId(null);
+  setSelectedBoardEdgeId(null);
   setBuildModeValue(null);
   socket.emit('clickVertex', { code: state.code, vertexId });
 }
 
-export function clickEdge(edgeId: number): void {
+export function confirmBoardEdgeBuild(edgeId: number): void {
+  setSelectedBoardVertexId(null);
+  setSelectedBoardEdgeId(null);
+  setBuildModeValue(null);
+  socket.emit('clickEdge', { code: state.code, edgeId });
+}
+
+export function clickVertex(vertexId: number, ev?: MouseEvent): void {
+  if (ev) ev.stopPropagation();
+  if (!state?.board) return;
+  const v = state.board.vertices[vertexId];
+  const me = state.players.find(p => p.id === socket.id);
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+
+  // Setup settlement or robber steal executes immediately.
+  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'ROBBER_STEAL') {
+    setSelectedBoardVertexId(null);
+    setSelectedBoardEdgeId(null);
+    setBuildModeValue(null);
+    socket.emit('clickVertex', { code: state.code, vertexId });
+    return;
+  }
+
+  // If the player explicitly picked Settle or City mode from the bottom bar, build on click right away.
+  if (buildMode === 'settlement' || buildMode === 'city') {
+    setSelectedBoardVertexId(null);
+    setSelectedBoardEdgeId(null);
+    setBuildModeValue(null);
+    socket.emit('clickVertex', { code: state.code, vertexId });
+    return;
+  }
+
+  // Otherwise, clicking your settlement or a valid road-connected vertex on the hex board toggles the on-board recipe + build popup.
+  if (v) {
+    const isMySettlement = Boolean(v.building && v.building.owner === socket.id && v.building.type === 'settlement');
+    const isSettleSpot = !v.building && canInspectSettlementSpot(v, me);
+    if (isMySettlement || isSettleSpot) {
+      setSelectedBoardVertexId(selectedBoardVertexId === vertexId ? null : vertexId);
+      playTone(500, 0.04);
+      renderBoard(me, Boolean(isMyTurn));
+      return;
+    }
+  }
+
+  setSelectedBoardVertexId(null);
+  setSelectedBoardEdgeId(null);
+  setBuildModeValue(null);
+  socket.emit('clickVertex', { code: state.code, vertexId });
+}
+
+export function clickEdge(edgeId: number, ev?: MouseEvent): void {
+  if (ev) ev.stopPropagation();
+  if (!state?.board) return;
+  const e = state.board.edges[edgeId];
+  const me = state.players.find(p => p.id === socket.id);
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+
+  // Setup road or Road Building mode from the bottom bar builds immediately.
+  if (state.phase === 'SETUP_ROAD' || buildMode === 'road') {
+    setSelectedBoardVertexId(null);
+    setSelectedBoardEdgeId(null);
+    setBuildModeValue(null);
+    socket.emit('clickEdge', { code: state.code, edgeId });
+    return;
+  }
+
+  // Otherwise, clicking a connected road spot on the hex board toggles the on-board road recipe + build popup.
+  if (e && !e.road && canInspectRoadSpot(e, me)) {
+    setSelectedBoardEdgeId(selectedBoardEdgeId === edgeId ? null : edgeId);
+    playTone(500, 0.04);
+    renderBoard(me, Boolean(isMyTurn));
+    return;
+  }
+
+  setSelectedBoardVertexId(null);
+  setSelectedBoardEdgeId(null);
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
 }
@@ -772,8 +1045,21 @@ export function triggerRobberMoveAnimation(fromHexId: number, toHexId: number): 
   }, flightMs);
 }
 
+function syncInFlightUi(): void {
+  if (!state) return;
+  const me = state.players.find(p => p.id === socket.id);
+  const current = state.players[state.turnIndex];
+  const isMyTurn = !!current && current.id === socket.id;
+  renderHand(me, isMyTurn);
+  renderSidebar();
+  syncBoardBuildPopup();
+}
+
 function getTransferTargetEl(actorId: string, resource: string, kind: string): HTMLElement | null {
   if (actorId === socket.id) {
+    if (resource && resource !== 'dev' && resource !== 'mystery') {
+      return document.querySelector<HTMLElement>(`#myHandPanel .card-${resource}`) || document.getElementById('myHandPanel');
+    }
     return document.getElementById('myHandPanel');
   }
   if (actorId === 'bank') {
@@ -827,6 +1113,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
   }
 
   let delay = 0;
+  let heldAny = false;
   transfers.forEach((tr, groupIdx) => {
     const fromEl = getTransferTargetEl(tr.from, tr.resource, tr.kind);
     const toEl = getTransferTargetEl(tr.to, tr.resource, tr.kind);
@@ -842,7 +1129,9 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
 
     // Slight vertical offset so simultaneous bidirectional trade cards don't overlap identically
     const curveOffset = (groupIdx % 2 === 0 ? -1 : 1) * 14;
-    const count = Math.min(tr.amount || 1, 4);
+    const totalAmount = Math.max(1, tr.amount || 1);
+    const count = Math.min(totalAmount, 4);
+    const isIncomingToPlayer = Boolean(tr.to && tr.to !== 'bank');
 
     // If bankTrade or buyDev receiving from bank, add a slight beat after the payment cards fly in
     const baseGroupDelay = (tr.from === 'bank' && (tr.kind === 'bankTrade' || tr.kind === 'buyDev'))
@@ -850,6 +1139,19 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
       : 0;
 
     for (let i = 0; i < count; i++) {
+      const cardAmount = i === count - 1
+        ? totalAmount - Math.floor(totalAmount / count) * (count - 1)
+        : Math.floor(totalAmount / count);
+
+      if (isIncomingToPlayer) {
+        heldAny = true;
+        if (tr.resource === 'dev') {
+          addInFlightDev(tr.to, socket.id, cardAmount);
+        } else {
+          addInFlightResource(tr.to, socket.id, tr.resource, cardAmount);
+        }
+      }
+
       const d = delay + baseGroupDelay;
       delay += stepDelay;
       setTimeout(() => {
@@ -884,14 +1186,26 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
           });
         });
 
-        // Land, then vanish at once (short fade, no lingering).
+        // Land: reveal the card in hand/sidebar right as the flying card arrives, then fade out.
         setTimeout(() => {
+          if (isIncomingToPlayer) {
+            if (tr.resource === 'dev') {
+              releaseInFlightDev(tr.to, socket.id, cardAmount);
+            } else {
+              releaseInFlightResource(tr.to, socket.id, tr.resource, cardAmount);
+            }
+            syncInFlightUi();
+          }
           cardEl.style.opacity = '0';
           setTimeout(() => cardEl.remove(), 100);
         }, flightMs);
       }, d);
     }
   });
+
+  if (heldAny) {
+    syncInFlightUi();
+  }
 }
 
 export function triggerFlyingResourceAnimations(productions: any[]): void {
@@ -905,6 +1219,7 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
   const stepDelay = Math.max(30, Math.round(110 / speed));
 
   let delay = 0;
+  let heldAny = false;
   productions.forEach(prod => {
     const hex = state.board.hexes[prod.hexId];
     if (!hex) return;
@@ -916,7 +1231,7 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
 
     let targetEl: HTMLElement | null = null;
     if (prod.playerId === socket.id) {
-      targetEl = document.getElementById('myHandPanel');
+      targetEl = document.querySelector<HTMLElement>(`#myHandPanel .card-${prod.resource}`) || document.getElementById('myHandPanel');
     } else {
       targetEl = document.getElementById(`playerRow_${prod.playerId}`);
     }
@@ -925,8 +1240,16 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
     const targetX = rect.left + rect.width / 2 - 24;
     const targetY = rect.top + rect.height / 2 - 33;
 
-    const cardsToFly = Math.min(prod.amount || 1, 3);
+    const totalAmount = Math.max(1, prod.amount || 1);
+    const cardsToFly = Math.min(totalAmount, 3);
     for (let i = 0; i < cardsToFly; i++) {
+      const cardAmount = i === cardsToFly - 1
+        ? totalAmount - Math.floor(totalAmount / cardsToFly) * (cardsToFly - 1)
+        : Math.floor(totalAmount / cardsToFly);
+
+      heldAny = true;
+      addInFlightResource(prod.playerId, socket.id, prod.resource, cardAmount);
+
       const d = delay;
       delay += stepDelay;
       setTimeout(() => {
@@ -950,10 +1273,16 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
         });
 
         setTimeout(() => {
+          releaseInFlightResource(prod.playerId, socket.id, prod.resource, cardAmount);
+          syncInFlightUi();
           cardEl.style.opacity = '0';
           setTimeout(() => cardEl.remove(), 100);
         }, flightMs);
       }, d);
     }
   });
+
+  if (heldAny) {
+    syncInFlightUi();
+  }
 }

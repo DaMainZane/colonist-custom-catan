@@ -8,6 +8,8 @@ export let mapOptions: MapOptionsView | null = null;
 export let soundOn = true;
 export let isMouseDown = false;
 export let buildMode: string | null = null;
+export let selectedBoardVertexId: number | null = null;
+export let selectedBoardEdgeId: number | null = null;
 export let drawerMode: string | null = null;
 export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
@@ -25,6 +27,51 @@ export const tradeGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore
 export const tradeWant: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 export const discardSel: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 
+// Cards currently flying toward a player's hand or row; held back from display until each flying card lands.
+export const inFlightHandResources: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+export const inFlightPlayerResCount: Record<string, number> = {};
+export const inFlightPlayerDevCount: Record<string, number> = {};
+export let inFlightMyDevCards = 0;
+
+export function addInFlightResource(playerId: string, myId: string | undefined, resource: string, amount: number): void {
+  if (!playerId || amount <= 0) return;
+  inFlightPlayerResCount[playerId] = (inFlightPlayerResCount[playerId] || 0) + amount;
+  if (playerId === myId && resource in inFlightHandResources) {
+    inFlightHandResources[resource] = (inFlightHandResources[resource] || 0) + amount;
+  }
+}
+
+export function releaseInFlightResource(playerId: string, myId: string | undefined, resource: string, amount: number): void {
+  if (!playerId || amount <= 0) return;
+  inFlightPlayerResCount[playerId] = Math.max(0, (inFlightPlayerResCount[playerId] || 0) - amount);
+  if (playerId === myId && resource in inFlightHandResources) {
+    inFlightHandResources[resource] = Math.max(0, (inFlightHandResources[resource] || 0) - amount);
+  }
+}
+
+export function addInFlightDev(playerId: string, myId: string | undefined, amount: number): void {
+  if (!playerId || amount <= 0) return;
+  inFlightPlayerDevCount[playerId] = (inFlightPlayerDevCount[playerId] || 0) + amount;
+  if (playerId === myId) {
+    inFlightMyDevCards += amount;
+  }
+}
+
+export function releaseInFlightDev(playerId: string, myId: string | undefined, amount: number): void {
+  if (!playerId || amount <= 0) return;
+  inFlightPlayerDevCount[playerId] = Math.max(0, (inFlightPlayerDevCount[playerId] || 0) - amount);
+  if (playerId === myId) {
+    inFlightMyDevCards = Math.max(0, inFlightMyDevCards - amount);
+  }
+}
+
+export function clearAllInFlight(): void {
+  for (const k of Object.keys(inFlightHandResources)) inFlightHandResources[k] = 0;
+  for (const k of Object.keys(inFlightPlayerResCount)) delete inFlightPlayerResCount[k];
+  for (const k of Object.keys(inFlightPlayerDevCount)) delete inFlightPlayerDevCount[k];
+  inFlightMyDevCards = 0;
+}
+
 // Counter-offer draft (the trade popup's edit mode). Both sides are from my point of view.
 export let counterTradeId: number | null = null;
 export const counterGet: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
@@ -37,7 +84,21 @@ export function setState(s: GameState): void { state = s; }
 export function setMapOptions(v: MapOptionsView | null): void { mapOptions = v; }
 export function setSoundOn(v: boolean): void { soundOn = v; }
 export function setIsMouseDown(v: boolean): void { isMouseDown = v; }
-export function setBuildModeValue(v: string | null): void { buildMode = v; }
+export function setBuildModeValue(v: string | null): void {
+  buildMode = v;
+  if (v !== null) {
+    selectedBoardVertexId = null;
+    selectedBoardEdgeId = null;
+  }
+}
+export function setSelectedBoardVertexId(v: number | null): void {
+  selectedBoardVertexId = v;
+  if (v !== null) selectedBoardEdgeId = null;
+}
+export function setSelectedBoardEdgeId(v: number | null): void {
+  selectedBoardEdgeId = v;
+  if (v !== null) selectedBoardVertexId = null;
+}
 export function setDrawerMode(v: string | null): void { drawerMode = v; }
 export function setVictoryTab(v: string): void { victoryTab = v; }
 export function setHideVictoryOverlay(v: boolean): void { hideVictoryOverlay = v; }
@@ -53,4 +114,5 @@ export function clearRes(r: Resources): void {
 export function getClientSpeed(): number {
   return 0.5;
 }
+
 

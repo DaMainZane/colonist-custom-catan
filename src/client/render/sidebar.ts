@@ -2,7 +2,7 @@
 import { RESOURCES } from '../constants';
 import { getMiniSvg, uiIcon } from '../icons';
 import { socket } from '../socket';
-import { state } from '../store';
+import { state, inFlightPlayerResCount, inFlightPlayerDevCount } from '../store';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 
@@ -93,7 +93,9 @@ export function renderSidebar(): void {
   stackEl.innerHTML = state.players.map((p, idx) => {
     const isVictim = canPickVictim && victimSet.has(p.id);
     const isTurn = idx === state.turnIndex && state.status !== 'LOBBY';
-    const overLimit = p.resourceCount > state.settings.cardDiscardLimit;
+    const shownResCount = Math.max(0, p.resourceCount - (inFlightPlayerResCount[p.id] || 0));
+    const shownDevCount = Math.max(0, p.devCardCount - (inFlightPlayerDevCount[p.id] || 0));
+    const overLimit = shownResCount > state.settings.cardDiscardLimit;
     const tags = [
       p.isBot ? botTag(p) : '',
       isVictim ? '<span class="tag danger">Rob</span>' : '',
@@ -117,8 +119,8 @@ export function renderSidebar(): void {
       </div>
       <div class="p-vp">${vpHtml}<small>VP</small></div>
       <div class="p-stats">
-        <span class="stat ${overLimit ? 'warn' : ''}" title="Resource cards">${uiIcon('cards', 14)}${p.resourceCount}</span>
-        <span class="stat dev" title="Development cards">${uiIcon('devcard', 14)}${p.devCardCount}</span>
+        <span class="stat ${overLimit ? 'warn' : ''}" title="Resource cards">${uiIcon('cards', 14)}${shownResCount}</span>
+        <span class="stat dev" title="Development cards">${uiIcon('devcard', 14)}${shownDevCount}</span>
         <span class="stat" title="Knights played">${uiIcon('sword', 14)}${p.knightsPlayed}</span>
         <span class="stat" title="Longest road">${uiIcon('road', 14)}${p.longestRoadLength}</span>
       </div>

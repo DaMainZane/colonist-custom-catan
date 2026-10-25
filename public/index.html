@@ -229,6 +229,7 @@
       <!-- Board -->
       <svg id="boardSvg" viewBox="-500 -450 1000 900"></svg>
       <div id="roadHoverTooltip" class="road-hover-tooltip"></div>
+      <div id="boardBuildPopup" class="board-build-popup" style="display:none;"></div>
 
       <!-- Bottom-left sheet and trade confirm buttons -->
       <div id="inlineDrawerWrap">
@@ -261,18 +262,22 @@
           <button class="act-btn" id="btnTradeDrawer" onclick="toggleTradeDrawer()" title="Trade">
             <span data-icon="swap" data-size="22"></span><span class="lbl">Trade</span>
           </button>
-          <button class="act-btn" id="btnBuyDev" onclick="buyDevCard()" title="Buy dev card (1 sheep, 1 wheat, 1 ore)">
+          <button class="act-btn has-recipe" id="btnBuyDev" onclick="buyDevCard()">
+            <div class="btn-recipe-popup" id="recipePopupDev"></div>
             <span data-icon="devbuy" data-size="22"></span><span class="lbl">Dev</span>
           </button>
-          <button class="act-btn" id="btnBuildRoad" onclick="setBuildMode('road')" title="Build road (1 wood, 1 brick)">
+          <button class="act-btn has-recipe" id="btnBuildRoad" onclick="setBuildMode('road')">
+            <div class="btn-recipe-popup" id="recipePopupRoad"></div>
             <span class="piece-badge" id="badgeRoadCnt">15</span>
             <span data-icon="road" data-size="22"></span><span class="lbl">Road</span>
           </button>
-          <button class="act-btn" id="btnBuildSettle" onclick="setBuildMode('settlement')" title="Build settlement (1 wood, 1 brick, 1 sheep, 1 wheat)">
+          <button class="act-btn has-recipe" id="btnBuildSettle" onclick="setBuildMode('settlement')">
+            <div class="btn-recipe-popup" id="recipePopupSettle"></div>
             <span class="piece-badge" id="badgeSettleCnt">5</span>
             <span data-icon="house" data-size="22"></span><span class="lbl">Settle</span>
           </button>
-          <button class="act-btn" id="btnBuildCity" onclick="setBuildMode('city')" title="Build city (2 wheat, 3 ore)">
+          <button class="act-btn has-recipe" id="btnBuildCity" onclick="setBuildMode('city')">
+            <div class="btn-recipe-popup" id="recipePopupCity"></div>
             <span class="piece-badge" id="badgeCityCnt">4</span>
             <span data-icon="city" data-size="22"></span><span class="lbl">City</span>
           </button>

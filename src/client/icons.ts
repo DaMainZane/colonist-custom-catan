@@ -218,7 +218,7 @@ export function settlementMarkup(col: string): string {
     { d: 'M-8.5,-2 H8.5 V10 H-8.5 Z', fill: col },
     { d: 'M-11.5,-1.5 L0,-12.5 L11.5,-1.5 Z', fill: shade(col, 0.7) },
     { d: 'M-2.3,3.2 H2.3 V10 H-2.3 Z', fill: LIGHT }
-  ]);
+  ], 3.8);
 }
 
 // Tower plus house, about 1.35x the settlement so the two are never confused at small sizes.
@@ -232,7 +232,7 @@ export function cityMarkup(col: string): string {
     { d: 'M-11,-2 H-6 V2 H-11 Z', fill: LIGHT },
     { d: 'M-11,5 H-6 V9 H-11 Z', fill: LIGHT },
     { d: 'M3,5 H8 V11 H3 Z', fill: LIGHT }
-  ]);
+  ], 3.8);
 }
 
 export function robberMarkup(): string {

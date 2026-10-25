@@ -3,10 +3,43 @@ import { RESOURCES, RES_META, DEV_META } from '../constants';
 import { getMiniSvg, getDevSvg, buildOverlappingStackHtml } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
-import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive } from '../store';
+import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive, inFlightHandResources, inFlightMyDevCards } from '../store';
 import { renderInlineDrawer } from './drawer';
 import { adjustCounter } from './trade';
 import { esc } from '../util';
+
+export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', string[]> = {
+  dev: ['sheep', 'wheat', 'ore'],
+  road: ['wood', 'brick'],
+  settlement: ['wood', 'brick', 'sheep', 'wheat'],
+  city: ['wheat', 'wheat', 'ore', 'ore', 'ore']
+};
+
+export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' | 'city', me: any): string {
+  const list = BUILD_RECIPES[recipeKey];
+  const seen: Record<string, number> = {};
+  const hand = me?.resources || {};
+  const cardsHtml = list.map(r => {
+    seen[r] = (seen[r] || 0) + 1;
+    const avail = Math.max(0, (hand[r] || 0) - (inFlightHandResources[r] || 0));
+    const hasIt = avail >= seen[r];
+    return `<div class="recipe-mini-card card-${r} ${hasIt ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
+  }).join('');
+  return `<div class="recipe-cards-strip">${cardsHtml}</div>`;
+}
+
+function updateActionRecipePopups(me: any): void {
+  const map: Array<[string, 'dev' | 'road' | 'settlement' | 'city']> = [
+    ['recipePopupDev', 'dev'],
+    ['recipePopupRoad', 'road'],
+    ['recipePopupSettle', 'settlement'],
+    ['recipePopupCity', 'city']
+  ];
+  for (const [id, key] of map) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = renderRecipeStripHtml(key, me);
+  }
+}
 
 // One dev card type: purple card with a cream glyph. Accent ring = playable now, faded + NEW = bought this turn.
 function devCardHtml(type: string, oldCount: number, newCount: number, canPlay: boolean): string {
@@ -25,6 +58,7 @@ function devCardHtml(type: string, oldCount: number, newCount: number, canPlay: 
 }
 
 export function renderHand(me: any, isMyTurn: boolean): void {
+  updateActionRecipePopups(me);
   const panel = document.getElementById('myHandPanel')!;
   if (!me || !me.resources) {
     panel.innerHTML = '<span class="hand-empty">Spectating</span>';
@@ -32,8 +66,8 @@ export function renderHand(me: any, isMyTurn: boolean): void {
   }
 
   let resHtml = RESOURCES.map(r => {
-    // When discarding or trading, subtract cards currently placed in the tray so they visually move
-    let count = me.resources[r] || 0;
+    // Hold back cards that are still flying toward the hand, plus cards placed in the active tray/counter
+    let count = Math.max(0, (me.resources[r] || 0) - (inFlightHandResources[r] || 0));
     if (drawerMode === 'discard') count = Math.max(0, count - (discardSel[r] || 0));
     else if (drawerMode === 'trade') count = Math.max(0, count - (tradeGive[r] || 0));
     // Cards placed in a counter offer also leave the hand view.
@@ -58,7 +92,10 @@ export function renderHand(me: any, isMyTurn: boolean): void {
   }).join('');
 
   const oldDevs: string[] = me.devCards || [];
-  const newDevs: string[] = me.newDevCards || [];
+  const rawNewDevs: string[] = me.newDevCards || [];
+  const newDevs: string[] = inFlightMyDevCards > 0
+    ? rawNewDevs.slice(0, Math.max(0, rawNewDevs.length - inFlightMyDevCards))
+    : rawNewDevs;
   const oldCounts: Record<string, number> = {};
   const newCounts: Record<string, number> = {};
   oldDevs.forEach(c => { oldCounts[c] = (oldCounts[c] || 0) + 1; });

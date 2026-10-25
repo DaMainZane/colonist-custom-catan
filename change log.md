@@ -1,11 +1,20 @@
 # Change Log
 
-## 2026-10-25 (Pass 17: Required nickname input, your-turn chime, unified victory icons, 0.5x speed lock & victory screen optimization)
+## 2026-10-25 (Pass 17: Road length tooltip, build recipe popups, required nickname, your-turn chime, unified victory icons & victory screen optimization)
 ### Added
+- **Road Length Speech-Bubble Tooltip on Hover** (`src/client/render/board.ts`, `src/client/styles.css`):
+  - Hovering any road on the board now shows a centered dark speech-bubble tooltip with a downward pointer arrow (`Road Length: <N>`) directly above the hovered road, along with the connected road network halo.
+- **On-Board Road, Settlement & City Click Build + Recipe Popup** (`public/index.html`, `src/client/store.ts`, `src/client/render/board.ts`, `src/client/render/hand.ts`, `src/client/main.ts`, `src/client/styles.css`):
+  - Clicking your own settlement, a road-connected empty settlement vertex, or a buildable road edge on the hex board highlights the spot with a glowing white circle (`.vertex-select-glow`) and opens a floating `#boardBuildPopup` directly above the vertex or road midpoint.
+  - Displays the square Road, Settlement, or City build button (with remaining piece badge) and the horizontal resource card recipe strip (`[wood][brick]` for Road, `[wood][brick][sheep][wheat]` for Settlement, `[wheat][wheat][ore][ore][ore]` for City) where cards currently held in hand are lit (`has-res`) and missing cards are dimmed (`lacks-res`).
+- **Action Bar Hover Recipe Popups (Dev, Road, Settlement, City)** (`public/index.html`, `src/client/render/hand.ts`, `src/client/styles.css`):
+  - Hovering `#btnBuyDev` (`[sheep][wheat][ore]`), `#btnBuildRoad` (`[wood][brick]`), `#btnBuildSettle` (`[wood][brick][sheep][wheat]`), or `#btnBuildCity` (`[wheat][wheat][ore][ore][ore]`) in the bottom action bar displays its resource card recipe strip directly above the button (even when the button is disabled), highlighting owned vs. missing cards in real time.
 - **Your Turn Sound Effect** (`src/client/audio.ts`, `src/client/main.ts`):
   - Added `playYourTurnSound()` (warm two-note rising notification chime) that plays whenever an active game turn transitions from another player (or lobby) to the local player.
 - **Unified 24×24 Pictogram Icons for Victory Screen** (`src/client/icons.ts`, `src/client/render/index.ts`, `src/client/styles.css`):
   - Added flat `UI_ICONS` (`star`, `robber`, `gift`, `crown`, `tree`, `bricks`, `wool`, `grain`, `rock`) so every column header across all 5 matrix tabs (`Overview`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) renders a uniform `20×20` `uiIcon(...)` inside an identical `34×34` `.vic-head-badge` container (with `.vic-head-badge.primary` accent styling on primary total columns).
+- **Zoom-Adaptive Settlement & City Scaling** (`src/client/render/board.ts`, `src/client/icons.ts`, `src/client/styles.css`):
+  - Settlements and cities now scale up dynamically via `--building-scale` (`.building-zoom-scale`) as the camera zooms out or when viewing larger boards (from `1.22x` at standard zoom up to `2.35x` when zoomed out), with a thicker `3.8` light rim so all players' buildings remain clearly visible at any zoom level.
 
 ### Changed
 - **Required Player Nickname Input** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`):
@@ -18,6 +27,11 @@
   - Added `#gameViewport.victory-modal-open #boardSvg * { animation-play-state: paused !important; }` to pause underlying SVG animations while the victory modal is open.
   - Memoized `renderVictoryScreen()` (`lastVicRenderKey`) and skipped redundant `renderBoard()` rebuilds while `#victoryOverlay` covers the viewport.
   - Streamlined `triggerVictoryConfetti()` to a 1x resolution cap (`<= 1280px`), 80 lightweight rectangle particles using direct `ctx.setTransform` + `fillRect`, and a 2.8s duration.
+
+### Fixed
+- **Resource & Dev Card Hand Arrival Timing** (`src/client/store.ts`, `src/client/render/board.ts`, `src/client/render/hand.ts`, `src/client/render/sidebar.ts`, `src/client/main.ts`):
+  - Newly produced or transferred cards are no longer shown immediately in `#myHandPanel` (or the sidebar player card counts) while their flying card animation is still in mid-air.
+  - Added `inFlightHandResources`, `inFlightPlayerResCount`, `inFlightPlayerDevCount`, and `inFlightMyDevCards` tracking in `store.ts`: each flying card holds back its card count until the exact moment its flight transition finishes (`flightMs`), then releases it and re-renders the hand and sidebar as the flying card lands.
 
 ## 2026-10-25 (Pass 16: Map Generation finishing pass)
 ### Changed

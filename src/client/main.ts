@@ -6,13 +6,13 @@ import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   activeBrush, hasDraggedMap,
   setState, setIsMouseDown, setIsPanning, setHasDraggedMap, setCamZoom, setCamPan, setDrawerMode,
-  setHideVictoryOverlay, clearRes
+  setHideVictoryOverlay, clearRes, clearAllInFlight
 } from './store';
 import { renderAll } from './render/index';
 import {
   rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations, triggerCardTransferAnimations,
   triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
-  onRoadHover, onRoadMove, onRoadLeave
+  onRoadHover, onRoadMove, onRoadLeave, confirmBoardVertexBuild, confirmBoardEdgeBuild, closeBoardBuildPopup
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade, startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed } from './render/trade';
 import { initCursors } from './cursors';
@@ -51,7 +51,7 @@ Object.assign(window as any, {
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
-  onRoadHover, onRoadMove, onRoadLeave
+  onRoadHover, onRoadMove, onRoadLeave, confirmBoardVertexBuild, confirmBoardEdgeBuild, closeBoardBuildPopup
 });
 
 function animateDice(sum?: number): void {
@@ -97,6 +97,9 @@ socket.on('gameState', (newState: any) => {
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
   setState(newState);
+  if (state.status === 'LOBBY') {
+    clearAllInFlight();
+  }
   // Back in the lobby after a game: fold the menus away so nothing overlaps; the settings button reopens the dock.
   if (!wasLobby && state.status === 'LOBBY') {
     collapseLobbyUi();
@@ -242,8 +245,13 @@ function init(): void {
       e.stopPropagation();
       e.preventDefault();
       setHasDraggedMap(false);
+      return;
     }
-  }, true);
+    const target = e.target as Element | null;
+    if (target && !target.closest('#boardBuildPopup')) {
+      closeBoardBuildPopup();
+    }
+  }, false);
   stage.addEventListener('contextmenu', e => e.preventDefault());
   initCursors();
 }
