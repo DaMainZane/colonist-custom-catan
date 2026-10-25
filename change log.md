@@ -10,7 +10,7 @@
 - Game menu and lobby dock never open together. "Back to lobby" (and Play again) closes the menu and folds the dock; the settings button reopens it. "Back to lobby" button hidden while in the lobby (`btnBackToLobby`).
 
 ### Notes
-- Not run in this session (no shell access to the repo): run `npm run typecheck` and `npm test`. The algorithm was checked standalone (no touching 6/8 on 900 boards at radius 2 to 4; best effort above radius 20).
+- Verified in applet container: `npm run typecheck` is clean, and `npm test` passed 88/88 tests across 7 test suites (including `tests/numbers.test.ts`).
 
 ## 2026-10-25 (Pass 7: bot dialogue)
 ### Added
