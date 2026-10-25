@@ -1,6 +1,7 @@
 // MODULE: lobby board tools (generate, presets, paint terrain/numbers/robber/ports) on the engine board | USED BY: server/socket, server/rooms
 import { buildTopology, createRng, generateBoard, hexDistance, randomSeed } from '../shared';
 import type { Board, HexInit } from '../shared';
+import { normalizeBotChat } from './bots/dialogue/events';
 import { fullRules, registry } from './runtime';
 import type { Settings } from './types';
 import { clamp } from './util';
@@ -42,7 +43,8 @@ export function mergeSettings(input: any, old: Settings): Settings {
     gameSpeed,
     turnTimerSec: clamp(s.turnTimerSec, 0, 900, old.turnTimerSec ?? 0),
     turnIncrementSec: clamp(s.turnIncrementSec, 0, 120, old.turnIncrementSec ?? 0),
-    tradeTimerSec: clamp(s.tradeTimerSec, 5, 300, old.tradeTimerSec ?? 20)
+    tradeTimerSec: clamp(s.tradeTimerSec, 5, 300, old.tradeTimerSec ?? 20),
+    botChat: normalizeBotChat(s.botChat, old.botChat)
   };
 }
 

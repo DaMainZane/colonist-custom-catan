@@ -122,6 +122,7 @@ export function pushSettings(): void {
       turnTimerSec: val('setTurnTime'),
       turnIncrementSec: val('setTurnInc'),
       tradeTimerSec: val('setTradeTime'),
+      botChat: val('setBotChat'),
       goldTiles: val('setGold'),
       desertTiles: val('setDesert'),
       fogTiles: val('setFog'),

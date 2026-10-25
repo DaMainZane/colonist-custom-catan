@@ -46,6 +46,7 @@ export function renderAll(): void {
     setVal('setTurnTime', s.turnTimerSec ?? 0);
     setVal('setTurnInc', s.turnIncrementSec ?? 0);
     setVal('setTradeTime', s.tradeTimerSec ?? 20);
+    if (document.getElementById('setBotChat')) setVal('setBotChat', s.botChat ?? 'normal');
     setVal('setGold', s.goldTiles);
     setVal('setDesert', s.desertTiles);
     if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
@@ -178,13 +179,16 @@ export function renderVictoryScreen(): void {
       if ((ds[n] || 0) > maxCount) maxCount = ds[n];
     }
 
+    // Pixel heights: percentage heights overflowed the column for the tallest bars and the flex layout squashed them to the same height.
+    const BAR_MAX_PX = 170;
     let barsHtml = '';
     for (let n = 2; n <= 12; n++) {
       const c = ds[n] || 0;
-      const heightPct = Math.max(8, Math.round((c / maxCount) * 100));
+      const heightPx = c > 0 ? Math.max(3, Math.round((c / maxCount) * BAR_MAX_PX)) : 0;
       barsHtml += `
         <div class="dice-bar-col">
-          <div class="dice-bar-fill ${n === 7 ? 'is-seven' : ''}" style="height:${heightPct}%">${c > 0 ? c : ''}</div>
+          <span class="dice-bar-count">${c > 0 ? c : ''}</span>
+          <div class="dice-bar-fill ${n === 7 ? 'is-seven' : ''}" style="height:${heightPx}px"></div>
           <span class="dice-bar-label">${n}</span>
         </div>
       `;

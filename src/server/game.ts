@@ -1,7 +1,7 @@
 // MODULE: game runner (start/rematch, dispatch one action, turn engine events into client effects) | USED BY: server/socket, bots/scheduler
 import { PLAYER_COLORS, createGame, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
-import { emitBotDialogue } from './bots/dialogue';
+import { emitBotDialogue, emitGameStartDialogue } from './bots/dialogue';
 import { noteBotEvents } from './bots/brain';
 import { newBoard } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
@@ -73,6 +73,7 @@ export function startGame(room: Room): string | null {
   room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [] };
   room.startedAt = Date.now();
   room.finishedAt = null;
+  emitGameStartDialogue(room);
   return null;
 }
 

@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-10-25 (Pass 7: bot dialogue)
+### Added
+- New bot dialogue engine in `src/server/bots/dialogue/` (`index.ts`, `engine.ts`, `context.ts`, `events.ts`, `types.ts`) with the line data in `lines/` (`roll`, `robber`, `build`, `awards`, `trade`, `table`). `bots/dialogue.ts` is now a re-export, so `game.ts` and `socket.ts` imports did not change.
+- 40 events across Main / Secondary / Overload voices. Lines are plain data with `{slots}`, `{a|b}` alternation, composed opener + core + closer lines (busiest events), plain-data conditions (leader or trailing, VP left, map traits, over the discard limit, other player is leader or newcomer) and personality overlays.
+- Leak rules enforced in code: the context is built from public information only (card counts and shown VP, never hands, dev card types or hidden VP). Steal, robbed, discard, dev-buy and one-VP-left lines are `risk: 'private'` and get no resource slot; `{res}` exists only for Monopoly and bank-empty.
+- Repeat memory (a bot skips its last 8 variants, the room skips the last 12), per-event chance, room gap, per-bot cooldown, game-speed scaling, 120 character cap.
+- Host setting **Bot chat: Off / Quiet / Normal / Chatty** (Rules and cards, Bots). Setting is `botChat`; unset means Normal. Off silences every bot line and the chat replies; Quiet also turns the chat replies off.
+- New triggers: game start, large map, islands, fog reveal, bank runs dry, trade declined (leader variant), trade accepted, countered, no takers, one VP from winning (not Overload), human near winning, robber on a number, awards lost, other player wins.
+- Replies to human chat (`reactToChat`, called from `sendChat`): hello, gg, thanks, lol, a bot's name. Canned, never about game state, one reply per 12 seconds.
+- `tests/dialogue.test.ts`: line data rules, leak rules (resource-word scan, `context.ts` source scan), picker, chat level and rate limits, game hooks, chat replies, `mergeSettings`.
+
+### Changed
+- `mergeSettings` keeps `botChat` (`normalizeBotChat`). Client: `setBotChat` select in `public/index.html`, sent by `pushSettings` (`actions.ts`), filled in `renderAll` (`render/index.ts`).
+
+### Notes
+- Not run in this session (no shell access to the repo): run `npm run typecheck` and `npm test`. If a hook test fails, check the engine event names and data fields used in `bots/dialogue/index.ts` first.
+- Not done: the "human's turn timer is low" line (needs a hook in `turnClock.ts`). Callbacks to earlier events and nemesis lines stay out of scope (`Bot Dialogue Design.md` section 11).
+
 ## 2026-10-25 (Pass 6: default bot)
 ### Added
 - Bot difficulty tiers **Main / Secondary / Overload**, chosen per bot. Host picks the tier in the dropdown next to the Bot button and can change it in the lobby by clicking the `Bot · Tier` tag. Socket events `addBot {tier}` and `setBotTier`. A bot that replaces a disconnected human is Secondary (closest to the old Hard bot).
@@ -12,6 +30,10 @@
 ### Changed
 - Bot chat style and think delay follow the tier.
 - Lobby log tells the host new bots are Main by default.
+
+### Fixed
+- Offering a trade for a resource nobody holds (bank plus your own hand already equal the full supply) now shows "No one has any X to trade." instead of sending an offer that closes at once. Client-side check in `proposePlayerTrade` (`render/drawer.ts`).
+- End-game dice chart: the tallest bars were squashed to one height (percentage heights overflowed the column). Bars are now pixel-scaled against the highest count, with the count above the bar.
 
 ### Notes
 - Not run in this session (no shell access to the repo): run `npm run typecheck` and `npm test`, then `runLadder` to tune the tier numbers. All numbers in `Bot AI Design.md` section 2 are starting guesses.

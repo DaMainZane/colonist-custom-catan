@@ -10,6 +10,7 @@ import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
 import { registry } from './runtime';
 import { DEFAULT_TIER, TAKEOVER_TIER, normalizeTier, tierLabel } from './bots/tiers';
+import { reactToChat } from './bots/dialogue';
 
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
 
@@ -262,8 +263,10 @@ export function registerSocketHandlers(io: Server): void {
       if (!room || !text) return;
       const me = room.game ? room.game.players.find(p => p.id === socket.id) : room.lobbyPlayers.find(p => p.id === socket.id);
       if (!me) return;
-      room.chats.push({ sender: me.name, avatar: me.avatar, color: me.color, text: String(text).trim().substring(0, 120) });
+      const said = String(text).trim().substring(0, 120);
+      room.chats.push({ sender: me.name, avatar: me.avatar, color: me.color, text: said });
       if (room.chats.length > 60) room.chats.shift();
+      reactToChat(room, socket.id, said);
       broadcastRoom(room);
     }));
 

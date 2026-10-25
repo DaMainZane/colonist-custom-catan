@@ -1,5 +1,6 @@
 // MODULE: server room types (lobby settings, room, client-facing effects) | USED BY: server/*, bots, sim
 import type { Board, GameState } from '../shared';
+import type { BotChatLevel } from './bots/dialogue/types';
 
 /** Lobby settings the client edits. The adapter maps them to engine rules (runtime.rulesFromSettings). */
 export interface Settings {
@@ -26,6 +27,8 @@ export interface Settings {
   turnIncrementSec?: number;
   /** Seconds a human-proposed trade offer stays open. */
   tradeTimerSec?: number;
+  /** How much bots talk: off, quiet, normal (default) or chatty. Host only. */
+  botChat?: BotChatLevel;
 }
 
 export interface LobbyPlayer {

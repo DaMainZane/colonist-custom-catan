@@ -821,9 +821,9 @@ svg#boardSvg:active { cursor: grabbing; }
 .dice-bar-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
 .dice-bar-fill {
   width: 100%; border-radius: 5px 5px 2px 2px; background: var(--accent); color: var(--on-accent);
-  display: flex; align-items: flex-start; justify-content: center; padding-top: 4px; font-size: 11px; font-weight: 700;
-  min-height: 18px; transition: height 0.4s ease;
+  flex-shrink: 0; transition: height 0.4s ease;
 }
+.dice-bar-count { font-size: 11px; font-weight: 700; min-height: 14px; line-height: 14px; flex-shrink: 0; }
 .dice-bar-fill.is-seven { background: #6f777e; color: #fff; }
 .vic-table { width: 100%; background: rgba(255, 255, 255, 0.06); border-radius: var(--r); padding: 14px; }
 .vic-table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); align-items: center; }

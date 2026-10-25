@@ -216,6 +216,17 @@
               <label class="field" title="How long a trade offer stays open.">Trade offer (sec)<input id="setTradeTime" type="number" class="num" value="20" min="5" max="300" onchange="pushSettings()" /></label>
             </div>
             <div class="rule-group">
+              <h4>Bots</h4>
+              <label class="field" title="How much bots talk in chat. Off also stops their replies to your messages.">Bot chat
+                <select id="setBotChat" class="num" onchange="pushSettings()">
+                  <option value="off">Off</option>
+                  <option value="quiet">Quiet</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="chatty">Chatty</option>
+                </select>
+              </label>
+            </div>
+            <div class="rule-group">
               <h4>Special tiles</h4>
               <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="0" min="0" max="500" onchange="pushSettings()" /></label>
               <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>
