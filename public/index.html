@@ -205,6 +205,12 @@
               <label class="field">Discard above<input id="setDiscard" type="number" class="num" value="7" min="3" max="50" onchange="pushSettings()" /></label>
             </div>
             <div class="rule-group">
+              <h4>Timers</h4>
+              <label class="field" title="Seconds per turn. 0 = no turn timer.">Turn time (sec, 0 = off)<input id="setTurnTime" type="number" class="num" value="0" min="0" max="900" onchange="pushSettings()" /></label>
+              <label class="field" title="Seconds added to your turn each time you complete an action.">+ sec per action<input id="setTurnInc" type="number" class="num" value="0" min="0" max="120" onchange="pushSettings()" /></label>
+              <label class="field" title="How long a trade offer stays open.">Trade offer (sec)<input id="setTradeTime" type="number" class="num" value="20" min="5" max="300" onchange="pushSettings()" /></label>
+            </div>
+            <div class="rule-group">
               <h4>Special tiles</h4>
               <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="0" min="0" max="500" onchange="pushSettings()" /></label>
               <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>

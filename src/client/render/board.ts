@@ -433,7 +433,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
 
-  html += `<g id="roadRimsLayer">${roadRimsHtml}</g><g id="roadBodiesLayer">${roadBodiesHtml}</g><g id="roadHighlightLayer"></g><g id="roadHitsLayer">${roadHitsHtml}</g>${roadSpotsHtml}`;
+  html += `<g id="roadHighlightLayer"></g><g id="roadRimsLayer">${roadRimsHtml}</g><g id="roadBodiesLayer">${roadBodiesHtml}</g><g id="roadHitsLayer">${roadHitsHtml}</g>${roadSpotsHtml}`;
 
   // Settlements, cities and settlement spots
   const robberVictimSet = new Set<string>(state.robberVictims || []);
@@ -615,16 +615,17 @@ export function onRoadHover(edgeId: number, ev?: MouseEvent): void {
   const tooltip = document.getElementById('roadHoverTooltip');
   if (!info || !hlLayer || !state?.board) return;
 
+  // Two halos under the roads. Each is one group (opacity on the group), so segments join without overlapping:
+  // a faint one for the whole connected network, a stronger one for the longest stretch.
   const { edges, vertices } = state.board;
-  let hlHtml = '';
-  for (const eId of info.componentEdges) {
+  const lineOf = (eId: number): string => {
     const e = edges[eId];
     const v1 = vertices[e.v1], v2 = vertices[e.v2];
-    if (!v1 || !v2) continue;
-    const isLongest = info.longestPathEdges.has(eId);
-    hlHtml += `<line class="${isLongest ? 'road-stretch-glow' : 'road-network-glow'}" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />`;
-  }
-  hlLayer.innerHTML = hlHtml;
+    return v1 && v2 ? `<line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />` : '';
+  };
+  const netHtml = info.componentEdges.map(lineOf).join('');
+  const bestHtml = [...info.longestPathEdges].map(lineOf).join('');
+  hlLayer.innerHTML = `<g class="road-glow-net">${netHtml}</g><g class="road-glow-best">${bestHtml}</g>`;
 
   if (tooltip) {
     tooltip.innerHTML = `

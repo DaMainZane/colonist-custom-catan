@@ -6,6 +6,7 @@ import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderBoard } from './board';
 import { renderPresetRow } from '../presets';
+import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
 import { uiIcon, dieFaceSvg } from '../icons';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
@@ -42,6 +43,9 @@ export function renderAll(): void {
     setVal('setVp', s.vpToWin);
     setVal('setMaxP', s.maxPlayers);
     setVal('setDiscard', s.cardDiscardLimit);
+    setVal('setTurnTime', s.turnTimerSec ?? 0);
+    setVal('setTurnInc', s.turnIncrementSec ?? 0);
+    setVal('setTradeTime', s.tradeTimerSec ?? 20);
     setVal('setGold', s.goldTiles);
     setVal('setDesert', s.desertTiles);
     if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
@@ -88,8 +92,9 @@ export function renderAll(): void {
       ROBBER_STEAL: 'Choose Player to Rob',
       MAIN: 'Turn'
     } as Record<string, string>)[state.phase] || state.phase;
-    pill.innerHTML = `<span class="avatar" style="background:${esc(current?.color)}">${avatarFace(current?.avatar, current?.name || '?')}</span> <strong>${esc(current?.name)}</strong> · ${phaseTxt}`;
+    pill.innerHTML = `<span class="avatar" style="background:${esc(current?.color)}">${avatarFace(current?.avatar, current?.name || '?')}</span> <strong>${esc(current?.name)}</strong> · ${phaseTxt}${turnClockHtml()}`;
   }
+  syncTurnClockDisplay();
 
   const btn = (id: string) => document.getElementById(id) as HTMLButtonElement;
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');

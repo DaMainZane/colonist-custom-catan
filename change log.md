@@ -2,10 +2,12 @@
 
 ## 2026-10-25 (Pass 5)
 ### Added
+- Turn timer, set in the lobby under Rules and cards, Timers: turn time (0 = off), seconds added per completed action, and trade offer time. Humans only; bots are not timed. When the clock runs out the turn is passed, or the pending step is finished for them (roll, robber, discard, gold pick). The time left shows in the turn pill. Server: `src/server/turnClock.ts`, settings `turnTimerSec` / `turnIncrementSec` / `tradeTimerSec`. Client: `render/turnclock.ts`.
 - Custom presets: save, apply and delete named lobby presets (map, ports, robber, fog, rules; not seats or game speed). Saving under an existing name replaces it. Stored in the host's `localStorage` (`hexsettlers.customPresets.v1`, max 30). Server: `src/server/presets.ts`, socket events `savePreset` / `presetSaved` / `applyCustomPreset`. Client: `src/client/presets.ts`, `#presetRow`.
 - Orange tint on every tile the robber can move to after a 7 (`.hex-tint`).
 
 ### Changed
+- Road hover highlight: a flat dark halo under the roads (whole network faint, longest stretch stronger), drawn as one shape per group so segments join seamlessly. The white glow and pulse are gone.
 - Counter offer editor now follows Colonist: click a hand card to add it to the give row, click a card in a row to remove one, click the "ask for" strip to add to the get row. Same layout as a normal offer (avatar + arrow, cards, check/X), no text labels.
 - Robber target hover: dark slate cast on the tile under the cursor, on top of the orange tint.
 - `mergeSettings` moved into `lobby.ts` so presets and `updateSettings` share it.
@@ -13,6 +15,9 @@
 ### Removed
 - Striped filter on robber targets.
 - Touch-screen outline on robber targets (the tint covers it).
+
+### Fixed
+- Trade time bar not showing: the client compared the server's timestamp with its own clock, so a clock more than the offer time off emptied the bar. The server now sends the time left and the client counts down from arrival.
 
 ### Notes
 - The pill-shaped trade time bar was tried and reverted; the thin bottom-edge bar stays.

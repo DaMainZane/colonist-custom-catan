@@ -587,6 +587,12 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 .turn-pill.mine { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
 .turn-pill .avatar { width: 22px; height: 22px; font-size: 11px; }
+/* Turn clock readout inside the pill */
+.turn-clock {
+  margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2);
+  font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.turn-clock.low { background: var(--danger); color: #fff; }
 .action-bar { display: flex; gap: 6px; align-items: center; }
 .act-btn {
   position: relative; width: 58px; height: 58px; border-radius: var(--r); background: var(--surface); color: var(--ink);
@@ -696,16 +702,14 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 @keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
 .road-hit { stroke: transparent; stroke-width: 20; stroke-linecap: round; cursor: pointer; pointer-events: stroke; }
-.road-network-glow {
-  stroke: var(--piece-rim); stroke-width: 15; stroke-linecap: round; stroke-opacity: 0.45;
-  pointer-events: none; transition: stroke-opacity 0.12s;
-}
-.road-stretch-glow {
-  stroke: #fff; stroke-width: 16; stroke-linecap: round; pointer-events: none;
-  filter: drop-shadow(0 0 8px var(--accent)) drop-shadow(0 0 3px #fff);
-  animation: roadStretchPulse 0.9s ease-in-out infinite;
-}
-@keyframes roadStretchPulse { 0%, 100% { stroke-opacity: 0.75; } 50% { stroke-opacity: 1; } }
+/* Road hover: a flat dark halo drawn UNDER the roads (the roads stay visible on top). Each halo is one group, and the
+   opacity is set on the group, so the pieces join into one seamless shape instead of overlapping. */
+.road-glow-net, .road-glow-best { pointer-events: none; }
+.road-glow-net { opacity: 0.2; }
+.road-glow-best { opacity: 0.5; }
+.road-glow-net line, .road-glow-best line { stroke: var(--target-dark); stroke-linecap: round; stroke-linejoin: round; }
+.road-glow-net line { stroke-width: 18; }
+.road-glow-best line { stroke-width: 22; }
 .road-hover-tooltip {
   position: fixed; z-index: 1100; pointer-events: none;
   background: var(--surface); color: var(--ink); border-radius: var(--r);

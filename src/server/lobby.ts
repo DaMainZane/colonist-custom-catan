@@ -39,7 +39,10 @@ export function mergeSettings(input: any, old: Settings): Settings {
     maxSettlements: clamp(s.maxSettlements, 2, 20, old.maxSettlements),
     maxCities: clamp(s.maxCities, 1, 20, old.maxCities),
     maxRoads: clamp(s.maxRoads, 5, 50, old.maxRoads),
-    gameSpeed
+    gameSpeed,
+    turnTimerSec: clamp(s.turnTimerSec, 0, 900, old.turnTimerSec ?? 0),
+    turnIncrementSec: clamp(s.turnIncrementSec, 0, 120, old.turnIncrementSec ?? 0),
+    tradeTimerSec: clamp(s.tradeTimerSec, 5, 300, old.tradeTimerSec ?? 20)
   };
 }
 

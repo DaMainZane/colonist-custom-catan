@@ -5,6 +5,7 @@ import { emitBotDialogue } from './bots/dialogue';
 import { newBoard } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { registry, rulesFromSettings } from './runtime';
+import { noteActionCompleted } from './turnClock';
 import type { LobbyPlayer, Room } from './types';
 
 /** Engine events -> the one-shot effects the client animates (productions, card transfers, rolled hexes). */
@@ -50,6 +51,7 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
   if (res.ok) {
     recordEffects(room, res.events);
     emitBotDialogue(room, playerId, type, res.events);
+    noteActionCompleted(room, playerId);
   }
   else if (res.error.startsWith('Internal error')) console.error(`[engine] ${type} by ${playerId}: ${res.error}`);
   return res;

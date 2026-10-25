@@ -3,6 +3,7 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import type { PlayerState } from '../shared';
 import { newBoard } from './lobby';
 import { defaultSettings } from './runtime';
+import { clearTurnClock } from './turnClock';
 import type { LobbyPlayer, Room, RoomStatus } from './types';
 
 export const rooms: Record<string, Room> = {};
@@ -88,4 +89,5 @@ export function clearBotTimers(room: Room): void {
   room.botTimer = undefined;
   room.tradeTimer = undefined;
   room.tradeTimerFor = null;
+  clearTurnClock(room);
 }

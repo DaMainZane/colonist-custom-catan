@@ -38,9 +38,10 @@ function openTradesList(): TradeView[] {
   return state.activeTrade ? [state.activeTrade] : [];
 }
 
+// Countdown starts from the time left that the server sent, counted on this machine's own clock.
+// (Comparing server and client wall-clock timestamps emptied the bar whenever the two clocks disagreed.)
 function syncClientTradeTimings(trades: TradeView[]): void {
   const now = performance.now();
-  const wallNow = Date.now();
   const activeIds = new Set(trades.map(t => t.id));
   for (const id of tradeTiming.keys()) {
     if (!activeIds.has(id)) tradeTiming.delete(id);
@@ -51,8 +52,8 @@ function syncClientTradeTimings(trades: TradeView[]): void {
   for (const t of trades) {
     if (tradeTiming.has(t.id)) continue;
     const durationMs = Math.max(2000, Number(t.durationMs) || 20000);
-    const serverElapsed = t.createdAt ? Math.max(0, Math.min(durationMs, wallNow - t.createdAt)) : 0;
-    tradeTiming.set(t.id, { startMs: now - serverElapsed, durationMs });
+    const left = typeof t.remainingMs === 'number' ? Math.max(0, Math.min(durationMs, t.remainingMs)) : durationMs;
+    tradeTiming.set(t.id, { startMs: now - (durationMs - left), durationMs });
   }
 }
 

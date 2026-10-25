@@ -59,6 +59,8 @@ export interface TradeView {
   createdAt?: number;
   expiresAt?: number;
   durationMs?: number;
+  /** Time left when this state was sent (ms). */
+  remainingMs?: number;
 }
 
 export interface GameState {
@@ -86,6 +88,8 @@ export interface GameState {
   largestArmyOwner: string | null;
   activeTrade: TradeView | null;
   activeTrades?: TradeView[];
+  /** Turn clock of the human on turn (null when timers are off or a bot is playing). */
+  turnClock?: { playerId: string; remainingMs: number } | null;
   winner: { id: string; name: string; vp: number; color: string } | null;
   logs: { text: string; color: string | null }[];
   chats: { sender: string; avatar: string; color: string; text: string }[];

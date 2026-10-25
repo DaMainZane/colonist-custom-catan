@@ -20,6 +20,12 @@ export interface Settings {
   maxCities: number;
   maxRoads: number;
   gameSpeed?: number;
+  /** Seconds a human gets per turn (0 = no turn timer). */
+  turnTimerSec?: number;
+  /** Seconds added to the turn clock each time the player completes an action. */
+  turnIncrementSec?: number;
+  /** Seconds a human-proposed trade offer stays open. */
+  tradeTimerSec?: number;
 }
 
 export interface LobbyPlayer {
@@ -82,6 +88,8 @@ export interface Room {
   tradeTimer?: any;
   /** Per-trade expiration timers and timestamps keyed by trade id. */
   tradeTimers?: Map<number, { createdAt: number; expiresAt: number; durationMs: number; timer: any }>;
+  /** Turn clock of the human whose turn it is (see turnClock.ts). */
+  turnClock?: { key: string; playerId: string; deadline: number; timer?: any };
 }
 
 /** Legacy status strings the client switches on. */

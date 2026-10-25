@@ -5,6 +5,7 @@ import { runAction } from '../game';
 import { broadcastRoom, setAfterBroadcast } from '../net';
 import { clearBotTimers } from '../rooms';
 import { registry } from '../runtime';
+import { ensureGrace, setTurnExpiryHandler, syncTurnClock } from '../turnClock';
 import type { Room } from '../types';
 import { chooseBotAction } from './brain';
 
@@ -13,7 +14,7 @@ const BASE_DELAY: Record<string, number> = { respond_trade: 450, discard: 450, p
 const DEFAULT_DELAY = 600;
 /** How long a human gets to answer a bot's trade offer (before game-speed scaling). */
 const BOT_TRADE_WAIT = 9000;
-/** Time limit for a human-proposed trade offer in the stack (ms). */
+/** Default time limit for a human-proposed trade offer (ms). The lobby setting `tradeTimerSec` overrides it. */
 const HUMAN_TRADE_WAIT = 20000;
 
 function delay(room: Room, baseMs: number): number {
@@ -64,7 +65,8 @@ export function ensureTradeTimers(room: Room): void {
   for (const trade of trades) {
     if (map.has(trade.id)) continue;
     const isBotOffer = !!getPlayer(g, trade.fromId)?.isBot;
-    const durationMs = isBotOffer ? Math.max(2500, delay(room, BOT_TRADE_WAIT)) : HUMAN_TRADE_WAIT;
+    const humanWaitMs = (Number(room.settings?.tradeTimerSec) || HUMAN_TRADE_WAIT / 1000) * 1000;
+    const durationMs = isBotOffer ? Math.max(2500, delay(room, BOT_TRADE_WAIT)) : humanWaitMs;
     const createdAt = now;
     const expiresAt = now + durationMs;
     const timer = setTimeout(() => {
@@ -79,6 +81,36 @@ export function ensureTradeTimers(room: Room): void {
 
     map.set(trade.id, { createdAt, expiresAt, durationMs, timer });
   }
+}
+
+/**
+ * The human's turn clock ran out: pass the turn if they can, otherwise finish what is pending
+ * (roll, move the robber, discard, pick) with the bot brain, then leave a few seconds for the next step.
+ */
+function handleTurnExpiry(room: Room): void {
+  const g = room.game;
+  if (!g || g.phase === 'gameover') return;
+  const cur = g.players[g.turn];
+  if (!cur || cur.isBot) return;
+
+  let move: Move | null = null;
+  if (legalActions(g, registry, cur.id).some(a => a.type === 'end_turn')) {
+    move = { botId: cur.id, type: 'end_turn', payload: {} };
+  } else {
+    // The current player first, then anyone else who owes something (for example a discard after a 7).
+    for (const p of [cur, ...g.players.filter(x => x.id !== cur.id)]) {
+      const m = chooseBotAction(g, registry, p.id);
+      if (m) { move = { botId: p.id, ...m }; break; }
+    }
+  }
+  if (!move) {
+    ensureGrace(room, 5000);
+    return;
+  }
+  const res = runAction(room, move.botId, move.type, move.payload);
+  if (!res.ok) console.error(`[turn clock] ${move.type} rejected in ${g.phase}: ${res.error}`);
+  ensureGrace(room);
+  broadcastRoom(room);
 }
 
 function runBotStep(room: Room): void {
@@ -111,6 +143,7 @@ export function scheduleBots(room: Room): void {
     return;
   }
   ensureTradeTimers(room);
+  syncTurnClock(room);
   if (room.botTimer) return;
 
   const move = nextBotMove(room);
@@ -124,4 +157,5 @@ export function scheduleBots(room: Room): void {
 /** Hooks the scheduler into the broadcast. Call once at startup. */
 export function initBots(): void {
   setAfterBroadcast(scheduleBots);
+  setTurnExpiryHandler(handleTurnExpiry);
 }

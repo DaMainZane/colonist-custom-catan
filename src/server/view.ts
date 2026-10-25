@@ -6,6 +6,7 @@ import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
 import { registry } from './runtime';
+import { syncTurnClock, turnClockView } from './turnClock';
 import type { Room } from './types';
 
 /** Engine phase ids -> the legacy phase names the client switches on. */
@@ -127,6 +128,7 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
       room.settings.devYearOfPlenty + room.settings.devMonopoly;
 
   ensureTradeTimers(room);
+  syncTurnClock(room);
   const activeTrades = g
     ? openTrades(g).map(t => {
         const from = getPlayer(g, t.fromId);
@@ -142,7 +144,9 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
           responses: t.responses,
           createdAt: timerMeta?.createdAt ?? Date.now(),
           expiresAt: timerMeta?.expiresAt ?? (Date.now() + 20000),
-          durationMs: timerMeta?.durationMs ?? 20000
+          durationMs: timerMeta?.durationMs ?? 20000,
+          // Time left, not a timestamp: the client counts down from when the message arrives, so a wrong clock cannot empty the bar.
+          remainingMs: timerMeta ? Math.max(0, timerMeta.expiresAt - Date.now()) : 20000
         };
       })
     : [];
@@ -176,6 +180,7 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     largestArmyOwner: g ? g.awards.largestArmy ?? null : null,
     activeTrade,
     activeTrades,
+    turnClock: g ? turnClockView(room) : null,
     winner: g ? g.winner : null,
     logs: g ? g.log : room.lobbyLog,
     chats: room.chats
