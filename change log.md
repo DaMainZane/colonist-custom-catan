@@ -1,5 +1,24 @@
 # Change Log
 
+## 2026-10-25 (Pass 17: Required nickname input, your-turn chime, unified victory icons, 0.5x speed lock & victory screen optimization)
+### Added
+- **Your Turn Sound Effect** (`src/client/audio.ts`, `src/client/main.ts`):
+  - Added `playYourTurnSound()` (warm two-note rising notification chime) that plays whenever an active game turn transitions from another player (or lobby) to the local player.
+- **Unified 24×24 Pictogram Icons for Victory Screen** (`src/client/icons.ts`, `src/client/render/index.ts`, `src/client/styles.css`):
+  - Added flat `UI_ICONS` (`star`, `robber`, `gift`, `crown`, `tree`, `bricks`, `wool`, `grain`, `rock`) so every column header across all 5 matrix tabs (`Overview`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) renders a uniform `20×20` `uiIcon(...)` inside an identical `34×34` `.vic-head-badge` container (with `.vic-head-badge.primary` accent styling on primary total columns).
+
+### Changed
+- **Required Player Nickname Input** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`):
+  - Removed the pre-filled `AvocadoMan` default value from `#playerNameInput` and added client + server validation requiring players to type a nickname before creating or joining a game.
+- **Game Speed Locked at `0.5x` & Speed UI Removed** (`src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/socket.ts`, `src/client/store.ts`, `src/client/actions.ts`, `src/client/main.ts`, `src/client/render/index.ts`, `public/index.html`):
+  - Default server and client `gameSpeed` is now locked at `0.5` (`0.5x`).
+  - Removed the navbar speed badge (`#navSpeedBadge`), settings menu speed slider & preset buttons, lobby toolbar speed selector (`#setGameSpeedHeader`), rules & cards speed selector (`#setGameSpeed`), and the `setGameSpeed` socket handler.
+- **Victory Screen & Confetti Performance Optimization** (`src/client/styles.css`, `src/client/render/index.ts`, `src/client/ui.ts`):
+  - Replaced `backdrop-filter: blur(4px)` on `#victoryOverlay` with a solid `#14181c` backdrop + `contain: layout paint`, eliminating full-viewport GPU blur recomputation over the SVG board.
+  - Added `#gameViewport.victory-modal-open #boardSvg * { animation-play-state: paused !important; }` to pause underlying SVG animations while the victory modal is open.
+  - Memoized `renderVictoryScreen()` (`lastVicRenderKey`) and skipped redundant `renderBoard()` rebuilds while `#victoryOverlay` covers the viewport.
+  - Streamlined `triggerVictoryConfetti()` to a 1x resolution cap (`<= 1280px`), 80 lightweight rectangle particles using direct `ctx.setTransform` + `fillRect`, and a 2.8s duration.
+
 ## 2026-10-25 (Pass 16: Map Generation finishing pass)
 ### Changed
 - `GEN_VERSION` is 2. John confirmed saved seeds do not need to replay across updates (presets keep the snapshot, and "same style, new seed" rolls a fresh one anyway). The recipe's `g` now tells an old seed apart from a current one, and the lobby shows the `older generator` tag for it. The version covers three changes that alter what a seed gives: the board loop redrawing tokens (Pass 14), the ring band below, and the `island_mix` perk existing.
@@ -154,25 +173,6 @@
 ### Notes
 - Verified in a scratch container with a mini registry: `tsc --noEmit` clean, 21/21 new tests pass. The full suite and `npm run typecheck` on the real repo were not run: please run both.
 - Found: today's port rules (one per hex, none on neighbouring hexes) cap the standard board at 6 ports, not 9. The design's 9 needs the M3 port rework.
-
-## 2026-10-25 (Pass 10b: Your-turn chime, unified victory icons, 0.5x speed lock & victory screen optimization)
-### Added
-- **Your Turn Sound Effect** (`src/client/audio.ts`, `src/client/main.ts`):
-  - Added `playYourTurnSound()` (warm two-note rising notification chime) that plays whenever an active game turn transitions from another player (or lobby) to the local player.
-- **Unified 24×24 Pictogram Icons for Victory Screen** (`src/client/icons.ts`, `src/client/render/index.ts`, `src/client/styles.css`):
-  - Added flat `UI_ICONS` (`star`, `robber`, `gift`, `crown`, `tree`, `bricks`, `wool`, `grain`, `rock`) so every column header across all 5 matrix tabs (`Overview`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) renders a uniform `20×20` `uiIcon(...)` inside an identical `34×34` `.vic-head-badge` container (with `.vic-head-badge.primary` accent styling on primary total columns).
-
-### Changed
-- **Required Player Nickname Input** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`):
-  - Removed the pre-filled `AvocadoMan` default value from `#playerNameInput` and added client + server validation requiring players to type a nickname before creating or joining a game.
-- **Game Speed Locked at `0.5x` & Speed UI Removed** (`src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/socket.ts`, `src/client/store.ts`, `src/client/actions.ts`, `src/client/main.ts`, `src/client/render/index.ts`, `public/index.html`):
-  - Default server and client `gameSpeed` is now locked at `0.5` (`0.5x`).
-  - Removed the navbar speed badge (`#navSpeedBadge`), settings menu speed slider & preset buttons, lobby toolbar speed selector (`#setGameSpeedHeader`), rules & cards speed selector (`#setGameSpeed`), and the `setGameSpeed` socket handler.
-- **Victory Screen & Confetti Performance Optimization** (`src/client/styles.css`, `src/client/render/index.ts`, `src/client/ui.ts`):
-  - Replaced `backdrop-filter: blur(4px)` on `#victoryOverlay` with a solid `#14181c` backdrop + `contain: layout paint`, eliminating full-viewport GPU blur recomputation over the SVG board.
-  - Added `#gameViewport.victory-modal-open #boardSvg * { animation-play-state: paused !important; }` to pause underlying SVG animations while the victory modal is open.
-  - Memoized `renderVictoryScreen()` (`lastVicRenderKey`) and skipped redundant `renderBoard()` rebuilds while `#victoryOverlay` covers the viewport.
-  - Streamlined `triggerVictoryConfetti()` to a 1x resolution cap (`<= 1280px`), 80 lightweight rectangle particles using direct `ctx.setTransform` + `fillRect`, and a 2.8s duration.
 
 ## 2026-10-25 (Pass 9: Victory screen 6-tab analytics & confetti celebration overlay)
 ### Added
