@@ -5,6 +5,7 @@ import { renderHand } from './hand';
 import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderBoard } from './board';
+import { renderPresetRow } from '../presets';
 import { uiIcon, dieFaceSvg } from '../icons';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
@@ -53,6 +54,7 @@ export function renderAll(): void {
     setVal('setMaxRoad', s.maxRoads);
     setVal('setMaxSettle', s.maxSettlements);
     setVal('setMaxCity', s.maxCities);
+    renderPresetRow();
   } else {
     lobbyBar.style.display = 'none';
   }

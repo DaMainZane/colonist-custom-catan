@@ -3,6 +3,7 @@ import { buildTopology, createRng, generateBoard, hexDistance, randomSeed } from
 import type { Board, HexInit } from '../shared';
 import { fullRules, registry } from './runtime';
 import type { Settings } from './types';
+import { clamp } from './util';
 
 const NUMBERS = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
 
@@ -14,6 +15,32 @@ export function newBoard(settings: Settings, preset = 'standard'): Board {
 
 export function isPreset(id: any): boolean {
   return typeof id === 'string' && registry.presets.has(id);
+}
+
+/** Clamps client-supplied settings to the allowed ranges. Anything missing or invalid keeps the old value. */
+export function mergeSettings(input: any, old: Settings): Settings {
+  const s = input ?? {};
+  const speed = Number(s.gameSpeed);
+  const gameSpeed = Number.isFinite(speed) && speed > 0 ? Math.max(0.25, Math.min(10, speed)) : (old.gameSpeed ?? 1);
+  return {
+    boardRadius: clamp(s.boardRadius, 1, 50, old.boardRadius),
+    goldTiles: clamp(s.goldTiles, 0, 500, old.goldTiles),
+    desertTiles: clamp(s.desertTiles, 0, 200, old.desertTiles),
+    fogTiles: clamp(s.fogTiles, 0, 2000, old.fogTiles ?? 0),
+    vpToWin: clamp(s.vpToWin, 3, 50, old.vpToWin),
+    maxPlayers: clamp(s.maxPlayers, 2, 8, old.maxPlayers),
+    cardDiscardLimit: clamp(s.cardDiscardLimit, 3, 50, old.cardDiscardLimit),
+    bankResourcePerType: clamp(s.bankResourcePerType, 5, 999, old.bankResourcePerType),
+    devKnights: clamp(s.devKnights, 0, 100, old.devKnights),
+    devVp: clamp(s.devVp, 0, 50, old.devVp),
+    devRoadBuilding: clamp(s.devRoadBuilding, 0, 50, old.devRoadBuilding),
+    devYearOfPlenty: clamp(s.devYearOfPlenty, 0, 50, old.devYearOfPlenty),
+    devMonopoly: clamp(s.devMonopoly, 0, 50, old.devMonopoly),
+    maxSettlements: clamp(s.maxSettlements, 2, 20, old.maxSettlements),
+    maxCities: clamp(s.maxCities, 1, 20, old.maxCities),
+    maxRoads: clamp(s.maxRoads, 5, 50, old.maxRoads),
+    gameSpeed
+  };
 }
 
 function portsOf(board: Board): Record<string, string> {

@@ -73,6 +73,7 @@
   --token-hot: #b3402e;
   --piece-rim: #f4f1ea;
   --robber: #38414a;
+  --target-dark: #1f262d;
 
   /* shape, size, depth */
   --r-sm: 6px;
@@ -257,6 +258,24 @@ svg#boardSvg:active { cursor: grabbing; }
   font-size: 12px; padding: 0 12px; min-height: 30px; cursor: pointer;
 }
 .chip-btn:hover { background: var(--surface-3); }
+.chip-btn svg.ui-icon { display: inline-block; vertical-align: -2px; }
+
+/* Saved (custom) presets: a chip with a small remove button. Deleting asks first, inline. */
+.chip-group { display: inline-flex; align-items: center; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.chip-group .chip-btn { background: transparent; border-radius: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-group .chip-btn:hover { background: var(--surface-3); }
+.chip-x {
+  border: 0; background: transparent; color: var(--ink-dim); width: 26px; min-height: 30px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.chip-x:hover { color: var(--danger); background: var(--surface-3); }
+.chip-group.confirm { box-shadow: 0 0 0 1.5px var(--danger); padding-left: 12px; }
+.chip-confirm-text { font-size: 12px; font-weight: 600; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-btn.chip-danger, .chip-group .chip-btn.chip-danger { background: var(--danger); color: #fff; }
+.chip-btn.chip-danger:hover, .chip-group .chip-btn.chip-danger:hover { filter: brightness(1.1); background: var(--danger); }
+.chip-btn.chip-accent { background: var(--accent); color: var(--on-accent); }
+.chip-btn.chip-accent:hover { background: var(--accent-hover); }
+.preset-name { width: 150px; height: 30px; text-align: left; padding: 0 10px; }
 
 .brush-btn {
   border: 2px solid transparent; border-radius: var(--r-sm); cursor: pointer; background: var(--surface-2); color: var(--ink);
@@ -339,7 +358,7 @@ svg#boardSvg:active { cursor: grabbing; }
 }
 .trade-offer-body {
   position: relative; overflow: hidden; flex-shrink: 0;
-  background: var(--surface); border-radius: var(--r-lg); padding: 10px 12px 13px; box-shadow: var(--shadow);
+  background: var(--surface); border-radius: var(--r-lg); padding: 30px 12px 12px; box-shadow: var(--shadow);
   display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
 }
 .trade-offer-body.trade-card-enter {
@@ -367,7 +386,7 @@ svg#boardSvg:active { cursor: grabbing; }
 .trade-arrow.get { color: var(--ok); }
 .trade-arrow.give { color: var(--danger); }
 .trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.trade-row-label { flex-shrink: 0; width: 54px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
+.trade-row-label { flex-shrink: 0; min-width: 64px; white-space: nowrap; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); }
 .trade-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; }
 
 /* Flat rounded-square responder & action boxes (Colonist layout in our matte token palette) */
@@ -402,16 +421,16 @@ svg#boardSvg:active { cursor: grabbing; }
 .trade-act-btn.decline, .trade-act-btn.cancel { background: var(--danger); color: #fff; }
 .trade-act-btn.off { opacity: 0.38; cursor: not-allowed; transform: none; }
 
-/* Per-offer time limit countdown bar along the bottom edge */
-.trade-timer-track {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 3.5px;
-  background: var(--surface-3); overflow: hidden; pointer-events: none;
+/* Per-offer time limit: a pill-shaped bar across the top of each offer card (fill is sized from render/trade.ts) */
+.trade-timebar {
+  position: absolute; top: 9px; left: 12px; right: 12px; height: 13px; padding: 2px;
+  border: 1.5px solid var(--ink); border-radius: 999px; background: var(--surface); pointer-events: none;
 }
-.trade-timer-fill {
-  width: 100%; height: 100%; background: var(--accent);
-  transform-origin: left center; transform: scaleX(1);
+.trade-timebar-fill {
+  height: 100%; width: 100%; border-radius: 999px; background: var(--ink);
+  filter: drop-shadow(-2px 3px 2px rgba(0, 0, 0, 0.22));
 }
-.trade-timer-fill.low { background: var(--danger); }
+.trade-timebar-fill.low { background: var(--danger); }
 
 /* ---------- Bottom-left sheet (trade, discard, gold, monopoly, robber victim) ---------- */
 #inlineDrawerWrap { position: absolute; bottom: 112px; left: 12px; display: none; align-items: flex-end; gap: 8px; z-index: 40; }
@@ -645,14 +664,15 @@ svg#boardSvg:active { cursor: grabbing; }
 /* Tiles that just produced go dark for about 2 s, then fade back (timing is driven from render/board.ts). */
 .hex-rolled { fill: #000; fill-opacity: 0; stroke: none; pointer-events: none; animation: rolledDim 2s ease-out both; }
 @keyframes rolledDim { 0%, 60% { fill-opacity: 0.5; } 100% { fill-opacity: 0; } }
-/* Robber targets: striped fill (pattern is defined in the board SVG) plus a pulsing dashed edge. */
+/* Robber targets: nothing is drawn until the cursor is over a tile. That one tile takes a dark slate cast, a different
+   color from the amber build highlights. Touch screens have no hover, so they get a faint outline on every target. */
 .hex-target {
-  fill-opacity: 0.9; stroke: var(--accent); stroke-width: 5; stroke-dasharray: 10 6;
-  stroke-linejoin: round; cursor: pointer; transition: fill-opacity 0.12s;
-  animation: targetPulse 1.4s ease-in-out infinite;
+  fill: var(--target-dark); fill-opacity: 0; stroke: var(--target-dark); stroke-opacity: 0; stroke-width: 4;
+  stroke-linejoin: round; cursor: pointer; pointer-events: all;
+  transition: fill-opacity 0.1s, stroke-opacity 0.1s;
 }
-.hex-target:hover { fill-opacity: 1; stroke-width: 7; animation: none; }
-@keyframes targetPulse { 0%, 100% { stroke-opacity: 0.6; } 50% { stroke-opacity: 1; } }
+.hex-target:hover { fill-opacity: 0.62; stroke-opacity: 0.9; }
+@media (hover: none) { .hex-target { stroke-opacity: 0.4; } }
 .port-dock-apron { fill: var(--pier-dark); fill-opacity: 0.32; stroke: none; }
 .port-pier-rim { stroke: var(--pier-dark); stroke-width: 9.5; stroke-linecap: round; fill: none; }
 .port-pier { stroke: var(--pier); stroke-width: 6; stroke-linecap: round; fill: none; }
@@ -839,17 +859,13 @@ svg#boardSvg:active { cursor: grabbing; }
 .trade-offer-body.trade-counter { flex-direction: column; align-items: stretch; gap: 8px; }
 .trade-counter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .trade-counter-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
-.trade-counter .trade-row { flex-wrap: wrap; gap: 6px; }
-.counter-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.counter-cell .mini-res-card { cursor: pointer; }
-.counter-step { display: flex; align-items: center; gap: 3px; }
-.counter-step button {
-  width: 18px; height: 18px; line-height: 16px; padding: 0; border-radius: 50%;
-  border: 1px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; font-size: 13px; cursor: pointer;
-}
-.counter-step button:hover { border-color: var(--accent); color: var(--accent); }
-.counter-step span { min-width: 14px; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-dim); }
-.counter-step span.on { color: var(--ink); }
+.trade-counter .trade-row { flex-wrap: wrap; gap: 8px; }
+.trade-empty-hint { font-size: 12px; font-weight: 500; color: var(--ink-dim); }
+/* Strip of resources to ask for (click one to add it to "You get") */
+.counter-picker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.counter-picker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-dim); min-width: 64px; }
+.counter-picker .mini-res-card { width: 40px; height: 48px; }
+.counter-picker .mini-res-card svg.glyph { width: 24px; height: 24px; }
 
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {

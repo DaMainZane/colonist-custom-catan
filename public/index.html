@@ -124,16 +124,23 @@
               <option value="4">4x Faster</option>
               <option value="8">8x Blitz</option>
             </select>
-            <button class="chip-btn" onclick="applyPreset('standard')">Standard</button>
-            <button class="chip-btn" onclick="applyPreset('goldRush')">Gold rush</button>
-            <button class="chip-btn" onclick="applyPreset('fogIsland')">Fog island</button>
-            <button class="chip-btn" onclick="applyPreset('archipelago')">Islands</button>
-            <button class="chip-btn" onclick="applyPreset('blank')">Blank ocean</button>
             <span class="tool-sep"></span>
             <button class="btn sm" onclick="addBot()"><span data-icon="plus" data-size="16"></span>Bot</button>
             <button class="btn sm" onclick="removeBot()"><span data-icon="minus" data-size="16"></span>Bot</button>
             <button class="btn sm primary" onclick="startGame()"><span data-icon="play" data-size="16"></span>Start</button>
           </div>
+        </div>
+
+        <!-- Presets: built-in ones are fixed, saved ones (host's browser) can be deleted after a confirmation -->
+        <div class="tool-row" id="presetRow">
+          <span class="tool-label">Presets</span>
+          <button class="chip-btn" onclick="applyPreset('standard')">Standard</button>
+          <button class="chip-btn" onclick="applyPreset('goldRush')">Gold rush</button>
+          <button class="chip-btn" onclick="applyPreset('fogIsland')">Fog island</button>
+          <button class="chip-btn" onclick="applyPreset('archipelago')">Islands</button>
+          <button class="chip-btn" onclick="applyPreset('blank')">Blank ocean</button>
+          <span class="tool-sep"></span>
+          <span id="customPresets" class="tool-row"></span>
         </div>
 
         <!-- Tab 1: map painter -->

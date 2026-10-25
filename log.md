@@ -21,14 +21,19 @@
   - Multiple trade offer stack & timers: engine holds `g.trades: TradeState[]` (newest first, up to 5 open offers, auto-pruned when a proposer spends offered cards) while keeping `g.trade` synced to `g.trades[0]`. Server tracks per-offer expiration timers (`ensureTradeTimers` in `bots/scheduler.ts`, 20s for human offers, speed-scaled for bot offers) and exposes `activeTrades` in `view.ts`. Client (`render/trade.ts`, `styles.css`) renders the Colonist-style top-right stack in our matte token palette: opponent avatar header with collapse/expand chevron, newest offer animated on top pushing older offers down, directional `↓` / `↑` rows, aligned per-player response boxes (clickable checkmark in player color to confirm, muted `✕` for declined, pulsing pending box), counter-offer editor per card, and a smooth bottom countdown bar.
   - README module table updated; `npm run typecheck` and `npm test` verified (26 passing tests).
 
+- **Pass 5 (10-25):**
+  - Dash filter on a 7: robber targets no longer show stripes on every tile. Only the tile under the cursor takes a dark slate cast (`.hex-target:hover`, token `--target-dark`, `render/board.ts` + `styles.css`). Touch screens (no hover) get a faint outline on every target.
+  - Multiple trade popups and Colonist-style counter trade confirmed as done by Pass 4 (stack, 20s timers, counter editor); the two backlog items were archived. Human offer time limit is `HUMAN_TRADE_WAIT` in `bots/scheduler.ts`.
+  - Custom presets: `src/server/presets.ts` (`serializePreset`, `loadPreset`, validated, capped), `mergeSettings` moved into `lobby.ts` (shared by `updateSettings` and presets), socket events `savePreset` / `presetSaved` / `applyCustomPreset`. Client: `src/client/presets.ts` (list in the host's `localStorage`, key `hexsettlers.customPresets.v1`, max 30), preset row in the lobby dock (`#presetRow`). Built-in presets are fixed chips; saved ones have an x with an inline delete confirmation. Saving under an existing name replaces it (that is how a preset is edited). A preset carries map, ports, robber, fog and rules except seats and game speed.
+  - Counter editor rework (Colonist style): click your hand cards to add to "You give" (`onClickHandResource` routes to `adjustCounter` while a counter is open, hand view subtracts `counterGive`), click a card in the offer rows to remove one of that type, "Ask for" strip adds to "You get". Labels "You get" / "You give" no longer wrap. Pill-shaped time bar on top of every offer card (`.trade-timebar`, width set by `paintTimerBars` in `render/trade.ts`).
+  - Not yet run after these edits: `npm run typecheck` and `npm test`.
+
 ## Remaining
-- Multiple trade popups (time limit, newest on top)
 - Bot difficulty tiers (Main, Secondary, Overload) and bot addon system: design in `Bot AI Design.md`
-- Bot difficulty tiers (Main, Secondary, Overload)
+- More built-in presets (brainstorm)
 - Big-map optimization
 - New map generation types (islands, archipelago, lake, realistic)
 - Continent map shapes (heat map)
-- Custom presets (built-in ones unremovable, delete confirmation)
 - Setting and navigation UI rework
 - Board UI rework (split by use case)
 

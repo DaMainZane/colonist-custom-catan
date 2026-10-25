@@ -16,6 +16,10 @@ import {
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade, startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed } from './render/trade';
 import { initCursors } from './cursors';
+import {
+  startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset,
+  askDeletePreset, cancelDeletePreset, deletePreset
+} from './presets';
 import { onClickHandResource, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
@@ -37,6 +41,8 @@ Object.assign(window as any, {
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
   startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar,
+  startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset,
+  askDeletePreset, cancelDeletePreset, deletePreset,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave

@@ -274,12 +274,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   updateCameraViewBox();
 
-  let html = `<defs>
-    <pattern id="targetStripes" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="14" height="14" style="fill:var(--accent);fill-opacity:0.16" />
-      <rect width="6" height="14" style="fill:var(--accent);fill-opacity:0.5" />
-    </pattern>
-  </defs>`;
+  let html = '';
 
   // Shallow water and sandy border under ALL land tiles (not only outer coastal tiles).
   const allLandPolys = hexes
@@ -334,7 +329,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           </g>
         </g>
         ${isRolledHex && showRollDim ? `<polygon class="hex-rolled" points="${innerPoly}" style="${rollDimStyle}" />` : ''}
-        ${canClickRobber ? `<polygon class="hex-target" points="${innerPoly}" style="fill:url(#targetStripes)" />` : ''}
+        ${canClickRobber ? `<polygon class="hex-target" points="${innerPoly}" />` : ''}
 
         ${h.id === robberHexId && !isFog ? `
           <g transform="translate(${h.x + ROBBER_DX}, ${h.y + ROBBER_DY})">

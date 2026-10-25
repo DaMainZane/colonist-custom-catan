@@ -82,8 +82,11 @@ Action types: `build {piece, loc}`, `roll`, `buy_dev`, `play_dev {card, ...}`, `
 | `avatars.ts` | flat pictogram faces keyed by the shared avatar id (`AVATAR_CHOICES` mirrors `shared/palette.ts`), falls back to the name initial |
 | `cursors.ts` | lobby-only shared cursors and Shift laser trail on a canvas over the board; positions travel in board coordinates via the `cursor` socket event |
 | `render/trade.ts` | stacked multi-offer trade UI (newest on top, per-offer countdown bar, collapsible header, aligned responder boxes) and counter-offer editor |
+| `presets.ts` | custom map presets: list kept in the host's `localStorage`, preset row in the lobby dock (save, load, delete with confirmation). Built-in presets stay fixed chips in `index.html` |
 
 Lobby rules: only the host edits (map painting, presets, settings, bots, start, game speed). Everyone picks their own avatar (click it in the player list; each avatar is used once per lobby, the host can change the bots').
+
+Custom presets: `src/server/presets.ts` turns the lobby map (tiles, numbers, fog, ports, robber) and the rule settings (not seats or game speed) into JSON on `savePreset`, and validates and rebuilds it on `applyCustomPreset`. The server stores nothing. Saving under an existing name replaces that preset, which is how one is edited. `mergeSettings` in `src/server/lobby.ts` is the one place settings are clamped.
 
 ### `src/packs/gold/` and `src/packs/fog/` (2e)
 

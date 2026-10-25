@@ -11,6 +11,7 @@ import type { TradeView } from '../types';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import { showToast } from '../ui';
+import { renderHand } from './hand';
 
 // Local arrival timestamps keyed by trade id so client countdown bars run smoothly regardless of clock skew.
 const tradeTiming = new Map<number, { startMs: number; durationMs: number }>();
@@ -55,10 +56,10 @@ function syncClientTradeTimings(trades: TradeView[]): void {
   }
 }
 
-function tickTradeTimerBars(): void {
-  timerRaf = 0;
+// Sets every countdown bar to the share of time left. Returns true while any bar is still running.
+function paintTimerBars(): boolean {
   const bars = document.querySelectorAll<HTMLElement>('[data-trade-timer]');
-  if (bars.length === 0) return;
+  if (bars.length === 0) return false;
   const now = performance.now();
   let anyActive = false;
 
@@ -68,33 +69,39 @@ function tickTradeTimerBars(): void {
     if (!timing) return;
     const elapsed = Math.max(0, now - timing.startMs);
     const frac = Math.max(0, Math.min(1, 1 - elapsed / timing.durationMs));
-    el.style.transform = `scaleX(${frac.toFixed(4)})`;
+    el.style.width = `${(frac * 100).toFixed(2)}%`;
     el.classList.toggle('low', frac < 0.28);
     if (frac > 0) anyActive = true;
   });
+  return anyActive;
+}
 
-  if (anyActive) {
-    timerRaf = requestAnimationFrame(tickTradeTimerBars);
-  }
+function tickTradeTimerBars(): void {
+  timerRaf = 0;
+  if (paintTimerBars()) timerRaf = requestAnimationFrame(tickTradeTimerBars);
 }
 
 function ensureTimerLoop(): void {
   if (!timerRaf) timerRaf = requestAnimationFrame(tickTradeTimerBars);
 }
 
-// One resource in the counter editor: click the card to add one, use - / + for exact amounts.
-function counterCellHtml(side: 'get' | 'give', r: string, n: number): string {
-  return `
-    <div class="counter-cell">
-      <div class="mini-res-card card-${r}" onclick="adjustCounter('${side}','${r}',1)" title="Add ${esc(RES_META[r].name)}">
-        ${getMiniSvg(r)}
-      </div>
-      <div class="counter-step">
-        <button type="button" onclick="adjustCounter('${side}','${r}',-1)" title="Remove one">&minus;</button>
-        <span class="${n > 0 ? 'on' : ''}">${n}</span>
-        <button type="button" onclick="adjustCounter('${side}','${r}',1)" title="Add one">+</button>
-      </div>
-    </div>`;
+// Counter editor rows (Colonist style): click a card here to take one back. Offer cards by clicking your hand
+// (give) or the strip under the rows (get).
+function counterStacksHtml(side: 'get' | 'give', counts: Record<string, number>): string {
+  const html = RESOURCES.filter(r => (counts[r] || 0) > 0).map(r =>
+    buildOverlappingStackHtml(
+      `card-${r}`, getMiniSvg(r), counts[r],
+      `adjustCounter('${side}','${r}',-1)`, `${RES_META[r].name}: click to remove one`
+    )
+  ).join('');
+  return html || `<span class="trade-empty-hint">${side === 'give' ? 'Click your cards to offer them' : 'Pick what you want below'}</span>`;
+}
+
+// Redraws the editor and the hand (cards placed in the counter leave the hand view, like in the trade drawer).
+function refreshCounterView(): void {
+  const me = myPlayerView();
+  renderActiveTradeModal(me);
+  renderHand(me, state.players[state.turnIndex]?.id === socket.id);
 }
 
 function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: boolean): string {
@@ -108,6 +115,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
       !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
     return `
       <div class="trade-offer-body trade-counter ${animCls}" data-trade-id="${t.id}">
+        <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
         <div class="trade-counter-head">
           <div class="trade-counter-title">${uiIcon('swap', 14)} Counter offer to ${esc(t.fromName)}</div>
           <div class="trade-actions">
@@ -119,14 +127,17 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
         <div class="trade-rows">
           <div class="trade-row">
             <span class="trade-row-label">You get</span>
-            ${RESOURCES.map(r => counterCellHtml('get', r, counterGet[r] || 0)).join('')}
+            <div class="trade-cards-line">${counterStacksHtml('get', counterGet)}</div>
           </div>
           <div class="trade-row">
             <span class="trade-row-label">You give</span>
-            ${RESOURCES.map(r => counterCellHtml('give', r, counterGive[r] || 0)).join('')}
+            <div class="trade-cards-line">${counterStacksHtml('give', counterGive)}</div>
           </div>
         </div>
-        <div class="trade-timer-track"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
+        <div class="counter-picker">
+          <span class="counter-picker-label">Ask for</span>
+          ${RESOURCES.map(r => `<div class="mini-res-card card-${r}" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}">${getMiniSvg(r)}</div>`).join('')}
+        </div>
       </div>`;
   }
 
@@ -174,6 +185,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
 
   return `
     <div class="trade-offer-body ${animCls}" data-trade-id="${t.id}">
+      <div class="trade-timebar" title="Time left"><div class="trade-timebar-fill" data-trade-timer="${t.id}"></div></div>
       <div class="trade-rows">
         <div class="trade-row" title="What you receive">
           <div class="trade-dir-badge get">
@@ -191,7 +203,6 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
         </div>
       </div>
       <div class="trade-actions">${actionsHtml}</div>
-      <div class="trade-timer-track"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
     </div>
   `;
 }
@@ -252,6 +263,7 @@ export function renderActiveTradeModal(me: any): void {
     ${cardsHtml}
   `;
 
+  paintTimerBars();
   ensureTimerLoop();
 }
 
@@ -289,16 +301,18 @@ export function startCounter(tradeId?: number): void {
     counterGive[r] = t.request[r] || 0;
   }
   playTone(520, 0.06);
-  renderActiveTradeModal(myPlayerView());
+  refreshCounterView();
 }
 
 export function adjustCounter(side: 'get' | 'give', r: string, delta: number): void {
   const target = side === 'get' ? counterGet : counterGive;
-  let next = Math.max(0, (target[r] || 0) + delta);
+  const before = target[r] || 0;
+  let next = Math.max(0, before + delta);
   if (side === 'give') next = Math.min(next, myPlayerView()?.resources?.[r] ?? 0);
+  if (next === before) return;
   target[r] = next;
   playTone(delta > 0 ? 480 : 420, 0.04);
-  renderActiveTradeModal(myPlayerView());
+  refreshCounterView();
 }
 
 export function sendCounter(tradeId?: number): void {
@@ -312,9 +326,10 @@ export function sendCounter(tradeId?: number): void {
   playTone(580, 0.1);
   socket.emit('counterTrade', { code: state.code, tradeId: t.id, offer: { ...counterGive }, request: { ...counterGet } });
   setCounterTradeId(null);
+  refreshCounterView();
 }
 
 export function cancelCounter(): void {
   setCounterTradeId(null);
-  renderActiveTradeModal(myPlayerView());
+  refreshCounterView();
 }

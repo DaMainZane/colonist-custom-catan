@@ -3,8 +3,9 @@ import { RESOURCES, RES_META, DEV_META } from '../constants';
 import { getMiniSvg, getDevSvg, buildOverlappingStackHtml } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
-import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode } from '../store';
+import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive } from '../store';
 import { renderInlineDrawer } from './drawer';
+import { adjustCounter } from './trade';
 import { esc } from '../util';
 
 // One dev card type: purple card with a cream glyph. Accent ring = playable now, faded + NEW = bought this turn.
@@ -35,6 +36,8 @@ export function renderHand(me: any, isMyTurn: boolean): void {
     let count = me.resources[r] || 0;
     if (drawerMode === 'discard') count = Math.max(0, count - (discardSel[r] || 0));
     else if (drawerMode === 'trade') count = Math.max(0, count - (tradeGive[r] || 0));
+    // Cards placed in a counter offer also leave the hand view.
+    if (counterTradeId !== null) count = Math.max(0, count - (counterGive[r] || 0));
 
     if (count <= 0 && state.status !== 'LOBBY') return '';
     if (count <= 0 && state.status === 'LOBBY') {
@@ -50,7 +53,7 @@ export function renderHand(me: any, isMyTurn: boolean): void {
       getMiniSvg(r),
       count,
       `onClickHandResource('${r}')`,
-      `${RES_META[r].name}: click to select`
+      `${RES_META[r].name}: ${counterTradeId !== null ? 'click to add to your counter offer' : 'click to select'}`
     );
   }).join('');
 
@@ -81,6 +84,12 @@ export function onClickHandResource(r: string): void {
   const me = state.players.find(p => p.id === socket.id);
   const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
   if (!me) return;
+
+  // While a counter offer is open, hand cards go into it ("You give") instead of opening the trade drawer.
+  if (counterTradeId !== null && drawerMode !== 'discard') {
+    adjustCounter('give', r, 1);
+    return;
+  }
 
   if (drawerMode === 'discard') {
     const totalSelected = RESOURCES.reduce((s, k) => s + discardSel[k], 0);

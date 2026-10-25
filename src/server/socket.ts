@@ -4,12 +4,11 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
-import { newBoard, isPreset, paintHex, paintPort } from './lobby';
+import { newBoard, isPreset, mergeSettings, paintHex, paintPort } from './lobby';
+import { loadPreset, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
 import { registry } from './runtime';
-import type { Settings } from './types';
-import { clamp } from './util';
 
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
 
@@ -93,28 +92,7 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room || !newSettings) return;
       const old = room.settings;
-      const speed = Number(newSettings.gameSpeed);
-      const gameSpeed = Number.isFinite(speed) && speed > 0 ? Math.max(0.25, Math.min(10, speed)) : (old.gameSpeed ?? 1);
-
-      const next: Settings = {
-        boardRadius: clamp(newSettings.boardRadius, 1, 50, old.boardRadius),
-        goldTiles: clamp(newSettings.goldTiles, 0, 500, old.goldTiles),
-        desertTiles: clamp(newSettings.desertTiles, 0, 200, old.desertTiles),
-        fogTiles: clamp(newSettings.fogTiles, 0, 2000, old.fogTiles ?? 0),
-        vpToWin: clamp(newSettings.vpToWin, 3, 50, old.vpToWin),
-        maxPlayers: clamp(newSettings.maxPlayers, 2, 8, old.maxPlayers),
-        cardDiscardLimit: clamp(newSettings.cardDiscardLimit, 3, 50, old.cardDiscardLimit),
-        bankResourcePerType: clamp(newSettings.bankResourcePerType, 5, 999, old.bankResourcePerType),
-        devKnights: clamp(newSettings.devKnights, 0, 100, old.devKnights),
-        devVp: clamp(newSettings.devVp, 0, 50, old.devVp),
-        devRoadBuilding: clamp(newSettings.devRoadBuilding, 0, 50, old.devRoadBuilding),
-        devYearOfPlenty: clamp(newSettings.devYearOfPlenty, 0, 50, old.devYearOfPlenty),
-        devMonopoly: clamp(newSettings.devMonopoly, 0, 50, old.devMonopoly),
-        maxSettlements: clamp(newSettings.maxSettlements, 2, 20, old.maxSettlements),
-        maxCities: clamp(newSettings.maxCities, 1, 20, old.maxCities),
-        maxRoads: clamp(newSettings.maxRoads, 5, 50, old.maxRoads),
-        gameSpeed
-      };
+      const next = mergeSettings(newSettings, old);
       room.settings = next;
 
       const boardChanged =
@@ -166,6 +144,25 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room || !isPreset(preset)) return;
       room.board = newBoard(room.settings, preset);
+      broadcastRoom(room);
+    }));
+
+    // Custom presets live in the host's browser. The server only turns the lobby map into plain JSON (save)
+    // and validates + rebuilds it (load), so a stored or edited preset can never put a bad board in a room.
+    socket.on('savePreset', safe(({ code, name }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      socket.emit('presetSaved', { preset: serializePreset(room.board, room.settings, name) });
+    }));
+
+    socket.on('applyCustomPreset', safe(({ code, preset }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      const loaded = loadPreset(preset, room.settings);
+      if ('error' in loaded) return socket.emit('errorMsg', loaded.error);
+      room.settings = loaded.settings;
+      room.board = loaded.board;
+      addLobbyLog(room, `Map preset "${loaded.name}" loaded`, null);
       broadcastRoom(room);
     }));
 
