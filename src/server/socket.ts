@@ -56,7 +56,8 @@ export function registerSocketHandlers(io: Server): void {
     // ---- Lobby ------------------------------------------------------------
 
     socket.on('createRoom', safe(({ name }) => {
-      const cleanName = (name || 'Settler').trim().substring(0, 16);
+      const cleanName = String(name || '').trim().substring(0, 16);
+      if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       const room = createRoom(socket.id, cleanName);
       socket.join(room.code);
       broadcastRoom(room);
@@ -64,7 +65,8 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on('joinRoom', safe(({ code, name }) => {
       const cleanCode = (code || '').trim().toUpperCase();
-      const cleanName = (name || 'Settler').trim().substring(0, 16);
+      const cleanName = String(name || '').trim().substring(0, 16);
+      if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       // No code (the normal case for a private group): take the newest lobby that still has a seat.
       const room = cleanCode
         ? rooms[cleanCode]

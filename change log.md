@@ -163,6 +163,8 @@
   - Added flat `UI_ICONS` (`star`, `robber`, `gift`, `crown`, `tree`, `bricks`, `wool`, `grain`, `rock`) so every column header across all 5 matrix tabs (`Overview`, `Res Card Stats`, `Dev Card Stats`, `Activity Stats`, `Resource Stats`) renders a uniform `20×20` `uiIcon(...)` inside an identical `34×34` `.vic-head-badge` container (with `.vic-head-badge.primary` accent styling on primary total columns).
 
 ### Changed
+- **Required Player Nickname Input** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`):
+  - Removed the pre-filled `AvocadoMan` default value from `#playerNameInput` and added client + server validation requiring players to type a nickname before creating or joining a game.
 - **Game Speed Locked at `0.5x` & Speed UI Removed** (`src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/socket.ts`, `src/client/store.ts`, `src/client/actions.ts`, `src/client/main.ts`, `src/client/render/index.ts`, `public/index.html`):
   - Default server and client `gameSpeed` is now locked at `0.5` (`0.5x`).
   - Removed the navbar speed badge (`#navSpeedBadge`), settings menu speed slider & preset buttons, lobby toolbar speed selector (`#setGameSpeedHeader`), rules & cards speed selector (`#setGameSpeed`), and the `setGameSpeed` socket handler.

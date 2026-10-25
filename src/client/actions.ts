@@ -33,14 +33,29 @@ export function cycleAvatar(playerId: string): void {
 
 // ---------- Landing / lobby ----------
 
+function getRequiredPlayerName(): string | null {
+  const input = document.getElementById('playerNameInput') as HTMLInputElement | null;
+  const name = (input?.value || '').trim();
+  if (!name) {
+    showToast('Please enter a nickname first.');
+    input?.focus();
+    return null;
+  }
+  return name;
+}
+
 export function createRoom(): void {
-  socket.emit('createRoom', { name: (document.getElementById('playerNameInput') as HTMLInputElement).value });
+  const name = getRequiredPlayerName();
+  if (!name) return;
+  socket.emit('createRoom', { name });
 }
 
 export function joinRoom(): void {
+  const name = getRequiredPlayerName();
+  if (!name) return;
   socket.emit('joinRoom', {
     code: (document.getElementById('roomCodeInput') as HTMLInputElement).value,
-    name: (document.getElementById('playerNameInput') as HTMLInputElement).value
+    name
   });
 }
 
