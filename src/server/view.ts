@@ -1,5 +1,5 @@
 // MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { computeVP, getPlayer, totalCards } from '../shared';
+import { computeVP, encodeRecipe, getPlayer, isOtherVersion, totalCards } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { openTrades, tradeRatios } from '../packs/base/trading';
@@ -264,7 +264,17 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     turnClock: g ? turnClockView(room) : null,
     winner: g ? g.winner : null,
     logs: g ? g.log : room.lobbyLog,
-    chats: room.chats
+    chats: room.chats,
+    // How the lobby map was made: recipe, one-line share code, the generator's report. The seed is shown even with Fog (design 5.8).
+    mapMeta: !g && room.mapMeta
+      ? {
+          recipe: room.mapMeta.recipe,
+          code: encodeRecipe(room.mapMeta.recipe),
+          report: room.mapMeta.report,
+          edited: room.mapMeta.edited,
+          otherVersion: isOtherVersion(room.mapMeta.recipe)
+        }
+      : null
   };
 
   return (viewerId: string) => {

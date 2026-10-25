@@ -1,17 +1,91 @@
-// MODULE: lobby board tools (generate, presets, paint terrain/numbers/robber/ports) on the engine board | USED BY: server/socket, server/rooms
-import { REAL_NUMBER_POOL, buildTopology, createRng, generateBoard, hexDistance, randomSeed } from '../shared';
+// MODULE: lobby board tools (generate from a recipe, quick starts, settings merge, paint terrain/numbers/robber/ports) on the engine board | USED BY: server/socket, server/rooms, server/game
+import {
+  REAL_NUMBER_POOL, SHARE_PREFIX, buildTopology, cleanSeed, createRng, decodeRecipe, generateBoard, generateMap, hexDistance,
+  isKnownMapId, randomSeed, resolveMapOptions, resolveParams, resolvePicks
+} from '../shared';
 import type { Board, HexInit } from '../shared';
 import { normalizeBotChat } from './bots/dialogue/events';
 import { fullRules, registry } from './runtime';
-import type { Settings } from './types';
+import type { MapMeta, Room, Settings } from './types';
 import { clamp } from './util';
 
 const NUMBERS = REAL_NUMBER_POOL;
 
 const isLand = (type: string): boolean => !!registry.tiles.get(type)?.land;
 
-export function newBoard(settings: Settings, preset = 'standard'): Board {
+// ---- Map from a recipe --------------------------------------------------------------------------------------
+
+/** The lobby map for these settings: seed, radius, picks and params become a recipe. An empty seed rolls a fresh one (read it from `meta.recipe`). */
+export function generateLobbyMap(settings: Settings): { board: Board; meta: MapMeta } {
+  const res = generateMap(registry, fullRules(settings), {
+    seed: settings.mapSeed ?? '',
+    radius: settings.boardRadius,
+    picks: settings.mapPicks ?? [],
+    params: settings.mapParams ?? {}
+  });
+  return { board: res.board, meta: { recipe: res.recipe, report: res.report, edited: false } };
+}
+
+/** An all-water canvas for the painter (the Blank quick start). */
+function blankBoard(settings: Settings): Board {
+  return generateBoard(registry, fullRules(settings), createRng(randomSeed()), 'blank');
+}
+
+/**
+ * A new board. Without `preset` it follows the settings' recipe (the seed in `mapSeed`; empty rolls a fresh one).
+ * With a quick start id it applies that recipe with a fresh seed. Other preset ids use the legacy generator (Archipelago, until M3).
+ */
+export function newBoard(settings: Settings, preset?: string): Board {
+  if (!preset) return generateLobbyMap(settings).board;
+  const quick = registry.quickStarts.get(preset);
+  if (quick?.blank) return blankBoard(settings);
+  if (quick) {
+    const picks = resolvePicks(registry, quick.picks).picks;
+    return generateLobbyMap({ ...settings, mapSeed: '', mapPicks: picks, mapParams: quick.params ?? {} }).board;
+  }
   return generateBoard(registry, fullRules(settings), createRng(randomSeed()), preset);
+}
+
+/** Rebuilds the room's lobby board from its settings and stores the seed that was used (so a rolled seed is never lost). */
+export function refreshMap(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>): void {
+  const { board, meta } = generateLobbyMap(room.settings);
+  room.settings.mapSeed = meta.recipe.seed;
+  room.board = board;
+  room.mapMeta = meta;
+}
+
+/**
+ * A preset chip. Quick starts set the picks and params and roll a new seed; Blank is the special all-water canvas;
+ * a legacy preset (Archipelago, until the M3 shape replaces it) draws a one-off board and clears the picks.
+ */
+export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>, id: string): void {
+  const quick = registry.quickStarts.get(id);
+  if (quick) {
+    room.settings.mapPicks = resolvePicks(registry, quick.picks).picks;
+    room.settings.mapParams = { ...(quick.params ?? {}) };
+    room.settings.mapSeed = '';
+    if (quick.blank) {
+      room.board = blankBoard(room.settings);
+      room.mapMeta = undefined;
+      return;
+    }
+    refreshMap(room);
+    return;
+  }
+  room.settings.mapPicks = [];
+  room.settings.mapParams = {};
+  room.board = generateBoard(registry, fullRules(room.settings), createRng(randomSeed()), id);
+  room.mapMeta = undefined;
+}
+
+/** Everything that decides the lobby map. When this changes the board is rebuilt; other settings leave painted edits alone. */
+export function recipeKey(s: Settings): string {
+  const params = s.mapParams ?? {};
+  return JSON.stringify([
+    s.mapSeed ?? '', s.boardRadius, s.mapPicks ?? [],
+    Object.keys(params).sort().map(k => [k, params[k]]),
+    s.goldTiles, s.desertTiles, s.fogTiles ?? 0
+  ]);
 }
 
 /** Smallest map radius that is comfortable for this many players (the default radius 2 fits 4). */
@@ -20,16 +94,44 @@ export function recommendedRadius(players: number): number {
 }
 
 export function isPreset(id: any): boolean {
-  return typeof id === 'string' && registry.presets.has(id);
+  return typeof id === 'string' && (registry.quickStarts.has(id) || registry.presets.has(id));
 }
 
-/** Clamps client-supplied settings to the allowed ranges. Anything missing or invalid keeps the old value. */
-export function mergeSettings(input: any, old: Settings): Settings {
+// ---- Settings ---------------------------------------------------------------------------------------------------
+
+/**
+ * Clamps client-supplied settings to the allowed ranges. Anything missing or invalid keeps the old value.
+ * Map picks go through the registry (unknown ids dropped, slots and conflicts resolved, params clamped).
+ * A full share code in `mapSeed` applies the whole recipe (radius, picks, params, seed); `dropped` lists the ids it had that this server does not know.
+ */
+export function mergeSettingsDetailed(input: any, old: Settings): { settings: Settings; dropped: string[] } {
   const s = input ?? {};
+  const dropped: string[] = [];
   const speed = Number(s.gameSpeed);
   const gameSpeed = Number.isFinite(speed) && speed > 0 ? Math.max(0.25, Math.min(10, speed)) : (old.gameSpeed ?? 1);
-  return {
-    boardRadius: clamp(s.boardRadius, 1, 50, old.boardRadius),
+
+  let seedIn: any = s.mapSeed;
+  let picksIn: any = s.mapPicks;
+  let paramsIn: any = s.mapParams;
+  let radiusIn: any = s.boardRadius;
+  if (typeof seedIn === 'string' && seedIn.length <= 400 && seedIn.trim().startsWith(`${SHARE_PREFIX};`)) {
+    const decoded = decodeRecipe(seedIn, id => isKnownMapId(registry, id));
+    if (decoded) {
+      seedIn = decoded.recipe.seed;
+      picksIn = decoded.recipe.picks;
+      paramsIn = decoded.recipe.params;
+      radiusIn = decoded.recipe.radius;
+      dropped.push(...decoded.dropped);
+    }
+  }
+
+  const mapSeed = seedIn === undefined || seedIn === null ? (old.mapSeed ?? '') : cleanSeed(seedIn);
+  const mapPicks = resolvePicks(registry, Array.isArray(picksIn) ? picksIn.slice(0, 32).map(String) : (old.mapPicks ?? [])).picks;
+  const options = resolveMapOptions(registry, mapPicks).options;
+  const mapParams = resolveParams(options, paramsIn && typeof paramsIn === 'object' && !Array.isArray(paramsIn) ? paramsIn : (old.mapParams ?? {}));
+
+  const settings: Settings = {
+    boardRadius: clamp(radiusIn, 1, 50, old.boardRadius),
     goldTiles: clamp(s.goldTiles, 0, 500, old.goldTiles),
     desertTiles: clamp(s.desertTiles, 0, 200, old.desertTiles),
     fogTiles: clamp(s.fogTiles, 0, 2000, old.fogTiles ?? 0),
@@ -49,9 +151,20 @@ export function mergeSettings(input: any, old: Settings): Settings {
     turnTimerSec: clamp(s.turnTimerSec, 0, 900, old.turnTimerSec ?? 0),
     turnIncrementSec: clamp(s.turnIncrementSec, 0, 120, old.turnIncrementSec ?? 0),
     tradeTimerSec: clamp(s.tradeTimerSec, 5, 300, old.tradeTimerSec ?? 20),
-    botChat: normalizeBotChat(s.botChat, old.botChat)
+    botChat: normalizeBotChat(s.botChat, old.botChat),
+    mapSeed,
+    mapSeedLocked: typeof s.mapSeedLocked === 'boolean' ? s.mapSeedLocked : !!old.mapSeedLocked,
+    mapPicks,
+    mapParams
   };
+  return { settings, dropped };
 }
+
+export function mergeSettings(input: any, old: Settings): Settings {
+  return mergeSettingsDetailed(input, old).settings;
+}
+
+// ---- Painting ---------------------------------------------------------------------------------------------------
 
 function portsOf(board: Board): Record<string, string> {
   const out: Record<string, string> = {};

@@ -117,7 +117,8 @@ export function loadPreset(raw: any, old: Settings): LoadedPreset | { error: str
     }
   }
 
-  const board = buildTopology(inits, { ports, isLand });
+  // Saved ports are kept as they are ('coast' only relaxes the final pass to one port per hex; nothing is auto-placed).
+  const board = buildTopology(inits, { ports, isLand, portMode: 'coast' });
 
   const robber = raw.robber;
   if (Array.isArray(robber)) {

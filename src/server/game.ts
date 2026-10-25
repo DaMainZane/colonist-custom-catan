@@ -3,7 +3,7 @@ import { PLAYER_COLORS, createGame, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
 import { emitBotDialogue, emitGameStartDialogue } from './bots/dialogue';
 import { noteBotEvents } from './bots/brain';
-import { newBoard } from './lobby';
+import { refreshMap } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { registry, rulesFromSettings, settingsForPlayers } from './runtime';
 import { noteActionCompleted } from './turnClock';
@@ -92,6 +92,8 @@ export function rematch(room: Room): void {
   room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [] };
   room.startedAt = null;
   room.finishedAt = null;
-  room.board = newBoard(room.settings);
+  // A new map each rematch, unless the host locked the seed (then the same recipe gives the same map again).
+  if (!room.settings.mapSeedLocked) room.settings.mapSeed = '';
+  refreshMap(room);
   addLobbyLog(room, '🔄 Returned to Lobby for a rematch!', '#1565c0');
 }

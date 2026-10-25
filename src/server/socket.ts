@@ -4,7 +4,7 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
-import { newBoard, isPreset, mergeSettings, paintHex, paintPort, recommendedRadius } from './lobby';
+import { applyMapStart, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap } from './lobby';
 import { loadPreset, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
 import { broadcastRoom } from './net';
@@ -117,15 +117,21 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room || !newSettings) return;
       const old = room.settings;
-      const next = mergeSettings(newSettings, old);
+      const { settings: next, dropped } = mergeSettingsDetailed(newSettings, old);
       room.settings = next;
 
-      const boardChanged =
-        old.boardRadius !== next.boardRadius ||
-        old.goldTiles !== next.goldTiles ||
-        old.desertTiles !== next.desertTiles ||
-        (old.fogTiles ?? 0) !== (next.fogTiles ?? 0);
-      if (boardChanged) room.board = newBoard(next);
+      // The map follows its recipe (seed, radius, picks, params, tile counts). Other settings leave painted edits alone.
+      if (recipeKey(old) !== recipeKey(next)) refreshMap(room);
+      if (dropped.length > 0) addLobbyLog(room, `Map code: ignored ${dropped.join(', ')} (not available here).`, null);
+      broadcastRoom(room);
+    }));
+
+    // New random seed, same picks and radius. The Reroll button.
+    socket.on('regenerate', safe(({ code }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      room.settings.mapSeed = '';
+      refreshMap(room);
       broadcastRoom(room);
     }));
 
@@ -168,7 +174,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('applyMapPreset', safe(({ code, preset }) => {
       const room = hostLobbyRoom(code);
       if (!room || !isPreset(preset)) return;
-      room.board = newBoard(room.settings, preset);
+      applyMapStart(room, preset);
       broadcastRoom(room);
     }));
 
@@ -187,6 +193,8 @@ export function registerSocketHandlers(io: Server): void {
       if ('error' in loaded) return socket.emit('errorMsg', loaded.error);
       room.settings = loaded.settings;
       room.board = loaded.board;
+      // A snapshot, not a recipe: the seed no longer describes this board until presets v2 (M6).
+      room.mapMeta = undefined;
       addLobbyLog(room, `Map preset "${loaded.name}" loaded`, null);
       broadcastRoom(room);
     }));
@@ -195,6 +203,7 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room) return;
       room.board = paintHex(room.board, hexId, paintType, paintValue);
+      if (room.mapMeta) room.mapMeta.edited = true;
       broadcastRoom(room);
     }));
 
@@ -202,6 +211,7 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room) return;
       room.board = paintPort(room.board, edgeId, portValue);
+      if (room.mapMeta) room.mapMeta.edited = true;
       broadcastRoom(room);
     }));
 

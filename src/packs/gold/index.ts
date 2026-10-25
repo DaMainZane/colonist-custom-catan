@@ -37,5 +37,15 @@ export const goldPack: Pack = {
       label: 'Gold Rush',
       tileCounts: (_rules, total) => ({ gold: goldRushCount(total) })
     });
+
+    // The same thing as a menu perk. A nonzero gold count on the Rules tab wins over this one (mapgen applies that rule).
+    api.mapPerk({
+      id: 'gold',
+      label: 'Gold',
+      description: 'A third of the tiles are gold (at least 5): production gives a free pick.',
+      stage: 'extras',
+      tileCounts: (_rules, total) => ({ gold: goldRushCount(total) })
+    });
+    api.quickStart({ id: 'goldRush', label: 'Gold Rush', picks: ['gold'] });
   }
 };

@@ -28,7 +28,11 @@ export function defaultSettings(): Settings {
     gameSpeed: 1,
     turnTimerSec: 0,
     turnIncrementSec: 0,
-    tradeTimerSec: 20
+    tradeTimerSec: 20,
+    mapSeed: '',
+    mapSeedLocked: false,
+    mapPicks: [],
+    mapParams: {}
   };
 }
 

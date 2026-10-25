@@ -4,7 +4,7 @@ Design notes for the map generator: board shape, terrain, number tokens, ports, 
 
 ## Status
 
-**Not started.** Everything below is brainstorming, nothing is final. Open questions are in section 16. All numbers are starting guesses until a gallery of generated maps has been looked at (section 15).
+**M1 built 2026-10-25** (noise, recipe and share code, stage RNG, `mapcheck.ts`, `generateMap` for the classic hexagon; see `change log.md` Pass 10). **M2 built** (registry, settings, quick starts; Pass 11). **M3 built 2026-10-25** (shapes and ports per landmass; Pass 12; written without a shell, run the tests first). M4 onward not started. Deviations from this text are listed in Pass 12 (land density is a share of the whole canvas with a soft rim penalty instead of a hard margin; `river` was added from John's sketch; the cheap shape checks ask for a landmass of about 7 tiles instead of an exact spot count). Everything below is still brainstorming, nothing is final. Open questions are in section 16. All numbers are starting guesses until a gallery of generated maps has been looked at (section 15).
 
 It builds on code that exists today:
 
@@ -312,7 +312,7 @@ The angle sort in `buildTopology` breaks for non-central shapes (section 1). Rep
 1. Classify water: ocean (flood fill from the canvas border) or lake. Ports go on ocean coast only. A `lakePorts` flag can allow lake shores later.
 2. Per landmass, walk the coast as an ordered loop of edges.
 3. Total ports `P = round(coast edges / 3.3)`. The standard board gives 30 / 3.3 = 9, the real count. Split across landmasses by coast length, at least 1 for a landmass of 6 or more tiles. Place evenly along each loop.
-4. Keep today's rules: at most one port per hex, none on adjacent hexes, none on a vertex next to a port.
+4. Rules: at most one port per hex and none on a vertex next to a port. Ports on neighbouring hexes are allowed (the real board has them). The old "none on adjacent hexes" rule capped the 12-hex ring at 6 ports, which contradicts the 9 in step 3. The plain hexagon uses this placement too.
 5. Deal types like cards: shuffle the pool and deal round-robin across landmasses, so every landmass gets a mix and every resource port appears at least once when `P >= 5`.
 
 Today the port pool repeats cyclically on big boards. Keep that for `P` above the pool size.

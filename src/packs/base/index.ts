@@ -5,6 +5,7 @@ import { registerAwards } from './awards';
 import { registerResourcesAndTiles } from './content';
 import { registerDevCards } from './devcards';
 import { registerHooks } from './hooks';
+import { registerMapContent } from './map';
 import { registerPhases } from './phases';
 import { registerPieces } from './pieces';
 import { registerPortsAndPresets } from './ports';
@@ -30,6 +31,7 @@ export const basePack: Pack = {
     registerDevCards(api);
     registerAwards(api);
     registerPortsAndPresets(api);
+    registerMapContent(api);
     registerPhases(api);
     registerActions(api);
     registerHooks(api);

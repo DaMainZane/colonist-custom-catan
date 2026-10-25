@@ -1,7 +1,7 @@
 // MODULE: rooms (registry of rooms, lobby roster, status, helpers over the engine game) | USED BY: server/*, bots
 import { AVATARS, PLAYER_COLORS } from '../shared';
 import type { PlayerState } from '../shared';
-import { newBoard } from './lobby';
+import { generateLobbyMap } from './lobby';
 import { defaultSettings } from './runtime';
 import { clearTurnClock } from './turnClock';
 import { DEFAULT_TIER, tierLabel } from './bots/tiers';
@@ -33,12 +33,15 @@ export function createRoom(hostId: string, hostName: string): Room {
   } while (rooms[code] || code.length < 5);
 
   const settings = defaultSettings();
+  const { board, meta } = generateLobbyMap(settings);
+  settings.mapSeed = meta.recipe.seed;
   const room: Room = {
     code,
     hostId,
     settings,
     lobbyPlayers: [createLobbyPlayer(hostId, hostName, 0, false)],
-    board: newBoard(settings),
+    board,
+    mapMeta: meta,
     game: null,
     lobbyLog: [{ text: `Lobby created. New bots are ${tierLabel(DEFAULT_TIER)}; pick a tier next to the Bot button.`, color: '#1565c0' }],
     chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add bots to start.' }],

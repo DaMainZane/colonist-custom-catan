@@ -1,5 +1,64 @@
 # Change Log
 
+## 2026-10-25 (Pass 12: Map Generation M3, shapes and ports per landmass)
+### Added
+- `src/shared/mapshape.ts`: the land field the shape stage works on (`LandField`: heightfield, `locked`, `keep`, `river` and `sat` flags, one index per canvas cell), `fillHeight` (noise plus pull toward the center minus a soft rim penalty), `takeTop`, the exact count fix `fixCount` (add the best-ranked water cell next to land, or remove the worst-ranked coastal cell whose land neighbours form one unbroken arc, so land never splits), `cleanupField` (largest landmass, spikes, one-cell holes, exact count), `growBlobs` / `pickCenters` / `splitSizes` for multi-landmass shapes, and `runShape` (tweak, base, carve, scatter; up to 40 attempts, each with its own RNG stream and noise; falls back to the plain hexagon and never throws). Only `runShape`, `SHAPE_ATTEMPTS`, `MIN_LAND` and the types are exported from `shared/index.ts`; the generic helper names stay in `mapshape.ts`.
+- `src/packs/base/map/shapes.ts`: base shapes `continent`, `ring`, `islands`, `archipelago`, `continents`; carve ops `lake` and `river`; scatter op `satellites`; tweak op `ragged`. `ShapeOpDef` gained `budget` (cells a carve or scatter op will remove or add, so the base builds the right number and the final land count is exact) and a typed `run(field, ctx)`.
+- `river` (from John's sketch): starts on a shore tile, each step goes through a random side of the current tile, a branch chance that grows with every step without a split. A step may only enter a tile whose only water neighbour is the channel it comes from and that keeps one arc of land around it, so a river is an inlet that never reaches the sea or a lake a second time and never cuts the land in two. River hexes are water with `ext.river`; they get no ports.
+- Params (clamped by the registry as before): `land` (30 to 90, per base shape), `ring.lagoon`, `islands.count`, `archipelago.count`, `continents.count`, `continents.gap`, `continents.stretch`, `lake.share`, `lake.count`, `river.length`, `satellites.count`, `ragged.amount`. Counts of 0 mean automatic.
+- `topology.ts`: `portMode: 'coast'` and `portOffset`. Ports per landmass on open-sea coast only (lake, lagoon and river shores excluded): about one port per 3.3 coast edges, split by coast length, at least 1 for a landmass of 6 or more tiles, 0 under 3 tiles, at most 1 under 6 tiles, spaced evenly along each coast, types dealt round-robin over the landmasses. Ordering uses a portable pseudo-angle (no `atan2`). The classic `'angle'` placement is untouched and still used for a board without water.
+- Quick start `archipelago` (picks `['archipelago']`) replaces the old water-chance chip.
+- `tests/mapshapes.test.ts`.
+
+### Changed
+- `generateMap`: the shape stage decides which canvas cells are land. Terrain, numbers and extras work on the land cells only, every other canvas cell becomes a `water` hex. A recipe without shape picks is the plain hexagon and gives the same board as M2 (no RNG is used for it). Picks that clash with the default hexagon (`ragged`, `satellites`) sit on a `continent`.
+- Deviations from the design text: land density is a share of the whole canvas (`round(cells x land%)`) and the rim is a soft penalty instead of a hard margin, so a big density still reaches the edge; the cheap shape check asks that the biggest landmass could hold about 8 spots (estimated vertices of at least 24) instead of an exact spot count (that is M5); a `ring` core band is forced to land so the lagoon stays enclosed.
+- `tests/mapsettings.test.ts`: the `archipelago` quick start is expected, and the Archipelago chip now returns a recipe and `mapMeta`.
+
+### Notes
+- Written without a shell on the repo, same as Pass 11. Run `npm run typecheck` and `npm test` and look at `tests/mapshapes.test.ts` first. It skips a map that fell back to the hexagon and has one test that bounds the fallback rate at 25% over radii 4 to 8; if it fails, look at which shape fell back before loosening it.
+- Every number here (noise frequency and strength, pull 0.9, rim penalty 0.8, compactness bonus in `growBlobs`, ring ridge slope) is a starting guess. The gallery script (`tools/mapgallery.ts`, design section 15) is still to do and is the way to tune them.
+- Not done yet: terrain and number styles (M4), `habitat`, the full check list and the report in the lobby (M5), the lobby UI (M6). Per-shape extra checks (ring band thickness, spots per landmass, island terrain mix) are only the cheap versions in `shapeOk`.
+- `PresetDef` and the legacy `archipelago` preset stay registered so `generateBoard`, the sims and old tests keep working.
+
+## 2026-10-25 (Pass 11: Map Generation M2, registry and settings)
+### Added
+- `src/shared/mapoptions.ts`: option types (`ShapeOpDef`, `TerrainDef`, `NumbersDef`, `PerkDef`, `QuickStartDef`, `ParamDef`, `MapCtx`, `GenFlags`) and the pure resolvers: `resolvePicks` (unknown and unmet ids dropped, later pick wins on a shared slot or a declared conflict), `resolveMapOptions` (adds the default of each empty slot), `resolveParams` (clamped to range and step), `effectiveFlags`, `paramOf`, `isKnownMapId`.
+- Pack API `mapShape`, `mapTerrain`, `mapNumbers`, `mapPerk`, `quickStart`, `capability`. Registry `mapShapes`, `mapTerrains`, `mapNumberings`, `mapPerks`, `quickStarts`, `capabilities`. Same `put()` duplicate rule (`replace: true` overrides); a pick id can live in only one option kind, because picks are one flat list.
+- Base pack `packs/base/map/`: `hexagon` (shape default), `random` terrain, `standard` numbers, quick starts `standard` and `blank`. Gold and Fog packs: perks `gold` and `fog` (fog is `secret`) and quick starts `goldRush` and `fogIsland`.
+- Settings `mapSeed`, `mapSeedLocked`, `mapPicks`, `mapParams`, validated in `mergeSettings` (new `mergeSettingsDetailed` also returns the ids a share code carried that this server does not know). A full share code pasted into `mapSeed` applies the whole recipe, radius included.
+- `lobby.ts`: `generateLobbyMap`, `refreshMap` (rebuilds the lobby board and stores the seed that was used), `applyMapStart` (preset chips), `recipeKey`. Socket event `regenerate` (new random seed). `room.mapMeta = { recipe, report, edited }`, sent to the client as `mapMeta` (recipe, share code, report) in the lobby; any paint event sets `edited`.
+- `tests/mapsettings.test.ts`.
+
+### Changed
+- `generateMap` is registry-driven: terrain and number styles come from the registry, perks add tile counts and extras, flags feed the check. A terrain or number style that changes the counts is refused with a warning and the default placement is used. Output for a recipe without picks is the same as M1.
+- Count precedence: a nonzero tile count on the Rules tab (`goldTiles`, `fogTiles`) wins over a perk's own count; zero lets the perk decide. Before, a preset's count always won.
+- A settings change that touches the map (seed, radius, picks, params, tile counts) rebuilds it from the recipe and KEEPS the seed. Only Regenerate and a rematch with the seed unlocked roll a new one. Quick-start chips roll a new seed. A picked style now survives a radius change (the old "presets are forgotten" problem).
+- `newBoard(settings)` follows the settings' recipe; `newBoard(settings, id)` applies a quick start with a fresh seed. `rooms.createRoom` and `game.rematch` build through recipes.
+- Removed `SUPPORTED_PICKS` from `mapgen.ts`; unknown picks now come from the registry (`pick-ignored` warning).
+
+### Notes
+- `PresetDef` stays (deprecated) because `createGame`, the sims and the topology tests still go through `generateBoard`. The Archipelago chip stays on the old water-chance preset until the M3 `archipelago` shape replaces it; it draws a one-off board without a recipe.
+- Not routed yet: `createGame` without a prepared board (sims, tests) still uses `generateBoard`. Real games copy the lobby board, which now comes from recipes. Switching the engine changes every existing sim seed, so do it together with a pass over seed-dependent tests.
+- No UI changes. The client keeps working: it ignores `mapMeta`, and `applyMapPreset` and `updateSettings` have the same shape.
+- Written without a shell on the repo: run `npm run typecheck` and `npm test` and check the new `tests/mapsettings.test.ts` first.
+
+## 2026-10-25 (Pass 10: Map Generation M1, foundations)
+### Added
+- `src/shared/noise.ts`: seeded lattice value noise (integer hash, `+ - * /` and `floor` only), `cellPoint`.
+- `src/shared/maprecipe.ts`: `GEN_VERSION`, `MapRecipe`, `stageRng(seed, stage, attempt)`, `cleanSeed`, `newSeedText`, share code `encodeRecipe` / `decodeRecipe` (`hx1;g=1;r=4;picks=...;seed=...`).
+- `src/shared/mapcheck.ts`: `findLandmasses`, `classifyCells` (ocean vs lake), `validateBoard` -> `MapReport` (spots, fairness, pips per resource, errors and warnings), `estimateVertices`.
+- `generateMap(reg, rules, recipe)` in `mapgen.ts` for the classic pipeline (hexagon, random terrain, standard numbers) with one RNG stream per stage. Other picks are reported as `pick-ignored`.
+- `tests/mapgen.test.ts` (21 tests).
+
+### Changed
+- `bots/mapProfile.ts` uses the shared `findLandmasses`.
+- `generateBoard` is unchanged in behavior (same RNG order); only the tile multiset moved into a helper.
+
+### Notes
+- Verified in a scratch container with a mini registry: `tsc --noEmit` clean, 21/21 new tests pass. The full suite and `npm run typecheck` on the real repo were not run: please run both.
+- Found: today's port rules (one per hex, none on neighbouring hexes) cap the standard board at 6 ports, not 9. The design's 9 needs the M3 port rework.
+
 ## 2026-10-25 (Pass 9: Victory screen 6-tab analytics & confetti celebration overlay)
 ### Added
 - **Victory Confetti Animation Overlay & Fanfare** (`src/client/ui.ts`, `src/client/audio.ts`, `src/client/main.ts`, `src/client/styles.css`):

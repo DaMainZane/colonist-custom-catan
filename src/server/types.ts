@@ -1,5 +1,5 @@
 // MODULE: server room types (lobby settings, room, client-facing effects) | USED BY: server/*, bots, sim
-import type { Board, GameState } from '../shared';
+import type { Board, GameState, MapRecipe, MapReport } from '../shared';
 import type { BotChatLevel } from './bots/dialogue/types';
 
 /** Lobby settings the client edits. The adapter maps them to engine rules (runtime.rulesFromSettings). */
@@ -29,6 +29,22 @@ export interface Settings {
   tradeTimerSec?: number;
   /** How much bots talk: off, quiet, normal (default) or chatty. Host only. */
   botChat?: BotChatLevel;
+  /** Seed of the lobby map. Empty = roll a fresh one on the next generation (it is stored once rolled). */
+  mapSeed?: string;
+  /** Keep the seed on rematch. */
+  mapSeedLocked?: boolean;
+  /** Ticked menu ids (shape ops, styles, perks), in the order they were ticked. Defaults for empty slots are not stored. */
+  mapPicks?: string[];
+  /** Numeric params by id (see ParamDef), clamped to their ranges. */
+  mapParams?: Record<string, number>;
+}
+
+/** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */
+export interface MapMeta {
+  recipe: MapRecipe;
+  report: MapReport;
+  /** A paint event touched the board, so the seed no longer describes it. */
+  edited: boolean;
 }
 
 export interface LobbyPlayer {
@@ -78,6 +94,8 @@ export interface Room {
   lobbyPlayers: LobbyPlayer[];
   /** Lobby board (editable). Copied into the game at start. */
   board: Board;
+  /** Recipe and report of the lobby board. Undefined for blank, legacy-preset and loaded-preset boards. */
+  mapMeta?: MapMeta;
   /** null = lobby. */
   game: GameState | null;
   lobbyLog: { text: string; color: string | null }[];

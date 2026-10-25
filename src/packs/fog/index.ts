@@ -75,6 +75,21 @@ export const fogPack: Pack = {
       extra: (_rules, total) => ({ fogCount: fogIslandCount(total) })
     });
 
+    // The same thing as a menu perk. A nonzero fogTiles on the Rules tab wins over the computed share.
+    api.mapPerk({
+      id: 'fog',
+      label: 'Fog',
+      description: 'About 42% of the tiles (at least 4) stay hidden until a road touches them.',
+      stage: 'extras',
+      // The seed and share code reveal the hidden tiles to anyone who rebuilds the map (accepted for a private group).
+      secret: true,
+      extra: (rules, total) => {
+        const typed = Math.floor(Number(rules.fogTiles) || 0);
+        return { fogCount: typed > 0 ? typed : fogIslandCount(total) };
+      }
+    });
+    api.quickStart({ id: 'fogIsland', label: 'Fog Island', picks: ['fog'] });
+
     api.hook('afterMapGenerated', hideTiles);
 
     api.hook('onBuild', (ctx: Ctx, def, pid: Id, loc: number) => {

@@ -1,4 +1,5 @@
 // MODULE: map profile (landmasses, fog and gold share, average pips, port count; built once per board, refreshed when fog is revealed) | USED BY: bots/brain
+import { findLandmasses } from '../../shared';
 import type { GameState, Registry } from '../../shared';
 import { getPips } from '../util';
 
@@ -31,34 +32,13 @@ function isLandHex(reg: Registry, h: HexT): boolean {
   return !!h.ext?.hidden || !!reg.tiles.get(h.type)?.land;
 }
 
-/** Landmasses: land hexes joined across shared edges (union-find). Never changes during a game. */
+/** Landmasses come from the shared map checker (one implementation for the generator, the lobby and the bots). Never changes during a game. */
 function buildLand(g: GameState, reg: Registry): LandInfo {
-  const hexes = g.board.hexes;
-  const land = hexes.map(h => isLandHex(reg, h));
-  const parent = hexes.map((_, i) => i);
-  const find = (x: number): number => {
-    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-    return x;
-  };
-  for (const e of g.board.edges) {
-    if (e.hexIds.length !== 2) continue;
-    const [a, b] = e.hexIds;
-    if (land[a] && land[b]) parent[find(a)] = find(b);
-  }
-  const index = new Map<number, number>();
-  const landmassSize: number[] = [];
-  const landOfHex = hexes.map((_, i) => {
-    if (!land[i]) return -1;
-    const root = find(i);
-    if (!index.has(root)) { index.set(root, landmassSize.length); landmassSize.push(0); }
-    const c = index.get(root)!;
-    landmassSize[c]++;
-    return c;
-  });
+  const { landOfHex, landmassSize, landCount } = findLandmasses(g.board, h => isLandHex(reg, h));
   return {
     landOfHex,
     landmassSize,
-    landCount: land.filter(Boolean).length,
+    landCount,
     portCount: g.board.edges.filter(e => !!e.port).length
   };
 }

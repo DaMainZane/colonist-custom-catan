@@ -1,5 +1,6 @@
 // MODULE: registry + pack loader (all game content is registered here) | USED BY: engine, packs, UI generation, bots
 import type { Ctx } from './ctx';
+import type { MapOptionBase, NumbersDef, PerkDef, QuickStartDef, ShapeOpDef, TerrainDef } from './mapoptions';
 import type { RngState } from './rng';
 import type { GameState, Id, Resources, Rules } from './types';
 
@@ -101,6 +102,7 @@ export interface PortDef {
   replace?: boolean;
 }
 
+/** @deprecated Map presets are quick starts now (`api.quickStart`, recipes). Kept so `generateBoard`, the sims and old tests keep working. */
 export interface PresetDef {
   id: string;
   label: string;
@@ -135,6 +137,14 @@ export interface Registry {
   actions: Map<string, ActionDef>;
   ports: Map<string, PortDef>;
   presets: Map<string, PresetDef>;
+  /** Map menu content (Map Generation Design, section 12). Pick ids are unique across shapes, terrains, numberings and perks. */
+  mapShapes: Map<string, ShapeOpDef>;
+  mapTerrains: Map<string, TerrainDef>;
+  mapNumberings: Map<string, NumbersDef>;
+  mapPerks: Map<string, PerkDef>;
+  quickStarts: Map<string, QuickStartDef>;
+  /** Features a pack provides, e.g. 'crossing' (ships or bridges). An option with `requires` is refused until they exist. */
+  capabilities: Set<string>;
   hooks: Record<HookName, ((...args: any[]) => any)[]>;
 }
 
@@ -148,6 +158,13 @@ export interface PackApi {
   action(def: ActionDef): void;
   port(def: PortDef): void;
   preset(def: PresetDef): void;
+  mapShape(def: ShapeOpDef): void;
+  mapTerrain(def: TerrainDef): void;
+  mapNumbers(def: NumbersDef): void;
+  mapPerk(def: PerkDef): void;
+  quickStart(def: QuickStartDef): void;
+  /** Declares a capability. Several packs may declare the same one. */
+  capability(id: string): void;
   hook(name: HookName, fn: (...args: any[]) => any): void;
 }
 
@@ -181,6 +198,14 @@ function put<T>(map: Map<string, T>, key: string, def: T, kind: string, packId: 
   map.set(key, def);
 }
 
+/** Like `put`, but a pick id may live in only one of the option maps (picks are one flat list). */
+function putOption<T extends MapOptionBase>(map: Map<string, T>, all: Map<string, MapOptionBase>[], def: T, kind: string, packId: string): void {
+  for (const other of all) {
+    if (other !== map && other.has(def.id)) throw new Error(`Pack "${packId}": map option id "${def.id}" is already used by another option kind (${kind})`);
+  }
+  put(map, def.id, def, kind, packId);
+}
+
 export function createRegistry(packs: Pack[], overrides: Record<string, any> = {}): Registry {
   const reg: Registry = {
     packs: [],
@@ -194,12 +219,19 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
     actions: new Map(),
     ports: new Map(),
     presets: new Map(),
+    mapShapes: new Map(),
+    mapTerrains: new Map(),
+    mapNumberings: new Map(),
+    mapPerks: new Map(),
+    quickStarts: new Map(),
+    capabilities: new Set(),
     hooks: {
       onGameStart: [], onTurnStart: [], onTurnEnd: [], onRoll: [], onBuild: [],
       afterAction: [], vp: [], afterMapGenerated: [], onView: []
     }
   };
 
+  const optionMaps: Map<string, MapOptionBase>[] = [reg.mapShapes, reg.mapTerrains, reg.mapNumberings, reg.mapPerks];
   const loaded = new Set<string>();
   for (const pack of packs) {
     if (loaded.has(pack.id)) throw new Error(`Pack "${pack.id}" listed twice`);
@@ -217,6 +249,12 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
       action: d => put(reg.actions, d.type, d, 'action', id),
       port: d => put(reg.ports, d.id, d, 'port', id),
       preset: d => put(reg.presets, d.id, d, 'preset', id),
+      mapShape: d => putOption(reg.mapShapes, optionMaps, d, 'map shape', id),
+      mapTerrain: d => putOption(reg.mapTerrains, optionMaps, d, 'map terrain', id),
+      mapNumbers: d => putOption(reg.mapNumberings, optionMaps, d, 'map numbers', id),
+      mapPerk: d => putOption(reg.mapPerks, optionMaps, d, 'map perk', id),
+      quickStart: d => put(reg.quickStarts, d.id, d, 'quick start', id),
+      capability: c => { reg.capabilities.add(c); },
       hook: (name, fn) => {
         if (!reg.hooks[name]) throw new Error(`Pack "${id}": unknown hook "${name}"`);
         reg.hooks[name].push(fn);
