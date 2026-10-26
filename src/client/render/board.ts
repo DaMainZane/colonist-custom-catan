@@ -40,12 +40,14 @@ const ANIM_DURATION_MS = 420;
 const ROBBER_DX = 30;
 const ROBBER_DY = -8;
 
-// Base size of settlements and cities at default zoom (was 1.22). The zoom-out boost and its cap scale with it.
+// Base size of settlements, cities, and roads at default zoom. The zoom-out boost and its cap scale with it.
 const BUILDING_BASE_SCALE = 1.5;
+const ROAD_BASE_SCALE = 1.15;
 
 let cachedBoundsKey = '';
 let cachedBounds = { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
 let lastBuildingScale = -1;
+let lastRoadScale = -1;
 let cameraRafPending = false;
 
 // Layer dirty-keys so gameplay updates (rolls, trades, builds, selections) do not rebuild static hex terrain or ports.
@@ -121,13 +123,19 @@ export function updateCameraViewBox(): void {
   const baseY = (centerY0 - camPanY) - baseH / 2;
   svg.setAttribute('viewBox', `${baseX.toFixed(1)} ${baseY.toFixed(1)} ${baseW.toFixed(1)} ${baseH.toFixed(1)}`);
 
-  // Scale settlements and cities up as the camera zooms out (or on larger boards), only touching style when scale changes.
+  // Scale settlements, cities, and roads up as the camera zooms out (or on larger boards), only touching style when scale changes.
   const zoomFactor = Math.max(camZoom, Math.max(baseW, baseH) / 720);
   const buildingScale = Math.min(2.8, BUILDING_BASE_SCALE * Math.pow(Math.max(1, zoomFactor), 0.62));
+  const roadScale = Math.min(2.45, ROAD_BASE_SCALE * Math.pow(Math.max(1, zoomFactor), 0.58));
   if (Math.abs(buildingScale - lastBuildingScale) >= 0.015) {
     lastBuildingScale = buildingScale;
-    const vLayer = document.getElementById('boardVerticesLayer') || svg;
-    vLayer.style.setProperty('--building-scale', buildingScale.toFixed(3));
+    svg.style.setProperty('--building-scale', buildingScale.toFixed(3));
+    const vLayer = document.getElementById('boardVerticesLayer');
+    if (vLayer) vLayer.style.setProperty('--building-scale', buildingScale.toFixed(3));
+  }
+  if (Math.abs(roadScale - lastRoadScale) >= 0.015) {
+    lastRoadScale = roadScale;
+    svg.style.setProperty('--road-scale', roadScale.toFixed(3));
   }
 }
 
@@ -200,6 +208,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastPortsKey = '';
     lastPlacedRoadsKey = '';
     lastBuildingScale = -1;
+    lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
   }
   return {
@@ -588,16 +597,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <g transform="translate(${mx}, ${my})">
           ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
           <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            <line x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
-              style="stroke:var(--piece-rim);stroke-width:12;stroke-linecap:round" />
+            <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
           </g>
         </g>`;
 
       roadBodiesHtml += `
         <g transform="translate(${mx}, ${my})">
           <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            <line x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
-              style="stroke:${col};stroke-width:8;stroke-linecap:round" />
+            <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
+              style="stroke:${col}" />
           </g>
         </g>`;
 
@@ -637,13 +645,14 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const staticSpots = vertices.length > 120;
   const availWheat = me ? Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0)) : 0;
   const availOre = me ? Math.max(0, (me.resources.ore || 0) - (inFlightHandResources.ore || 0)) : 0;
+  const cityMult = isClientPieceDoubleCost('city', socket.id) ? 2 : 1;
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
       const canUpgrade = isMyTurn && state.phase === 'MAIN' && (!buildMode || buildMode === 'city') &&
         v.building.owner === socket.id && v.building.type === 'settlement' &&
-        me && availWheat >= 2 && availOre >= 3 && me.citiesLeft > 0;
+        me && availWheat >= 2 * cityMult && availOre >= 3 * cityMult && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
       const isCity = v.building.type === 'city';
@@ -896,6 +905,33 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
+const CLIENT_BASE_PIECE_LIMITS: Record<'road' | 'settlement' | 'city', number> = {
+  road: 15,
+  settlement: 5,
+  city: 4
+};
+
+export function countClientActivePieces(ownerId: string, piece: 'road' | 'settlement' | 'city'): number {
+  if (!state?.board) return 0;
+  if (piece === 'road') {
+    let n = 0;
+    for (const e of state.board.edges) {
+      if (e.road === ownerId) n++;
+    }
+    return n;
+  }
+  let n = 0;
+  for (const v of state.board.vertices) {
+    if (v.building && v.building.owner === ownerId && v.building.type === piece) n++;
+  }
+  return n;
+}
+
+export function isClientPieceDoubleCost(piece: 'road' | 'settlement' | 'city', ownerId: string = socket.id || ''): boolean {
+  if (!ownerId || !state?.board) return false;
+  return countClientActivePieces(ownerId, piece) >= CLIENT_BASE_PIECE_LIMITS[piece];
+}
+
 export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (!me || me.settlementsLeft <= 0) return false;
   for (const adjId of v.adjacentVertices) {
@@ -904,11 +940,12 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (state.phase === 'SETUP_SETTLEMENT') return true;
   if (state.phase !== 'MAIN') return false;
   if (buildMode && buildMode !== 'settlement') return false;
+  const mult = isClientPieceDoubleCost('settlement', socket.id) ? 2 : 1;
   const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
   const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
   const sheep = Math.max(0, (me.resources.sheep || 0) - (inFlightHandResources.sheep || 0));
   const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
-  if (wood < 1 || brick < 1 || sheep < 1 || wheat < 1) return false;
+  if (wood < mult || brick < mult || sheep < mult || wheat < mult) return false;
   return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
 }
 
@@ -919,9 +956,10 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
   }
   if (state.phase !== 'MAIN') return false;
   if (buildMode && buildMode !== 'road' && me.freeRoads === 0) return false;
+  const mult = isClientPieceDoubleCost('road', socket.id) ? 2 : 1;
   const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
   const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
-  const canAfford = me.freeRoads > 0 || (wood >= 1 && brick >= 1);
+  const canAfford = me.freeRoads > 0 || (wood >= mult && brick >= mult);
   if (!canAfford) return false;
 
   for (const vId of [e.v1, e.v2]) {

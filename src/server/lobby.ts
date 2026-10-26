@@ -5,7 +5,7 @@ import {
 } from '../shared';
 import type { Board, HexInit } from '../shared';
 import { normalizeBotChat } from './bots/dialogue/events';
-import { fullRules, registry } from './runtime';
+import { fullRules, registry, scaledPieces } from './runtime';
 import type { MapMeta, Room, Settings } from './types';
 import { clamp } from './util';
 
@@ -141,12 +141,36 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
   const options = resolveMapOptions(registry, mapPicks).options;
   const mapParams = resolveParams(options, paramsIn && typeof paramsIn === 'object' && !Array.isArray(paramsIn) ? paramsIn : (old.mapParams ?? {}));
 
+  const newVp = clamp(s.vpToWin, 3, 50, old.vpToWin);
+  const prevAutoPieces = scaledPieces(old.vpToWin);
+  const wasAutoPieces =
+    old.maxRoads === prevAutoPieces.maxRoads &&
+    old.maxSettlements === prevAutoPieces.maxSettlements &&
+    old.maxCities === prevAutoPieces.maxCities;
+
+  let maxSettlements = clamp(s.maxSettlements, 2, 50, old.maxSettlements);
+  let maxCities = clamp(s.maxCities, 1, 50, old.maxCities);
+  let maxRoads = clamp(s.maxRoads, 5, 100, old.maxRoads);
+
+  if (
+    newVp !== old.vpToWin &&
+    wasAutoPieces &&
+    maxRoads === prevAutoPieces.maxRoads &&
+    maxSettlements === prevAutoPieces.maxSettlements &&
+    maxCities === prevAutoPieces.maxCities
+  ) {
+    const nextPieces = scaledPieces(newVp);
+    maxRoads = nextPieces.maxRoads;
+    maxSettlements = nextPieces.maxSettlements;
+    maxCities = nextPieces.maxCities;
+  }
+
   const settings: Settings = {
     boardRadius: clamp(radiusIn, 1, 50, old.boardRadius),
     goldTiles: clamp(s.goldTiles, 0, 500, old.goldTiles),
     desertTiles: clamp(s.desertTiles, 0, 200, old.desertTiles),
     fogTiles: clamp(s.fogTiles, 0, 2000, old.fogTiles ?? 0),
-    vpToWin: clamp(s.vpToWin, 3, 50, old.vpToWin),
+    vpToWin: newVp,
     maxPlayers: clamp(s.maxPlayers, 2, 8, old.maxPlayers),
     cardDiscardLimit: clamp(s.cardDiscardLimit, 3, 50, old.cardDiscardLimit),
     bankResourcePerType: clamp(s.bankResourcePerType, 5, 999, old.bankResourcePerType),
@@ -155,9 +179,9 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     devRoadBuilding: clamp(s.devRoadBuilding, 0, 50, old.devRoadBuilding),
     devYearOfPlenty: clamp(s.devYearOfPlenty, 0, 50, old.devYearOfPlenty),
     devMonopoly: clamp(s.devMonopoly, 0, 50, old.devMonopoly),
-    maxSettlements: clamp(s.maxSettlements, 2, 20, old.maxSettlements),
-    maxCities: clamp(s.maxCities, 1, 20, old.maxCities),
-    maxRoads: clamp(s.maxRoads, 5, 50, old.maxRoads),
+    maxSettlements,
+    maxCities,
+    maxRoads,
     gameSpeed,
     turnTimerSec: clamp(s.turnTimerSec, 0, 900, old.turnTimerSec ?? 0),
     turnIncrementSec: clamp(s.turnIncrementSec, 0, 120, old.turnIncrementSec ?? 0),

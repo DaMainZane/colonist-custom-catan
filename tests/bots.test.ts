@@ -122,4 +122,22 @@ describe('bot tiers (play)', () => {
     const wins = res.winsByTier.main + res.winsByTier.secondary + res.winsByTier.overload;
     expect(wins).toBe(res.finished);
   }, 300_000);
+
+  it('records structured AI bot training telemetry logs with final rewards when recordTrainingLog is enabled', () => {
+    const r = simulateGame({
+      seed: 19,
+      players: 3,
+      tiers: ['main', 'secondary', 'overload'],
+      recordTrainingLog: true
+    });
+    expect(r.error).toBeNull();
+    expect(r.finished).toBe(true);
+    expect(r.trainingLog).toBeDefined();
+    expect(r.trainingLog!.steps.length).toBeGreaterThan(20);
+    expect(r.trainingLog!.outcome?.winnerId).toBe(r.winner);
+    const winningStep = r.trainingLog!.steps.find(s => s.state.actorId === r.winner);
+    expect(winningStep).toBeDefined();
+    expect(r.trainingLog!.outcome?.rewardByPlayer[r.winner!]).toBe(1);
+  }, 180_000);
 });
+

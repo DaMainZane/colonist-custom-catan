@@ -1,6 +1,7 @@
 // MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | USED BY: bots/scheduler, bots/sim, server/game
 import { checkAction, computeVP, getPlayer, legalActions, makeCtx, totalCards } from '../../shared';
 import type { Ctx, GameEvent, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
+import { pieceCost } from '../../packs/base/building';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
 import { openTrades, tradeRatios } from '../../packs/base/trading';
 import { getPips } from '../util';
@@ -441,7 +442,7 @@ function cutBonus(dc: Dc, vertexId: number): number {
   return n >= 2 ? 8 : 0;
 }
 
-/** Value of putting a settlement on this vertex, from the bot's point of view (fog, gold, ports and room follow the tier and the map). */
+/** Value of putting a settlement on this vertex, from the bot's point of view (fog, gold, ports, scarcity, starting hand and room follow the tier and the map). */
 function vertexScore(dc: Dc, vertexId: number, prod: Record<string, number> = dc.prod): number {
   const own = prod === dc.prod;
   if (own) {
@@ -456,12 +457,17 @@ function vertexScore(dc: Dc, vertexId: number, prod: Record<string, number> = dc
   const lastRoll = (g.dice?.[0] || 0) + (g.dice?.[1] || 0);
   const ids = resIds(reg);
   const missingKinds = ids.filter(r => (prod[r] || 0) === 0).length;
-  const boost = tier.setupPlanning >= 1 && dc.placed === 1 && g.phase.startsWith('setup');
+  const isSetup = g.phase.startsWith('setup');
+  const isSecondSetup = isSetup && (!own || dc.placed === 1);
+  const boost = tier.setupPlanning >= 1 && isSecondSetup;
 
   let score = 0;
+  let totalPips = 0;
+  let productiveHexes = 0;
   const types = new Set<string>();
   const numbers = new Set<number>();
   const here: Record<string, number> = {};
+  const startCards: Record<string, number> = {};
 
   for (const hId of v.hexIds) {
     const h = g.board.hexes[hId];
@@ -479,6 +485,8 @@ function vertexScore(dc: Dc, vertexId: number, prod: Record<string, number> = dc
     if (!tile.land || !tile.numbered) continue;
 
     const pp = getPips(h.number);
+    totalPips += pp;
+    productiveHexes++;
     score += reveal + pp * 3.0;
     if (tier.hotNumbers && h.number && h.number === lastRoll) score += 2.0;
 
@@ -488,28 +496,62 @@ function vertexScore(dc: Dc, vertexId: number, prod: Record<string, number> = dc
       const r = tile.produces;
       types.add(r);
       here[r] = (here[r] || 0) + pp;
-      if ((prod[r] || 0) === 0) score += 5.5 + (boost ? 3.0 : 0); // a resource I do not make yet
+      startCards[r] = (startCards[r] || 0) + 1;
+      if ((prod[r] || 0) === 0) score += 5.5 + (boost ? 3.5 : 0); // a resource I do not make yet
       if (r === 'wheat' || r === 'ore') score += 1.5;
+      // Scarcity on the current board: locking down a scarce resource is worth much more in setup and early expansion.
+      if (tier.setupPlanning >= 1 && (mp.scarcityBonus[r] || 0) > 0) {
+        score += mp.scarcityBonus[r] * (pp / 3.0) * (tier.setupPlanning === 2 ? 1.25 : 0.9);
+      }
     }
     if (h.number) {
-      if (numbers.has(h.number)) score -= 1.5;
+      if (numbers.has(h.number)) score -= 1.8;
       numbers.add(h.number);
     }
   }
 
+  // Volume & number spread bonus for 3-hex intersections with strong total pip output
+  if (productiveHexes === 3 && totalPips >= 9) score += 2.0;
+  if (numbers.size === 3) score += 1.5;
+
   score += types.size * 3.5;
   const has = (r: string): boolean => (prod[r] || 0) > 0 || types.has(r);
-  if (has('wood') && has('brick')) score += 4.0;
-  if (has('wheat') && has('ore')) score += 5.0;
+  if (has('wood') && has('brick')) score += 4.5;
+  if (has('wheat') && has('ore')) score += 5.5;
+  if (has('wheat') && has('ore') && has('sheep')) score += 2.5;
+
+  // Setup-specific strategic evaluation: 2nd settlement starting hand tempo & full resource coverage
+  if (boost) {
+    // 2nd settlement grants 1 starting resource card from each adjacent producing hex
+    if ((startCards.wood || 0) >= 1 && (startCards.brick || 0) >= 1) {
+      score += 3.5; // Immediate Turn 1 road in hand to race for an expansion spot
+    }
+    if ((startCards.wheat || 0) >= 1 && (startCards.ore || 0) >= 1 && (startCards.sheep || 0) >= 1) {
+      score += 3.0; // Immediate Turn 1 dev card in hand
+    }
+    const settleHandParts = ['wood', 'brick', 'sheep', 'wheat'].filter(r => (startCards[r] || 0) >= 1).length;
+    if (settleHandParts >= 3) {
+      score += 2.5; // 3/4 of a settlement already in starting hand
+    }
+    // Anchor check: having zero wheat production across both setup settlements cripples settlements, cities, and devs
+    if (!has('wheat')) score -= 4.5;
+    // Reward covering 4 or all 5 resources across the two opening settlements
+    const coveredCount = ids.filter(r => has(r)).length;
+    if (coveredCount >= 5) score += 4.0;
+    else if (coveredCount === 4) score += 2.0;
+  }
 
   if (v.port) {
     score += portValue(dc, v.port, prod, here, boost);
   } else if (tier.setupPlanning >= 1) {
-    // A matching 2:1 port one step away is worth a little: the next settlement can reach it.
+    // A matching 2:1 or 3:1 port one or two steps away is valuable if reachable by the setup road.
     for (const n of v.adjacentVertices) {
       const np = g.board.vertices[n].port;
       const port = np ? reg.ports.get(np) : undefined;
-      if (port && port.resource && types.has(port.resource)) score += 1.5;
+      if (port) {
+        if (port.resource && types.has(port.resource)) score += 1.8;
+        else if (port.resource === null) score += 0.8;
+      }
     }
   }
 
@@ -549,24 +591,50 @@ function addPips(dc: Dc, vId: number): Record<string, number> {
   return out;
 }
 
-/** Overload opening: judges the first settlement together with the best partner for the second (resources and ports). */
+/**
+ * Snake-draft opening planner: judges the first settlement together with realistic partner spots for the second settlement,
+ * accounting for how many opponent settlements will be drafted before this bot picks again.
+ */
 function planOpening(dc: Dc, spots: Legal[]): Legal | null {
+  const { g, tier } = dc;
   const cheap = (a: Legal): number => cheapVertex(dc, a.payload.loc);
-  const firsts = prune(spots, cheap, 24);
-  const partners = prune(spots, cheap, 40);
+  const firsts = prune(spots, cheap, tier.setupPlanning === 2 ? 28 : 18);
+  const partners = prune(spots, cheap, 44);
+
+  // Count how many opponent settlements will be placed between our 1st pick and our 2nd pick in the snake draft.
+  let picksBetween = Math.max(0, g.players.length - 1);
+  if (g.setup?.order) {
+    const curStep = g.setup.step;
+    const myTurnIdx = g.turn;
+    for (let idx = curStep + 1; idx < g.setup.order.length; idx++) {
+      if (g.setup.order[idx] === myTurnIdx) {
+        picksBetween = idx - curStep - 1;
+        break;
+      }
+    }
+  }
+  // If picking back-to-back at the snake turn (picksBetween === 0), the #1 non-overlapping partner is guaranteed!
+  // Otherwise opponents will likely take some of the top spots before our turn comes back.
+  const expectedRankIdx = Math.min(8, Math.floor(picksBetween * 0.75));
+  const partnerWeight = picksBetween === 0 ? 0.92 : clamp(0.78 - picksBetween * 0.04, 0.52, 0.78);
+
   let best: Legal | null = null;
   let bestScore = -Infinity;
   for (const a of firsts) {
-    const v1 = dc.g.board.vertices[a.payload.loc];
+    const v1 = g.board.vertices[a.payload.loc];
     const after = addPips(dc, v1.id);
     const near = new Set<number>([v1.id, ...v1.adjacentVertices]);
-    let second = 0;
+    const partnerScores: number[] = [];
     for (const b of partners) {
       if (near.has(b.payload.loc)) continue;
-      second = Math.max(second, vertexScore(dc, b.payload.loc, after));
+      partnerScores.push(vertexScore(dc, b.payload.loc, after));
     }
-    // The other players take spots in between, so the partner counts for less than the settlement in hand.
-    const s = vertexScore(dc, v1.id) + 0.7 * second;
+    partnerScores.sort((x, y) => y - x);
+    const topPartner = partnerScores[0] ?? 0;
+    const realisticPartner = partnerScores[Math.min(partnerScores.length - 1, expectedRankIdx)] ?? topPartner;
+    const second = picksBetween === 0 ? topPartner : 0.35 * topPartner + 0.65 * realisticPartner;
+
+    const s = vertexScore(dc, v1.id) + partnerWeight * second;
     if (s > bestScore) { bestScore = s; best = a; }
   }
   return best;
@@ -577,6 +645,53 @@ function roadScore(dc: Dc, edgeId: number): number {
   const e = g.board.edges[edgeId];
   const setup = g.phase.startsWith('setup');
   const fogBonus = tier.fogMode === 0 ? 0 : tier.fogMode === 2 ? 10 : (setup || placeable(dc, SETTLEMENT).length > 0 ? 3 : 14);
+
+  // During `setup_road`, one endpoint is the settlement just placed (`lastVertexId`) and the other is `step1`
+  // (1 edge away, where a settlement can never be built due to the distance rule). Score the 2-edge and 3-edge
+  // expansion spots reachable from `step1` so the setup road points toward the best open expansion corridor!
+  if (setup && g.setup.lastVertexId !== null) {
+    const originId = g.setup.lastVertexId;
+    const step1Id = e.v1 === originId ? e.v2 : e.v1;
+    const step1 = g.board.vertices[step1Id];
+    if (!step1) return -999;
+
+    let setupScore = 0;
+    for (const hId of step1.hexIds) if (g.board.hexes[hId] && isHidden(g.board.hexes[hId])) setupScore += fogBonus;
+    if (step1.port) setupScore += portValue(dc, step1.port, dc.prod, {}, true) * 0.5;
+
+    let bestStep2 = 0;
+    let openStep2Count = 0;
+    let bestStep3 = 0;
+
+    for (const step2Id of step1.adjacentVertices) {
+      if (step2Id === originId) continue;
+      const step2 = g.board.vertices[step2Id];
+      if (!step2) continue;
+
+      if (isSpot(dc, step2Id)) {
+        openStep2Count++;
+        const s2 = 36 + vertexScore(dc, step2Id) + (tier.roadPlanning === 2 ? contested(dc, step2Id) * 0.8 : 0);
+        if (s2 > bestStep2) bestStep2 = s2;
+      }
+
+      if (tier.roadPlanning >= 1 && (!step2.piece || step2.piece.owner === dc.p.id)) {
+        for (const step3Id of step2.adjacentVertices) {
+          if (step3Id === step1Id || step3Id === originId) continue;
+          if (isSpot(dc, step3Id)) {
+            const s3 = 18 + vertexScore(dc, step3Id) * 0.65;
+            if (s3 > bestStep3) bestStep3 = s3;
+          }
+        }
+      }
+    }
+
+    setupScore += bestStep2 + openStep2Count * 6 + bestStep3 * 0.55;
+    if (openStep2Count === 0 && bestStep3 === 0) {
+      setupScore -= 25; // Avoid pointing the initial road into a blocked dead end or coastal corner
+    }
+    return setupScore;
+  }
+
   let score = 0;
   for (const endId of [e.v1, e.v2]) {
     const end = g.board.vertices[endId];
@@ -686,7 +801,10 @@ function awardChase(dc: Dc): Chase {
 function planList(dc: Dc): Plan[] {
   if (dc.plans) return dc.plans;
   const { reg, p, g } = dc;
-  const cost = (id: string): Resources => reg.pieces.get(id)?.cost ?? {};
+  const cost = (id: string): Resources => {
+    const def = reg.pieces.get(id);
+    return def ? pieceCost(g, p, def) : {};
+  };
   const pers = dc.personality;
   const chase = awardChase(dc);
   const out: Plan[] = [];
@@ -1059,7 +1177,7 @@ function decide(dc: Dc): BotMove | null {
     case 'setup_settlement': {
       const spots = of('build');
       let pick: Legal | null = null;
-      if (tier.setupPlanning === 2 && dc.placed === 0 && spots.length > 1) pick = planOpening(dc, spots);
+      if (tier.setupPlanning >= 1 && dc.placed === 0 && spots.length > 1) pick = planOpening(dc, spots);
       if (!pick) pick = pickSettlement(dc, spots);
       return pick ? { type: 'build', payload: pick.payload } : null;
     }
@@ -1156,7 +1274,8 @@ function mainPhase(dc: Dc): BotMove | null {
   // 8. Road toward a new settlement spot, when rich in roads, to chase Longest Road, or to spend down a big hand.
   const roads = builds(ROAD);
   if (roads.length) {
-    const cost = reg.pieces.get(ROAD)?.cost ?? {};
+    const roadDef = reg.pieces.get(ROAD);
+    const cost = roadDef ? pieceCost(g, p, roadDef) : {};
     const factor = dc.personality === 'roadHog' ? 1 : 2;
     const richInRoads = Object.entries(cost).every(([r, n]) => (p.resources[r] || 0) >= (n as number) * factor);
     const hasOpenSpot = placeable(dc, SETTLEMENT).length > 0;

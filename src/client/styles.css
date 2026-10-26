@@ -666,6 +666,10 @@ svg#boardSvg.is-panning * {
 .recipe-mini-card.has-res {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
+.recipe-double-badge {
+  background: var(--accent); color: var(--on-accent); font-size: 10.5px; font-weight: 800;
+  padding: 2px 5px; border-radius: 4px; margin-right: 2px; line-height: 1;
+}
 
 /* ---------- Right sidebar ---------- */
 .right-sidebar {
@@ -763,21 +767,38 @@ svg#boardSvg.is-panning * {
 .spot-pulse.spot-static { animation: none; }
 .spot-pulse:hover { opacity: 1; animation: none; transform: scale(1.15); }
 @keyframes spotPulse { 0%, 100% { opacity: 0.78; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1.08); } }
-.road-spot-line { stroke: var(--accent); stroke-opacity: 0.35; stroke-width: 12; stroke-linecap: round; animation: roadGlow 1.6s ease-in-out infinite; }
+.road-rim-line {
+  stroke: var(--piece-rim);
+  stroke-width: calc(12px * var(--road-scale, 1));
+  stroke-linecap: round;
+}
+.road-body-line {
+  stroke-width: calc(8px * var(--road-scale, 1));
+  stroke-linecap: round;
+}
+.road-spot-line {
+  stroke: var(--accent); stroke-opacity: 0.35;
+  stroke-width: calc(12px * var(--road-scale, 1));
+  stroke-linecap: round; animation: roadGlow 1.6s ease-in-out infinite;
+}
 .road-spot-dot {
-  fill: var(--accent); stroke: var(--piece-rim); stroke-width: 2.8;
+  fill: var(--accent); stroke: var(--piece-rim); stroke-width: calc(2.8px * var(--road-scale, 1));
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
 @keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
-.road-hit { stroke: transparent; stroke-width: 20; stroke-linecap: round; cursor: pointer; pointer-events: stroke; }
+.road-hit {
+  stroke: transparent;
+  stroke-width: calc(20px * var(--road-scale, 1));
+  stroke-linecap: round; cursor: pointer; pointer-events: stroke;
+}
 /* Road hover: a flat dark halo drawn UNDER the roads (the roads stay visible on top). Each halo is one group, and the
    opacity is set on the group, so the pieces join into one seamless shape instead of overlapping. */
 .road-glow-net, .road-glow-best { pointer-events: none; }
 .road-glow-net { opacity: 0.2; }
 .road-glow-best { opacity: 0.5; }
 .road-glow-net line, .road-glow-best line { stroke: var(--target-dark); stroke-linecap: round; stroke-linejoin: round; }
-.road-glow-net line { stroke-width: 18; }
-.road-glow-best line { stroke-width: 22; }
+.road-glow-net line { stroke-width: calc(18px * var(--road-scale, 1)); }
+.road-glow-best line { stroke-width: calc(22px * var(--road-scale, 1)); }
 .road-hover-tooltip {
   position: fixed; z-index: 1100; pointer-events: none;
   transform: translate(-50%, -100%);

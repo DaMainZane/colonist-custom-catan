@@ -31,7 +31,68 @@ export function cycleAvatar(playerId: string): void {
   }
 }
 
-// ---------- Landing / lobby ----------
+// ---------- Landing / lobby / reconnect ----------
+
+const CLIENT_ID_KEY = 'catan_client_id';
+const SAVED_NAME_KEY = 'catan_player_name';
+const SAVED_ROOM_KEY = 'catan_last_room';
+
+export function getClientId(): string {
+  try {
+    let cid = localStorage.getItem(CLIENT_ID_KEY);
+    if (!cid) {
+      cid = 'cid_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+      localStorage.setItem(CLIENT_ID_KEY, cid);
+    }
+    return cid;
+  } catch {
+    return 'cid_ephemeral';
+  }
+}
+
+export function saveSessionInfo(code?: string, name?: string): void {
+  try {
+    if (code) localStorage.setItem(SAVED_ROOM_KEY, code);
+    if (name) localStorage.setItem(SAVED_NAME_KEY, name);
+    syncRejoinButton();
+  } catch {}
+}
+
+export function clearSavedRoom(): void {
+  try {
+    localStorage.removeItem(SAVED_ROOM_KEY);
+    syncRejoinButton();
+  } catch {}
+}
+
+export function getSavedSession(): { clientId: string; code: string; name: string } {
+  try {
+    return {
+      clientId: getClientId(),
+      code: (localStorage.getItem(SAVED_ROOM_KEY) || '').trim().toUpperCase(),
+      name: (localStorage.getItem(SAVED_NAME_KEY) || '').trim()
+    };
+  } catch {
+    return { clientId: getClientId(), code: '', name: '' };
+  }
+}
+
+export function syncRejoinButton(): void {
+  const btn = document.getElementById('rejoinLastGameBtn') as HTMLButtonElement | null;
+  const lbl = document.getElementById('rejoinLastGameLbl');
+  if (!btn) return;
+  const { code, name } = getSavedSession();
+  const nameInput = document.getElementById('playerNameInput') as HTMLInputElement | null;
+  if (nameInput && !nameInput.value && name) {
+    nameInput.value = name;
+  }
+  if (code) {
+    btn.style.display = 'inline-flex';
+    if (lbl) lbl.textContent = `Rejoin game (${code})`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
 
 function getRequiredPlayerName(): string | null {
   const input = document.getElementById('playerNameInput') as HTMLInputElement | null;
@@ -41,13 +102,14 @@ function getRequiredPlayerName(): string | null {
     input?.focus();
     return null;
   }
+  saveSessionInfo(undefined, name);
   return name;
 }
 
 export function createRoom(): void {
   const name = getRequiredPlayerName();
   if (!name) return;
-  socket.emit('createRoom', { name });
+  socket.emit('createRoom', { name, clientId: getClientId() });
 }
 
 export function joinRoom(): void {
@@ -55,8 +117,31 @@ export function joinRoom(): void {
   if (!name) return;
   socket.emit('joinRoom', {
     code: (document.getElementById('roomCodeInput') as HTMLInputElement).value,
-    name
+    name,
+    clientId: getClientId()
   });
+}
+
+export function rejoinSavedRoom(silent = false): void {
+  const { clientId, code, name } = getSavedSession();
+  const inputName = ((document.getElementById('playerNameInput') as HTMLInputElement | null)?.value || '').trim() || name;
+  if (!code && !clientId) {
+    if (!silent) showToast('No saved game session to rejoin.');
+    return;
+  }
+  socket.emit('reconnectRoom', { code, clientId, name: inputName, silent });
+}
+
+export function downloadTrainingLog(): void {
+  const roomQuery = state?.code ? `?room=${encodeURIComponent(state.code)}&format=jsonl` : '?format=jsonl';
+  const a = document.createElement('a');
+  a.href = `/api/bot-training-logs${roomQuery}`;
+  a.download = `bot-training-${state?.code || 'all'}.jsonl`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  playTone(600, 0.08);
+  showToast('Downloading AI bot training log (.jsonl)');
 }
 
 export function copyInviteLink(): void {

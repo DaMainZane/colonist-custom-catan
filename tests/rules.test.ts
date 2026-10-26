@@ -285,5 +285,56 @@ describe('rules', () => {
     expect(p1.stats.resTradedIn).toBe(1);
     expect(p1.stats.res_brick).toBe(1);
   });
+
+  it('scales settlement, city, and road limits with VP setting and charges double above base limits', () => {
+    const g = createGame(registry, {
+      players: [{ id: 'p1', name: 'P1' }, { id: 'p2', name: 'P2' }],
+      rules: { vpToWin: 20 },
+      seed: 1,
+      shuffleSeats: false
+    });
+    expect(g.rules.pieceLimits).toEqual({
+      road: 30,
+      settlement: 10,
+      city: 8
+    });
+
+    g.phase = 'main';
+    g.turnCount = 1;
+    const p1 = getPlayer(g, 'p1')!;
+    expect(p1.pieces.road).toBe(30);
+    expect(p1.pieces.settlement).toBe(10);
+    expect(p1.pieces.city).toBe(8);
+
+    // Place 15 active roads for p1 on the board so the 16th road is above the base limit (15)
+    for (let i = 0; i < 15; i++) {
+      g.board.edges[i].piece = { owner: 'p1', type: 'road' };
+    }
+    p1.pieces.road = 15;
+
+    // Find an empty edge connected to one of p1's existing roads
+    const connEdge = g.board.edges.find(e =>
+      !e.piece &&
+      (g.board.vertices[e.v1].edgeIds.some(oe => g.board.edges[oe].piece?.owner === 'p1') ||
+       g.board.vertices[e.v2].edgeIds.some(oe => g.board.edges[oe].piece?.owner === 'p1'))
+    )!;
+    expect(connEdge).toBeDefined();
+
+    // Normal 1x road cost (1 wood, 1 brick) should be rejected when building above the 15-road base limit
+    p1.resources.wood = 1;
+    p1.resources.brick = 1;
+    const failRoad = dispatch(g, registry, { type: 'build', playerId: 'p1', payload: { piece: 'road', loc: connEdge.id } });
+    expect(failRoad.ok).toBe(false);
+
+    // Double road cost (2 wood, 2 brick) succeeds and deducts 2 wood + 2 brick
+    p1.resources.wood = 2;
+    p1.resources.brick = 2;
+    const okRoad = dispatch(g, registry, { type: 'build', playerId: 'p1', payload: { piece: 'road', loc: connEdge.id } });
+    expect(okRoad.ok).toBe(true);
+    expect(p1.resources.wood).toBe(0);
+    expect(p1.resources.brick).toBe(0);
+    expect(p1.pieces.road).toBe(14);
+  });
 });
+
 

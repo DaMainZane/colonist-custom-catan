@@ -7,6 +7,7 @@ import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawe
 import { renderInlineDrawer } from './drawer';
 import { adjustCounter } from './trade';
 import { esc } from '../util';
+import { isClientPieceDoubleCost } from './board';
 
 export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', string[]> = {
   dev: ['sheep', 'wheat', 'ore'],
@@ -16,7 +17,9 @@ export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', strin
 };
 
 export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' | 'city', me: any): string {
-  const list = BUILD_RECIPES[recipeKey];
+  const baseList = BUILD_RECIPES[recipeKey];
+  const isDouble = recipeKey !== 'dev' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
+  const list = isDouble ? baseList.flatMap(r => [r, r]) : baseList;
   const seen: Record<string, number> = {};
   const hand = me?.resources || {};
   const cardsHtml = list.map(r => {
@@ -25,7 +28,8 @@ export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' |
     const hasIt = avail >= seen[r];
     return `<div class="recipe-mini-card card-${r} ${hasIt ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
   }).join('');
-  return `<div class="recipe-cards-strip">${cardsHtml}</div>`;
+  const badgeHtml = isDouble ? `<span class="recipe-double-badge" title="Above base piece limit: costs 2× resources">2×</span>` : '';
+  return `<div class="recipe-cards-strip">${badgeHtml}${cardsHtml}</div>`;
 }
 
 function updateActionRecipePopups(me: any): void {

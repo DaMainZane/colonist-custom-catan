@@ -31,14 +31,15 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
-  createRoom, joinRoom, copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
+  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton, getSavedSession,
+  copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
   setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
-  createRoom, joinRoom, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
+  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
   switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
@@ -86,6 +87,29 @@ function syncAutomaticDrawers(): void {
 
 socket.on('errorMsg', (msg: string) => showToast(msg));
 
+socket.on('reconnected', ({ code }: { code: string; name: string }) => {
+  showToast(`Reconnected to room ${code}`);
+});
+
+socket.on('reconnectFailed', () => {
+  if (!state) {
+    clearSavedRoom();
+  }
+});
+
+socket.on('connect', () => {
+  // Automatically rejoin if the socket dropped and reconnected mid-game, or if a saved session exists
+  if (state?.code) {
+    rejoinSavedRoom(true);
+  } else {
+    const saved = getSavedSession();
+    const urlRoom = new URLSearchParams(window.location.search).get('room');
+    if (saved.code && (!urlRoom || urlRoom.toUpperCase() === saved.code)) {
+      rejoinSavedRoom(true);
+    }
+  }
+});
+
 socket.on('gameState', (newState: any) => {
   const prevDice = state ? state.lastDice.join(',') : '';
   const wasGameOver = state?.status === 'GAMEOVER';
@@ -97,6 +121,10 @@ socket.on('gameState', (newState: any) => {
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
   setState(newState);
+  const meInNewState = newState?.players?.find((p: any) => p.id === socket.id);
+  if (newState?.code && meInNewState) {
+    saveSessionInfo(newState.code, meInNewState.name?.replace(/\s*\(Bot\)$/i, ''));
+  }
   if (state.status === 'LOBBY') {
     clearAllInFlight();
   }
@@ -162,6 +190,7 @@ socket.on('gameState', (newState: any) => {
 
 function init(): void {
   hydrateIcons();
+  syncRejoinButton();
   const params = new URLSearchParams(window.location.search);
   if (params.get('room')) (document.getElementById('roomCodeInput') as HTMLInputElement).value = params.get('room')!;
 

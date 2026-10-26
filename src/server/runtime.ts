@@ -38,6 +38,20 @@ export function defaultSettings(): Settings {
 
 /** Bank and dev deck sizes of the standard 3-4 player game, the ones the lobby starts with. */
 const STANDARD_SUPPLY = { bankResourcePerType: 19, devKnights: 14, devVp: 5, devRoadBuilding: 2, devYearOfPlenty: 2, devMonopoly: 2 };
+const STANDARD_PIECES = { maxRoads: 15, maxSettlements: 5, maxCities: 4 };
+
+/**
+ * Piece limits (roads, settlements, cities) scaled to `vpToWin` when above the standard 10 VP.
+ * Base limits at 10 VP are 15 roads, 5 settlements, 4 cities. Pieces built above the base limits cost double.
+ */
+export function scaledPieces(vpToWin: number): typeof STANDARD_PIECES {
+  const mult = Math.max(1, (Number(vpToWin) || 10) / 10);
+  return {
+    maxRoads: Math.min(100, Math.ceil(STANDARD_PIECES.maxRoads * mult)),
+    maxSettlements: Math.min(50, Math.ceil(STANDARD_PIECES.maxSettlements * mult)),
+    maxCities: Math.min(50, Math.ceil(STANDARD_PIECES.maxCities * mult))
+  };
+}
 
 /** Bigger tables get a bigger bank and dev deck (5-6 follows the real extension: 24 per resource, 34 dev cards). */
 function supplyFor(players: number): typeof STANDARD_SUPPLY {
@@ -64,13 +78,26 @@ export function scaledSupply(players: number, landHexes: number): typeof STANDAR
 }
 
 /**
- * Settings for the game about to start. If the host left the bank and dev deck at the standard numbers,
- * they grow with the real player count (not the seat limit) and with the size of the board (`landHexes`, 0 = unknown).
+ * Settings for the game about to start. If the host left the bank, dev deck, or piece limits at the standard numbers,
+ * they grow with the real player count, board size (`landHexes`, 0 = unknown), and `vpToWin`.
  * Anything the host changed is kept as is.
  */
 export function settingsForPlayers(s: Settings, players: number, landHexes = 0): Settings {
-  const untouched = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => s[k] === STANDARD_SUPPLY[k]);
-  return untouched ? { ...s, ...scaledSupply(players, landHexes) } : s;
+  const untouchedSupply = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => s[k] === STANDARD_SUPPLY[k]);
+  const untouchedPieces = (Object.keys(STANDARD_PIECES) as (keyof typeof STANDARD_PIECES)[]).every(k => s[k] === STANDARD_PIECES[k]);
+
+  let next = s;
+  if (untouchedSupply) {
+    const sup = scaledSupply(players, landHexes);
+    const sameSup = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => sup[k] === s[k]);
+    if (!sameSup) next = { ...next, ...sup };
+  }
+  if (untouchedPieces && s.vpToWin > 10) {
+    const pcs = scaledPieces(s.vpToWin);
+    const samePcs = (Object.keys(STANDARD_PIECES) as (keyof typeof STANDARD_PIECES)[]).every(k => pcs[k] === s[k]);
+    if (!samePcs) next = { ...next, ...pcs };
+  }
+  return next;
 }
 
 /** Overrides handed to createGame (it merges them over the registry defaults). */

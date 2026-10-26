@@ -6,6 +6,7 @@ import { defaultSettings } from './runtime';
 import { clearTurnClock } from './turnClock';
 import { DEFAULT_TIER, tierLabel } from './bots/tiers';
 import type { TierId } from './bots/tiers';
+import { rebindTrainingLogPlayerId } from './bots/trainingLog';
 import type { LobbyPlayer, Room, RoomStatus } from './types';
 
 export const rooms: Record<string, Room> = {};
@@ -47,7 +48,9 @@ export function createRoom(hostId: string, hostName: string): Room {
     chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add bots to start.' }],
     fx: { lastRollHexIds: [], recentProductions: [], recentTransfers: [] },
     startedAt: null,
-    finishedAt: null
+    finishedAt: null,
+    clientTokens: {},
+    disconnectedSeats: {}
   };
   rooms[code] = room;
   return room;
@@ -82,9 +85,99 @@ export function enginePlayer(room: Room, id: string): PlayerState | undefined {
   return room.game?.players.find(p => p.id === id);
 }
 
+/**
+ * Rebinds a player's seat from `oldId` to `newId` across lobby roster, active game state,
+ * board pieces, awards, active trades, turn clocks, and AI training logs.
+ */
+export function rebindPlayerId(
+  room: Room,
+  oldId: string,
+  newId: string,
+  restoreName?: string,
+  restoreAvatar?: string
+): boolean {
+  let found = false;
+
+  if (room.hostId === oldId) {
+    room.hostId = newId;
+  }
+
+  for (const lp of room.lobbyPlayers) {
+    if (lp.id === oldId) {
+      lp.id = newId;
+      lp.isBot = false;
+      lp.difficulty = null;
+      if (restoreName) lp.name = restoreName;
+      if (restoreAvatar) lp.avatar = restoreAvatar;
+      found = true;
+    }
+  }
+
+  const g = room.game;
+  if (g) {
+    for (const p of g.players) {
+      if (p.id === oldId) {
+        p.id = newId;
+        p.isBot = false;
+        p.difficulty = null;
+        if (restoreName) p.name = restoreName;
+        else p.name = p.name.replace(/\s*\(Bot\)$/i, '');
+        if (restoreAvatar) p.avatar = restoreAvatar;
+        found = true;
+      }
+    }
+
+    if (found) {
+      for (const v of g.board.vertices) {
+        if (v.piece && v.piece.owner === oldId) v.piece.owner = newId;
+      }
+      for (const e of g.board.edges) {
+        if (e.piece && e.piece.owner === oldId) e.piece.owner = newId;
+      }
+      for (const k of Object.keys(g.awards)) {
+        if (g.awards[k]?.owner === oldId) g.awards[k]!.owner = newId;
+      }
+      const trades = g.trades ?? (g.trade ? [g.trade] : []);
+      for (const t of trades) {
+        if (t.fromId === oldId) t.fromId = newId;
+        if (t.responses && oldId in t.responses) {
+          t.responses[newId] = t.responses[oldId];
+          delete t.responses[oldId];
+        }
+      }
+      if (g.winner && g.winner.id === oldId) {
+        g.winner.id = newId;
+        if (restoreName) g.winner.name = restoreName;
+      }
+      rebindTrainingLogPlayerId(room.code, oldId, newId);
+    }
+  }
+
+  if (room.turnClock && room.turnClock.playerId === oldId) {
+    room.turnClock.playerId = newId;
+  }
+
+  for (const prod of room.fx.recentProductions) {
+    if (prod.playerId === oldId) prod.playerId = newId;
+  }
+  for (const tr of room.fx.recentTransfers) {
+    if (tr.from === oldId) tr.from = newId;
+    if (tr.to === oldId) tr.to = newId;
+  }
+
+  if (room.clientTokens) {
+    for (const [token, pid] of Object.entries(room.clientTokens)) {
+      if (pid === oldId) room.clientTokens[token] = newId;
+    }
+  }
+
+  return found;
+}
+
 export function clearBotTimers(room: Room): void {
   if (room.botTimer) clearTimeout(room.botTimer);
   if (room.tradeTimer) clearTimeout(room.tradeTimer);
+  if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
   if (room.tradeTimers) {
     for (const entry of room.tradeTimers.values()) {
       if (entry.timer) clearTimeout(entry.timer);
@@ -93,6 +186,7 @@ export function clearBotTimers(room: Room): void {
   }
   room.botTimer = undefined;
   room.tradeTimer = undefined;
+  room.cleanupTimer = undefined;
   room.tradeTimerFor = null;
   clearTurnClock(room);
 }

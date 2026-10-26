@@ -87,6 +87,15 @@ export interface Effects {
   animDelayMs?: number;
 }
 
+export interface DisconnectedSeat {
+  playerId: string;
+  clientId?: string;
+  originalName: string;
+  originalAvatar: string;
+  wasHost: boolean;
+  disconnectedAt: number;
+}
+
 export interface Room {
   code: string;
   hostId: string;
@@ -104,6 +113,12 @@ export interface Room {
   fx: Effects;
   startedAt: number | null;
   finishedAt: number | null;
+  /** Persistent browser clientId -> current playerId seat mapping for seamless reconnects. */
+  clientTokens?: Record<string, string>;
+  /** Seats where a human disconnected and can rejoin by clientId or nickname. */
+  disconnectedSeats?: Record<string, DisconnectedSeat>;
+  /** Grace timer before an empty room is garbage-collected after all humans disconnect. */
+  cleanupTimer?: any;
   /** Timestamp until which client roll/card/robber animations are still playing; bots wait until after this time. */
   animatingUntil?: number;
   botTimer?: any;

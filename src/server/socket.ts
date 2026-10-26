@@ -3,7 +3,7 @@ import type { Server } from 'socket.io';
 import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
-import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rooms } from './rooms';
+import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rebindPlayerId, rooms } from './rooms';
 import { applyMapStart, applyRecipeStyle, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap } from './lobby';
 import { mapOptionsView } from './mapmenu';
 import { applyLoadedPreset, loadPreset, presetStyle, serializePreset } from './presets';
@@ -15,6 +15,66 @@ import { reactToChat } from './bots/dialogue';
 import type { Room } from './types';
 
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
+const ROOM_DISCONNECT_TTL_MS = 10 * 60 * 1000;
+
+function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: string): boolean {
+  room.clientTokens = room.clientTokens || {};
+  room.disconnectedSeats = room.disconnectedSeats || {};
+  const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
+  const cleanName = typeof name === 'string' ? name.trim().substring(0, 16) : '';
+
+  let targetOldId: string | undefined;
+  if (cleanClientId && room.clientTokens[cleanClientId]) {
+    targetOldId = room.clientTokens[cleanClientId];
+  }
+  if (!targetOldId && cleanClientId) {
+    const byToken = Object.values(room.disconnectedSeats).find(s => s.clientId === cleanClientId);
+    if (byToken) targetOldId = byToken.playerId;
+  }
+  if (!targetOldId && cleanName) {
+    const lower = cleanName.toLowerCase();
+    const byName = Object.values(room.disconnectedSeats).find(s => s.originalName.toLowerCase() === lower);
+    if (byName) targetOldId = byName.playerId;
+  }
+  if (!targetOldId) return false;
+
+  const seatInfo = room.disconnectedSeats[targetOldId];
+  const restoreName = seatInfo?.originalName || (cleanName || undefined);
+  const restoreAvatar = seatInfo?.originalAvatar;
+  const wasHost = seatInfo?.wasHost ?? (room.hostId === targetOldId);
+
+  if (!rebindPlayerId(room, targetOldId, socket.id, restoreName, restoreAvatar)) {
+    return false;
+  }
+
+  delete room.disconnectedSeats[targetOldId];
+  if (cleanClientId) {
+    room.clientTokens[cleanClientId] = socket.id;
+  }
+  if (wasHost || !humanIds(room).includes(room.hostId)) {
+    room.hostId = socket.id;
+  }
+  if (room.cleanupTimer) {
+    clearTimeout(room.cleanupTimer);
+    room.cleanupTimer = undefined;
+  }
+
+  socket.join(room.code);
+  const p = room.game
+    ? room.game.players.find(pl => pl.id === socket.id)
+    : room.lobbyPlayers.find(pl => pl.id === socket.id);
+
+  if (room.game && p) {
+    room.game.log.push({ text: `🔌 ${p.name} reconnected and reclaimed their seat!`, color: p.color });
+    if (room.game.log.length > 80) room.game.log.shift();
+  } else if (p) {
+    addLobbyLog(room, `🔌 ${p.avatar} ${p.name} reconnected to the lobby`, p.color);
+  }
+
+  socket.emit('reconnected', { code: room.code, name: p?.name || restoreName || '' });
+  broadcastRoom(room);
+  return true;
+}
 
 /** Once the table passes 4 and the map radius is below what that many players need, tell the lobby once per size. */
 function noteCrowding(room: Room): void {
@@ -55,33 +115,100 @@ export function registerSocketHandlers(io: Server): void {
 
     // ---- Lobby ------------------------------------------------------------
 
-    socket.on('createRoom', safe(({ name }) => {
+    socket.on('createRoom', safe(({ name, clientId }) => {
       const cleanName = String(name || '').trim().substring(0, 16);
       if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       const room = createRoom(socket.id, cleanName);
+      const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
+      if (cleanClientId) {
+        room.clientTokens = room.clientTokens || {};
+        room.clientTokens[cleanClientId] = socket.id;
+      }
       socket.join(room.code);
       broadcastRoom(room);
     }));
 
-    socket.on('joinRoom', safe(({ code, name }) => {
+    socket.on('joinRoom', safe(({ code, name, clientId }) => {
       const cleanCode = (code || '').trim().toUpperCase();
       const cleanName = String(name || '').trim().substring(0, 16);
       if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
-      // No code (the normal case for a private group): take the newest lobby that still has a seat.
+      const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
+
+      // If a room code is specified (or a room has a disconnected seat matching clientId/name), try reclaiming first!
+      const candidateRoom = cleanCode
+        ? rooms[cleanCode]
+        : Object.values(rooms).reverse().find(r =>
+            (cleanClientId && (r.clientTokens?.[cleanClientId] || Object.values(r.disconnectedSeats || {}).some(s => s.clientId === cleanClientId))) ||
+            (!r.game && r.lobbyPlayers.length < r.settings.maxPlayers)
+          );
+
+      if (!candidateRoom) {
+        return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
+      }
+
+      if (tryReclaimSeat(candidateRoom, socket, cleanClientId, cleanName)) {
+        return;
+      }
+
+      if (candidateRoom.game) return socket.emit('errorMsg', 'Game already started!');
+      if (candidateRoom.lobbyPlayers.length >= candidateRoom.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
+
+      if (candidateRoom.cleanupTimer) {
+        clearTimeout(candidateRoom.cleanupTimer);
+        candidateRoom.cleanupTimer = undefined;
+      }
+
+      const newP = createLobbyPlayer(socket.id, cleanName, candidateRoom.lobbyPlayers.length, false);
+      newP.avatar = freeAvatar(candidateRoom);
+      candidateRoom.lobbyPlayers.push(newP);
+      if (cleanClientId) {
+        candidateRoom.clientTokens = candidateRoom.clientTokens || {};
+        candidateRoom.clientTokens[cleanClientId] = socket.id;
+      }
+      socket.join(candidateRoom.code);
+      addLobbyLog(candidateRoom, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
+      noteCrowding(candidateRoom);
+      broadcastRoom(candidateRoom);
+    }));
+
+    socket.on('reconnectRoom', safe(({ code, clientId, name, silent }) => {
+      const cleanCode = String(code || '').trim().toUpperCase();
+      const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
+      const cleanName = String(name || '').trim().substring(0, 16);
+
       const room = cleanCode
         ? rooms[cleanCode]
-        : Object.values(rooms).reverse().find(r => !r.game && r.lobbyPlayers.length < r.settings.maxPlayers);
-      if (!room) return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
-      if (room.game) return socket.emit('errorMsg', 'Game already started!');
-      if (room.lobbyPlayers.length >= room.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
+        : Object.values(rooms).reverse().find(r =>
+            cleanClientId && (r.clientTokens?.[cleanClientId] || Object.values(r.disconnectedSeats || {}).some(s => s.clientId === cleanClientId))
+          );
 
-      const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
-      newP.avatar = freeAvatar(room);
-      room.lobbyPlayers.push(newP);
-      socket.join(room.code);
-      addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
-      noteCrowding(room);
-      broadcastRoom(room);
+      if (!room) {
+        socket.emit('reconnectFailed', { code: cleanCode });
+        if (!silent) socket.emit('errorMsg', 'Previous session expired or room no longer exists.');
+        return;
+      }
+
+      if (tryReclaimSeat(room, socket, cleanClientId, cleanName)) {
+        return;
+      }
+
+      // If the room is still in LOBBY and has space, let them join directly if not silent
+      if (!silent && !room.game && cleanName && room.lobbyPlayers.length < room.settings.maxPlayers) {
+        const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
+        newP.avatar = freeAvatar(room);
+        room.lobbyPlayers.push(newP);
+        if (cleanClientId) {
+          room.clientTokens = room.clientTokens || {};
+          room.clientTokens[cleanClientId] = socket.id;
+        }
+        socket.join(room.code);
+        addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
+        broadcastRoom(room);
+        return;
+      }
+
+      socket.emit('reconnectFailed', { code: cleanCode });
+      if (!silent) socket.emit('errorMsg', 'Could not find your seat in that game.');
     }));
 
     socket.on('addBot', safe(({ code, tier }) => {
@@ -304,34 +431,67 @@ export function registerSocketHandlers(io: Server): void {
         for (const code of Object.keys(rooms)) {
           const room = rooms[code];
           const g = room.game;
+          room.disconnectedSeats = room.disconnectedSeats || {};
+          const tokenEntry = Object.entries(room.clientTokens || {}).find(([, pid]) => pid === socket.id);
+          const clientId = tokenEntry?.[0];
 
           if (!g) {
-            const idx = room.lobbyPlayers.findIndex(p => p.id === socket.id);
-            if (idx === -1) continue;
-            room.lobbyPlayers.splice(idx, 1);
-            if (humanIds(room).length === 0) {
+            const lp = room.lobbyPlayers.find(p => p.id === socket.id);
+            if (!lp) continue;
+            room.disconnectedSeats[socket.id] = {
+              playerId: socket.id,
+              clientId,
+              originalName: lp.name,
+              originalAvatar: lp.avatar,
+              wasHost: room.hostId === socket.id,
+              disconnectedAt: Date.now()
+            };
+            const humans = humanIds(room).filter(id => id !== socket.id);
+            if (humans.length === 0) {
               clearBotTimers(room);
-              delete rooms[code];
+              room.cleanupTimer = setTimeout(() => {
+                if (rooms[code] && humanIds(rooms[code]).filter(id => !rooms[code].disconnectedSeats?.[id]).length === 0) {
+                  clearBotTimers(rooms[code]);
+                  delete rooms[code];
+                }
+              }, ROOM_DISCONNECT_TTL_MS);
               continue;
             }
-            if (room.hostId === socket.id) room.hostId = humanIds(room)[0];
+            const idx = room.lobbyPlayers.findIndex(p => p.id === socket.id);
+            if (idx !== -1) room.lobbyPlayers.splice(idx, 1);
+            delete room.disconnectedSeats[socket.id];
+            if (room.hostId === socket.id) room.hostId = humans[0];
             broadcastRoom(room);
             continue;
           }
 
           const p = g.players.find(pl => pl.id === socket.id);
           if (!p) continue;
+          const cleanOriginalName = p.name.replace(/\s*\(Bot\)$/i, '');
+          room.disconnectedSeats[socket.id] = {
+            playerId: socket.id,
+            clientId,
+            originalName: cleanOriginalName,
+            originalAvatar: p.avatar,
+            wasHost: room.hostId === socket.id,
+            disconnectedAt: Date.now()
+          };
           p.isBot = true;
           p.difficulty = tierLabel(TAKEOVER_TIER);
           if (!p.name.includes('(Bot)')) p.name += ' (Bot)';
-          g.log.push({ text: `🤖 ${p.name} disconnected — a ${tierLabel(TAKEOVER_TIER)} bot took over.`, color: p.color });
+          g.log.push({ text: `🤖 ${cleanOriginalName} disconnected — a ${tierLabel(TAKEOVER_TIER)} bot took over (rejoin anytime).`, color: p.color });
           if (g.log.length > 80) g.log.shift();
 
           const humans = humanIds(room);
           if (humans.length === 0) {
-            // Nobody can ever rejoin (identity is the socket id until Step 3), so stop simulating.
+            // Pause bot simulation while no human is connected, but keep the room alive for 10 minutes so the player can reconnect.
             clearBotTimers(room);
-            delete rooms[code];
+            room.cleanupTimer = setTimeout(() => {
+              if (rooms[code] && humanIds(rooms[code]).length === 0) {
+                clearBotTimers(rooms[code]);
+                delete rooms[code];
+              }
+            }, ROOM_DISCONNECT_TTL_MS);
             continue;
           }
           if (room.hostId === socket.id) room.hostId = humans[0];

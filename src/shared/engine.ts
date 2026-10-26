@@ -43,6 +43,17 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
   const seed = cfg.seed ?? randomSeed();
   const rng = createRng(seed);
   const rules: Rules = mergeRules(reg.rules, cfg.rules ?? {});
+  if (rules.vpToWin > 10 && rules.pieceLimits) {
+    const mult = rules.vpToWin / 10;
+    const explicit = cfg.rules?.pieceLimits ?? {};
+    const scaled: Record<string, number> = { ...rules.pieceLimits };
+    for (const [id, base] of Object.entries(reg.rules.pieceLimits ?? {})) {
+      if (explicit[id] === undefined && scaled[id] === base) {
+        scaled[id] = Math.ceil((base as number) * mult);
+      }
+    }
+    rules.pieceLimits = scaled;
+  }
   const board = cfg.board ?? generateBoard(reg, rules, rng, cfg.preset);
   const seats = cfg.shuffleSeats === false ? cfg.players : rngShuffle(rng, cfg.players);
 

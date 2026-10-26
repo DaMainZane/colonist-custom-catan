@@ -1,5 +1,26 @@
 # Change Log
 
+## 2026-10-26 10:14:20 ICT (UTC+7) (Pass 30: Road zoom-out scaling, session reconnect, bot setup optimization, AI training data log, VP-scaled pieces with 2× cost above base limit)
+### Added
+- **Road Zoom-Out Scaling** (`src/client/render/board.ts`, `src/client/styles.css`) — `2026-10-26 10:14:20 ICT`:
+  - Added dynamic `--road-scale` CSS custom property calculation in `updateCameraViewBox()` (`ROAD_BASE_SCALE = 1.15`, up to `2.45×` when zoomed out or on large maps) alongside `--building-scale`.
+  - Placed road rims (`.road-rim-line`), road bodies (`.road-body-line`), hover hit targets (`.road-hit`), road network glow halos (`.road-glow-net line`, `.road-glow-best line`), and buildable road spots (`.road-spot-line`, `.road-spot-dot`) all scale smoothly when zooming out without rebuilding SVG DOM.
+- **Disconnect / Logout Reconnect System** (`src/server/types.ts`, `src/server/rooms.ts`, `src/server/socket.ts`, `src/client/actions.ts`, `src/client/main.ts`, `public/index.html`) — `2026-10-26 10:14:20 ICT`:
+  - Added persistent `catan_client_id`, `catan_player_name`, and `catan_last_room` in `localStorage`.
+  - Added `rebindPlayerId()` in `src/server/rooms.ts` and `tryReclaimSeat()` / `reconnectRoom` in `src/server/socket.ts` so a player who refreshes, closes the tab, or temporarily disconnects reclaims their seat (converting a takeover bot back into the human player and restoring their name, avatar, pieces, trades, and host status).
+  - Rooms with all humans temporarily disconnected stay alive for a 10-minute grace period (`ROOM_DISCONNECT_TTL_MS`) instead of being deleted immediately, and `#authScreen` shows a **Rejoin game** button plus automatic socket reconnect on reload.
+- **Optimized Bot Initial Placement Strategy** (`src/server/bots/mapProfile.ts`, `src/server/bots/brain.ts`) — `2026-10-26 10:14:20 ICT`:
+  - Added board-wide resource pip scarcity analysis (`resourcePips`, `scarcityBonus`) to `MapProfile`.
+  - Upgraded `vertexScore` with resource scarcity weighting, 3-hex intersection volume and number-diversity bonuses, wheat anchor evaluation, 4/5-resource coverage bonuses, and 2nd-settlement starting hand tempo bonuses (immediate Turn 1 road from wood+brick, immediate Dev card from wheat+ore+sheep, or 3/4 of a settlement).
+  - Upgraded `planOpening` with snake-draft turn-order lookahead (`picksBetween` opponent picks before the 2nd settlement) and enabled it for `setupPlanning >= 1` (`Secondary` and `Overload`).
+  - Upgraded `roadScore` during `setup_road` so setup roads evaluate 2-step and 3-step open settlement vertices reachable from the road's outer endpoint (`step1`), coastal ports, and penalize dead-end roads.
+- **AI Bot Training Data Logger & Exporter** (`src/server/bots/trainingLog.ts`, `src/server/game.ts`, `src/server/bots/sim.ts`, `src/server/main.ts`, `src/client/actions.ts`, `public/index.html`) — `2026-10-26 10:14:20 ICT`:
+  - Records every human and bot decision step with state features (`vp`, `pipYield`, `portAccess`, `resources`, `resourceTotal`, `devCardCount`, `knightsPlayed`, `longestRoadLength`, `piecesLeft`, `legalActionCount`), chosen action, events, and end-of-game outcome labels (`finalVp`, `wonGame`, RL `reward`).
+  - Persists completed game trajectories to `data/bot_training_logs.jsonl` and exposes `GET /api/bot-training-logs` (`.json` or `.jsonl`), `POST /api/bot-training-sim` (headless self-play batch generator), and **AI Log** download buttons in the in-game menu and Victory screen.
+- **Scale Settlement, City & Road Limits with VP Setting (2× Cost Above Base Limit)** (`src/packs/base/building.ts`, `src/packs/base/actions/build.ts`, `src/shared/engine.ts`, `src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/bots/brain.ts`, `src/client/render/board.ts`, `src/client/render/hand.ts`, `public/index.html`) — `2026-10-26 10:14:20 ICT`:
+  - `maxRoads`, `maxSettlements`, and `maxCities` scale proportionally with `vpToWin` when `vpToWin > 10` (`ceil(base * vpToWin / 10)`).
+  - Building any piece above its base limit (`15` roads, `5` settlements, `4` cities on the board) costs **double resources** (`2×`), enforced in the game engine (`pieceCost`), bot planner (`brain.ts`), client board affordability checks, and action-bar hover recipe strips (which display `2×` and the doubled card recipe).
+
 ## 2026-10-26 (Pass 29: server-side "no one has X" check, discard clock keeps turn time, port rework; untested)
 ### Fixed
 - **"No one has any X to trade" still fired after Pass 27** (`tradeOffers.ts`, `drawer.ts`): the client guess from `bankSupply - bank - my hand` is gone. `propose_trade` now checks the real hands (human proposers) and answers through the error toast only when nobody else holds the card. If it still shows, hard refresh and restart `npm run dev` (a stale bundle or server gives the same symptom).

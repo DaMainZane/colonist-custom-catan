@@ -5,6 +5,8 @@ import { registry } from '../runtime';
 import { chooseBotAction, noteBotEvents } from './brain';
 import { TIER_IDS, normalizeTier, tierFromDifficulty, tierLabel } from './tiers';
 import type { TierId } from './tiers';
+import { captureTrainingSnapshot, commitTrainingStep, finalizeTrainingLog, initGameTrainingLog } from './trainingLog';
+import type { GameTrainingTrajectory } from './trainingLog';
 
 export interface SimOptions {
   seed: number;
@@ -20,6 +22,8 @@ export interface SimOptions {
   maxTurns?: number;
   /** Tier per seat, repeated if shorter than the table. Default: every bot is Secondary (the old Hard bot). */
   tiers?: (TierId | string)[];
+  /** Record a full AI training trajectory (state features, legal counts, actions, outcome rewards) for this simulated game. */
+  recordTrainingLog?: boolean;
 }
 
 export interface SimResult {
@@ -33,6 +37,7 @@ export interface SimResult {
   /** Time spent choosing actions (ms): total, the slowest single decision, and how many were made. */
   decisionMs: { total: number; max: number; count: number };
   game: GameState;
+  trainingLog?: GameTrainingTrajectory;
 }
 
 /** Small seeded PRNG so a (seed, options) pair always plays out the same way. */
@@ -82,18 +87,25 @@ export function simulateGame(opts: SimOptions): SimResult {
     board
   });
 
+  const simCode = `SIM_${opts.seed}`;
+  const traj = opts.recordTrainingLog ? initGameTrainingLog(g, registry, simCode) : undefined;
+
   let steps = 0;
   const timing = { total: 0, max: 0, count: 0 };
-  const result = (error: string | null): SimResult => ({
-    finished: g.phase === 'gameover',
-    winner: g.winner ? g.winner.id : null,
-    winnerTier: g.winner ? tierFromDifficulty(g.players.find(p => p.id === g.winner!.id)?.difficulty) : null,
-    turns: g.turnCount,
-    steps,
-    error,
-    decisionMs: timing,
-    game: g
-  });
+  const result = (error: string | null): SimResult => {
+    if (traj && !traj.outcome) finalizeTrainingLog(g, registry, traj);
+    return {
+      finished: g.phase === 'gameover',
+      winner: g.winner ? g.winner.id : null,
+      winnerTier: g.winner ? tierFromDifficulty(g.players.find(p => p.id === g.winner!.id)?.difficulty) : null,
+      turns: g.turnCount,
+      steps,
+      error,
+      decisionMs: timing,
+      game: g,
+      ...(traj ? { trainingLog: traj } : {})
+    };
+  };
 
   while (g.phase !== 'gameover') {
     if (steps >= maxSteps) return result(`no winner after ${steps} steps`);
@@ -110,8 +122,10 @@ export function simulateGame(opts: SimOptions): SimResult {
       timing.count++;
       if (ms > timing.max) timing.max = ms;
       if (!move) continue;
+      const snap = traj ? captureTrainingSnapshot(g, registry, p.id) : null;
       const res = dispatch(g, registry, { type: move.type, playerId: p.id, payload: move.payload });
       if (!res.ok) return result(`${p.id} ${move.type} rejected in phase ${g.phase}: ${res.error}`);
+      if (traj) commitTrainingStep(g, registry, simCode, snap, move.type, move.payload, res.events);
       noteBotEvents(g, res.events);
       acted = true;
       steps++;

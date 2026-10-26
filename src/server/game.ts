@@ -3,6 +3,7 @@ import { PLAYER_COLORS, createGame, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
 import { emitBotDialogue, emitGameStartDialogue } from './bots/dialogue';
 import { noteBotEvents } from './bots/brain';
+import { captureTrainingSnapshot, commitTrainingStep, initGameTrainingLog } from './bots/trainingLog';
 import { refreshMap } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { registry, rulesFromSettings, settingsForPlayers } from './runtime';
@@ -81,8 +82,10 @@ export function recordEffects(room: Room, events: GameEvent[]): void {
 export function runAction(room: Room, playerId: string, type: string, payload: any = {}): DispatchResult {
   const g = room.game;
   if (!g) return { ok: false, error: 'No game in progress' };
+  const snap = captureTrainingSnapshot(g, registry, playerId);
   const res = dispatch(g, registry, { type, playerId, payload });
   if (res.ok) {
+    commitTrainingStep(g, registry, room.code, snap, type, payload, res.events);
     recordEffects(room, res.events);
     noteBotEvents(g, res.events);
     emitBotDialogue(room, playerId, type, res.events);
@@ -109,6 +112,7 @@ export function startGame(room: Room): string | null {
   room.animatingUntil = 0;
   room.startedAt = Date.now();
   room.finishedAt = null;
+  initGameTrainingLog(room.game, registry, room.code);
   emitGameStartDialogue(room);
   return null;
 }

@@ -13,6 +13,10 @@ export interface MapProfile {
   goldShare: number;
   /** Average pips of revealed numbered land tiles (the best public guess for a fog tile). */
   avgPips: number;
+  /** Total pips per resource across revealed numbered land tiles. */
+  resourcePips: Record<string, number>;
+  /** Scarcity bonus (0..4.5) per resource: higher when a resource has fewer pips on this board than average. */
+  scarcityBonus: Record<string, number>;
   /** hex id -> landmass index, -1 for water. */
   landOfHex: number[];
   /** Hexes per landmass. */
@@ -54,16 +58,37 @@ export function getMapProfile(g: GameState, reg: Registry): MapProfile {
   let land = LAND_CACHE.get(board);
   if (!land) { land = buildLand(g, reg); LAND_CACHE.set(board, land); }
 
+  const resIds = [...reg.resources.keys()];
+  const resourcePips: Record<string, number> = Object.fromEntries(resIds.map(r => [r, 0]));
+
   let numbered = 0;
   let gold = 0;
   let pipSum = 0;
+  let resPipSum = 0;
   for (const h of board.hexes) {
     if (h.ext?.hidden) continue;
     const t = reg.tiles.get(h.type);
     if (!t || !t.land || !t.numbered) continue;
     numbered++;
-    pipSum += getPips(h.number);
-    if (!t.produces) gold++;
+    const pp = getPips(h.number);
+    pipSum += pp;
+    if (!t.produces) {
+      gold++;
+    } else if (t.produces in resourcePips) {
+      resourcePips[t.produces] += pp;
+      resPipSum += pp;
+    }
+  }
+
+  const avgResPips = resIds.length > 0 ? resPipSum / resIds.length : 0;
+  const scarcityBonus: Record<string, number> = {};
+  for (const r of resIds) {
+    if (avgResPips <= 0) {
+      scarcityBonus[r] = 0;
+    } else {
+      const ratio = (resourcePips[r] || 0) / avgResPips;
+      scarcityBonus[r] = ratio < 1 ? Math.min(4.5, (1 - ratio) * 5.0) : 0;
+    }
   }
 
   const mp: MapProfile = {
@@ -73,6 +98,8 @@ export function getMapProfile(g: GameState, reg: Registry): MapProfile {
     portCount: land.portCount,
     goldShare: numbered > 0 ? gold / numbered : 0,
     avgPips: numbered > 0 ? pipSum / numbered : 3.5,
+    resourcePips,
+    scarcityBonus,
     landOfHex: land.landOfHex,
     landmassSize: land.landmassSize,
     hiddenCount: hidden
