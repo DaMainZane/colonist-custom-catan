@@ -22,4 +22,4 @@ Seed show toggle, bigger settlements/cities (`BUILDING_BASE_SCALE` in `render/bo
 - **Shape bug (Dashboard line 102)**: root cause unknown. It is the `shape-fallback` path in `shared/mapgen.ts` -> `runShape` (`shared/mapshape.ts`, not read yet). Likely candidates: carve ops (`river`, `lake` in `packs/base/map/shapes.ts`) or islands on the default radius 2 board (19 tiles). Ask John for the picks, radius and the tag tooltip text, or write a vitest that loops `generateMap` over radius 2..6 for islands+river and logs how often `shape.fallback` is true.
 - Remaining Tier 3 and 4 items are in `Backlog Priority.md` (settings/navigation UI rework, reconnect after logout, bot training data log, port spawn rework, bot initial placement, big-map optimization, full board UI rework).
 - Victory screen optimization was already touched in Pass 17 (see `change log.md`); ask John what is still wrong before redoing it.
-- Add an entry to `change log.md` for the Step 1 and Step 2 changes (not done yet).
+- `change log.md` has entries for Step 1 (Pass 24) and Step 2 (Pass 25). Add a Pass 26 entry for anything new, newest on top, same format.

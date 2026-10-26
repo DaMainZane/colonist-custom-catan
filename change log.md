@@ -1,5 +1,37 @@
 # Change Log
 
+## 2026-10-26 08:30:12 (Pass 25: Bank trade ratio advice, board-scaled bank and dev deck, turn clock bar, human discard clock; untested)
+### Added
+- **Bank Trade Ratio Advice + "Fix amounts"** (`src/client/render/drawer.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 08:30:12`:
+  - `bankTradeAdvice()` explains why the give/get cards are not a legal bank trade using the player's own rates (4:1 bank, 3:1 port, 2:1 port), names the better port rate when one applies, and `fixBankTrade()` (the "Fix amounts" button) rounds give piles to legal sizes and matches a single give pile to what was asked for. The disabled Bank button now carries the reason as its title. New `.trade-hint.warn` style.
+- **Turn Clock Countdown Bar** (`src/client/render/turnclock.ts`, `src/client/styles.css`) — `2026-10-26 08:30:12`:
+  - A draining bar (`.turn-clock-bar`) next to the clock text in the turn pill, red in the last 10 seconds. The bar length is the base time or the first time left seen for that turn (it only grows when actions add time). The turn timer itself already existed (lobby > Rules and cards > Timers, 0 = off).
+- **Shape Fallback Tag** (`src/client/mapmenu.ts`) — `2026-10-26 08:30:12`:
+  - A red "shape not applied" tag in the map report when the generator reports `shape-fallback` (plain hexagon used). Diagnostic only; the cause of the bug is not found yet.
+
+### Changed
+- **Bank and Dev Deck Scale With the Board** (`src/server/runtime.ts`, `src/server/game.ts`) — `2026-10-26 08:30:12`:
+  - New `scaledSupply(players, landHexes)`; `settingsForPlayers` takes the land tile count. Only when the host left bank and dev numbers at the standard values: bank = max(table floor, 0.8 x land tiles), dev deck = max(table floor, 1.2 x land tiles), victory point cards stay at 5 until the deck is large. The standard 19-tile board is unchanged.
+- **Discard Clock for Humans** (`src/server/turnClock.ts`, `src/server/bots/scheduler.ts`) — `2026-10-26 08:30:12`:
+  - While a human owes a discard after a 7, that human is on the clock even when a bot plays the turn. On expiry every human who still owes is discarded with the bot brain. After the discard phase the turn owner starts a fresh full clock.
+
+## 2026-10-26 08:21:00 (Pass 24: Seed hide toggle, bigger pieces, scrolling lobby dock, more built-in presets)
+### Added
+- **Seed Hide/Show Toggle** (`src/client/mapmenu.ts`, `src/client/main.ts`) — `2026-10-26 08:21:00`:
+  - Hide/Show button on the lobby seed line. Personal setting kept in `localStorage` (`hexsettlers.seedHidden`); a hidden seed shows as dots and the seed edit box starts empty. Copy still works while hidden.
+- **11 More Built-in Preset Chips** (`src/packs/base/map/index.ts`, `src/packs/gold/index.ts`, `src/packs/fog/index.ts`, `tests/mapmenu.test.ts`, `tests/mapsettings.test.ts`) — `2026-10-26 08:21:00`:
+  - Beginner, Realistic continent, Balanced continent, Island hopper, Ring lagoon, Lakeland, Chaos (base); Mountain gold, Gold islands (gold); Fog ring, Fog continents (fog). Recipes only (picks), so no rule presets. The two tests that assert the preset list were updated.
+
+### Changed
+- **Bigger Settlements and Cities** (`src/client/render/board.ts`) — `2026-10-26 08:21:00`:
+  - `BUILDING_BASE_SCALE` 1.5 (was 1.22) and a 2.8 cap (was 2.35) for the zoom-adaptive scale.
+- **Lobby Dock Scrolls Instead of Growing** (`src/client/styles.css`) — `2026-10-26 08:21:00`:
+  - `#lobbyToolbar` is capped at `calc(100vh - 24px)` with its own scroll; `.right-sidebar` clips to the screen, the player list scrolls and the bank bar keeps its size so log and chat stay visible.
+
+### Fixed
+- **Typecheck Error After Pass 23** (`src/client/render/board.ts`) — `2026-10-26 08:21:00`:
+  - Removed a leftover `syncBoardBuildPopup()` call in `syncInFlightUiImmediate()`.
+
 ## 2026-10-26 08:09:10 (Pass 23: Revert on-board road/settlement/city click recipe popups; restore direct click-to-build/upgrade while keeping action-bar hover recipes)
 ### Changed
 - **Reverted On-Board Settlement, City & Road Click Build + Recipe Popup** (`public/index.html`, `src/client/store.ts`, `src/client/render/board.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 08:09:10`:
