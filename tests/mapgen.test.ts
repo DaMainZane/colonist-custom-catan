@@ -171,7 +171,7 @@ describe('generateMap (classic pipeline)', () => {
     expect(report.stats.land).toBe(19);
     expect(report.stats.landmasses).toEqual([19]);
     expect(report.stats.lakes).toBe(0);
-    // The plain hexagon gets the real count: 30 coast edges / 3.3 = 9 ports.
+    // The plain hexagon gets the real count: a harbor on every second sea tile of the frame = 9 ports (layout checked in ports.test.ts).
     expect(report.stats.ports).toBe(9);
     expect(report.stats.genVersion).toBe(GEN_VERSION);
     expect(report.stats.spots).toBeGreaterThanOrEqual(BASELINE_SPOTS);

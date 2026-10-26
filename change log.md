@@ -1,5 +1,13 @@
 # Change Log
 
+## 2026-10-26 (Pass 32: fixed-size player list that follows the turn, hexagon-only port layout)
+### Changed
+- **Sidebar** (`src/client/render/sidebar.ts`, `src/client/styles.css`): log, chat and bank keep a fixed size for 1 to 8 players. The player list always shows 4 rows (`--p-row-h`) with a thin scrollbar on its right edge when there are more. On every turn change the current player's row scrolls into view by the smallest move (player 5 = one row down, back to player 1 = up to the top). The list keeps its scroll position across re-renders, wheel/touch/drag stops the auto-scroll, and the robber victim row is scrolled into view when the steal choice opens.
+- **Animations keep working with a scrolled list**: `visibleRect()` clamps a player row that is scrolled out of view to the nearest edge of the visible list, so production, steal, trade and dev-card flights land on the list edge instead of over the chat or off screen (used in `triggerCardTransferAnimations` and `triggerFlyingResourceAnimations`). Rolled-tile dim, in-flight card counts, rob highlight, turn marker, tier tags and avatar picking are unchanged.
+- **Ports** (`src/shared/topology.ts`, `src/shared/mapgen.ts`): the real-board layout (`portLayout: 'hexagon'`: a harbor on every second sea tile of the frame, on the edge away from the corner tile, 3 x (R + 1) ports) applies only to the plain full hexagon. Every other shape keeps the general coast placement. `tests/ports.test.ts` checks gaps 2-2-3 on the standard board, corner harbors with gaps of 2 on both sides, and 3 (R + 1) ports on radius 3 and 4.
+### Not verified
+- Written without a shell: run `npm run typecheck` and `npm test`, restart `npm run dev`, hard refresh, then roll a few seeds on radius 2, 3 and 4 and compare with the reference images.
+
 ## 2026-10-26 10:14:20 ICT (UTC+7) (Pass 30: Road zoom-out scaling, session reconnect, bot setup optimization, AI training data log, VP-scaled pieces with 2× cost above base limit)
 ### Added
 - **Road Zoom-Out Scaling** (`src/client/render/board.ts`, `src/client/styles.css`) — `2026-10-26 10:14:20 ICT`:

@@ -281,17 +281,19 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, extrasCtx.rng, extra);
 
     // 7 topology and ports, 8 check.
-    // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports in the real layout: a harbor on
-    // every second sea tile of the frame). The first shuffle and the offset draw exactly as before; the pool then repeats as fresh shuffles,
-    // so a board with more than 9 ports (a big table, the 5-6 player size) keeps the real 4 generic : 5 resource mix instead of repeating
-    // one order. The mirror flag is drawn last, so it never moves the draws before it.
+    // Ports: always per landmass along the coast. The plain hexagon (the whole canvas is land) gets the real board's layout: 9 ports on the
+    // standard board, a harbor on every second sea tile of the frame, each on the edge the real board uses (`portLayout: 'hexagon'`).
+    // Every other shape keeps the general placement and may put ports on neighbouring tiles. The first shuffle and the offset draw exactly
+    // as before; the pool then repeats as fresh shuffles, so a board with more than 9 ports (a big table, the 5-6 player size) keeps the
+    // real 4 generic : 5 resource mix instead of repeating one order. The mirror flag is drawn last, so it never moves the draws before it.
     const portRng = stageRng(seed, 'ports');
     const autoPorts = rngShuffle(portRng, portPool(reg));
     const portOffset = rngNext(portRng);
     for (let k = 0; k < PORT_POOL_REPEATS; k++) autoPorts.push(...rngShuffle(portRng, portPool(reg)));
     const portFlip = rngNext(portRng) >= 0.5;
+    const fullHexagon = shape.land.every(v => v === 1);
     const board = buildTopology(inits, {
-      isLand, autoPorts, portMode: 'coast', portOffset, portFlip,
+      isLand, autoPorts, portMode: 'coast', portOffset, portFlip, portLayout: fullHexagon ? 'hexagon' : undefined,
       // A tile a pack marks `noPort` (land that takes none, or non-sea terrain) never gets or faces a port.
       portBlocked: t => !!reg.tiles.get(t)?.noPort
     });

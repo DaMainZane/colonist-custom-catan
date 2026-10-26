@@ -22,7 +22,7 @@ import {
   addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev, inFlightHandResources
 } from '../store';
 import { renderHand } from './hand';
-import { renderSidebar } from './sidebar';
+import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
 
 const knownRoads = new Set<number>();
@@ -1109,8 +1109,8 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
     const toEl = getTransferTargetEl(tr.to, tr.resource, tr.kind);
     if (!fromEl || !toEl) return;
 
-    const fromRect = fromEl.getBoundingClientRect();
-    const toRect = toEl.getBoundingClientRect();
+    const fromRect = visibleRect(fromEl);
+    const toRect = visibleRect(toEl);
 
     const startX = fromRect.left + fromRect.width / 2 - 24;
     const startY = fromRect.top + fromRect.height / 2 - 33;
@@ -1229,7 +1229,7 @@ export function triggerFlyingResourceAnimations(productions: any[]): void {
       targetEl = document.getElementById(`playerRow_${prod.playerId}`);
     }
     if (!targetEl) return;
-    const rect = targetEl.getBoundingClientRect();
+    const rect = visibleRect(targetEl);
     const targetX = rect.left + rect.width / 2 - 24;
     const targetY = rect.top + rect.height / 2 - 33;
 

@@ -10,8 +10,10 @@ import type { RngState } from './rng';
  *    deals fresh shuffles of the pool instead of repeating one order.
  * 4: ports follow the real board's rule (a harbor on every second sea tile of the coast, 9 on the standard board in the real layout,
  *    3 (R + 1) on a hexagon of radius R) instead of an even spread by coast length at a random phase.
+ * 5: on the plain hexagon each harbor takes the edge of its sea tile the real board uses (away from the corner tile next to it), so the
+ *    gaps run 2, 3, 2, 2, 3, 2, 2, 3, 2 and a corner harbor has a gap of 2 on both sides. Other shapes are unchanged.
  */
-export const GEN_VERSION = 4;
+export const GEN_VERSION = 5;
 
 export const SHARE_PREFIX = 'hx1';
 export const MIN_RADIUS = 1;

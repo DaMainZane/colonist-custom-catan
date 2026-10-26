@@ -676,12 +676,20 @@ svg#boardSvg.is-panning * {
   width: 308px; height: 100vh; background: var(--bg); padding: 8px; display: flex; flex-direction: column;
   gap: 8px; z-index: 35;
 }
-.players-stack { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 52%; flex: 0 1 auto; min-height: 0; scrollbar-gutter: stable; overscroll-behavior: contain; }
-/* The sidebar never grows past the screen: the player list scrolls and the bank bar keeps its size, so log and chat stay on screen. */
-.right-sidebar { overflow: hidden; min-height: 0; }
+/* Locked layout: log, chat and bank keep their size whatever the player count. The player list always shows 4 rows;
+   with more players it scrolls (the scrollbar sits on its right edge) and render/sidebar.ts follows the turn. */
+.right-sidebar { --p-row-h: 80px; --p-gap: 6px; overflow: hidden; min-height: 0; }
+.players-stack {
+  position: relative; display: flex; flex-direction: column; gap: var(--p-gap);
+  flex: 0 0 auto; height: calc(var(--p-row-h) * 4 + var(--p-gap) * 3); max-height: 55%; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
+  scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent;
+}
+.players-stack::-webkit-scrollbar { width: 8px; }
+.players-stack::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
 .bank-bar { flex-shrink: 0; }
 .p-row {
-  flex-shrink: 0;
+  flex-shrink: 0; min-height: var(--p-row-h); align-content: center;
   background: var(--surface); border-radius: var(--r); padding: 8px 10px; display: grid;
   grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; position: relative;
   border-left: 3px solid transparent; transition: background 0.15s;
@@ -707,14 +715,6 @@ svg#boardSvg.is-panning * {
 .tag.danger { background: var(--danger); color: #fff; }
 .tag.accent { background: var(--accent); color: var(--on-accent); }
 .p-avatar { width: 34px; height: 34px; font-size: 14px; }
-
-/* 6-8 players: tighter rows, taller list (log and chat shrink to make room) */
-.players-stack.dense { max-height: 66%; gap: 4px; }
-.players-stack.dense .p-row { padding: 5px 8px; gap: 3px 8px; }
-.players-stack.dense .p-avatar { width: 28px; height: 28px; }
-.players-stack.dense .p-vp { font-size: 17px; }
-.players-stack.dense .p-vp small { margin-top: 0; }
-.players-stack.dense .stat { padding: 2px 6px; font-size: 11.5px; }
 
 .bank-bar { background: var(--surface); border-radius: var(--r); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .bank-ico { color: var(--ink-dim); }

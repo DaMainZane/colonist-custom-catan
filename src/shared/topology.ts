@@ -19,8 +19,14 @@ export interface TopologyOptions {
   portMode?: 'angle' | 'coast';
   /** 0..1, picks which of the alternating harbor sites carry ports (a half-turn of the real layout) ('coast' mode). */
   portOffset?: number;
-  /** Takes the last edge of a harbor site instead of the first, which mirrors the layout ('coast' mode). */
+  /** Takes the last edge of a harbor site instead of the first, which mirrors the layout ('coast' mode). Only breaks ties in the 'hexagon' layout. */
   portFlip?: boolean;
+  /**
+   * 'hexagon' = the plain full hexagon ('coast' mode): each harbor sits on the edge the real board uses. On a sea tile with two
+   * coast edges that is the edge away from the corner tile next to it, so a harbor on a corner has a gap of 2 on both sides and the
+   * gaps go 2, 3, 2, 2, 3, 2 ... around the island. Every other shape keeps the general placement (first edge of the site).
+   */
+  portLayout?: 'hexagon';
   /**
    * Tile types that take no port ('coast' mode): a land tile of this type never carries one, and a non-land tile of this type
    * (a swamp, an ice shelf, anything a mod adds that is not open sea) is not sea, so no port faces it. Default: none.
@@ -112,7 +118,7 @@ function coastSites<T extends { edge: Edge; sea: string }>(ring: T[]): T[][] {
  */
 function placeCoastPorts(
   hexes: Hex[], vertices: Vertex[], edges: Edge[], edgeMap: Map<string, Edge>,
-  isLand: (t: string) => boolean, types: string[], offset: number, blocked: (t: string) => boolean, flip: boolean
+  isLand: (t: string) => boolean, types: string[], offset: number, blocked: (t: string) => boolean, flip: boolean, hexLayout: boolean
 ): void {
   const n = hexes.length;
   const at = new Map<string, number>();
@@ -231,14 +237,27 @@ function placeCoastPorts(
       done++;
       return true;
     };
-    // A site takes its first edge (its last when mirrored), or the other edge of the site when that one does not fit.
-    const trySite = (site: Coast[]): boolean => (flip ? [...site].reverse() : site).some(tryEdge);
+    // Which edge a site tries first. General shapes: its first edge (its last when mirrored). Plain hexagon: the real board's choice,
+    // the edge of a two-edge sea tile that is NOT next to a corner tile (a corner tile has one edge). With no corner beside it
+    // (bigger hexagons) the first edge is taken, the last when mirrored. The other edge of the site is the fallback.
+    const edgeOrder = (idx: number): Coast[] => {
+      const site = slots[idx];
+      const first = site;
+      const last = [...site].reverse();
+      if (!hexLayout || site.length !== 2) return flip ? last : first;
+      const cornerAfter = slots[(idx + 1) % count].length === 1;
+      const cornerBefore = slots[(idx - 1 + count) % count].length === 1;
+      if (cornerAfter && !cornerBefore) return first;
+      if (cornerBefore && !cornerAfter) return last;
+      return flip ? last : first;
+    };
+    const trySite = (idx: number): boolean => edgeOrder(idx).some(tryEdge);
     // First pass: sites spread evenly (every second one when the coast allows), the nearest free site when one is taken.
     for (let j = 0; j < quota[m]; j++) {
       const target = Math.floor(((j + offset) * count) / quota[m]) % count;
       for (let d = 0; d < count; d++) {
         const step = d % 2 === 0 ? d / 2 : -(d + 1) / 2;
-        if (trySite(slots[(((target + step) % count) + count) % count])) break;
+        if (trySite((((target + step) % count) + count) % count)) break;
       }
     }
     // Second pass: fill any shortfall (crowded or jagged coasts) with whatever still fits.
@@ -381,7 +400,7 @@ export function buildTopology(inits: HexInit[], opts: TopologyOptions = {}): Boa
   });
 
   if (opts.autoPorts && opts.autoPorts.length > 0 && opts.portMode === 'coast') {
-    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0, opts.portBlocked ?? (() => false), !!opts.portFlip);
+    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0, opts.portBlocked ?? (() => false), !!opts.portFlip, opts.portLayout === 'hexagon');
   } else if (opts.autoPorts && opts.autoPorts.length > 0) {
     const portTypes = opts.autoPorts;
     let portIdx = 0;

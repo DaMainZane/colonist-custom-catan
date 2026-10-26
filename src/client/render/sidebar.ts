@@ -47,6 +47,74 @@ function botTag(p: any): string {
     ${pick ? `onclick="cycleBotTier('${esc(p.id)}')" title="Click to change difficulty"` : `title="Bot difficulty: ${esc(label || 'unknown')}"`}>${text}</span>`;
 }
 
+// ---- Player list: fixed size (CSS), scrolls to follow the turn ----------------------------------------------------
+// The list always shows 4 rows. With more players it scrolls, and every new turn scrolls the current player into view with the
+// smallest move that shows the whole row (turn goes to player 5: one row down; back to player 1: up to the top).
+let lastTurnKey = '';
+let lastRobKey = '';
+let followRaf = 0;
+let stackGuardsBound = false;
+
+// Grabbing the list (wheel, drag, touch) stops the automatic scroll so it never fights the hand.
+function bindStackGuards(el: HTMLElement): void {
+  if (stackGuardsBound) return;
+  stackGuardsBound = true;
+  const stop = () => {
+    if (followRaf) cancelAnimationFrame(followRaf);
+    followRaf = 0;
+  };
+  el.addEventListener('wheel', stop, { passive: true });
+  el.addEventListener('pointerdown', stop, { passive: true });
+  el.addEventListener('touchstart', stop, { passive: true });
+}
+
+function scrollStackTo(el: HTMLElement, target: number): void {
+  if (followRaf) cancelAnimationFrame(followRaf);
+  followRaf = 0;
+  const from = el.scrollTop;
+  const dist = target - from;
+  if (Math.abs(dist) < 1) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    el.scrollTop = target;
+    return;
+  }
+  const dur = Math.min(520, 200 + Math.abs(dist) * 0.8);
+  const t0 = performance.now();
+  const step = (now: number) => {
+    const k = Math.min(1, (now - t0) / dur);
+    el.scrollTop = from + dist * (1 - Math.pow(1 - k, 3));
+    followRaf = k < 1 ? requestAnimationFrame(step) : 0;
+  };
+  followRaf = requestAnimationFrame(step);
+}
+
+/** Scrolls the list the least it takes to show `row` completely. */
+function revealRow(stackEl: HTMLElement, row: HTMLElement | null): void {
+  if (!row) return;
+  const top = row.offsetTop;
+  const bottom = top + row.offsetHeight;
+  const view = stackEl.scrollTop;
+  const h = stackEl.clientHeight;
+  let target = view;
+  if (top < view) target = top;
+  else if (bottom > view + h) target = bottom - h;
+  target = Math.max(0, Math.min(Math.max(0, stackEl.scrollHeight - h), target));
+  scrollStackTo(stackEl, target);
+}
+
+/**
+ * Screen rect of an element for the card-flight animations. A player row that is scrolled out of the list would send the cards
+ * flying over the chat or off screen, so its rect is pulled to the nearest edge of the visible list (the card lands on the edge row).
+ */
+export function visibleRect(el: HTMLElement): { left: number; top: number; width: number; height: number } {
+  const r = el.getBoundingClientRect();
+  const stack = document.getElementById('playersStack');
+  if (!stack || !el.classList.contains('p-row') || !stack.contains(el)) return r;
+  const s = stack.getBoundingClientRect();
+  const top = Math.min(Math.max(r.top, s.top), Math.max(s.top, s.bottom - r.height));
+  return { left: r.left, top, width: r.width, height: r.height };
+}
+
 export function renderSidebar(): void {
   const logEl = document.getElementById('logSection')!;
   const logs: any[] = state.logs || [];
@@ -87,8 +155,7 @@ export function renderSidebar(): void {
   // innerHTML rebuilds reset the scroll position, which made the list jump. Keep it.
   const stackEl = document.getElementById('playersStack')!;
   const stackTop = stackEl.scrollTop;
-  // 6+ players: tighter rows so the whole table fits without a long scroll.
-  stackEl.classList.toggle('dense', state.players.length > 5);
+  bindStackGuards(stackEl);
 
   stackEl.innerHTML = state.players.map((p, idx) => {
     const isVictim = canPickVictim && victimSet.has(p.id);
@@ -128,6 +195,21 @@ export function renderSidebar(): void {
   `;
   }).join('');
   stackEl.scrollTop = stackTop;
+
+  // Follow the turn: when the current player changes, scroll them into view. Lobby and game over reset to the top.
+  const turnKey = state.status === 'LOBBY' || state.status === 'GAMEOVER' ? '' : String(state.currentPlayerId ?? state.turnIndex);
+  if (turnKey !== lastTurnKey) {
+    const hadTurn = lastTurnKey !== '';
+    lastTurnKey = turnKey;
+    if (turnKey) revealRow(stackEl, document.getElementById(`playerRow_${state.currentPlayerId ?? state.players[state.turnIndex]?.id}`));
+    else if (hadTurn) scrollStackTo(stackEl, 0);
+  }
+  // The player you have to rob must be reachable: scroll to the first victim when the choice opens.
+  const robKey = canPickVictim ? [...victimSet].join(',') : '';
+  if (robKey !== lastRobKey) {
+    lastRobKey = robKey;
+    if (robKey) revealRow(stackEl, stackEl.querySelector<HTMLElement>('.p-row.can-rob'));
+  }
 }
 
 export function sendChat(): void {
