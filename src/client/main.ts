@@ -31,7 +31,7 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
-  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton, getSavedSession,
+  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
   setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
@@ -97,16 +97,15 @@ socket.on('reconnectFailed', () => {
   }
 });
 
-socket.on('connect', () => {
-  // Automatically rejoin if the socket dropped and reconnected mid-game, or if a saved session exists
+socket.on('disconnect', () => {
   if (state?.code) {
-    rejoinSavedRoom(true);
-  } else {
-    const saved = getSavedSession();
-    const urlRoom = new URLSearchParams(window.location.search).get('room');
-    if (saved.code && (!urlRoom || urlRoom.toUpperCase() === saved.code)) {
-      rejoinSavedRoom(true);
-    }
+    const me = state.players?.find((p: any) => p.id === socket.id);
+    saveSessionInfo(state.code, me?.name?.replace(/\s*\(Bot\)$/i, ''));
+    setState(null);
+    document.getElementById('gameViewport')!.style.display = 'none';
+    document.getElementById('authScreen')!.style.display = 'flex';
+    syncRejoinButton();
+    showToast('Disconnected from server. Press Reconnect to rejoin.');
   }
 });
 
