@@ -22,26 +22,26 @@ function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: strin
   room.disconnectedSeats = room.disconnectedSeats || {};
   const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
   const cleanName = typeof name === 'string' ? name.trim().substring(0, 16) : '';
+  const lowerName = cleanName.toLowerCase();
+  const disconnectedList = Object.values(room.disconnectedSeats);
 
-  let targetOldId: string | undefined;
-  if (cleanClientId && room.clientTokens[cleanClientId]) {
-    targetOldId = room.clientTokens[cleanClientId];
-  }
-  if (!targetOldId && cleanClientId) {
-    const byToken = Object.values(room.disconnectedSeats).find(s => s.clientId === cleanClientId);
-    if (byToken) targetOldId = byToken.playerId;
-  }
-  if (!targetOldId && cleanName) {
-    const lower = cleanName.toLowerCase();
-    const byName = Object.values(room.disconnectedSeats).find(s => s.originalName.toLowerCase() === lower);
-    if (byName) targetOldId = byName.playerId;
-  }
-  if (!targetOldId) return false;
+  let seatInfo =
+    (cleanClientId && lowerName
+      ? disconnectedList.find(s => s.clientId === cleanClientId && s.originalName.toLowerCase() === lowerName)
+      : undefined) ||
+    (lowerName
+      ? disconnectedList.find(s => s.originalName.toLowerCase() === lowerName)
+      : undefined) ||
+    (cleanClientId
+      ? disconnectedList.find(s => s.clientId === cleanClientId)
+      : undefined);
 
-  const seatInfo = room.disconnectedSeats[targetOldId];
-  const restoreName = seatInfo?.originalName || (cleanName || undefined);
-  const restoreAvatar = seatInfo?.originalAvatar;
-  const wasHost = seatInfo?.wasHost ?? (room.hostId === targetOldId);
+  if (!seatInfo) return false;
+
+  const targetOldId = seatInfo.playerId;
+  const restoreName = seatInfo.originalName || (cleanName || undefined);
+  const restoreAvatar = seatInfo.originalAvatar;
+  const wasHost = seatInfo.wasHost ?? (room.hostId === targetOldId);
 
   if (!rebindPlayerId(room, targetOldId, socket.id, restoreName, restoreAvatar)) {
     return false;
@@ -134,24 +134,17 @@ export function registerSocketHandlers(io: Server): void {
       if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
 
-      // If a room code is specified (or a room has a disconnected seat matching clientId/name), try reclaiming first!
       const candidateRoom = cleanCode
         ? rooms[cleanCode]
-        : Object.values(rooms).reverse().find(r =>
-            (cleanClientId && (r.clientTokens?.[cleanClientId] || Object.values(r.disconnectedSeats || {}).some(s => s.clientId === cleanClientId))) ||
-            (!r.game && r.lobbyPlayers.length < r.settings.maxPlayers)
-          );
+        : Object.values(rooms).reverse().find(r => !r.game && !r.setup && r.lobbyPlayers.length < r.settings.maxPlayers);
 
       if (!candidateRoom) {
         return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
       }
 
-      if (tryReclaimSeat(candidateRoom, socket, cleanClientId, cleanName)) {
-        return;
-      }
-
       if (candidateRoom.game) return socket.emit('errorMsg', 'Game already started!');
       if (candidateRoom.setup) return socket.emit('errorMsg', 'Host is creating world');
+      if (candidateRoom.lobbyPlayers.some(p => p.id === socket.id)) return;
       if (candidateRoom.lobbyPlayers.length >= candidateRoom.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
 
       if (candidateRoom.cleanupTimer) {
@@ -172,20 +165,24 @@ export function registerSocketHandlers(io: Server): void {
       broadcastRoom(candidateRoom);
     }));
 
-    socket.on('reconnectRoom', safe(({ code, clientId, name, silent }) => {
+    socket.on('reconnectRoom', safe(({ code, clientId, name }) => {
       const cleanCode = String(code || '').trim().toUpperCase();
       const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
       const cleanName = String(name || '').trim().substring(0, 16);
+      const lowerName = cleanName.toLowerCase();
 
       const room = cleanCode
         ? rooms[cleanCode]
         : Object.values(rooms).reverse().find(r =>
-            cleanClientId && (r.clientTokens?.[cleanClientId] || Object.values(r.disconnectedSeats || {}).some(s => s.clientId === cleanClientId))
+            Object.values(r.disconnectedSeats || {}).some(s =>
+              (cleanClientId && s.clientId === cleanClientId) ||
+              (lowerName && s.originalName.toLowerCase() === lowerName)
+            )
           );
 
       if (!room) {
         socket.emit('reconnectFailed', { code: cleanCode });
-        if (!silent) socket.emit('errorMsg', 'Previous session expired or room no longer exists.');
+        socket.emit('errorMsg', 'Previous session expired or room no longer exists.');
         return;
       }
 
@@ -193,14 +190,15 @@ export function registerSocketHandlers(io: Server): void {
         return;
       }
 
-      if (!silent && !room.game && room.setup) {
+      if (!room.game && room.setup) {
         socket.emit('reconnectFailed', { code: cleanCode });
         socket.emit('errorMsg', 'Host is creating world');
         return;
       }
 
-      // If the room is still in LOBBY and has space, let them join directly if not silent
-      if (!silent && !room.game && cleanName && room.lobbyPlayers.length < room.settings.maxPlayers) {
+      // If the room is still in LOBBY and has space, let them rejoin the lobby
+      if (!room.game && cleanName && room.lobbyPlayers.length < room.settings.maxPlayers) {
+        if (room.lobbyPlayers.some(p => p.id === socket.id)) return;
         const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
         newP.avatar = freeAvatar(room);
         room.lobbyPlayers.push(newP);
@@ -209,13 +207,13 @@ export function registerSocketHandlers(io: Server): void {
           room.clientTokens[cleanClientId] = socket.id;
         }
         socket.join(room.code);
-        addLobbyLog(room, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
+        addLobbyLog(room, `${newP.avatar} ${cleanName} rejoined the lobby`, newP.color);
         broadcastRoom(room);
         return;
       }
 
       socket.emit('reconnectFailed', { code: cleanCode });
-      if (!silent) socket.emit('errorMsg', 'Could not find your seat in that game.');
+      socket.emit('errorMsg', 'Could not find a disconnected seat in that game.');
     }));
 
     // The host moves between the world setup page and the board. While the setup page is open nobody new can join.
@@ -475,6 +473,9 @@ export function registerSocketHandlers(io: Server): void {
             const idx = room.lobbyPlayers.findIndex(p => p.id === socket.id);
             if (idx !== -1) room.lobbyPlayers.splice(idx, 1);
             delete room.disconnectedSeats[socket.id];
+            if (clientId && room.clientTokens?.[clientId] === socket.id) {
+              delete room.clientTokens[clientId];
+            }
             if (room.hostId === socket.id) room.hostId = humans[0];
             broadcastRoom(room);
             continue;

@@ -88,7 +88,7 @@ export function syncRejoinButton(): void {
   }
   if (code) {
     btn.style.display = 'inline-flex';
-    if (lbl) lbl.textContent = `Rejoin game (${code})`;
+    if (lbl) lbl.textContent = `Reconnect (${code})`;
   } else {
     btn.style.display = 'none';
   }
@@ -122,14 +122,17 @@ export function joinRoom(): void {
   });
 }
 
-export function rejoinSavedRoom(silent = false): void {
+export function rejoinSavedRoom(): void {
   const { clientId, code, name } = getSavedSession();
   const inputName = ((document.getElementById('playerNameInput') as HTMLInputElement | null)?.value || '').trim() || name;
   if (!code && !clientId) {
-    if (!silent) showToast('No saved game session to rejoin.');
+    showToast('No saved game session to reconnect.');
     return;
   }
-  socket.emit('reconnectRoom', { code, clientId, name: inputName, silent });
+  if (inputName) {
+    saveSessionInfo(code || undefined, inputName);
+  }
+  socket.emit('reconnectRoom', { code, clientId, name: inputName });
 }
 
 export function downloadTrainingLog(): void {

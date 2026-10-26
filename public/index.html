@@ -24,7 +24,7 @@
       <p>Bots, full trading and a custom map painter</p>
       <div class="stack">
         <input id="playerNameInput" class="text-input" type="text" placeholder="Enter your nickname..." maxlength="15" autocomplete="off" />
-        <button id="rejoinLastGameBtn" class="btn primary" style="display:none;" onclick="rejoinSavedRoom(false)"><span data-icon="refresh" data-size="18"></span><span id="rejoinLastGameLbl">Rejoin last game</span></button>
+        <button id="rejoinLastGameBtn" class="btn primary" style="display:none;" onclick="rejoinSavedRoom()"><span data-icon="refresh" data-size="18"></span><span id="rejoinLastGameLbl">Reconnect</span></button>
         <button class="btn primary" onclick="createRoom()"><span data-icon="plus" data-size="18"></span>Create game</button>
         <!-- Filled from an invite link (?room=CODE). Otherwise Join takes the newest open lobby. -->
         <input id="roomCodeInput" type="hidden" />
