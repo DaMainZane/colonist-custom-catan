@@ -281,15 +281,17 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, extrasCtx.rng, extra);
 
     // 7 topology and ports, 8 check.
-    // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports on the standard board).
-    // The first shuffle and the offset draw exactly as before; the pool then repeats as fresh shuffles, so a board with more than
-    // 9 ports (a big table, the 5-6 player size) keeps the real 4 generic : 5 resource mix instead of repeating one order.
+    // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports in the real layout: a harbor on
+    // every second sea tile of the frame). The first shuffle and the offset draw exactly as before; the pool then repeats as fresh shuffles,
+    // so a board with more than 9 ports (a big table, the 5-6 player size) keeps the real 4 generic : 5 resource mix instead of repeating
+    // one order. The mirror flag is drawn last, so it never moves the draws before it.
     const portRng = stageRng(seed, 'ports');
     const autoPorts = rngShuffle(portRng, portPool(reg));
     const portOffset = rngNext(portRng);
     for (let k = 0; k < PORT_POOL_REPEATS; k++) autoPorts.push(...rngShuffle(portRng, portPool(reg)));
+    const portFlip = rngNext(portRng) >= 0.5;
     const board = buildTopology(inits, {
-      isLand, autoPorts, portMode: 'coast', portOffset,
+      isLand, autoPorts, portMode: 'coast', portOffset, portFlip,
       // A tile a pack marks `noPort` (land that takes none, or non-sea terrain) never gets or faces a port.
       portBlocked: t => !!reg.tiles.get(t)?.noPort
     });

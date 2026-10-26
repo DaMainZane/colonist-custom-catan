@@ -8,8 +8,10 @@ import type { RngState } from './rng';
  * 2: the board loop redraws tokens per attempt, the ring keeps a 2-tile band, the `island_mix` perk exists.
  * 3: ports per landmass are capped by land size (`portCap`), `noPort` tiles take or face none, and a board with more than 9 ports
  *    deals fresh shuffles of the pool instead of repeating one order.
+ * 4: ports follow the real board's rule (a harbor on every second sea tile of the coast, 9 on the standard board in the real layout,
+ *    3 (R + 1) on a hexagon of radius R) instead of an even spread by coast length at a random phase.
  */
-export const GEN_VERSION = 3;
+export const GEN_VERSION = 4;
 
 export const SHARE_PREFIX = 'hx1';
 export const MIN_RADIUS = 1;

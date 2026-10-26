@@ -273,11 +273,12 @@ describe('ports per landmass', () => {
     }
   });
 
-  it('about one port per 3.3 coast edges', () => {
+  it('ports stay sparser than the 3-edge minimum and denser than one per 6 coast edges (every second harbor site)', () => {
     const m = make(['continent'], 8, 'PORTCOUNT');
     if (fellBack(m)) return;
     const coast = m.board.edges.filter(e => e.hexIds.length === 1).length;
-    expect(Math.abs(m.report.stats.ports - coast / 3.3)).toBeLessThanOrEqual(3);
+    expect(m.report.stats.ports).toBeGreaterThanOrEqual(coast / 6);
+    expect(m.report.stats.ports).toBeLessThanOrEqual(coast / 3);
   });
 });
 
@@ -329,14 +330,49 @@ describe('port caps, port mix and tiles that take no port', () => {
     }
   });
 
-  it('the base board keeps its 9 ports and a bigger table keeps the real density with a full mix', () => {
+  it('the base board keeps its 9 ports and a bigger hexagon gets 3 (R + 1), with a full mix', () => {
     expect(make([], 2, 'BASE').report.stats.ports).toBe(9);
-    for (const radius of [3, 4]) {
+    for (const radius of [3, 4, 5]) {
       const m = make([], radius, `BIG${radius}`);
-      const coast = m.board.edges.filter(e => e.hexIds.length === 1).length;
-      expect(Math.abs(m.report.stats.ports - coast / 3.3), `r${radius}`).toBeLessThanOrEqual(2);
+      expect(m.report.stats.ports, `r${radius}`).toBe(3 * (radius + 1));
       const used = new Set(m.board.edges.filter(e => e.port).map(e => e.port));
       for (const id of registry.ports.keys()) expect(used.has(id), `r${radius} has a ${id} port`).toBe(true);
+    }
+  });
+
+  it('puts the 9 ports of the base board on every second tile of the sea ring, as the real frame does, for every seed', () => {
+    const ring: { q: number; r: number }[] = [];
+    for (let q = -3; q <= 3; q++) {
+      for (let r = -3; r <= 3; r++) if (Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) === 3) ring.push({ q, r });
+    }
+    const angle = (c: { q: number; r: number }) => Math.atan2(1.5 * c.r, Math.sqrt(3) * (c.q + c.r / 2));
+    ring.sort((a, b) => angle(a) - angle(b));
+    expect(ring).toHaveLength(18);
+    for (const seed of seeds(12)) {
+      const m = make([], 2, seed);
+      const at = m.board.edges.filter(e => e.port).map(e => {
+        const f = facing(m.board, e);
+        return ring.findIndex(c => c.q === f.q && c.r === f.r);
+      }).sort((a, b) => a - b);
+      expect(at, seed).toHaveLength(9);
+      expect(at.every(i => i >= 0), seed).toBe(true);
+      // Neighbouring ports are 2 apart around the ring, wrapping at the end.
+      at.forEach((v, k) => expect((at[(k + 1) % 9] - v + 18) % 18, seed).toBe(2));
+    }
+  });
+
+  it('the 5-6 player shape (30 tiles, 38 coast edges) gets the real 11 ports', () => {
+    const rows = [3, 4, 5, 6, 5, 4, 3];
+    const inits: HexInit[] = [];
+    rows.forEach((len, i) => {
+      const r = i - 3;
+      for (let c = 0; c < len; c++) inits.push({ q: c - Math.floor((len - 1) / 2) - Math.floor(r / 2), r, type: 'wood', number: null });
+    });
+    const autoPorts = ['any', 'wood', 'brick', 'any', 'sheep', 'wheat', 'any', 'ore', 'any', 'wood', 'brick', 'any'];
+    for (const [portOffset, portFlip] of [[0, false], [0.6, false], [0.2, true], [0.9, true]] as const) {
+      const b = buildTopology(inits, { autoPorts, portMode: 'coast', portOffset, portFlip, isLand: t => t === 'wood' });
+      expect(b.edges.filter(e => e.hexIds.length === 1)).toHaveLength(38);
+      expect(b.edges.filter(e => e.port)).toHaveLength(11);
     }
   });
 

@@ -17,8 +17,10 @@ export interface TopologyOptions {
    * `generateMap` (9 ports on the standard board). Needs `autoPorts`.
    */
   portMode?: 'angle' | 'coast';
-  /** 0..1, shifts where the evenly spaced ports start on each coast ('coast' mode). */
+  /** 0..1, picks which of the alternating harbor sites carry ports (a half-turn of the real layout) ('coast' mode). */
   portOffset?: number;
+  /** Takes the last edge of a harbor site instead of the first, which mirrors the layout ('coast' mode). */
+  portFlip?: boolean;
   /**
    * Tile types that take no port ('coast' mode): a land tile of this type never carries one, and a non-land tile of this type
    * (a swamp, an ice shelf, anything a mod adds that is not open sea) is not sea, so no port faces it. Default: none.
@@ -74,19 +76,43 @@ export function portCap(size: number): number {
   return Math.max(1, Math.floor(size * PORTS_PER_LAND_HEX + 0.5));
 }
 
+/** One port per this many harbor sites. The real frame has 18 sea tiles around the island and a harbor on every second one. */
+export const SITES_PER_PORT = 2;
+
+/**
+ * Harbor sites: the walked coast cut into runs of edges that look out on the same sea tile (a corner tile of the sea frame
+ * has one edge, the others have two). A run never wraps around the end of the walk. Pieces that do not join stay apart.
+ */
+function coastSites<T extends { edge: Edge; sea: string }>(ring: T[]): T[][] {
+  const n = ring.length;
+  const joined = (a: T, b: T): boolean =>
+    a.sea === b.sea && (a.edge.v1 === b.edge.v1 || a.edge.v1 === b.edge.v2 || a.edge.v2 === b.edge.v1 || a.edge.v2 === b.edge.v2);
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    if (!joined(ring[(i + n - 1) % n], ring[i])) { start = i; break; }
+  }
+  const sites: T[][] = [];
+  for (let k = 0; k < n; k++) {
+    const c = ring[(start + k) % n];
+    const last = sites[sites.length - 1];
+    if (last && joined(last[last.length - 1], c)) last.push(c); else sites.push([c]);
+  }
+  return sites;
+}
+
 /**
  * Ports per landmass (Map Generation Design, section 9). Open sea only: water that reaches the canvas edge is ocean,
- * walled-in water (a lake, a lagoon) and river channels get no ports. About one port per 3.3 coast edges, split over
- * the landmasses by coast length, at least one for a landmass of 6 or more tiles, none for islets under 3 tiles,
- * at most one for a landmass under 6 tiles. A landmass also never gets more than `PORTS_PER_LAND_HEX` per tile (the real
- * board has 9 ports on 19 tiles): a small island has a long coast for its size, so the coast rule alone buried it in ports.
- * Ports are spaced evenly along each coast. A resource-port mix is dealt
- * round-robin across the landmasses. Rules: one port per hex and none on a vertex next to a port. Ports on
- * neighbouring hexes are fine (the real board has them); forbidding that capped the 12-hex ring at 6 ports, not 9.
+ * walled-in water (a lake, a lagoon) and river channels get no ports. The base board's rule, for any shape: cut each
+ * coast into harbor sites (see `coastSites`) and give every second site a port, spread evenly. The standard board has
+ * 18 sites and 9 ports in the real layout; a hexagon of radius R gets 3 (R + 1). A landmass gets at least one port from
+ * 6 tiles up, at most one under 6 tiles and none under 3 tiles, and never more than `portCap` (a small island has a long
+ * coast for its size, so the site rule alone buried it in ports). A resource-port mix is dealt round-robin across the
+ * landmasses. Rules: one port per hex and none on a vertex next to a port. Ports on neighbouring hexes are fine (the real
+ * board has them). `offset` picks which half of the sites carry ports, `flip` mirrors the layout.
  */
 function placeCoastPorts(
   hexes: Hex[], vertices: Vertex[], edges: Edge[], edgeMap: Map<string, Edge>,
-  isLand: (t: string) => boolean, types: string[], offset: number, blocked: (t: string) => boolean
+  isLand: (t: string) => boolean, types: string[], offset: number, blocked: (t: string) => boolean, flip: boolean
 ): void {
   const n = hexes.length;
   const at = new Map<string, number>();
@@ -138,43 +164,33 @@ function placeCoastPorts(
   }
 
   // Coast edges on open sea, per landmass.
-  interface Coast { edge: Edge; hex: number }
+  // `sea` names the tile an edge looks out on (off the canvas too), which is what makes a harbor site.
+  interface Coast { edge: Edge; hex: number; sea: string }
   const coast: Coast[][] = massSize.map(() => []);
   for (let i = 0; i < n; i++) {
     if (!land[i] || blocked(hexes[i].type)) continue;
     const h = hexes[i];
     for (let k = 0; k < 6; k++) {
-      const j = at.get(`${h.q + EDGE_DIR[k][0]},${h.r + EDGE_DIR[k][1]}`);
+      const sea = `${h.q + EDGE_DIR[k][0]},${h.r + EDGE_DIR[k][1]}`;
+      const j = at.get(sea);
       if (j !== undefined && (land[j] || !ocean[j] || hexes[j].ext?.river)) continue;
       const a = h.vertexIds[k];
       const b = h.vertexIds[(k + 1) % 6];
       const edge = edgeMap.get(`${Math.min(a, b)}_${Math.max(a, b)}`);
-      if (edge && edge.hexIds.length === 1) coast[massOf.get(find(i))!].push({ edge, hex: i });
+      if (edge && edge.hexIds.length === 1) coast[massOf.get(find(i))!].push({ edge, hex: i, sea });
     }
   }
 
-  // How many ports each landmass gets.
-  const eligible = massSize.map((size, m) => size >= 3 && coast[m].length > 0);
-  const totalCoast = coast.reduce((s, c, m) => s + (eligible[m] ? c.length : 0), 0);
-  if (totalCoast === 0) return;
-  const total = Math.floor(totalCoast / 3.3 + 0.5);
+  // Harbor sites per landmass and how many ports each gets: every second site, within the caps.
+  const rings = coast.map(c => walkCoast(c));
+  const sites = rings.map(r => coastSites(r));
   const quota = massSize.map(() => 0);
-  const frac: number[] = massSize.map(() => 0);
-  let given = 0;
-  massSize.forEach((_, m) => {
-    if (!eligible[m]) return;
-    const share = (total * coast[m].length) / totalCoast;
-    quota[m] = Math.floor(share);
-    frac[m] = share - quota[m];
-    given += quota[m];
-  });
-  const byFrac = massSize.map((_, m) => m).filter(m => eligible[m]).sort((a, b) => frac[b] - frac[a] || a - b);
-  for (let k = 0; given < total && byFrac.length > 0; k = (k + 1) % byFrac.length) { quota[byFrac[k]]++; given++; }
   massSize.forEach((size, m) => {
-    if (!eligible[m]) return;
-    if (size >= 6 && quota[m] < 1) quota[m] = 1;
-    if (size < 6) quota[m] = Math.min(quota[m], 1);
-    quota[m] = Math.min(quota[m], coast[m].length, portCap(size));
+    if (size < 3 || coast[m].length === 0) return;
+    let q = Math.round(sites[m].length / SITES_PER_PORT);
+    if (size >= 6) q = Math.max(q, 1);
+    else q = Math.min(q, 1);
+    quota[m] = Math.min(q, coast[m].length, portCap(size));
   });
 
   // Deal the port types round-robin over the landmasses, so each one gets a mix.
@@ -193,38 +209,43 @@ function placeCoastPorts(
     if (!any) break;
   }
 
-  const placed: Hex[] = [];
+  const placedHex = new Set<number>();
   for (let m = 0; m < massSize.length; m++) {
     if (quota[m] <= 0) continue;
-    const ring = walkCoast(coast[m]);
-    const len = ring.length;
+    const ring = rings[m];
+    const slots = sites[m];
+    const count = slots.length;
     let done = 0;
     // A port fits when no port corner touches either of its corners and no other port sits on its hex.
-    const tryPlace = (c: Coast): boolean => {
+    const tryEdge = (c: Coast): boolean => {
       const v1 = vertices[c.edge.v1];
       const v2 = vertices[c.edge.v2];
       if (c.edge.port || v1.port || v2.port) return false;
       if (v1.adjacentVertices.some(id => vertices[id].port) || v2.adjacentVertices.some(id => vertices[id].port)) return false;
-      const h = hexes[c.hex];
-      if (placed.includes(h)) return false;
+      if (placedHex.has(c.hex)) return false;
       const type = dealt[m][done];
       c.edge.port = type;
       v1.port = type;
       v2.port = type;
-      placed.push(h);
+      placedHex.add(c.hex);
       done++;
       return true;
     };
-    // First pass: evenly spaced along the coast, the nearest free edge when the exact spot is taken.
+    // A site takes its first edge (its last when mirrored), or the other edge of the site when that one does not fit.
+    const trySite = (site: Coast[]): boolean => (flip ? [...site].reverse() : site).some(tryEdge);
+    // First pass: sites spread evenly (every second one when the coast allows), the nearest free site when one is taken.
     for (let j = 0; j < quota[m]; j++) {
-      const target = Math.floor(((j + offset) * len) / quota[m]) % len;
-      for (let d = 0; d < len; d++) {
+      const target = Math.floor(((j + offset) * count) / quota[m]) % count;
+      for (let d = 0; d < count; d++) {
         const step = d % 2 === 0 ? d / 2 : -(d + 1) / 2;
-        if (tryPlace(ring[(((target + step) % len) + len) % len])) break;
+        if (trySite(slots[(((target + step) % count) + count) % count])) break;
       }
     }
     // Second pass: fill any shortfall (crowded or jagged coasts) with whatever still fits.
-    for (let k = 0; k < len && done < quota[m]; k++) tryPlace(ring[k]);
+    for (const c of ring) {
+      if (done >= quota[m]) break;
+      tryEdge(c);
+    }
   }
 }
 
@@ -360,7 +381,7 @@ export function buildTopology(inits: HexInit[], opts: TopologyOptions = {}): Boa
   });
 
   if (opts.autoPorts && opts.autoPorts.length > 0 && opts.portMode === 'coast') {
-    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0, opts.portBlocked ?? (() => false));
+    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0, opts.portBlocked ?? (() => false), !!opts.portFlip);
   } else if (opts.autoPorts && opts.autoPorts.length > 0) {
     const portTypes = opts.autoPorts;
     let portIdx = 0;

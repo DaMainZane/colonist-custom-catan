@@ -135,7 +135,7 @@ export function rebindPlayerId(
         if (e.piece && e.piece.owner === oldId) e.piece.owner = newId;
       }
       for (const k of Object.keys(g.awards)) {
-        if (g.awards[k]?.owner === oldId) g.awards[k]!.owner = newId;
+        if (g.awards[k] === oldId) g.awards[k] = newId;
       }
       const trades = g.trades ?? (g.trade ? [g.trade] : []);
       for (const t of trades) {

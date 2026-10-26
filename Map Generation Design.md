@@ -307,15 +307,14 @@ Pips: 6 and 8 = 5, 5 and 9 = 4, 4 and 10 = 3, 3 and 11 = 2, 2 and 12 = 1.
 
 ## 9. Ports layer
 
-The angle sort in `buildTopology` breaks for non-central shapes (section 1). Replacement:
+The angle sort in `buildTopology` breaks for non-central shapes (section 1). Replacement (rewritten in Pass 31, `GEN_VERSION` 4, to follow the real board):
 
 1. Classify water: ocean (flood fill from the canvas border) or lake. Ports go on ocean coast only. A `lakePorts` flag can allow lake shores later.
-2. Per landmass, walk the coast as an ordered loop of edges.
-3. Total ports `P = round(coast edges / 3.3)`. The standard board gives 30 / 3.3 = 9, the real count. Split across landmasses by coast length, at least 1 for a landmass of 6 or more tiles. Place evenly along each loop.
-4. Rules: at most one port per hex and none on a vertex next to a port. Ports on neighbouring hexes are allowed (the real board has them). The old "none on adjacent hexes" rule capped the 12-hex ring at 6 ports, which contradicts the 9 in step 3. The plain hexagon uses this placement too.
-5. Deal types like cards: shuffle the pool and deal round-robin across landmasses, so every landmass gets a mix and every resource port appears at least once when `P >= 5`.
-
-Today the port pool repeats cyclically on big boards. Keep that for `P` above the pool size.
+2. Per landmass, walk the coast as an ordered loop of edges and cut it into **harbor sites**: runs of edges that look out on the same sea tile. The real frame is 18 sea tiles around the island (6 corner tiles with one coast edge, 12 with two).
+3. **Every second site gets a port**, spread evenly. The standard board gives 18 sites, 9 ports, in the real layout (frame pieces with 2, 1, 2, 1, 2, 1 ports). A hexagon of radius R gives 3 (R + 1); the 5-6 player shape (30 tiles, 38 coast edges) gives the real 11. Jagged coasts come out around one port per 4 to 5 edges, because a bay is one site however long it is. A landmass gets at least 1 port from 6 tiles up, at most 1 under 6 tiles, none under 3, and never more than `portCap(size)`.
+4. Rules: at most one port per hex and none on a vertex next to a port. Ports on neighbouring hexes are allowed (the real board has them). A site takes its first edge (its last when mirrored); if that does not fit, its other edge, then the nearest free site.
+5. `portOffset` picks which half of the sites carry ports (the real layout turned by a tile), `portFlip` mirrors it. Both come from the `ports` stream, so they follow the seed. The old even spread by edge count at a random phase gave the real layout on roughly one seed in six.
+6. Deal types like cards: shuffle the pool and deal round-robin across landmasses, so every landmass gets a mix and every resource port appears at least once when `P >= 5`. Past the pool size, the pool is redealt as fresh shuffles (4 generic : 5 resource kept).
 
 ## 10. Perks and quick starts
 
