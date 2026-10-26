@@ -89,6 +89,8 @@ export const fogPack: Pack = {
       }
     });
     api.quickStart({ id: 'fogIsland', label: 'Fog Island', picks: ['fog'] });
+    api.quickStart({ id: 'fogRing', label: 'Fog ring', picks: ['ring', 'fog'] });
+    api.quickStart({ id: 'fogContinents', label: 'Fog continents', picks: ['continents', 'fog'] });
 
     api.hook('afterMapGenerated', hideTiles);
 

@@ -28,21 +28,38 @@ function arm(room: Room): void {
 }
 
 /**
+ * Who the clock runs for. Normally the player whose turn it is (none for a bot). After a 7, the first human who still owes
+ * a discard is on the clock instead, even when a bot is the one playing the turn, so nobody can stall the table by not discarding.
+ */
+type Game = NonNullable<Room['game']>;
+type Seat = Game['players'][number];
+
+function clockOwner(g: Game): { player: Seat; discard: boolean } | null {
+  if (g.phase === 'discard') {
+    const owing = g.players.find(p => !p.isBot && (p.pending?.discard || 0) > 0);
+    if (owing) return { player: owing, discard: true };
+  }
+  const cur = g.players[g.turn];
+  return cur && !cur.isBot ? { player: cur, discard: false } : null;
+}
+
+/**
  * Starts, keeps or stops the clock so it matches the game: one clock per human turn, restarted at the base time
- * whenever the turn passes on. Off when the setting is 0 or when a bot is playing. Safe to call any number of times.
+ * whenever the turn passes on, and a fresh one while a human owes a discard. Off when the setting is 0 or when only bots
+ * have something to do. Safe to call any number of times.
  */
 export function syncTurnClock(room: Room): void {
   const g = room.game;
   const baseMs = Math.max(0, Number(room.settings?.turnTimerSec) || 0) * 1000;
-  const cur = g ? g.players[g.turn] : undefined;
-  if (!g || g.phase === 'gameover' || baseMs <= 0 || !cur || cur.isBot) {
+  const owner = g && g.phase !== 'gameover' ? clockOwner(g) : null;
+  if (!g || baseMs <= 0 || !owner) {
     clearTurnClock(room);
     return;
   }
-  const key = `${g.turnCount}:${g.turn}:${cur.id}`;
+  const key = `${g.turnCount}:${g.turn}:${owner.player.id}${owner.discard ? ':discard' : ''}`;
   if (room.turnClock?.key === key) return;
   clearTurnClock(room);
-  room.turnClock = { key, playerId: cur.id, deadline: Date.now() + baseMs };
+  room.turnClock = { key, playerId: owner.player.id, deadline: Date.now() + baseMs };
   arm(room);
 }
 

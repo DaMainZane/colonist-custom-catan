@@ -101,7 +101,7 @@ export function startGame(room: Room): string | null {
 
   room.game = createGame(registry, {
     players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, isBot: p.isBot, difficulty: p.difficulty })),
-    rules: rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length)),
+    rules: rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length, room.board.hexes.filter(h => h.type !== 'water').length)),
     board: structuredClone(room.board),
     shuffleSeats: true
   });

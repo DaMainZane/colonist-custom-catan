@@ -17,6 +17,13 @@ let wipeTimer: any = null;
 let lastMenuSig = '';
 let lastChipSig = '';
 
+// Seed visibility is a personal view setting (kept in this browser), so a host can stream or share a screen without leaking the seed.
+const SEED_HIDDEN_KEY = 'hexsettlers.seedHidden';
+function readSeedHidden(): boolean {
+  try { return localStorage.getItem(SEED_HIDDEN_KEY) === '1'; } catch { return false; }
+}
+let seedHidden = readSeedHidden();
+
 /** Chips shown until the server's list arrives (and if it never does). */
 const FALLBACK_STARTS = [
   { id: 'standard', label: 'Standard' },
@@ -155,7 +162,10 @@ function reportHtml(meta: MapMetaView): string {
   if (meta.report.degraded) tags.push(tag(`best of ${st.boardAttempts ?? '?'} tries`, 'warn', 'No attempt passed every check, so the best one was kept. Reroll for another.'));
   if (players * 2 > biggest) tags.push(tag(`small for ${players}`, 'danger', `${players} players need ${players * 2} spots; the biggest landmass has ${biggest}.`));
   const errors = meta.report.errors;
-  const warnings = meta.report.warnings;
+  // The generator drops to a plain hexagon when no shape attempt passes its checks. Say so loudly instead of hiding it in the notes.
+  const fell = meta.report.warnings.find(w => w.code === 'shape-fallback');
+  if (fell) tags.push(tag('shape not applied', 'danger', `${fell.message} A small board may not fit this combination (islands, rivers, lakes): try a bigger map radius, a different seed or fewer options.`));
+  const warnings = meta.report.warnings.filter(w => w.code !== 'shape-fallback');
   if (errors.length > 0) tags.push(tag(`${errors.length} error${errors.length === 1 ? '' : 's'}`, 'danger', errors.map(e => e.message).join('\n')));
   if (warnings.length > 0) tags.push(tag(`${warnings.length} note${warnings.length === 1 ? '' : 's'}`, '', warnings.map(w => w.message).join('\n')));
 
@@ -171,7 +181,7 @@ function seedLineHtml(meta: MapMetaView | null, host: boolean): string {
   if (editingSeed && host) {
     return `
       <div class="map-seedline">
-        <input id="mapSeedInput" class="num map-seed-input" type="text" maxlength="400" value="${esc(seed)}"
+        <input id="mapSeedInput" class="num map-seed-input" type="text" maxlength="400" value="${seedHidden ? '' : esc(seed)}"
           placeholder="Seed, or paste a share code" onkeydown="mapSeedKey(event)" />
         <button type="button" class="chip-btn chip-accent" onclick="mapApplySeed()">Apply</button>
         <button type="button" class="chip-btn" onclick="mapCancelSeed()">Cancel</button>
@@ -181,7 +191,8 @@ function seedLineHtml(meta: MapMetaView | null, host: boolean): string {
   return `
     <div class="map-seedline">
       <span class="map-label">Seed</span>
-      <button type="button" class="map-seed" onclick="mapCopySeed()" title="Copy the seed">${esc(seed)}</button>
+      <button type="button" class="map-seed" onclick="mapCopySeed()" title="Copy the seed">${seedHidden ? '••••••' : esc(seed)}</button>
+      <button type="button" class="chip-btn" onclick="mapToggleSeedVisible()" title="${seedHidden ? 'Show the seed' : 'Hide the seed on your screen'}">${seedHidden ? 'Show' : 'Hide'}</button>
       <button type="button" class="chip-btn" onclick="mapCopyCode()" title="Copy the share code: size, shape, style and seed in one line">Copy code</button>
       ${host ? `
         <button type="button" class="chip-btn" onclick="mapEditSeed()" title="Type a seed, or paste a share code">Edit</button>
@@ -198,7 +209,7 @@ export function renderMapMenu(): void {
   const s = state.settings ?? {};
   const meta = state.mapMeta ?? null;
   const sig = JSON.stringify([
-    host, open, editingSeed, wipeArmed, currentPicks(), currentParams(), s.mapSeed, !!s.mapSeedLocked, s.boardRadius,
+    host, open, editingSeed, wipeArmed, seedHidden, currentPicks(), currentParams(), s.mapSeed, !!s.mapSeedLocked, s.boardRadius,
     meta, state.players.length, mapOptions ? mapOptions.options.length : 0
   ]);
   if (sig === lastMenuSig) return;
@@ -363,6 +374,14 @@ function copyText(text: string, done: string): void {
     () => showToast(text)
   );
   playTone(660, 0.08);
+}
+
+/** Hide or show the seed text on this screen only. Copy still works while hidden. */
+export function mapToggleSeedVisible(): void {
+  seedHidden = !seedHidden;
+  try { localStorage.setItem(SEED_HIDDEN_KEY, seedHidden ? '1' : '0'); } catch { /* storage can be blocked; the toggle still works for this session */ }
+  playTone(480, 0.04);
+  renderMapMenu();
 }
 
 export function mapCopySeed(): void {

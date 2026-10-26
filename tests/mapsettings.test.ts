@@ -106,7 +106,10 @@ describe('registry map content', () => {
     expect([...registry.mapTerrains.keys()]).toContain('random');
     expect([...registry.mapNumberings.keys()]).toContain('standard');
     expect([...registry.mapPerks.keys()].sort()).toEqual(['fog', 'gold', 'island_mix']);
-    expect([...registry.quickStarts.keys()].sort()).toEqual(['archipelago', 'blank', 'fogIsland', 'goldRush', 'standard']);
+    expect([...registry.quickStarts.keys()].sort()).toEqual([
+      'archipelago', 'balancedContinent', 'beginner', 'blank', 'chaos', 'fogContinents', 'fogIsland', 'fogRing', 'goldIslands',
+      'goldRush', 'islandHopper', 'lakeland', 'mountainGold', 'realisticContinent', 'ringLagoon', 'standard'
+    ]);
     expect(registry.quickStarts.get('blank')?.blank).toBe(true);
   });
 });

@@ -97,6 +97,25 @@ export function ensureTradeTimers(room: Room): void {
 function handleTurnExpiry(room: Room): void {
   const g = room.game;
   if (!g || g.phase === 'gameover') return;
+
+  // A discard clock belongs to a human who owes cards (the turn itself may be a bot's): discard for every human who still owes.
+  if (g.phase === 'discard') {
+    let forced = false;
+    for (const p of g.players) {
+      if (p.isBot || !((p.pending.discard || 0) > 0)) continue;
+      const m = chooseBotAction(g, registry, p.id);
+      if (!m) continue;
+      const res = runAction(room, p.id, m.type, m.payload);
+      if (res.ok) forced = true;
+      else console.error(`[turn clock] auto-discard rejected for ${p.id}: ${res.error}`);
+    }
+    if (forced) {
+      ensureGrace(room);
+      broadcastRoom(room);
+      return;
+    }
+  }
+
   const cur = g.players[g.turn];
   if (!cur || cur.isBot) return;
 

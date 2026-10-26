@@ -49,5 +49,8 @@ export const goldPack: Pack = {
       tileCounts: (_rules, total) => ({ gold: goldRushCount(total) })
     });
     api.quickStart({ id: 'goldRush', label: 'Gold Rush', picks: ['gold'] });
+    // Gold sits next to the mountains on one natural landmass.
+    api.quickStart({ id: 'mountainGold', label: 'Mountain gold', picks: ['continent', 'realistic', 'gold'] });
+    api.quickStart({ id: 'goldIslands', label: 'Gold islands', picks: ['islands', 'gold', 'island_mix'] });
   }
 };

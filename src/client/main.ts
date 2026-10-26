@@ -22,12 +22,12 @@ import {
 } from './presets';
 import {
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
-  mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock
+  mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible
 } from './mapmenu';
 import { onClickHandResource, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
-  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive
+  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
@@ -48,8 +48,8 @@ Object.assign(window as any, {
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset, applyPresetStyle,
   askDeletePreset, cancelDeletePreset, deletePreset,
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
-  mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock,
-  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
+  mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible,
+  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave
 });

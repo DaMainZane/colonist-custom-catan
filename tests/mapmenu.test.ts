@@ -56,7 +56,10 @@ describe('map options for the menu', () => {
   });
 
   it('lists the quick starts, with Blank marked', () => {
-    expect(view.quickStarts.map(q => q.id).sort()).toEqual(['archipelago', 'blank', 'fogIsland', 'goldRush', 'standard']);
+    expect(view.quickStarts.map(q => q.id).sort()).toEqual([
+      'archipelago', 'balancedContinent', 'beginner', 'blank', 'chaos', 'fogContinents', 'fogIsland', 'fogRing', 'goldIslands',
+      'goldRush', 'islandHopper', 'lakeland', 'mountainGold', 'realisticContinent', 'ringLagoon', 'standard'
+    ]);
     expect(view.quickStarts.find(q => q.id === 'blank')?.blank).toBe(true);
     expect(view.quickStarts.find(q => q.id === 'standard')?.blank).toBe(false);
   });

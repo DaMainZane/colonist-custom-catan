@@ -31,6 +31,86 @@ export function canExecuteBankTrade(me: any): boolean {
   return credits > 0 && credits === wanted;
 }
 
+/** What the bank takes per card for this resource: 4 normally, 3 with a generic port, 2 with its own port (sent by the server). */
+function bankRate(r: string): number {
+  return Number(state.tradeRatios?.[r]) || 4;
+}
+
+function rateSource(rate: number): string {
+  return rate === 2 ? ' (your 2:1 port)' : rate === 3 ? ' (your 3:1 port)' : ' (bank rate)';
+}
+
+interface BankAdvice { ok: boolean; text: string; fixable: boolean }
+
+/**
+ * Says why the current give/get cards are not a legal bank trade, and what would fix it. The rates are the player's own,
+ * so with a port the message names the better rate instead of leaving a disabled button with no reason.
+ */
+export function bankTradeAdvice(me: any): BankAdvice {
+  const giveRes = RESOURCES.filter(r => (tradeGive[r] || 0) > 0);
+  const wantSum = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
+  if (giveRes.length === 0 && wantSum === 0) {
+    return { ok: false, text: 'Click a resource above for what you want, then cards in your hand for what you give.', fixable: false };
+  }
+  if (canExecuteBankTrade(me)) return { ok: true, text: 'Bank trade is ready.', fixable: false };
+
+  for (const r of giveRes) {
+    const have = me?.resources?.[r] || 0;
+    const g = tradeGive[r];
+    const name = RES_META[r].name;
+    if (g > have) return { ok: false, text: `You only hold ${have} ${name}.`, fixable: false };
+    const rate = bankRate(r);
+    if (g % rate !== 0) {
+      const lower = Math.floor(g / rate) * rate;
+      const how = lower >= rate ? `give ${lower} or ${lower + rate}` : `give ${rate}`;
+      return {
+        ok: false,
+        text: `${name} trades at ${rate}:1${rateSource(rate)}, so ${how} (you are giving ${g}).`,
+        fixable: lower >= rate || have >= rate
+      };
+    }
+  }
+
+  const credits = giveRes.reduce((s, r) => s + tradeGive[r] / bankRate(r), 0);
+  const single = giveRes.length === 1 ? giveRes[0] : null;
+  const canFix = !!single && wantSum > 0 && bankRate(single) * wantSum <= (me?.resources?.[single] || 0);
+  if (giveRes.length === 0) return { ok: false, text: 'Click cards in your hand for what you give.', fixable: false };
+  if (wantSum === 0) return { ok: false, text: 'Pick what you want from the bank.', fixable: false };
+
+  const portNote = giveRes
+    .filter(r => bankRate(r) < 4)
+    .map(r => ` Your ${bankRate(r)}:1 port on ${RES_META[r].name} means ${bankRate(r)} buys 1 card.`)
+    .join('');
+  if (credits > wantSum) {
+    return { ok: false, text: `Your cards pay for ${credits} card${credits === 1 ? '' : 's'} but you asked for ${wantSum}.${portNote}`, fixable: canFix };
+  }
+  return { ok: false, text: `You asked for ${wantSum} card${wantSum === 1 ? '' : 's'} but your cards only pay for ${credits}.${portNote}`, fixable: canFix };
+}
+
+/** The "Fix amounts" button: rounds each give pile down to a legal size, then matches a single give pile to what you asked for. */
+export function fixBankTrade(): void {
+  const me = myPlayer();
+  if (!me?.resources) return;
+  for (const r of RESOURCES) {
+    const g = tradeGive[r] || 0;
+    const rate = bankRate(r);
+    if (g <= 0 || g % rate === 0) continue;
+    const lower = Math.floor(g / rate) * rate;
+    if (lower >= rate) tradeGive[r] = lower;
+    else if ((me.resources[r] || 0) >= rate) tradeGive[r] = rate;
+  }
+  const giveRes = RESOURCES.filter(r => (tradeGive[r] || 0) > 0);
+  const wantSum = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
+  if (giveRes.length === 1 && wantSum > 0) {
+    const r = giveRes[0];
+    const need = bankRate(r) * wantSum;
+    if (need <= (me.resources[r] || 0)) tradeGive[r] = need;
+  }
+  playTone(520, 0.06);
+  renderHand(me, true);
+  renderInlineDrawer(me, true);
+}
+
 export function canProposePlayerTrade(me: any): boolean {
   if (!me || !me.resources) return false;
   const giveSum = RESOURCES.reduce((s, r) => s + (tradeGive[r] || 0), 0);
@@ -193,11 +273,11 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       )
     ).join('');
 
-    const giveSum = RESOURCES.reduce((s, r) => s + (tradeGive[r] || 0), 0);
-    const wantSum = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
-    let hint = 'Click a resource above for what you want, then cards in your hand for what you give.';
-    if (bankOk) hint = 'Bank trade is ready.';
-    else if (giveSum > 0 || wantSum > 0) hint = 'Bank trades need exact ratios. Offer it to players instead, or adjust the cards.';
+    const advice = bankTradeAdvice(me);
+    const bankBtn = document.getElementById('btnExecBankTrade') as HTMLButtonElement;
+    bankBtn.title = bankOk ? 'Trade with bank or port' : advice.text;
+    const hintClass = advice.ok ? 'ok' : (advice.text.startsWith('Click') ? '' : 'warn');
+    const fixHtml = advice.fixable ? ` <button type="button" class="chip-btn chip-accent" onclick="fixBankTrade()">Fix amounts</button>` : '';
 
     drawer.innerHTML = `
       <div class="sheet-head">
@@ -215,7 +295,7 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       <div class="tray">
         ${giveStacksHtml || '<span class="tray-hint">Click cards in your hand</span>'}
       </div>
-      <div class="trade-hint ${bankOk ? 'ok' : ''}">${hint}</div>
+      <div class="trade-hint ${hintClass}">${advice.text}${fixHtml}</div>
     `;
   }
 }

@@ -249,6 +249,8 @@ svg#boardSvg.is-panning * {
   position: absolute; top: 12px; left: 68px; right: 12px; max-width: 920px; padding: 12px 14px; z-index: 40;
   display: flex; flex-direction: column; gap: 10px;
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow);
+  /* Never taller than the screen: when the map menu, presets or rules grow, the dock scrolls instead of expanding. */
+  max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
 }
 .dock-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: var(--r); }
@@ -461,6 +463,8 @@ svg#boardSvg.is-panning * {
 .tray-hint { font-size: 12px; color: var(--ink-dim); font-weight: 500; }
 .trade-hint { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
 .trade-hint.ok { color: var(--ok); }
+.trade-hint.warn { color: var(--danger); }
+.trade-hint .chip-btn { margin-left: 6px; min-height: 24px; vertical-align: middle; }
 .sheet-foot { display: flex; justify-content: flex-end; }
 
 #tradeConfirmStack { display: none; flex-direction: column; gap: 6px; }
@@ -604,6 +608,16 @@ svg#boardSvg.is-panning * {
   font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums;
 }
 .turn-clock.low { background: var(--danger); color: #fff; }
+/* Countdown bar next to the readout: it drains from right to left as the turn time runs out and turns red in the last 10 s. */
+.turn-clock-bar {
+  display: inline-block; width: 64px; height: 6px; border-radius: 999px; background: var(--surface-3);
+  overflow: hidden; vertical-align: middle; margin-left: 2px;
+}
+.turn-clock-bar > i {
+  display: block; width: 100%; height: 100%; border-radius: 999px; background: var(--accent);
+  transform-origin: left center; transform: scaleX(1); transition: transform 0.25s linear;
+}
+.turn-clock-bar > i.low { background: var(--danger); }
 .action-bar { display: flex; gap: 6px; align-items: center; }
 .act-btn {
   position: relative; width: 58px; height: 58px; border-radius: var(--r); background: var(--surface); color: var(--ink);
@@ -658,7 +672,10 @@ svg#boardSvg.is-panning * {
   width: 308px; height: 100vh; background: var(--bg); padding: 8px; display: flex; flex-direction: column;
   gap: 8px; z-index: 35;
 }
-.players-stack { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 52%; flex: 0 1 auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.players-stack { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 52%; flex: 0 1 auto; min-height: 0; scrollbar-gutter: stable; overscroll-behavior: contain; }
+/* The sidebar never grows past the screen: the player list scrolls and the bank bar keeps its size, so log and chat stay on screen. */
+.right-sidebar { overflow: hidden; min-height: 0; }
+.bank-bar { flex-shrink: 0; }
 .p-row {
   flex-shrink: 0;
   background: var(--surface); border-radius: var(--r); padding: 8px 10px; display: grid;

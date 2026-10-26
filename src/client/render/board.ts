@@ -40,6 +40,9 @@ const ANIM_DURATION_MS = 420;
 const ROBBER_DX = 30;
 const ROBBER_DY = -8;
 
+// Base size of settlements and cities at default zoom (was 1.22). The zoom-out boost and its cap scale with it.
+const BUILDING_BASE_SCALE = 1.5;
+
 let cachedBoundsKey = '';
 let cachedBounds = { centerX0: 0, centerY0: 0, contentW: 1000, contentH: 900 };
 let lastBuildingScale = -1;
@@ -120,7 +123,7 @@ export function updateCameraViewBox(): void {
 
   // Scale settlements and cities up as the camera zooms out (or on larger boards), only touching style when scale changes.
   const zoomFactor = Math.max(camZoom, Math.max(baseW, baseH) / 720);
-  const buildingScale = Math.min(2.35, 1.22 * Math.pow(Math.max(1, zoomFactor), 0.62));
+  const buildingScale = Math.min(2.8, BUILDING_BASE_SCALE * Math.pow(Math.max(1, zoomFactor), 0.62));
   if (Math.abs(buildingScale - lastBuildingScale) >= 0.015) {
     lastBuildingScale = buildingScale;
     const vLayer = document.getElementById('boardVerticesLayer') || svg;
@@ -995,7 +998,6 @@ function syncInFlightUiImmediate(): void {
   const isMyTurn = !!current && current.id === socket.id;
   renderHand(me, isMyTurn);
   renderSidebar();
-  syncBoardBuildPopup();
 }
 
 function syncInFlightUi(): void {

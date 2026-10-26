@@ -47,12 +47,30 @@ function supplyFor(players: number): typeof STANDARD_SUPPLY {
 }
 
 /**
- * Settings for the game about to start. If the host left the bank and dev deck at the standard numbers,
- * they grow with the real player count (not the seat limit). Anything the host changed is kept as is.
+ * Bank and dev deck for a table and a board. The table sets the floor (`supplyFor`). A board bigger than the standard 19 land
+ * tiles raises it: the real 5-6 player extension has about 1.1 dev cards per land tile (34 on 30) and 24 bank cards per type,
+ * so the bank is scaled at 0.8 per land tile and the deck at 1.2. Victory point cards stay at 5 until the deck is large.
  */
-export function settingsForPlayers(s: Settings, players: number): Settings {
+export function scaledSupply(players: number, landHexes: number): typeof STANDARD_SUPPLY {
+  const byTable = supplyFor(players);
+  const bank = Math.min(999, Math.max(byTable.bankResourcePerType, Math.round(landHexes * 0.8)));
+  const tableTotal = byTable.devKnights + byTable.devVp + byTable.devRoadBuilding + byTable.devYearOfPlenty + byTable.devMonopoly;
+  const wantTotal = Math.round(landHexes * 1.2);
+  if (wantTotal <= tableTotal) return { ...byTable, bankResourcePerType: bank };
+  const each = Math.min(50, Math.max(byTable.devRoadBuilding, Math.round(wantTotal * 0.08)));
+  const vp = Math.min(50, Math.max(5, Math.round(wantTotal * 0.14)));
+  const knights = Math.min(100, Math.max(byTable.devKnights, wantTotal - vp - each * 3));
+  return { bankResourcePerType: bank, devKnights: knights, devVp: vp, devRoadBuilding: each, devYearOfPlenty: each, devMonopoly: each };
+}
+
+/**
+ * Settings for the game about to start. If the host left the bank and dev deck at the standard numbers,
+ * they grow with the real player count (not the seat limit) and with the size of the board (`landHexes`, 0 = unknown).
+ * Anything the host changed is kept as is.
+ */
+export function settingsForPlayers(s: Settings, players: number, landHexes = 0): Settings {
   const untouched = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => s[k] === STANDARD_SUPPLY[k]);
-  return untouched ? { ...s, ...supplyFor(players) } : s;
+  return untouched ? { ...s, ...scaledSupply(players, landHexes) } : s;
 }
 
 /** Overrides handed to createGame (it merges them over the registry defaults). */
