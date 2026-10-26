@@ -17,11 +17,11 @@ import {
 } from '../audio';
 import { socket } from '../socket';
 import {
-  state, buildMode, selectedBoardVertexId, selectedBoardEdgeId, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
-  setBuildModeValue, setSelectedBoardVertexId, setSelectedBoardEdgeId, setCamZoom, setCamPan, getClientSpeed,
+  state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
+  setBuildModeValue, setCamZoom, setCamPan, getClientSpeed,
   addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev, inFlightHandResources
 } from '../store';
-import { renderHand, renderRecipeStripHtml } from './hand';
+import { renderHand } from './hand';
 import { renderSidebar } from './sidebar';
 import { esc } from '../util';
 
@@ -126,10 +126,6 @@ export function updateCameraViewBox(): void {
     const vLayer = document.getElementById('boardVerticesLayer') || svg;
     vLayer.style.setProperty('--building-scale', buildingScale.toFixed(3));
   }
-
-  if (selectedBoardVertexId !== null || selectedBoardEdgeId !== null) {
-    positionBoardBuildPopup();
-  }
 }
 
 function getPieceAnimAttrs(key: string, now: number): { isAnimating: boolean; delayStyle: string } {
@@ -187,14 +183,6 @@ function ensureBoardLayers(svg: HTMLElement): {
   let terrainLayer = document.getElementById('boardTerrainLayer');
   if (!terrainLayer || terrainLayer.parentElement !== svg) {
     svg.innerHTML = `
-      <defs>
-        <radialGradient id="vertexSelectGlowGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
-          <stop offset="55%" stop-color="#ffffff" stop-opacity="0.55" />
-          <stop offset="85%" stop-color="#ffffff" stop-opacity="0.82" />
-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.98" />
-        </radialGradient>
-      </defs>
       <g id="boardTerrainLayer"></g>
       <g id="boardHexDynamicLayer"></g>
       <g id="boardPortsLayer"></g>
@@ -622,7 +610,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.roadHitsLayer.innerHTML = roadHitsHtml;
   }
 
-  // 5. Road Spots Layer (buildable and inspectable edges)
+  // 5. Road Spots Layer (buildable edges)
   let roadSpotsHtml = '';
   for (const e of edges) {
     if (e.road) continue;
@@ -630,21 +618,10 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     if (!v1 || !v2) continue;
     if (isMyTurn && canClientPlaceRoad(e, me)) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
-      const isSelectedEdge = selectedBoardEdgeId === e.id;
       roadSpotsHtml += `
-        <g onclick="clickEdge(${e.id}, event)" style="cursor:pointer">
+        <g onclick="clickEdge(${e.id})" style="cursor:pointer">
           <line class="road-spot-line" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
           <circle class="road-spot-dot" cx="${mx}" cy="${my}" r="8" />
-          ${isSelectedEdge ? `<circle cx="${mx}" cy="${my}" r="20" class="vertex-select-glow" />` : ''}
-        </g>
-      `;
-    } else if (canInspectRoadSpot(e, me)) {
-      const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
-      const isSelectedEdge = selectedBoardEdgeId === e.id;
-      roadSpotsHtml += `
-        <g onclick="clickEdge(${e.id}, event)" style="cursor:pointer">
-          <line x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" stroke="transparent" stroke-width="18" stroke-linecap="round" />
-          ${isSelectedEdge ? `<circle cx="${mx}" cy="${my}" r="20" class="vertex-select-glow" />` : ''}
         </g>
       `;
     }
@@ -655,20 +632,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const robberVictimSet = new Set<string>(state.robberVictims || []);
   let verticesHtml = '';
   const staticSpots = vertices.length > 120;
+  const availWheat = me ? Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0)) : 0;
+  const availOre = me ? Math.max(0, (me.resources.ore || 0) - (inFlightHandResources.ore || 0)) : 0;
   for (const v of vertices) {
-    const isSelectedVertex = selectedBoardVertexId === v.id;
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
-      const isMySettlement = v.building.owner === socket.id && v.building.type === 'settlement';
-      const canUpgrade = isMyTurn && state.phase === 'MAIN' && isMySettlement &&
-        me && me.resources.wheat >= 2 && me.resources.ore >= 3 && me.citiesLeft > 0;
+      const canUpgrade = isMyTurn && state.phase === 'MAIN' && (!buildMode || buildMode === 'city') &&
+        v.building.owner === socket.id && v.building.type === 'settlement' &&
+        me && availWheat >= 2 && availOre >= 3 && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
       const isCity = v.building.type === 'city';
-      const canInspectUpgrade = !isCity && isMySettlement && state.status !== 'LOBBY' && state.status !== 'GAMEOVER' && !canRobThisBuilding;
-      const isClickable = canUpgrade || canRobThisBuilding || canInspectUpgrade;
-      const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id}, event)` : '';
+      const isClickable = canUpgrade || canRobThisBuilding;
+      const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id})` : '';
       const ringR = isCity ? 27 : 22;
       const anim = getPieceAnimAttrs(`${isCity ? 'city' : 'settlement'}_${v.id}`, now);
 
@@ -682,30 +659,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
             <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
               ${isCity ? cityMarkup(col) : settlementMarkup(col)}
             </g>
-            ${isSelectedVertex ? `<circle cx="0" cy="4" r="20" class="vertex-select-glow" />` : ''}
           </g>
         </g>
       `;
     } else if (isMyTurn && canClientPlaceSettlement(v, me)) {
       verticesHtml += `
-        <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
+        <g onclick="clickVertex(${v.id})" style="cursor:pointer">
           <circle cx="${v.x}" cy="${v.y}" r="20" fill="transparent" />
           <circle cx="${v.x}" cy="${v.y}" r="11" class="spot-pulse${staticSpots ? ' spot-static' : ''}" />
-          ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
-        </g>
-      `;
-    } else if (canInspectSettlementSpot(v, me)) {
-      verticesHtml += `
-        <g onclick="clickVertex(${v.id}, event)" style="cursor:pointer">
-          <circle cx="${v.x}" cy="${v.y}" r="18" fill="transparent" />
-          ${isSelectedVertex ? `<circle cx="${v.x}" cy="${v.y}" r="20" class="vertex-select-glow" />` : ''}
         </g>
       `;
     }
   }
 
   layers.verticesLayer.innerHTML = verticesHtml;
-  syncBoardBuildPopup();
 }
 
 // Updates camera viewBox smoothly via requestAnimationFrame on pan/zoom without reconstructing the SVG DOM.
@@ -926,17 +893,6 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
-export function canInspectSettlementSpot(v: any, me: any): boolean {
-  if (!me || !state?.board) return false;
-  if (state.status === 'LOBBY' || state.status === 'GAMEOVER') return false;
-  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') return false;
-  if (v.building) return false;
-  for (const adjId of v.adjacentVertices) {
-    if (state.board.vertices[adjId]?.building) return false;
-  }
-  return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
-}
-
 export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (!me || me.settlementsLeft <= 0) return false;
   for (const adjId of v.adjacentVertices) {
@@ -951,21 +907,6 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
   const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
   if (wood < 1 || brick < 1 || sheep < 1 || wheat < 1) return false;
   return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
-}
-
-export function canInspectRoadSpot(e: any, me: any): boolean {
-  if (!me || !state?.board) return false;
-  if (state.status === 'LOBBY' || state.status === 'GAMEOVER') return false;
-  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') return false;
-  if (e.road) return false;
-  for (const vId of [e.v1, e.v2]) {
-    const v = state.board.vertices[vId];
-    if (!v) continue;
-    if (v.building && v.building.owner === socket.id) return true;
-    if (v.building && v.building.owner !== socket.id) continue;
-    if (v.edgeIds.some((oe: number) => state.board.edges[oe]?.road === socket.id)) return true;
-  }
-  return false;
 }
 
 export function canClientPlaceRoad(e: any, me: any): boolean {
@@ -990,211 +931,12 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
   return false;
 }
 
-export function positionBoardBuildPopup(): void {
-  const popup = document.getElementById('boardBuildPopup');
-  if (!popup || (selectedBoardVertexId === null && selectedBoardEdgeId === null) || !state?.board) return;
-  const svg = document.getElementById('boardSvg') as unknown as SVGSVGElement | null;
-  const stage = document.getElementById('boardStage');
-  if (!svg || !stage) return;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return;
-
-  let targetX = 0;
-  let targetY = 0;
-  if (selectedBoardVertexId !== null) {
-    const v = state.board.vertices[selectedBoardVertexId];
-    if (!v) return;
-    targetX = v.x;
-    targetY = v.y;
-  } else if (selectedBoardEdgeId !== null) {
-    const e = state.board.edges[selectedBoardEdgeId];
-    const v1 = e ? state.board.vertices[e.v1] : null;
-    const v2 = e ? state.board.vertices[e.v2] : null;
-    if (!v1 || !v2) return;
-    targetX = (v1.x + v2.x) / 2;
-    targetY = (v1.y + v2.y) / 2;
-  }
-
-  const pt = svg.createSVGPoint();
-  pt.x = targetX;
-  pt.y = targetY;
-  const screenPt = pt.matrixTransform(ctm);
-  const stageRect = stage.getBoundingClientRect();
-  popup.style.left = `${screenPt.x - stageRect.left}px`;
-  popup.style.top = `${screenPt.y - stageRect.top - 22}px`;
-}
-
-export function syncBoardBuildPopup(): void {
-  const popup = document.getElementById('boardBuildPopup');
-  if (!popup) return;
-  if ((selectedBoardVertexId === null && selectedBoardEdgeId === null) || !state?.board || state.status === 'LOBBY' || state.status === 'GAMEOVER') {
-    popup.style.display = 'none';
-    return;
-  }
-
-  const me = state.players.find(p => p.id === socket.id);
-  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
-  if (!me) {
-    setSelectedBoardVertexId(null);
-    setSelectedBoardEdgeId(null);
-    popup.style.display = 'none';
-    return;
-  }
-
-  if (selectedBoardEdgeId !== null) {
-    const e = state.board.edges[selectedBoardEdgeId];
-    if (!e || e.road || !canInspectRoadSpot(e, me)) {
-      setSelectedBoardEdgeId(null);
-      popup.style.display = 'none';
-      return;
-    }
-    const canBuildRoad = isMyTurn && state.phase === 'MAIN' && canClientPlaceRoad(e, me);
-    popup.innerHTML = `
-      ${me.freeRoads > 0 ? '' : renderRecipeStripHtml('road', me)}
-      <button class="board-build-btn" ${canBuildRoad ? `onclick="confirmBoardEdgeBuild(${e.id})"` : 'disabled'}>
-        <span class="board-build-badge">${me.roadsLeft}</span>
-        ${uiIcon('road', 28)}
-      </button>
-    `;
-    popup.style.display = 'flex';
-    positionBoardBuildPopup();
-    return;
-  }
-
-  const v = state.board.vertices[selectedBoardVertexId!];
-  if (!v) {
-    setSelectedBoardVertexId(null);
-    popup.style.display = 'none';
-    return;
-  }
-
-  const isMySettlement = Boolean(v.building && v.building.owner === socket.id && v.building.type === 'settlement');
-  const isSettleSpot = !v.building && canInspectSettlementSpot(v, me);
-  if (!isMySettlement && !isSettleSpot) {
-    setSelectedBoardVertexId(null);
-    popup.style.display = 'none';
-    return;
-  }
-
-  const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
-  const ore = Math.max(0, (me.resources.ore || 0) - (inFlightHandResources.ore || 0));
-
-  if (isMySettlement) {
-    const canBuildCity = isMyTurn && state.phase === 'MAIN' && wheat >= 2 && ore >= 3 && me.citiesLeft > 0;
-    popup.innerHTML = `
-      ${renderRecipeStripHtml('city', me)}
-      <button class="board-build-btn" ${canBuildCity ? `onclick="confirmBoardVertexBuild(${v.id})"` : 'disabled'}>
-        <span class="board-build-badge">${me.citiesLeft}</span>
-        ${uiIcon('city', 28)}
-      </button>
-    `;
-  } else {
-    const canBuildSettle = isMyTurn && state.phase === 'MAIN' && canClientPlaceSettlement(v, me);
-    popup.innerHTML = `
-      ${renderRecipeStripHtml('settlement', me)}
-      <button class="board-build-btn" ${canBuildSettle ? `onclick="confirmBoardVertexBuild(${v.id})"` : 'disabled'}>
-        <span class="board-build-badge">${me.settlementsLeft}</span>
-        ${uiIcon('house', 28)}
-      </button>
-    `;
-  }
-
-  popup.style.display = 'flex';
-  positionBoardBuildPopup();
-}
-
-export function closeBoardBuildPopup(): void {
-  if (selectedBoardVertexId === null && selectedBoardEdgeId === null) return;
-  setSelectedBoardVertexId(null);
-  setSelectedBoardEdgeId(null);
-  const me = state?.players?.find(p => p.id === socket.id);
-  const isMyTurn = state?.players?.[state.turnIndex]?.id === socket.id;
-  renderBoard(me, Boolean(isMyTurn));
-}
-
-export function confirmBoardVertexBuild(vertexId: number): void {
-  setSelectedBoardVertexId(null);
-  setSelectedBoardEdgeId(null);
+export function clickVertex(vertexId: number): void {
   setBuildModeValue(null);
   socket.emit('clickVertex', { code: state.code, vertexId });
 }
 
-export function confirmBoardEdgeBuild(edgeId: number): void {
-  setSelectedBoardVertexId(null);
-  setSelectedBoardEdgeId(null);
-  setBuildModeValue(null);
-  socket.emit('clickEdge', { code: state.code, edgeId });
-}
-
-export function clickVertex(vertexId: number, ev?: MouseEvent): void {
-  if (ev) ev.stopPropagation();
-  if (!state?.board) return;
-  const v = state.board.vertices[vertexId];
-  const me = state.players.find(p => p.id === socket.id);
-  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
-
-  // Setup settlement or robber steal executes immediately.
-  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'ROBBER_STEAL') {
-    setSelectedBoardVertexId(null);
-    setSelectedBoardEdgeId(null);
-    setBuildModeValue(null);
-    socket.emit('clickVertex', { code: state.code, vertexId });
-    return;
-  }
-
-  // If the player explicitly picked Settle or City mode from the bottom bar, build on click right away.
-  if (buildMode === 'settlement' || buildMode === 'city') {
-    setSelectedBoardVertexId(null);
-    setSelectedBoardEdgeId(null);
-    setBuildModeValue(null);
-    socket.emit('clickVertex', { code: state.code, vertexId });
-    return;
-  }
-
-  // Otherwise, clicking your settlement or a valid road-connected vertex on the hex board toggles the on-board recipe + build popup.
-  if (v) {
-    const isMySettlement = Boolean(v.building && v.building.owner === socket.id && v.building.type === 'settlement');
-    const isSettleSpot = !v.building && canInspectSettlementSpot(v, me);
-    if (isMySettlement || isSettleSpot) {
-      setSelectedBoardVertexId(selectedBoardVertexId === vertexId ? null : vertexId);
-      playTone(500, 0.04);
-      renderBoard(me, Boolean(isMyTurn));
-      return;
-    }
-  }
-
-  setSelectedBoardVertexId(null);
-  setSelectedBoardEdgeId(null);
-  setBuildModeValue(null);
-  socket.emit('clickVertex', { code: state.code, vertexId });
-}
-
-export function clickEdge(edgeId: number, ev?: MouseEvent): void {
-  if (ev) ev.stopPropagation();
-  if (!state?.board) return;
-  const e = state.board.edges[edgeId];
-  const me = state.players.find(p => p.id === socket.id);
-  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
-
-  // Setup road or Road Building mode from the bottom bar builds immediately.
-  if (state.phase === 'SETUP_ROAD' || buildMode === 'road') {
-    setSelectedBoardVertexId(null);
-    setSelectedBoardEdgeId(null);
-    setBuildModeValue(null);
-    socket.emit('clickEdge', { code: state.code, edgeId });
-    return;
-  }
-
-  // Otherwise, clicking a connected road spot on the hex board toggles the on-board road recipe + build popup.
-  if (e && !e.road && canInspectRoadSpot(e, me)) {
-    setSelectedBoardEdgeId(selectedBoardEdgeId === edgeId ? null : edgeId);
-    playTone(500, 0.04);
-    renderBoard(me, Boolean(isMyTurn));
-    return;
-  }
-
-  setSelectedBoardVertexId(null);
-  setSelectedBoardEdgeId(null);
+export function clickEdge(edgeId: number): void {
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
 }

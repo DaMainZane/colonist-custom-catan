@@ -8,8 +8,6 @@ export let mapOptions: MapOptionsView | null = null;
 export let soundOn = true;
 export let isMouseDown = false;
 export let buildMode: string | null = null;
-export let selectedBoardVertexId: number | null = null;
-export let selectedBoardEdgeId: number | null = null;
 export let drawerMode: string | null = null;
 export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
@@ -84,21 +82,7 @@ export function setState(s: GameState): void { state = s; }
 export function setMapOptions(v: MapOptionsView | null): void { mapOptions = v; }
 export function setSoundOn(v: boolean): void { soundOn = v; }
 export function setIsMouseDown(v: boolean): void { isMouseDown = v; }
-export function setBuildModeValue(v: string | null): void {
-  buildMode = v;
-  if (v !== null) {
-    selectedBoardVertexId = null;
-    selectedBoardEdgeId = null;
-  }
-}
-export function setSelectedBoardVertexId(v: number | null): void {
-  selectedBoardVertexId = v;
-  if (v !== null) selectedBoardEdgeId = null;
-}
-export function setSelectedBoardEdgeId(v: number | null): void {
-  selectedBoardEdgeId = v;
-  if (v !== null) selectedBoardVertexId = null;
-}
+export function setBuildModeValue(v: string | null): void { buildMode = v; }
 export function setDrawerMode(v: string | null): void { drawerMode = v; }
 export function setVictoryTab(v: string): void { victoryTab = v; }
 export function setHideVictoryOverlay(v: boolean): void { hideVictoryOverlay = v; }

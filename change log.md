@@ -1,5 +1,11 @@
 # Change Log
 
+## 2026-10-26 08:09:10 (Pass 23: Revert on-board road/settlement/city click recipe popups; restore direct click-to-build/upgrade while keeping action-bar hover recipes)
+### Changed
+- **Reverted On-Board Settlement, City & Road Click Build + Recipe Popup** (`public/index.html`, `src/client/store.ts`, `src/client/render/board.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 08:09:10`:
+  - Removed `#boardBuildPopup`, `.vertex-select-glow`, `selectedBoardVertexId`, and `selectedBoardEdgeId` so clicking a buildable settlement spot, road spot, or your own upgradable settlement on the board builds/upgrades immediately with no middle confirmation popup.
+  - Kept the hover resource recipe strips (`#recipePopupDev`, `#recipePopupRoad`, `#recipePopupSettle`, `#recipePopupCity`) on the bottom-right action buttons below the dice (`Dev`, `Road`, `Settle`, `City`) as well as the `Road Length: <N>` hover tooltip on placed roads.
+
 ## 2026-10-26 06:36:12 (Pass 22: Big-map & zoom-out performance optimization, bot roll/card animation pacing fix & mouse-wheel scrolling on Rules/Cards numbers)
 ### Optimized
 - **Zoom-Out & Large-Map Rendering / Panning Performance** (`src/client/render/board.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 06:36:12`:

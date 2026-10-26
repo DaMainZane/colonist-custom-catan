@@ -12,7 +12,7 @@ import { renderAll } from './render/index';
 import {
   rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations, triggerCardTransferAnimations,
   triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
-  onRoadHover, onRoadMove, onRoadLeave, confirmBoardVertexBuild, confirmBoardEdgeBuild, closeBoardBuildPopup
+  onRoadHover, onRoadMove, onRoadLeave
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade, startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed } from './render/trade';
 import { initCursors } from './cursors';
@@ -51,7 +51,7 @@ Object.assign(window as any, {
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
-  onRoadHover, onRoadMove, onRoadLeave, confirmBoardVertexBuild, confirmBoardEdgeBuild, closeBoardBuildPopup
+  onRoadHover, onRoadMove, onRoadLeave
 });
 
 function animateDice(sum?: number): void {
@@ -326,13 +326,8 @@ function init(): void {
       e.stopPropagation();
       e.preventDefault();
       setHasDraggedMap(false);
-      return;
     }
-    const target = e.target as Element | null;
-    if (target && !target.closest('#boardBuildPopup')) {
-      closeBoardBuildPopup();
-    }
-  }, false);
+  }, true);
   stage.addEventListener('contextmenu', e => e.preventDefault());
   initCursors();
 }
