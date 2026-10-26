@@ -15,8 +15,8 @@ const cellsOf = (landmasses: number[]): CellInfo[] =>
   landmasses.map((landmass, i) => ({ q: i, r: 0, h: 0, m: 0, coastDist: 0, landmass }));
 
 describe('GEN_VERSION', () => {
-  it('is 2 (the retry loop, the ring band and island_mix changed what a seed gives)', () => {
-    expect(GEN_VERSION).toBe(2);
+  it('is 3 (the M3 shapes and add-ons changed what a seed gives)', () => {
+    expect(GEN_VERSION).toBe(3);
   });
 });
 

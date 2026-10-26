@@ -42,6 +42,9 @@ function tileMultiset(reg: Registry, total: number, counts: Record<string, numbe
   return types;
 }
 
+/** Extra shuffled copies of the port pool after the first one (11 x 9 = 99 types; the biggest board needs about 93 ports). */
+const PORT_POOL_REPEATS = 10;
+
 function portPool(reg: Registry): string[] {
   const pool: string[] = [];
   for (const p of reg.ports.values()) {
@@ -279,10 +282,17 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
 
     // 7 topology and ports, 8 check.
     // Ports: always per landmass along the coast (the plain hexagon too, which gives the real 9 ports on the standard board).
+    // The first shuffle and the offset draw exactly as before; the pool then repeats as fresh shuffles, so a board with more than
+    // 9 ports (a big table, the 5-6 player size) keeps the real 4 generic : 5 resource mix instead of repeating one order.
     const portRng = stageRng(seed, 'ports');
     const autoPorts = rngShuffle(portRng, portPool(reg));
     const portOffset = rngNext(portRng);
-    const board = buildTopology(inits, { isLand, autoPorts, portMode: 'coast', portOffset });
+    for (let k = 0; k < PORT_POOL_REPEATS; k++) autoPorts.push(...rngShuffle(portRng, portPool(reg)));
+    const board = buildTopology(inits, {
+      isLand, autoPorts, portMode: 'coast', portOffset,
+      // A tile a pack marks `noPort` (land that takes none, or non-sea terrain) never gets or faces a port.
+      portBlocked: t => !!reg.tiles.get(t)?.noPort
+    });
     const report = validateBoard(board, reg, {
       expectLand: total,
       attempts: shape.attempts,

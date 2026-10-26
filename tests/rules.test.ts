@@ -82,6 +82,35 @@ describe('bank and dev deck auto-scale', () => {
   });
 });
 
+describe('player trade needs someone who holds the card', () => {
+  const setup = () => {
+    const g = newGame(3);
+    g.phase = 'main';
+    g.turnCount = 1;
+    const [p1, p2, p3] = ['p1', 'p2', 'p3'].map(id => getPlayer(g, id)!);
+    for (const p of [p1, p2, p3]) for (const k of Object.keys(p.resources)) p.resources[k] = 0;
+    p1.resources.wood = 2;
+    return { g, p1, p2, p3 };
+  };
+
+  it('refuses a request when no other player holds that resource, whatever the bank says', () => {
+    const { g, p1 } = setup();
+    p1.resources.brick = 3; // the proposer's own cards do not count
+    g.bank.brick = 0;
+    const res = dispatch(g, registry, { type: 'propose_trade', playerId: 'p1', payload: { offer: { wood: 1 }, request: { brick: 1 } } });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/No one has any/);
+  });
+
+  it('allows it as soon as one other player holds the card (right after a roll, scaled bank or not)', () => {
+    const { g, p3 } = setup();
+    g.bank.brick = 24;
+    p3.resources.brick = 1;
+    const res = dispatch(g, registry, { type: 'propose_trade', playerId: 'p1', payload: { offer: { wood: 1 }, request: { brick: 1 } } });
+    expect(res.ok).toBe(true);
+  });
+});
+
 describe('rules', () => {
   it('enforces the distance rule for settlements', () => {
     const g = newGame();

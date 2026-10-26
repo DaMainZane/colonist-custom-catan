@@ -43,6 +43,14 @@ export const proposeTradeAction: ActionDef = {
     }
     const p = getPlayer(ctx.g, pid)!;
     if (!holds(p, offer)) return "You don't have enough cards for that offer!";
+    // Nobody to trade with: the server sees every hand, so this is exact (a client-side guess went stale). Bots skip the check.
+    if (!p.isBot) {
+      for (const r of Object.keys(request)) {
+        if (!(request[r] > 0)) continue;
+        const anyone = ctx.g.players.some(o => o.id !== pid && (o.resources[r] || 0) > 0);
+        if (!anyone) return `No one has any ${ctx.reg.resources.get(r)?.name ?? r} to trade.`;
+      }
+    }
     return null;
   },
   apply(ctx, pid, payload) {

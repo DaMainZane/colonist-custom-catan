@@ -58,8 +58,19 @@ export function syncTurnClock(room: Room): void {
   }
   const key = `${g.turnCount}:${g.turn}:${owner.player.id}${owner.discard ? ':discard' : ''}`;
   if (room.turnClock?.key === key) return;
+  // A discard clock cuts in on a running turn clock. Park what the turn had left and give it back afterwards, so the discard
+  // phase does not hand the turn owner a fresh full clock.
+  const prev = room.turnClock;
+  if (prev && !prev.key.endsWith(':discard')) {
+    room.savedTurnClock = { key: prev.key, remainingMs: Math.max(0, prev.deadline - Date.now()) };
+  }
+  let ms = baseMs;
+  if (!owner.discard) {
+    if (room.savedTurnClock?.key === key) ms = Math.max(GRACE_MS, room.savedTurnClock.remainingMs);
+    room.savedTurnClock = undefined;
+  }
   clearTurnClock(room);
-  room.turnClock = { key, playerId: owner.player.id, deadline: Date.now() + baseMs };
+  room.turnClock = { key, playerId: owner.player.id, deadline: Date.now() + ms };
   arm(room);
 }
 

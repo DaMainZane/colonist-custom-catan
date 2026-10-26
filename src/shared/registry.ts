@@ -29,6 +29,11 @@ export interface TileDef {
   base?: boolean;
   /** Placement hint for the `realistic` terrain style. A tile without one is placed randomly among the leftovers. */
   habitat?: Habitat;
+  /**
+   * No port for this tile. On a land tile: its coast never carries a port. On a non-land tile that is not open sea
+   * (a pack's swamp, ice or lava): it does not count as sea, so no port faces it. Plain water leaves this off.
+   */
+  noPort?: boolean;
   /** Overrides default production, e.g. gold gives picks instead of cards. */
   onProduce?(ctx: Ctx, hex: any, ownerId: Id, amount: number): void;
   replace?: boolean;

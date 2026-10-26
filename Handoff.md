@@ -47,3 +47,12 @@ Seed show toggle, bigger settlements/cities (`BUILDING_BASE_SCALE` in `render/bo
 2. Victory screen optimization: ask what is still wrong (Pass 17 touched it).
 3. Tier 3: settings/navigation UI rework, reconnect after logout, bot training data log (settle the JSON-lines schema first).
 4. Tier 4: port spawn rework, bot initial placement, big-map optimization (profile first; the budget test shows r20 hexagon ~190 ms median vs a 100 ms target), full board UI rework.
+
+
+
+## After Pass 29 (2026-10-26)
+
+- John tested Pass 27: the false "No one has any X" toast STILL appeared. Pass 29 removed the client guess in `proposePlayerTrade` and moved the check to `propose_trade` validate (`tradeOffers.ts`, real hands, humans only). Written, NOT run. If the toast still shows after a hard refresh and a server restart, ask for board size, player count, the resource, and what the player list shows for card counts.
+- Pass 29 also: discard clock now gives the turn its remaining time back (`savedTurnClock` in `turnClock.ts`), port rework (`portCap` in `shared/topology.ts`, `TileDef.noPort`, fresh port-pool shuffles in `mapgen.ts`, `GEN_VERSION` 3), tests in `tests/rules.test.ts` and `tests/mapshapes.test.ts`.
+- John runs `npm run typecheck; npm test` and pastes the output. Open and unticked on the Dashboard until he plays them: auto discard, invalid trade ratio, dev card scale, turn timer visualizer, both "no one has x-resource" lines, port spawn rework.
+- Still asked, not coded: scale city/settlement/road with VP (needs John's answers on formula and "double cost").

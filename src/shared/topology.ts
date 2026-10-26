@@ -19,6 +19,11 @@ export interface TopologyOptions {
   portMode?: 'angle' | 'coast';
   /** 0..1, shifts where the evenly spaced ports start on each coast ('coast' mode). */
   portOffset?: number;
+  /**
+   * Tile types that take no port ('coast' mode): a land tile of this type never carries one, and a non-land tile of this type
+   * (a swamp, an ice shelf, anything a mod adds that is not open sea) is not sea, so no port faces it. Default: none.
+   */
+  portBlocked?: (type: string) => boolean;
 }
 
 export function hexDistance(a: { q: number; r: number }, b: { q: number; r: number }): number {
@@ -59,28 +64,42 @@ function walkCoast<T extends { edge: Edge }>(list: T[]): T[] {
   return out;
 }
 
+/** Ports a landmass may carry per land tile (the real board: 9 ports on 19 tiles). */
+export const PORTS_PER_LAND_HEX = 0.45;
+
+/** Most ports a landmass of `size` tiles may carry (0 under 3 tiles, 1 under 6). */
+export function portCap(size: number): number {
+  if (size < 3) return 0;
+  if (size < 6) return 1;
+  return Math.max(1, Math.floor(size * PORTS_PER_LAND_HEX + 0.5));
+}
+
 /**
  * Ports per landmass (Map Generation Design, section 9). Open sea only: water that reaches the canvas edge is ocean,
  * walled-in water (a lake, a lagoon) and river channels get no ports. About one port per 3.3 coast edges, split over
  * the landmasses by coast length, at least one for a landmass of 6 or more tiles, none for islets under 3 tiles,
- * at most one for a landmass under 6 tiles. Ports are spaced evenly along each coast. A resource-port mix is dealt
+ * at most one for a landmass under 6 tiles. A landmass also never gets more than `PORTS_PER_LAND_HEX` per tile (the real
+ * board has 9 ports on 19 tiles): a small island has a long coast for its size, so the coast rule alone buried it in ports.
+ * Ports are spaced evenly along each coast. A resource-port mix is dealt
  * round-robin across the landmasses. Rules: one port per hex and none on a vertex next to a port. Ports on
  * neighbouring hexes are fine (the real board has them); forbidding that capped the 12-hex ring at 6 ports, not 9.
  */
 function placeCoastPorts(
   hexes: Hex[], vertices: Vertex[], edges: Edge[], edgeMap: Map<string, Edge>,
-  isLand: (t: string) => boolean, types: string[], offset: number
+  isLand: (t: string) => boolean, types: string[], offset: number, blocked: (t: string) => boolean
 ): void {
   const n = hexes.length;
   const at = new Map<string, number>();
   hexes.forEach((h, i) => at.set(`${h.q},${h.r}`, i));
   const land = hexes.map(h => isLand(h.type));
+  // Non-land tiles that are not sea: they stop the sea flood and no port faces them.
+  const solid = hexes.map((h, i) => !land[i] && blocked(h.type));
 
   // Water: a connected body that reaches the canvas edge is open sea.
   const ocean = new Uint8Array(n);
   const seen = new Uint8Array(n);
   for (let s = 0; s < n; s++) {
-    if (land[s] || seen[s]) continue;
+    if (land[s] || solid[s] || seen[s]) continue;
     const comp = [s];
     seen[s] = 1;
     let open = false;
@@ -89,7 +108,7 @@ function placeCoastPorts(
       for (const [dq, dr] of EDGE_DIR) {
         const j = at.get(`${h.q + dq},${h.r + dr}`);
         if (j === undefined) { open = true; continue; }
-        if (land[j] || seen[j]) continue;
+        if (land[j] || solid[j] || seen[j]) continue;
         seen[j] = 1;
         comp.push(j);
       }
@@ -122,7 +141,7 @@ function placeCoastPorts(
   interface Coast { edge: Edge; hex: number }
   const coast: Coast[][] = massSize.map(() => []);
   for (let i = 0; i < n; i++) {
-    if (!land[i]) continue;
+    if (!land[i] || blocked(hexes[i].type)) continue;
     const h = hexes[i];
     for (let k = 0; k < 6; k++) {
       const j = at.get(`${h.q + EDGE_DIR[k][0]},${h.r + EDGE_DIR[k][1]}`);
@@ -155,7 +174,7 @@ function placeCoastPorts(
     if (!eligible[m]) return;
     if (size >= 6 && quota[m] < 1) quota[m] = 1;
     if (size < 6) quota[m] = Math.min(quota[m], 1);
-    quota[m] = Math.min(quota[m], coast[m].length);
+    quota[m] = Math.min(quota[m], coast[m].length, portCap(size));
   });
 
   // Deal the port types round-robin over the landmasses, so each one gets a mix.
@@ -341,7 +360,7 @@ export function buildTopology(inits: HexInit[], opts: TopologyOptions = {}): Boa
   });
 
   if (opts.autoPorts && opts.autoPorts.length > 0 && opts.portMode === 'coast') {
-    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0);
+    placeCoastPorts(hexes, vertices, edges, edgeMap, isLand, opts.autoPorts, opts.portOffset ?? 0, opts.portBlocked ?? (() => false));
   } else if (opts.autoPorts && opts.autoPorts.length > 0) {
     const portTypes = opts.autoPorts;
     let portIdx = 0;

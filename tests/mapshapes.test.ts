@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { classifyCells, createNoise, createRng, findLandmasses, generateMap, hexDistance } from '../src/shared';
-import type { Board, GeneratedMap, Hex } from '../src/shared';
+import { buildTopology, classifyCells, createNoise, createRng, findLandmasses, generateMap, hexDistance } from '../src/shared';
+import type { Board, GeneratedMap, Hex, HexInit } from '../src/shared';
 import { createLandField, fixCount, isArc, splitSizes } from '../src/shared/mapshape';
+import { PORTS_PER_LAND_HEX, portCap } from '../src/shared/topology';
 import { defaultSettings, fullRules, registry } from '../src/server/runtime';
 
 // M3: shape ops, exact land counts, landmass rules, per-landmass ports. Generation is heuristic (it retries and may
@@ -277,6 +278,89 @@ describe('ports per landmass', () => {
     if (fellBack(m)) return;
     const coast = m.board.edges.filter(e => e.hexIds.length === 1).length;
     expect(Math.abs(m.report.stats.ports - coast / 3.3)).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('port caps, port mix and tiles that take no port', () => {
+  const EDGE_DIR: [number, number][] = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+  /** The hex a coast edge looks out onto (an edge's outward direction is the angle of its midpoint from the hex centre). */
+  const facing = (b: Board, e: Board['edges'][number]) => {
+    const h = b.hexes[e.hexIds[0]];
+    const mx = (b.vertices[e.v1].x + b.vertices[e.v2].x) / 2 - h.x;
+    const my = (b.vertices[e.v1].y + b.vertices[e.v2].y) / 2 - h.y;
+    const k = ((Math.round(Math.atan2(my, mx) / (Math.PI / 3)) % 6) + 6) % 6;
+    return { q: h.q + EDGE_DIR[k][0], r: h.r + EDGE_DIR[k][1] };
+  };
+  /** A radius 3 canvas: wood land out to radius 2, then a ring that `ring(q, r)` fills (or leaves as water). */
+  const hand = (land: (q: number, r: number) => string, ring: (q: number, r: number) => string, opts: Record<string, any>) => {
+    const inits: HexInit[] = [];
+    for (let q = -3; q <= 3; q++) {
+      for (let r = Math.max(-3, -q - 3); r <= Math.min(3, -q + 3); r++) {
+        const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+        inits.push({ q, r, type: dist <= 2 ? land(q, r) : ring(q, r), number: null });
+      }
+    }
+    const autoPorts = ['any', 'wood', 'brick', 'any', 'sheep', 'wheat', 'any', 'ore', 'any', 'wood', 'brick'];
+    return buildTopology(inits, { autoPorts, portMode: 'coast', portOffset: 0, ...opts });
+  };
+
+  it('a landmass never carries more ports than portCap allows', () => {
+    expect(portCap(2)).toBe(0);
+    expect(portCap(5)).toBe(1);
+    expect(portCap(19)).toBe(9); // the real board: 9 ports on 19 tiles
+    expect(PORTS_PER_LAND_HEX).toBeLessThan(0.5);
+    for (const picks of [['islands'], ['archipelago'], ['continent', 'satellites'], ['continents']]) {
+      for (const radius of [5, 6, 8]) {
+        for (const seed of seeds(4)) {
+          const m = make(picks, radius, seed);
+          if (fellBack(m)) continue;
+          const land = findLandmasses(m.board, isLandHex);
+          const perMass = new Map<number, number>();
+          for (const e of m.board.edges) {
+            if (!e.port) continue;
+            const id = land.landOfHex[e.hexIds[0]];
+            perMass.set(id, (perMass.get(id) ?? 0) + 1);
+          }
+          for (const [id, n] of perMass) {
+            expect(n, `${picks.join('+')} r${radius} ${seed}: landmass of ${land.landmassSize[id]}`).toBeLessThanOrEqual(portCap(land.landmassSize[id]));
+          }
+        }
+      }
+    }
+  });
+
+  it('the base board keeps its 9 ports and a bigger table keeps the real density with a full mix', () => {
+    expect(make([], 2, 'BASE').report.stats.ports).toBe(9);
+    for (const radius of [3, 4]) {
+      const m = make([], radius, `BIG${radius}`);
+      const coast = m.board.edges.filter(e => e.hexIds.length === 1).length;
+      expect(Math.abs(m.report.stats.ports - coast / 3.3), `r${radius}`).toBeLessThanOrEqual(2);
+      const used = new Set(m.board.edges.filter(e => e.port).map(e => e.port));
+      for (const id of registry.ports.keys()) expect(used.has(id), `r${radius} has a ${id} port`).toBe(true);
+    }
+  });
+
+  it('a land tile marked noPort never carries a port', () => {
+    const b = hand((q) => (q >= 1 ? 'rock' : 'wood'), () => 'water', { isLand: (t: string) => t === 'wood' || t === 'rock', portBlocked: (t: string) => t === 'rock' });
+    const ports = b.edges.filter(e => e.port);
+    expect(ports.length).toBeGreaterThan(0);
+    for (const e of ports) expect(b.hexes[e.hexIds[0]].type).toBe('wood');
+    // Control: without the rule the rock coast takes ports too.
+    const free = hand((q) => (q >= 1 ? 'rock' : 'wood'), () => 'water', { isLand: (t: string) => t === 'wood' || t === 'rock' });
+    expect(free.edges.some(e => e.port && free.hexes[e.hexIds[0]].type === 'rock')).toBe(true);
+  });
+
+  it('no port faces a non-land tile marked noPort (swamp, ice) but ports still face real sea', () => {
+    const opts = { isLand: (t: string) => t === 'wood' };
+    const b = hand(() => 'wood', (q) => (q > 0 ? 'swamp' : 'water'), { ...opts, portBlocked: (t: string) => t === 'swamp' });
+    const typeAt = (c: { q: number; r: number }) => b.hexes.find(h => h.q === c.q && h.r === c.r)?.type;
+    const ports = b.edges.filter(e => e.port);
+    expect(ports.length).toBeGreaterThan(0);
+    for (const e of ports) expect(typeAt(facing(b, e))).not.toBe('swamp');
+    // Control: left alone, the swamp counts as sea and gets ports.
+    const free = hand(() => 'wood', (q) => (q > 0 ? 'swamp' : 'water'), opts);
+    const freeAt = (c: { q: number; r: number }) => free.hexes.find(h => h.q === c.q && h.r === c.r)?.type;
+    expect(free.edges.some(e => e.port && freeAt(facing(free, e)) === 'swamp')).toBe(true);
   });
 });
 

@@ -114,6 +114,8 @@ export interface Room {
   tradeTimers?: Map<number, { createdAt: number; expiresAt: number; durationMs: number; timer: any }>;
   /** Turn clock of the human whose turn it is (see turnClock.ts). */
   turnClock?: { key: string; playerId: string; deadline: number; timer?: any };
+  /** What a turn clock had left when a discard clock cut in; given back when the turn owner is on the clock again. */
+  savedTurnClock?: { key: string; remainingMs: number };
 }
 
 /** Legacy status strings the client switches on. */
