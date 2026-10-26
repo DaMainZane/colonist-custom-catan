@@ -5,7 +5,7 @@ import { longestRoadFor } from '../src/packs/base/longestRoad';
 import { canPlaceSettlement } from '../src/packs/base/placement';
 import { victimsOnHex } from '../src/packs/base/robbing';
 import { tradeRatios } from '../src/packs/base/trading';
-import { registry } from '../src/server/runtime';
+import { defaultSettings, registry, scaledSupply, settingsForPlayers } from '../src/server/runtime';
 
 /** A fresh game with fixed seat order: p1, p2, ... */
 function newGame(n = 2): GameState {
@@ -37,6 +37,50 @@ function findPath(board: Board, length: number): number[] | null {
   }
   return null;
 }
+
+describe('bank and dev deck auto-scale', () => {
+  const deckTotal = (s: ReturnType<typeof scaledSupply>) =>
+    s.devKnights + s.devVp + s.devRoadBuilding + s.devYearOfPlenty + s.devMonopoly;
+
+  it('keeps the standard numbers on the standard 19 land tiles', () => {
+    for (const players of [2, 3, 4]) {
+      expect(scaledSupply(players, 19)).toEqual({
+        bankResourcePerType: 19,
+        devKnights: 14,
+        devVp: 5,
+        devRoadBuilding: 2,
+        devYearOfPlenty: 2,
+        devMonopoly: 2
+      });
+    }
+    // Unknown board size (0) must also fall back to the table floor
+    expect(scaledSupply(4, 0).bankResourcePerType).toBe(19);
+  });
+
+  it('never goes below the player-count floor', () => {
+    const six = scaledSupply(6, 19);
+    expect(six.bankResourcePerType).toBe(24);
+    expect(six.devKnights).toBe(20);
+    expect(deckTotal(six)).toBe(34);
+  });
+
+  it('grows the bank and deck on a bigger board', () => {
+    const small = scaledSupply(4, 19);
+    const big = scaledSupply(4, 61);
+    expect(big.bankResourcePerType).toBeGreaterThan(small.bankResourcePerType);
+    expect(deckTotal(big)).toBeGreaterThan(deckTotal(small));
+    expect(big.devVp).toBeGreaterThanOrEqual(5);
+    expect(big.devRoadBuilding).toBeGreaterThanOrEqual(2);
+  });
+
+  it('only rescales settings the host left at the standard values', () => {
+    const untouched = settingsForPlayers(defaultSettings(), 4, 61);
+    expect(untouched.bankResourcePerType).toBeGreaterThan(19);
+
+    const custom = { ...defaultSettings(), bankResourcePerType: 25 };
+    expect(settingsForPlayers(custom, 4, 61)).toBe(custom);
+  });
+});
 
 describe('rules', () => {
   it('enforces the distance rule for settlements', () => {

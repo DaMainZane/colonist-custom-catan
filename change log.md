@@ -1,5 +1,9 @@
 # Change Log
 
+## 2026-10-26 (Pass 28: Test for the bank / dev deck auto-scale; not run)
+### Added
+- **Auto-scale Tests** (`tests/rules.test.ts`) — new `bank and dev deck auto-scale` block: standard 19 land tiles stay 19 bank and 14/5/2/2/2 for 2-4 players (and with unknown board size 0), the 5-6 player floor holds (24 bank, 20 knights, 34 cards), a 61-tile board grows the bank and deck, and `settingsForPlayers` leaves host-changed numbers alone. Run `npm test` to confirm.
+
 ## 2026-10-26 (Pass 27: "No one has any X" used the lobby bank setting instead of the real supply; untested)
 ### Fixed
 - **False "No one has any <resource> to trade" on Scaled Games** (`src/server/view.ts`, `src/client/types.ts`, `src/client/render/drawer.ts`) — the client worked out how many cards the others hold from `settings.bankResourcePerType` (the lobby number, 19 by default). Since Pass 25 the real bank can be bigger (scaled to the table or the board at game start), so the sum went negative and every player trade for that resource was refused. The server now sends `bankSupply` (bank + all hands per resource; cards are conserved) and the client uses that. Other places that might read the lobby number were not searched (no grep tool): if the toast still appears, look for `bankResourcePerType` or a literal 19 in `src/client`.
