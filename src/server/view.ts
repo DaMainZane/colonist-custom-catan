@@ -241,6 +241,8 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     code: room.code,
     hostId: room.hostId,
     status,
+    // Host is on the world setup page (lobby only). Everyone else waits.
+    setup: !g && !!room.setup,
     settings: room.settings,
     board,
     bank,

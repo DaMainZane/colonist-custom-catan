@@ -110,6 +110,8 @@ export interface GameState {
   code: string;
   hostId: string;
   status: string;
+  /** Lobby only: the host is on the world setup page, so everyone else waits and nobody new can join. */
+  setup?: boolean;
   settings: any;
   board: { hexes: any[]; vertices: any[]; edges: any[]; robberHexId: number };
   bank: Resources;

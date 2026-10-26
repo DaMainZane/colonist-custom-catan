@@ -155,10 +155,26 @@ export function copyInviteLink(): void {
 }
 
 export function switchLobbyTab(tab: string): void {
-  document.getElementById('tabBtnMap')!.classList.toggle('active', tab === 'map');
-  document.getElementById('tabBtnCards')!.classList.toggle('active', tab === 'cards');
-  document.getElementById('lobbyTabMap')!.style.display = tab === 'map' ? 'flex' : 'none';
-  document.getElementById('lobbyTabCards')!.style.display = tab === 'cards' ? 'flex' : 'none';
+  // The dock only holds the map painter now (rules moved to the setup page); kept so old callers do not break.
+  document.getElementById('tabBtnMap')?.classList.toggle('active', tab === 'map');
+  document.getElementById('tabBtnCards')?.classList.toggle('active', tab === 'cards');
+  const mapTab = document.getElementById('lobbyTabMap');
+  const cardsTab = document.getElementById('lobbyTabCards');
+  if (mapTab) mapTab.style.display = tab === 'map' ? 'flex' : 'none';
+  if (cardsTab) cardsTab.style.display = tab === 'cards' ? 'flex' : 'none';
+}
+
+/** Host: open the world setup page (true) or go on to the board (false). While it is open nobody new can join. */
+export function setSetupOpen(open: boolean): void {
+  if (!state || state.status !== 'LOBBY') return;
+  if (!requireHost('change the world setup')) return;
+  if (!open) {
+    // Landing on the board: show the painter dock.
+    const dock = document.getElementById('lobbyToolbar');
+    if (dock) dock.style.display = 'flex';
+  }
+  socket.emit('setSetup', { code: state.code, open });
+  playTone(open ? 460 : 560, 0.05);
 }
 
 export function toggleLobbyToolbar(): void {

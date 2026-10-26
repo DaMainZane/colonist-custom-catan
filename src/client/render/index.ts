@@ -5,6 +5,7 @@ import { renderActiveTradeModal } from './trade';
 import { renderHand } from './hand';
 import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
+import { renderSetupPage } from './setup';
 import { renderBoard } from './board';
 import { renderPresetRow } from '../presets';
 import { renderMapMenu, renderQuickStarts } from '../mapmenu';
@@ -121,6 +122,7 @@ export function renderAll(): void {
   renderHand(me, isMyTurn);
   renderInlineDrawer(me, isMyTurn);
   renderSidebar();
+  renderSetupPage();
 
   const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
   if (state.status !== 'GAMEOVER') {

@@ -96,40 +96,119 @@
         </div>
       </div>
 
-      <!-- Lobby dock: map painter and rules -->
+      <!-- World setup page (host only, between the name page and the board): bots, preview, map and rules. The painter stays on the board. -->
+      <div id="setupScreen" style="display:none;">
+        <div class="setup-inner">
+          <div class="setup-top">
+            <section class="setup-card setup-bots">
+              <h3>Bots and talkativeness</h3>
+              <div class="tool-row">
+                <span class="tool-label">Add bot</span>
+                <select id="botTier" class="num" title="Difficulty of the next bot (click a bot's tag below to change it later)">
+                  <option value="main" selected>Main</option>
+                  <option value="secondary">Secondary</option>
+                  <option value="overload">Overload</option>
+                </select>
+                <button class="btn sm" onclick="addBot()"><span data-icon="plus" data-size="16"></span>Bot</button>
+                <button class="btn sm" onclick="removeBot()"><span data-icon="minus" data-size="16"></span>Bot</button>
+              </div>
+              <div class="tool-row">
+                <span class="tool-label">Bot chat</span>
+                <select id="setBotChat" class="num" title="How much bots talk in chat. Off also stops their replies to your messages." onchange="pushSettings()">
+                  <option value="off">Off</option>
+                  <option value="quiet">Quiet</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="chatty">Chatty</option>
+                </select>
+              </div>
+              <div id="setupRoster" class="setup-roster"></div>
+            </section>
+            <section class="setup-card setup-preview">
+              <h3>Preview</h3>
+              <svg id="setupPreview" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+            </section>
+          </div>
+
+          <section class="setup-card setup-tools">
+            <h3>Map and rules</h3>
+            <!-- Presets: quick starts come from the registry (drawn by mapmenu.ts); saved ones (host's browser) can be deleted after a confirmation -->
+            <div class="tool-row" id="presetRow">
+              <span class="tool-label">Presets</span>
+              <span id="builtinPresets" class="tool-row"></span>
+              <span class="tool-sep"></span>
+              <span id="customPresets" class="tool-row"></span>
+            </div>
+
+            <!-- Map recipe: summary and dropdown (shape, style, perks), seed, report. Drawn by mapmenu.ts from the server's option list -->
+            <div class="map-recipe-row">
+              <span class="tool-label">Map</span>
+              <div id="mapRecipe" class="map-recipe"></div>
+            </div>
+
+            <div class="rules-grid">
+              <div class="rule-group">
+                <h4>Game</h4>
+                <label class="field">Map radius (1-50)<input id="setRadius" type="number" class="num" value="2" min="1" max="50" onchange="pushSettings()" /></label>
+                <label class="field">VP to win<input id="setVp" type="number" class="num" value="10" min="3" max="50" onchange="pushSettings()" /></label>
+                <label class="field">Max players<input id="setMaxP" type="number" class="num" value="8" min="2" max="8" onchange="pushSettings()" /></label>
+                <label class="field">Discard above<input id="setDiscard" type="number" class="num" value="7" min="3" max="50" onchange="pushSettings()" /></label>
+              </div>
+              <div class="rule-group">
+                <h4>Timers</h4>
+                <label class="field" title="Seconds per turn. 0 = no turn timer.">Turn time (sec, 0 = off)<input id="setTurnTime" type="number" class="num" value="0" min="0" max="900" onchange="pushSettings()" /></label>
+                <label class="field" title="Seconds added to your turn each time you complete an action.">+ sec per action<input id="setTurnInc" type="number" class="num" value="0" min="0" max="120" onchange="pushSettings()" /></label>
+                <label class="field" title="How long a trade offer stays open.">Trade offer (sec)<input id="setTradeTime" type="number" class="num" value="20" min="5" max="300" onchange="pushSettings()" /></label>
+              </div>
+              <div class="rule-group">
+                <h4>Special tiles</h4>
+                <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="0" min="0" max="500" onchange="pushSettings()" /></label>
+                <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>
+                <label class="field">Fog hexes<input id="setFog" type="number" class="num" value="0" min="0" max="2000" onchange="pushSettings()" /></label>
+              </div>
+              <div class="rule-group">
+                <h4>Bank and dev cards</h4>
+                <label class="field">Bank cards per type<input id="setBankRes" type="number" class="num" value="19" min="5" max="999" onchange="pushSettings()" /></label>
+                <label class="field">Knights<input id="setDevKnight" type="number" class="num" value="14" min="0" max="100" onchange="pushSettings()" /></label>
+                <label class="field">Victory points<input id="setDevVp" type="number" class="num" value="5" min="0" max="50" onchange="pushSettings()" /></label>
+                <label class="field">Road building<input id="setDevRb" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
+                <label class="field">Year of plenty<input id="setDevYop" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
+                <label class="field">Monopoly<input id="setDevMono" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
+              </div>
+              <div class="rule-group">
+                <h4>Pieces per player (above base = 2× cost)</h4>
+                <label class="field" title="Scales with VP to win; roads built after your 15th cost 2× resources">Roads<input id="setMaxRoad" type="number" class="num" value="15" min="5" max="100" onchange="pushSettings()" /></label>
+                <label class="field" title="Scales with VP to win; settlements built after your 5th cost 2× resources">Settlements<input id="setMaxSettle" type="number" class="num" value="5" min="2" max="50" onchange="pushSettings()" /></label>
+                <label class="field" title="Scales with VP to win; cities built after your 4th cost 2× resources">Cities<input id="setMaxCity" type="number" class="num" value="4" min="1" max="50" onchange="pushSettings()" /></label>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="setup-foot">
+          <span class="setup-note">Nobody can join until you continue to the board.</span>
+          <button class="btn" onclick="startGame()"><span data-icon="play" data-size="16"></span>Start now</button>
+          <button class="btn primary" onclick="setSetupOpen(false)"><span data-icon="map" data-size="16"></span>Continue to board</button>
+        </div>
+      </div>
+
+      <!-- Shown to everyone but the host while the setup page is open -->
+      <div id="hostWaiting" style="display:none;">
+        <div class="host-waiting-card">Host is creating world</div>
+      </div>
+
+      <!-- Lobby dock: map painter -->
       <div id="lobbyToolbar">
         <div class="dock-head">
           <div class="tabs">
             <button class="tab active" id="tabBtnMap" onclick="switchLobbyTab('map')">Map painter</button>
-            <button class="tab" id="tabBtnCards" onclick="switchLobbyTab('cards')">Rules and cards</button>
           </div>
           <div class="dock-actions">
-            <select id="botTier" class="num" title="Difficulty of the next bot (click a bot's tag in the player list to change it later)">
-              <option value="main" selected>Main</option>
-              <option value="secondary">Secondary</option>
-              <option value="overload">Overload</option>
-            </select>
-            <button class="btn sm" onclick="addBot()"><span data-icon="plus" data-size="16"></span>Bot</button>
-            <button class="btn sm" onclick="removeBot()"><span data-icon="minus" data-size="16"></span>Bot</button>
+            <button class="btn sm" onclick="setSetupOpen(true)" title="Back to bots, presets, map and rules"><span data-icon="sliders" data-size="16"></span>World setup</button>
             <button class="btn sm primary" onclick="startGame()"><span data-icon="play" data-size="16"></span>Start</button>
           </div>
         </div>
 
-        <!-- Presets: quick starts come from the registry (drawn by mapmenu.ts); saved ones (host's browser) can be deleted after a confirmation -->
-        <div class="tool-row" id="presetRow">
-          <span class="tool-label">Presets</span>
-          <span id="builtinPresets" class="tool-row"></span>
-          <span class="tool-sep"></span>
-          <span id="customPresets" class="tool-row"></span>
-        </div>
-
-        <!-- Map recipe: summary and dropdown (shape, style, perks), seed, report. Drawn by mapmenu.ts from the server's option list -->
-        <div class="map-recipe-row">
-          <span class="tool-label">Map</span>
-          <div id="mapRecipe" class="map-recipe"></div>
-        </div>
-
-        <!-- Tab 1: map painter -->
+        <!-- Map painter -->
         <div id="lobbyTabMap" class="dock-body">
           <div class="tool-row">
             <span class="tool-label">Tiles</span>
@@ -171,56 +250,6 @@
           </div>
         </div>
 
-        <!-- Tab 2: rules and card amounts -->
-        <div id="lobbyTabCards" class="dock-body" style="display:none;">
-          <div class="rules-grid">
-            <div class="rule-group">
-              <h4>Game</h4>
-              <label class="field">Map radius (1-50)<input id="setRadius" type="number" class="num" value="2" min="1" max="50" onchange="pushSettings()" /></label>
-              <label class="field">VP to win<input id="setVp" type="number" class="num" value="10" min="3" max="50" onchange="pushSettings()" /></label>
-              <label class="field">Max players<input id="setMaxP" type="number" class="num" value="8" min="2" max="8" onchange="pushSettings()" /></label>
-              <label class="field">Discard above<input id="setDiscard" type="number" class="num" value="7" min="3" max="50" onchange="pushSettings()" /></label>
-            </div>
-            <div class="rule-group">
-              <h4>Timers</h4>
-              <label class="field" title="Seconds per turn. 0 = no turn timer.">Turn time (sec, 0 = off)<input id="setTurnTime" type="number" class="num" value="0" min="0" max="900" onchange="pushSettings()" /></label>
-              <label class="field" title="Seconds added to your turn each time you complete an action.">+ sec per action<input id="setTurnInc" type="number" class="num" value="0" min="0" max="120" onchange="pushSettings()" /></label>
-              <label class="field" title="How long a trade offer stays open.">Trade offer (sec)<input id="setTradeTime" type="number" class="num" value="20" min="5" max="300" onchange="pushSettings()" /></label>
-            </div>
-            <div class="rule-group">
-              <h4>Bots</h4>
-              <label class="field" title="How much bots talk in chat. Off also stops their replies to your messages.">Bot chat
-                <select id="setBotChat" class="num" onchange="pushSettings()">
-                  <option value="off">Off</option>
-                  <option value="quiet">Quiet</option>
-                  <option value="normal" selected>Normal</option>
-                  <option value="chatty">Chatty</option>
-                </select>
-              </label>
-            </div>
-            <div class="rule-group">
-              <h4>Special tiles</h4>
-              <label class="field">Gold hexes<input id="setGold" type="number" class="num" value="0" min="0" max="500" onchange="pushSettings()" /></label>
-              <label class="field">Desert hexes<input id="setDesert" type="number" class="num" value="1" min="0" max="200" onchange="pushSettings()" /></label>
-              <label class="field">Fog hexes<input id="setFog" type="number" class="num" value="0" min="0" max="2000" onchange="pushSettings()" /></label>
-            </div>
-            <div class="rule-group">
-              <h4>Bank and dev cards</h4>
-              <label class="field">Bank cards per type<input id="setBankRes" type="number" class="num" value="19" min="5" max="999" onchange="pushSettings()" /></label>
-              <label class="field">Knights<input id="setDevKnight" type="number" class="num" value="14" min="0" max="100" onchange="pushSettings()" /></label>
-              <label class="field">Victory points<input id="setDevVp" type="number" class="num" value="5" min="0" max="50" onchange="pushSettings()" /></label>
-              <label class="field">Road building<input id="setDevRb" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
-              <label class="field">Year of plenty<input id="setDevYop" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
-              <label class="field">Monopoly<input id="setDevMono" type="number" class="num" value="2" min="0" max="50" onchange="pushSettings()" /></label>
-            </div>
-            <div class="rule-group">
-              <h4>Pieces per player (above base = 2× cost)</h4>
-              <label class="field" title="Scales with VP to win; roads built after your 15th cost 2× resources">Roads<input id="setMaxRoad" type="number" class="num" value="15" min="5" max="100" onchange="pushSettings()" /></label>
-              <label class="field" title="Scales with VP to win; settlements built after your 5th cost 2× resources">Settlements<input id="setMaxSettle" type="number" class="num" value="5" min="2" max="50" onchange="pushSettings()" /></label>
-              <label class="field" title="Scales with VP to win; cities built after your 4th cost 2× resources">Cities<input id="setMaxCity" type="number" class="num" value="4" min="1" max="50" onchange="pushSettings()" /></label>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Hint bar -->

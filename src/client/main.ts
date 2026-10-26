@@ -34,7 +34,7 @@ import {
   createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton, getSavedSession,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
   setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
-  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi
+  toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
@@ -45,7 +45,7 @@ Object.assign(window as any, {
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
-  startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier,
+  startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier, setSetupOpen,
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset, applyPresetStyle,
   askDeletePreset, cancelDeletePreset, deletePreset,
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
@@ -202,7 +202,7 @@ function init(): void {
     const target = e.target as Element | null;
 
     // Hovering a number input (or its field row) in the Rules and Cards menu scrolls the value up/down with the mouse wheel.
-    if (target && target.closest('#lobbyToolbar')) {
+    if (target && target.closest('#lobbyToolbar, #setupScreen')) {
       const fieldLabel = target.closest('.field');
       const numInput = (
         target instanceof HTMLInputElement && target.type === 'number'

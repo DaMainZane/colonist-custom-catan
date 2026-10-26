@@ -151,6 +151,7 @@ export function registerSocketHandlers(io: Server): void {
       }
 
       if (candidateRoom.game) return socket.emit('errorMsg', 'Game already started!');
+      if (candidateRoom.setup) return socket.emit('errorMsg', 'Host is creating world');
       if (candidateRoom.lobbyPlayers.length >= candidateRoom.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
 
       if (candidateRoom.cleanupTimer) {
@@ -192,6 +193,12 @@ export function registerSocketHandlers(io: Server): void {
         return;
       }
 
+      if (!silent && !room.game && room.setup) {
+        socket.emit('reconnectFailed', { code: cleanCode });
+        socket.emit('errorMsg', 'Host is creating world');
+        return;
+      }
+
       // If the room is still in LOBBY and has space, let them join directly if not silent
       if (!silent && !room.game && cleanName && room.lobbyPlayers.length < room.settings.maxPlayers) {
         const newP = createLobbyPlayer(socket.id, cleanName, room.lobbyPlayers.length, false);
@@ -209,6 +216,14 @@ export function registerSocketHandlers(io: Server): void {
 
       socket.emit('reconnectFailed', { code: cleanCode });
       if (!silent) socket.emit('errorMsg', 'Could not find your seat in that game.');
+    }));
+
+    // The host moves between the world setup page and the board. While the setup page is open nobody new can join.
+    socket.on('setSetup', safe(({ code, open }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      room.setup = !!open;
+      broadcastRoom(room);
     }));
 
     socket.on('addBot', safe(({ code, tier }) => {

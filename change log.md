@@ -1,5 +1,16 @@
 # Change Log
 
+## 2026-10-26 (Pass 33: world setup page between the name page and the board)
+### Added
+- **Setup page** (`public/index.html` `#setupScreen`, `src/client/render/setup.ts`, `styles.css`): host only. Three boxes: bots and bot chat (with a player strip: avatar click, bot tier tag click), a tiles-only map preview, and map presets, map menu (seed) and all rules (game, timers, special tiles, bank and dev cards, pieces). Buttons: Continue to board, Start now. Controls keep their ids and handlers, so settings sync, presets and the seed work unchanged.
+- **Waiting screen**: everyone but the host sees "Host is creating world" over the board while the page is open. A new player who tries to join (or rejoin without a seat) gets the same message as a toast and stays on the name page. Players who already have a seat can still reclaim it.
+- Server: `room.setup` (true on create), socket `setSetup`, `setup` in the client state. Rematch leaves it off, so Play again still goes straight to the board; the board dock has a **World setup** button to go back.
+### Changed
+- The board dock is the map painter only (plus World setup and Start). The Rules and cards tab and the bot controls moved to the setup page. Mouse-wheel editing of number fields and sliders works on the setup page too.
+- Tests: `tests/setuppage.test.ts`.
+### Not verified
+- Written without a shell: run typecheck and test, then check: create game (setup page), add bots, change a preset and the seed (preview updates), Continue to board, World setup (back), second browser join during setup (toast) and after Continue (joins).
+
 ## 2026-10-26 (Pass 32: fixed-size player list that follows the turn, hexagon-only port layout)
 ### Changed
 - **Sidebar** (`src/client/render/sidebar.ts`, `src/client/styles.css`): log, chat and bank keep a fixed size for 1 to 8 players. The player list always shows 4 rows (`--p-row-h`) with a thin scrollbar on its right edge when there are more. On every turn change the current player's row scrolls into view by the smallest move (player 5 = one row down, back to player 1 = up to the top). The list keeps its scroll position across re-renders, wheel/touch/drag stops the auto-scroll, and the robber victim row is scrolled into view when the steal choice opens.

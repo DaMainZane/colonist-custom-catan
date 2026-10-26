@@ -108,6 +108,8 @@ export interface Room {
   mapMeta?: MapMeta;
   /** null = lobby. */
   game: GameState | null;
+  /** The host is on the world setup page (before the board). Newcomers cannot join until the host continues. */
+  setup?: boolean;
   lobbyLog: { text: string; color: string | null }[];
   chats: ChatEntry[];
   fx: Effects;

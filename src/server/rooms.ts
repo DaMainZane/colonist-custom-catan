@@ -44,6 +44,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     board,
     mapMeta: meta,
     game: null,
+    setup: true,
     lobbyLog: [{ text: `Lobby created. New bots are ${tierLabel(DEFAULT_TIER)}; pick a tier next to the Bot button.`, color: '#1565c0' }],
     chats: [{ sender: hostName, avatar: AVATARS[0], color: PLAYER_COLORS[0], text: 'Welcome! Customize the board or add bots to start.' }],
     fx: { lastRollHexIds: [], recentProductions: [], recentTransfers: [] },
