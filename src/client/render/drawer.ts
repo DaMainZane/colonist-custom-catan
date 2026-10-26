@@ -349,9 +349,10 @@ export function proposePlayerTrade(): void {
   const me = myPlayer();
   // Hands are hidden, but cards are conserved: nobody else holds a resource when the bank plus my hand already add up to the full supply.
   if (me?.resources) {
-    const supply = Number(state.settings?.bankResourcePerType) || 0;
     for (const r of RESOURCES) {
       if ((tradeWant[r] || 0) <= 0) continue;
+      // The real supply comes from the server (the bank may have been scaled to the board), not from the lobby setting.
+      const supply = Number(state.bankSupply?.[r]) || 0;
       const others = supply - (state.bank?.[r] ?? 0) - (me.resources[r] || 0);
       if (supply > 0 && others <= 0) {
         showToast(`No one has any ${RES_META[r].name} to trade.`);

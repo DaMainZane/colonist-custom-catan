@@ -315,6 +315,76 @@ describe('robustness', () => {
   });
 });
 
+describe('add-ons on every base shape', () => {
+  const BASES: string[][] = [[], ['continent'], ['ring'], ['islands'], ['continents']];
+  const ADDONS = ['river', 'lake', 'satellites', 'ragged'];
+  const label = (picks: string[]) => picks.join('+') || 'hexagon';
+  const fallbackNote = (m: GeneratedMap) => m.report.warnings.find(w => w.code === 'shape-fallback');
+
+  it('an add-on is applied, not swapped for the plain hexagon (the reasons are listed when it is)', () => {
+    const misses: string[] = [];
+    let total = 0;
+    for (const base of BASES) {
+      for (const addon of ADDONS) {
+        // Continents need room for their water gaps, so they are only tried on big boards (small ones fall back by design).
+        for (const radius of base[0] === 'continents' ? [6, 8] : [3, 4, 6]) {
+          for (const seed of seeds(4)) {
+            total++;
+            const picks = [...base, addon];
+            const fell = fallbackNote(make(picks, radius, seed));
+            if (fell) misses.push(`${label(picks)} r${radius} ${seed}: ${fell.message}`);
+          }
+        }
+      }
+    }
+    // Some combinations clash (a ring and a lake: the later pick wins), so this is a bound, not zero. The message lists the first misses.
+    expect(misses.length / total, `${misses.length}/${total} fell back\n${misses.slice(0, 12).join('\n')}`).toBeLessThanOrEqual(0.15);
+  });
+
+  it('the default radius 2 board takes a river, a lake or islets without dropping to the hexagon', () => {
+    const misses: string[] = [];
+    let total = 0;
+    for (const addon of ['river', 'lake', 'satellites']) {
+      for (const seed of seeds(8)) {
+        total++;
+        const fell = fallbackNote(make([addon], 2, seed));
+        if (fell) misses.push(`${addon} r2 ${seed}: ${fell.message}`);
+      }
+    }
+    expect(misses.length / total, `${misses.length}/${total} fell back\n${misses.slice(0, 12).join('\n')}`).toBeLessThanOrEqual(0.25);
+  });
+
+  it('a river on islands or continents is carved into the biggest landmass and keeps every island at its minimum', () => {
+    let rivers = 0;
+    let tried = 0;
+    for (const shape of ['islands', 'continents']) {
+      for (const radius of shape === 'continents' ? [6, 8] : [4, 5, 6, 8]) {
+        for (const seed of seeds(5)) {
+          tried++;
+          const m = make([shape, 'river'], radius, seed);
+          if (fellBack(m)) continue;
+          if (m.board.hexes.some(h => h.ext.river)) rivers++;
+          const sizes = m.report.stats.landmasses;
+          expect(Math.min(...sizes), `${shape} r${radius} ${seed}`).toBeGreaterThanOrEqual(shape === 'islands' ? 6 : 3);
+        }
+      }
+    }
+    expect(rivers / tried, `${rivers}/${tried} maps got a river`).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('a part-applied add-on says so in the report (shape-partial) and the map still builds', () => {
+    // Radius 2 has almost no open water, so islets rarely fit; either they do or the report names what is short.
+    for (const seed of seeds(6)) {
+      const m = make(['satellites'], 2, seed);
+      expect(m.board.hexes).toHaveLength(canvasSize(2));
+      if (fellBack(m)) continue;
+      const partial = m.report.warnings.filter(w => w.code === 'shape-partial');
+      const sizes = m.report.stats.landmasses;
+      if (sizes.length < 2) expect(partial.length, `r2 ${seed}`).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('land field helpers', () => {
   const field = (radius = 3) => createLandField(radius, createNoise('T'), createRng('T'));
 

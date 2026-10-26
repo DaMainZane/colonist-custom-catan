@@ -113,6 +113,8 @@ export interface GameState {
   settings: any;
   board: { hexes: any[]; vertices: any[]; edges: any[]; robberHexId: number };
   bank: Resources;
+  /** Cards of each resource in the game (bank + all hands); null in the lobby. */
+  bankSupply?: Resources | null;
   devDeckCount: number;
   turnIndex: number;
   currentPlayerId: string;

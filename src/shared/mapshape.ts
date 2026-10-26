@@ -23,6 +23,8 @@ export function canvasCoords(radius: number): { q: number; r: number }[] {
 
 /** Shape attempts before the generator gives up and falls back to the plain hexagon (Map Generation Design, section 11). */
 export const SHAPE_ATTEMPTS = 40;
+/** Attempts spent hunting for a clean shape once one with notes (a short river, fewer islets) exists. */
+export const SOFT_ATTEMPTS = 10;
 /** Smallest land count a shaped map may have. */
 export const MIN_LAND = 7;
 
@@ -73,6 +75,11 @@ export interface LandField {
   lakes: number;
   /** Set by an op that cannot finish; the attempt is dropped. */
   failed: string | null;
+  /**
+   * Plain-words remarks about what an op could only do in part (a river that ran out of room, fewer islets than asked).
+   * An attempt with notes still counts, but `runShape` first looks for a clean one.
+   */
+  notes: string[];
 }
 
 export function createLandField(radius: number, noise: NoiseFn, rng: RngState): LandField {
@@ -112,7 +119,8 @@ export function createLandField(radius: number, noise: NoiseFn, rng: RngState): 
     ragged: 0,
     minSize: 1,
     lakes: 0,
-    failed: null
+    failed: null,
+    notes: []
   };
 }
 
@@ -513,26 +521,30 @@ export interface ShapeResult {
   attempts: number;
   /** The attempts all failed and the plain hexagon was used. */
   fallback: boolean;
+  /** When `fallback` is set: the reasons most attempts failed on, most common first (for the lobby tag). */
+  why?: string | null;
+  /** What the chosen attempt could only do in part (see `LandField.notes`). */
+  notes?: string[];
 }
 
-/** Cheap checks on a finished shape: count, landmasses, sizes and room for a table. */
-function shapeOk(f: LandField, expect: number | null): boolean {
-  if (f.failed) return false;
-  const n = landCount(f);
-  if (n < 1) return false;
-  if (expect !== null && n !== expect) return false;
+/** Cheap checks on a finished shape: landmasses, sizes and room for a table. Returns what is wrong, or null when it passes. */
+function shapeProblem(f: LandField): string | null {
+  if (f.failed) return f.failed;
+  if (landCount(f) < 1) return 'no land';
   const main = components(f).filter(c => c.some(i => !f.sat[i]));
-  if (main.length === 0) return false;
-  if (f.single && main.length !== 1) return false;
-  for (const c of main) if (c.length < f.minSize) return false;
+  if (main.length === 0) return 'no mainland';
+  if (f.single && main.length !== 1) return 'land split in several pieces';
+  for (const c of main) if (c.length < f.minSize) return 'a landmass is too small';
   let big = main[0];
   for (const c of main) if (c.length > big.length) big = c;
   let coast = 0;
   for (const i of big) for (const j of f.nb[i]) if (j < 0 || !f.land[j]) coast++;
-  return estimateVertices(big.length, coast, 1, f.lakes) >= 3 * BASELINE_SPOTS;
+  if (estimateVertices(big.length, coast, 1, f.lakes) < 3 * BASELINE_SPOTS) return 'no landmass can hold a table';
+  return null;
 }
 
-function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDef[], carves: ShapeOpDef[], scatters: ShapeOpDef[]): boolean {
+/** Null when the attempt produced a usable shape, else the reason it did not. */
+function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDef[], carves: ShapeOpDef[], scatters: ShapeOpDef[]): string | null {
   for (const t of tweaks) t.run?.(f, ctx);
   if (!base.run) {
     // The hexagon: the whole canvas is land. Carve ops (a lake) may still cut into it; the count is whatever is left.
@@ -543,7 +555,7 @@ function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDe
     f.single = true;
     f.cleanup = false;
     for (const c of carves) c.run?.(f, ctx);
-    return shapeOk(f, null);
+    return shapeProblem(f);
   }
 
   const landDefault = base.params?.find(p => p.id === 'land')?.default ?? 70;
@@ -556,12 +568,15 @@ function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDe
   f.target = Math.max(1, L - satCells);
   f.baseTarget = Math.min(f.size, f.target + carveCells);
   base.run(f, ctx);
-  if (f.failed) return false;
+  if (f.failed) return f.failed;
   for (const c of carves) c.run?.(f, ctx);
-  if (f.failed) return false;
-  if (f.cleanup && !cleanupField(f)) return false;
+  if (f.failed) return f.failed;
+  if (f.cleanup && !cleanupField(f)) return 'cleanup could not reach the land count';
   for (const s of scatters) s.run?.(f, ctx);
-  return shapeOk(f, f.L);
+  // A carve that finds no room (a river on a small island) leaves extra land, and a scatter may place fewer islets than asked.
+  // Both are accepted and noted (`f.notes`): the land count is exact only for what was placed. `runShape` prefers a clean attempt,
+  // but keeps one with notes over dropping the whole shape for the plain hexagon.
+  return shapeProblem(f);
 }
 
 /**
@@ -574,17 +589,34 @@ export function runShape(input: ShapeInput): ShapeResult {
   const tweaks = input.ops.filter(o => o.phase === 'tweak');
   const carves = input.ops.filter(o => o.phase === 'carve');
   const scatters = input.ops.filter(o => o.phase === 'scatter');
+  const why = new Map<string, number>();
+  let soft: { f: LandField; attempt: number } | null = null;
+  const finish = (f: LandField, attempts: number): ShapeResult => {
+    // A shape that never called fillHeight leaves the field all zero: that means "no height", not "flat".
+    const drawn = f.h.some(v => v !== 0);
+    return { land: f.land, river: f.river, h: drawn ? f.h : null, attempts, fallback: false, why: null, notes: f.notes };
+  };
   if (base) {
     for (let attempt = 0; attempt < SHAPE_ATTEMPTS; attempt++) {
       const ctx = input.make(attempt);
       const f = createLandField(input.radius, ctx.noise, ctx.rng);
-      if (tryShape(f, ctx, base, tweaks, carves, scatters)) {
-        // A shape that never called fillHeight leaves the field all zero: that means "no height", not "flat".
-        const drawn = f.h.some(v => v !== 0);
-        return { land: f.land, river: f.river, h: drawn ? f.h : null, attempts: attempt + 1, fallback: false };
+      const problem = tryShape(f, ctx, base, tweaks, carves, scatters);
+      if (problem !== null) {
+        why.set(problem, (why.get(problem) ?? 0) + 1);
+        continue;
       }
+      if (f.notes.length === 0) return finish(f, attempt + 1);
+      // Usable, but an op could only do part of its work: keep the first such shape and look a little longer for a clean one.
+      if (!soft) soft = { f, attempt };
+      if (attempt + 1 >= SOFT_ATTEMPTS) break;
     }
+    if (soft) return finish(soft.f, soft.attempt + 1);
   }
   const size = canvasCoords(input.radius).length;
-  return { land: new Uint8Array(size).fill(1), river: new Uint8Array(size), h: null, attempts: SHAPE_ATTEMPTS, fallback: !!base };
+  const top = [...why.entries()]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .slice(0, 2)
+    .map(([reason, n]) => `${reason} (${n}x)`)
+    .join(', ');
+  return { land: new Uint8Array(size).fill(1), river: new Uint8Array(size), h: null, attempts: SHAPE_ATTEMPTS, fallback: !!base, why: top || null, notes: [] };
 }

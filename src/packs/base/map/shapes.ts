@@ -3,7 +3,7 @@ import { rngInt, rngNext } from '../../../shared';
 import type { MapCtx, PackApi } from '../../../shared';
 // The land-field helpers are imported from their module directly (their names are generic and stay out of the shared index).
 import {
-  cellDistance, fillHeight, growBlobs, isArc, isCoastal, limitLand, oceanDistance, pickCenters, splitSizes, takeTop, waterNeighbours
+  cellDistance, components, fillHeight, growBlobs, isArc, isCoastal, limitLand, oceanDistance, pickCenters, splitSizes, takeTop, waterNeighbours
 } from '../../../shared/mapshape';
 import type { BlobSpec, LandField } from '../../../shared/mapshape';
 
@@ -14,6 +14,15 @@ const landParam = (def: number) => ({ id: 'land', label: 'Land', min: 30, max: 9
 
 /** Noise frequency (lattice units per cell) that gives features about half the canvas wide. */
 const baseFreq = (f: LandField) => 1 / (0.5 * f.radius + 1.5);
+
+/** Mask of the biggest landmass. Carve ops cut there, so a small island (or a satellite) is never the one that shrinks below its minimum. */
+function biggestLand(f: LandField): Uint8Array {
+  const mask = new Uint8Array(f.size);
+  let best: number[] = [];
+  for (const c of components(f)) if (c.length > best.length) best = c;
+  for (const i of best) mask[i] = 1;
+  return mask;
+}
 
 function landDistance(f: LandField): Int32Array {
   const d = new Int32Array(f.size).fill(-1);
@@ -37,12 +46,16 @@ const satSizes = (n: number): number[] => Array.from({ length: n }, (_, i) => SA
 const satCount = (f: LandField, ctx: MapCtx): number => ctx.param('satellites.count') || Math.max(2, Math.round(f.L / 12));
 
 function placeSatellites(f: LandField, ctx: MapCtx): void {
-  for (const size of satSizes(satCount(f, ctx))) {
+  const wanted = satSizes(satCount(f, ctx));
+  const wantCells = wanted.reduce((a, b) => a + b, 0);
+  let placed = 0;
+  let cells = 0;
+  for (const size of wanted) {
     const dist = landDistance(f);
     const pool: number[] = [];
     for (let i = 0; i < f.size; i++) if (!f.land[i] && !f.locked[i] && dist[i] >= 2 && dist[i] <= 4) pool.push(i);
     if (pool.length === 0) for (let i = 0; i < f.size; i++) if (!f.land[i] && !f.locked[i] && dist[i] >= 2) pool.push(i);
-    if (pool.length === 0) { f.failed = 'satellites: no open water'; return; }
+    if (pool.length === 0) break;
     const start = pool[rngInt(f.rng, pool.length)];
     const isle = [start];
     f.land[start] = 1;
@@ -64,8 +77,11 @@ function placeSatellites(f: LandField, ctx: MapCtx): void {
       f.land[pick] = 1;
       f.sat[pick] = 1;
     }
-    if (isle.length < size) { f.failed = 'satellites: no room'; return; }
+    placed++;
+    cells += isle.length;
   }
+  // Open water runs out on a small board: keep what fits and say so (the shape stage first looks for an attempt that fits everything).
+  if (cells < wantCells) f.notes.push(`satellites: ${placed} islet${placed === 1 ? '' : 's'} fit (${cells} of ${wantCells} tiles)`);
 }
 
 // ---- Lake -------------------------------------------------------------------------------------------------------
@@ -75,6 +91,7 @@ const lakeCells = (f: LandField, ctx: MapCtx): number => Math.max(1, Math.round(
 function carveLakes(f: LandField, ctx: MapCtx): void {
   const total = lakeCells(f, ctx);
   const lakes = Math.max(1, ctx.param('lake.count') || 1);
+  const main = biggestLand(f);
   for (let li = 0; li < lakes; li++) {
     const want = Math.floor(total / lakes) + (li < total % lakes ? 1 : 0);
     if (want <= 0) continue;
@@ -82,10 +99,10 @@ function carveLakes(f: LandField, ctx: MapCtx): void {
     const dist = oceanDistance(f);
     let start = -1;
     for (let i = 0; i < f.size; i++) {
-      if (!f.land[i] || f.keep[i] || dist[i] < 2) continue;
+      if (!f.land[i] || !main[i] || f.keep[i] || dist[i] < 2) continue;
       if (start < 0 || dist[i] > dist[start]) start = i;
     }
-    if (start < 0) return;
+    if (start < 0) { f.notes.push('lake: no room for a lake'); return; }
     const lake = [start];
     const inLake = new Uint8Array(f.size);
     inLake[start] = 1;
@@ -104,12 +121,27 @@ function carveLakes(f: LandField, ctx: MapCtx): void {
     for (const c of lake) { f.land[c] = 0; f.locked[c] = 1; }
     for (const c of lake) for (const n of f.nb[c]) if (n >= 0 && f.land[n]) f.keep[n] = 1;
     f.lakes++;
+    if (lake.length < want) f.notes.push(`lake: ${lake.length} of ${want} tiles fit`);
   }
 }
 
 // ---- River ------------------------------------------------------------------------------------------------------
 
 const riverLength = (f: LandField, ctx: MapCtx): number => clampInt(ctx.param('river.length') || Math.max(3, Math.round(f.radius * 1.5)), 2, 60);
+
+/**
+ * Land tiles a river could flow into next from `head`. Never the canvas edge (open sea) and never a tile that would cut the
+ * land: the tile must touch no other water than `head` and keep one unbroken arc of land around it.
+ */
+function riverSteps(f: LandField, head: number): number[] {
+  const out: number[] = [];
+  for (const n of f.nb[head]) {
+    if (n < 0 || !f.land[n] || f.keep[n] || waterNeighbours(f, n) !== 1) continue;
+    if (f.nb[n].some(j => j < 0) || !isArc(f, n)) continue;
+    out.push(n);
+  }
+  return out;
+}
 
 /**
  * A river is a one-tile-wide channel of water that starts on the shore and walks inland: each step goes through a
@@ -119,30 +151,30 @@ const riverLength = (f: LandField, ctx: MapCtx): number => clampInt(ctx.param('r
  */
 function carveRiver(f: LandField, ctx: MapCtx): void {
   const len = riverLength(f, ctx);
+  // The river runs in the biggest landmass, so a small island never shrinks below its minimum.
+  const main = biggestLand(f);
   const starts: number[] = [];
   for (let i = 0; i < f.size; i++) {
-    if (!f.land[i] || f.keep[i] || !isCoastal(f, i) || !isArc(f, i)) continue;
+    if (!f.land[i] || !main[i] || f.keep[i] || !isCoastal(f, i) || !isArc(f, i)) continue;
     // Water on the shore must be open sea, not a lake.
     if (f.nb[i].some(j => j >= 0 && !f.land[j] && f.locked[j] && !f.river[j])) continue;
     starts.push(i);
   }
-  if (starts.length === 0) return;
+  // Only a shore tile with a way inland can start a river, so it is never a lone tile when the land has room for more.
+  const open = starts.filter(s => {
+    f.land[s] = 0;
+    const ok = riverSteps(f, s).length > 0;
+    f.land[s] = 1;
+    return ok;
+  });
+  if (open.length === 0) { f.notes.push('river: no room inland'); return; }
   const carve = (c: number) => { f.land[c] = 0; f.locked[c] = 1; f.river[c] = 1; };
-  const first = starts[rngInt(f.rng, starts.length)];
+  const first = open[rngInt(f.rng, open.length)];
   carve(first);
   let carved = 1;
   let heads = [first];
   let sinceSplit = 0;
-  const options = (head: number): number[] => {
-    const out: number[] = [];
-    for (const n of f.nb[head]) {
-      // Never reach the canvas edge (open sea) and never cut the land: the tile must keep one unbroken arc of land around it.
-      if (n < 0 || !f.land[n] || f.keep[n] || waterNeighbours(f, n) !== 1) continue;
-      if (f.nb[n].some(j => j < 0) || !isArc(f, n)) continue;
-      out.push(n);
-    }
-    return out;
-  };
+  const options = (head: number): number[] => riverSteps(f, head);
   while (carved < len && heads.length > 0) {
     const next: number[] = [];
     for (const head of heads) {
@@ -168,6 +200,7 @@ function carveRiver(f: LandField, ctx: MapCtx): void {
     }
     heads = next;
   }
+  if (carved < len) f.notes.push(`river: ${carved} of ${len} tiles fit`);
 }
 
 // ---- Registration -------------------------------------------------------------------------------------------------
@@ -252,9 +285,13 @@ export function registerShapes(api: PackApi): void {
       f.cleanup = false;
       f.minSize = 6;
       const total = f.baseTarget;
+      // A river or lake is cut out of the biggest island later, so that island needs room for it and must still hold a table.
+      const carve = Math.max(0, f.baseTarget - f.target);
+      const bigNeed = carve > 0 ? Math.min(total, 7 + carve) : 7;
       let k = ctx.param('islands.count') || clampInt(Math.round(f.radius / 1.5), 2, 8);
       while (k > 1 && k * 6 > total) k--;
-      const sizes = splitSizes(f.rng, total, k, 6, 7);
+      while (k > 1 && carve > 0 && (k - 1) * 6 + bigNeed > total) k--;
+      const sizes = splitSizes(f.rng, total, k, 6, bigNeed);
       const centers = pickCenters(f, k, 1);
       if (!sizes || centers.length < k) { f.failed = 'islands: sizes'; return; }
       const specs: BlobSpec[] = sizes.map((size, i) => ({
@@ -320,6 +357,9 @@ export function registerShapes(api: PackApi): void {
     run(f, ctx) {
       f.single = false;
       f.cleanup = false;
+      const carve = Math.max(0, f.baseTarget - f.target);
+      // A river's tiles come out of the land budget: asking the blobs for extra land packs the continents too tightly for their water gap.
+      f.baseTarget = f.target;
       const total = f.baseTarget;
       const gap = clampInt(ctx.param('continents.gap'), 1, 4);
       const stretchMax = Math.max(100, ctx.param('continents.stretch')) / 100;
@@ -328,7 +368,8 @@ export function registerShapes(api: PackApi): void {
       f.minSize = min;
       let k = clampInt(ctx.param('continents.count'), 2, 4);
       while (k > 1 && k * min > total) k--;
-      const sizes = splitSizes(f.rng, total, k, min, 7);
+      // The biggest continent also has to keep a table's worth of land after a river or lake is cut into it.
+      const sizes = splitSizes(f.rng, total, k, min, carve > 0 ? Math.min(total, 7 + carve) : 7);
       const centers = pickCenters(f, k, 1);
       if (!sizes || centers.length < k) { f.failed = 'continents: sizes'; return; }
       for (let a = 0; a < k; a++) {

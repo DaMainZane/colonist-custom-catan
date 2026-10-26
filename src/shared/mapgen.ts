@@ -192,8 +192,11 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     make: attempt => ({ ...ctxFor('shape'), rng: stageRng(seed, 'shape', attempt), noise: createNoise(`${seed}:shape:${attempt}`) })
   });
   if (shape.fallback) {
-    warnings.push({ code: 'shape-fallback', message: 'No shape attempt passed the checks, so the plain hexagon was used. Try another seed or fewer options.' });
+    const why = shape.why ? ` Most attempts failed on: ${shape.why}.` : '';
+    warnings.push({ code: 'shape-fallback', message: `No shape attempt passed the checks, so the plain hexagon was used.${why} Try another seed or fewer options.` });
   }
+  // An op that could only do part of its work (a river that ran out of room, fewer islets than asked) still gives a shape; say what is short.
+  for (const note of shape.notes ?? []) warnings.push({ code: 'shape-partial', message: note });
   // Per-cell data for the terrain and number styles (land cells, canvas order): height, moisture, coast distance, landmass.
   // The shape's height field reaches the terrain stage here; shapes that drew none fall back to the terrain stage's noise.
   const cellsFor = (t: number): CellInfo[] =>

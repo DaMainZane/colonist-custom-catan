@@ -244,6 +244,11 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     settings: room.settings,
     board,
     bank,
+    // Cards of each resource in the game (bank + every hand). Cards are conserved, so this is the real supply, whatever the lobby setting
+    // said: the bank and dev deck may have been scaled to the table and board at game start.
+    bankSupply: g
+      ? Object.fromEntries(Object.keys(g.bank).map(r => [r, (g.bank[r] || 0) + g.players.reduce((s, p) => s + (p.resources[r] || 0), 0)]))
+      : null,
     devDeckCount,
     turnIndex: g ? g.turn : 0,
     currentPlayerId: current?.id,

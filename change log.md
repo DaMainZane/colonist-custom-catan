@@ -1,5 +1,25 @@
 # Change Log
 
+## 2026-10-26 (Pass 27: "No one has any X" used the lobby bank setting instead of the real supply; untested)
+### Fixed
+- **False "No one has any <resource> to trade" on Scaled Games** (`src/server/view.ts`, `src/client/types.ts`, `src/client/render/drawer.ts`) — the client worked out how many cards the others hold from `settings.bankResourcePerType` (the lobby number, 19 by default). Since Pass 25 the real bank can be bigger (scaled to the table or the board at game start), so the sum went negative and every player trade for that resource was refused. The server now sends `bankSupply` (bank + all hands per resource; cards are conserved) and the client uses that. Other places that might read the lobby number were not searched (no grep tool): if the toast still appears, look for `bankResourcePerType` or a literal 19 in `src/client`.
+
+## 2026-10-26 (Pass 26: Shape add-ons no longer drop to the hexagon; fallback reason in the tag; tested, typecheck and all tests pass)
+### Fixed
+- **River / Lake / Islet Add-ons Falling Back to the Plain Hexagon** (`src/shared/mapshape.ts`, `src/packs/base/map/shapes.ts`) — root cause found by reading, not by running:
+  - The shape check demanded an exact land count after every carve and scatter, but only continent and ring run the cleanup that repairs the count. A river on islands/continents that came out short, or islets that did not fit, left the count off and the attempt was dropped, 40 times in a row, then the hexagon was used. The exact-count check is gone (count is still exact for the base shape alone: cleanup or blob growth guarantees it).
+  - The river and lake started anywhere, including on a 6-tile island, which then fell under its minimum size. Carves now run only in the biggest landmass (`biggestLand`), and islands/continents reserve room for the carve (`bigNeed`) so the biggest one still holds a table afterwards.
+  - A river now starts only on a shore tile that has a way inland (`riverSteps`), so it is not a lone tile.
+  - Islets (`satellites`) no longer fail the attempt when open water runs out; they place what fits.
+### Added
+- **Part-applied Add-ons Are Reported** (`src/shared/mapshape.ts`, `src/shared/mapgen.ts`) — an op that could only do part of its work writes a note (`LandField.notes`), shown as a `shape-partial` warning ("river: 2 of 6 tiles fit"). `runShape` keeps the first such shape but looks up to `SOFT_ATTEMPTS` (10) attempts for a clean one before taking it.
+- **Fallback Reason** (`src/shared/mapshape.ts`, `src/shared/mapgen.ts`) — the "shape not applied" tooltip now names the two most common failure reasons (`ShapeResult.why`).
+- **Tests** (`tests/mapshapes.test.ts`) — "add-ons on every base shape": fallback rate over base x add-on x radius (the failure message lists the first misses), the default radius 2 board, river on islands/continents, and the `shape-partial` report. Continents are only tried at radius 6 and 8 (smaller boards cannot fit their water gaps, with or without a river).
+- **Continents + River** (`src/packs/base/map/shapes.ts`) — found by the first test run: the river's tiles were added on top of the land density (65% became 72%), so the continents no longer fit their water gap and every attempt failed. The river's tiles now come out of the land budget, so continents + river land is a few tiles under the slider.
+### Notes
+- Maps with river or lake picks, and islets, can come out differently for the same seed (river start choice changed). `GEN_VERSION` was NOT bumped; that is the owner's call.
+
+
 ## 2026-10-26 08:30:12 (Pass 25: Bank trade ratio advice, board-scaled bank and dev deck, turn clock bar, human discard clock; untested)
 ### Added
 - **Bank Trade Ratio Advice + "Fix amounts"** (`src/client/render/drawer.ts`, `src/client/main.ts`, `src/client/styles.css`) — `2026-10-26 08:30:12`:
