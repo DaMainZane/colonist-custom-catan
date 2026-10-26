@@ -336,3 +336,7 @@ Principle: build services first, then the DLC with the fewest outside dependenci
 24. Unit Mode Design.md (settle the five open decisions first), then Dominion mode: units engine, hex control, combat, capture, DLC hooks, unit-mode bot addon. Last because it reuses the strength numbers and every DLC hook built above.
 
 Parallel tracks that do not block the main line: the bot dialogue lines (grow each stage), the pictogram icon set for each DLC piece, and phone layout checks for each new overlay.
+
+## Unprocessed Ideas:
+- Boss fight: dragon that spit fireball every 2 turns (first turn up to the sky outside of render, 2nd turn drop down onto a random tile). Random tile is destroyed, similar to volcano explosion (same mechanic port over) (1 tiles only) (does not give resources until volcano)
+
