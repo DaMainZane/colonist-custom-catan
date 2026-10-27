@@ -1,11 +1,19 @@
 // MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | USED BY: server/*, bots, sim
 import { allPacks } from '../packs';
-import { createRegistry, mergeRules } from '../shared';
-import type { Rules } from '../shared';
+import { createRegistry, mergeRules, registryFor } from '../shared';
+import type { Registry, Rules } from '../shared';
 import type { Settings } from './types';
 
 /** One registry for the whole process: every shipped pack, in load order. */
 export const registry = createRegistry(allPacks);
+
+/** Returns a registry configured for the active DLC/addon toggles on `rules` (or the shared base registry when no DLC is on). */
+export function gameRegistry(rules?: Record<string, any>): Registry {
+  if (rules?.dlc && typeof rules.dlc === 'object' && Object.values(rules.dlc).some(Boolean)) {
+    return registryFor(allPacks, rules);
+  }
+  return registry;
+}
 
 export function defaultSettings(): Settings {
   return {
@@ -32,7 +40,11 @@ export function defaultSettings(): Settings {
     mapSeed: '',
     mapSeedLocked: false,
     mapPicks: [],
-    mapParams: {}
+    mapParams: {},
+    dlc: {},
+    addons: {},
+    eventsOn: false,
+    fateTokens: 2
   };
 }
 
@@ -102,7 +114,7 @@ export function settingsForPlayers(s: Settings, players: number, landHexes = 0):
 
 /** Overrides handed to createGame (it merges them over the registry defaults). */
 export function rulesFromSettings(s: Settings): Record<string, any> {
-  return {
+  const out: Record<string, any> = {
     boardRadius: s.boardRadius,
     vpToWin: s.vpToWin,
     maxPlayers: s.maxPlayers,
@@ -119,9 +131,15 @@ export function rulesFromSettings(s: Settings): Record<string, any> {
     },
     pieceLimits: { road: s.maxRoads, settlement: s.maxSettlements, city: s.maxCities }
   };
+  if (s.dlc && Object.keys(s.dlc).length > 0) out.dlc = { ...s.dlc };
+  if (s.addons && Object.keys(s.addons).length > 0) out.addons = { ...s.addons };
+  if (s.eventsOn) out.eventsOn = true;
+  if (s.fateTokens !== undefined && (s.eventsOn || s.fateTokens !== 2)) out.fateTokens = s.fateTokens;
+  return out;
 }
 
 /** Full rules (registry defaults + settings), for generating a board outside createGame. */
 export function fullRules(s: Settings): Rules {
-  return mergeRules(registry.rules, rulesFromSettings(s));
+  const r = rulesFromSettings(s);
+  return mergeRules(gameRegistry(r).rules, r);
 }

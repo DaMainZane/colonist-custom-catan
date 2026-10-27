@@ -1,7 +1,7 @@
 // MODULE: AI bot training data logger (captures pre-action state features, legal action counts, chosen actions, and terminal VP/win rewards) | USED BY: server/game, server/main, bots/sim
 import fs from 'fs';
 import path from 'path';
-import { computeVP, getPlayer, legalActions, totalCards } from '../../shared';
+import { getPlayer, legalActions, publicVP, score, totalCards } from '../../shared';
 import type { GameEvent, GameState, Id, Registry, Resources } from '../../shared';
 import { tradeRatios } from '../../packs/base/trading';
 import { getPips } from '../util';
@@ -185,8 +185,8 @@ export function captureTrainingSnapshot(g: GameState, reg: Registry, playerId: I
     actorId: playerId,
     isBot: p.isBot,
     tier: p.isBot ? tierFromDifficulty(p.difficulty) : 'human',
-    myVp: computeVP(g, reg, p, true),
-    publicVp: computeVP(g, reg, p, false),
+    myVp: score(g, reg, p, true),
+    publicVp: publicVP(g, reg, p),
     resources: { ...p.resources },
     totalCards: totalCards(p),
     prodPips: playerPips(g, reg, playerId),
@@ -203,7 +203,7 @@ export function captureTrainingSnapshot(g: GameState, reg: Registry, playerId: I
       .filter(o => o.id !== playerId)
       .map(o => ({
         id: o.id,
-        publicVp: computeVP(g, reg, o, false),
+        publicVp: publicVP(g, reg, o),
         cardCount: totalCards(o),
         devCount: o.devCards.length + o.newDevCards.length,
         knightsPlayed: o.stats.knightsPlayed || 0,
@@ -246,7 +246,7 @@ export function finalizeTrainingLog(g: GameState, reg: Registry, traj?: GameTrai
 
   const finalVpByPlayer: Record<Id, number> = {};
   for (const p of g.players) {
-    finalVpByPlayer[p.id] = computeVP(g, reg, p, true);
+    finalVpByPlayer[p.id] = score(g, reg, p, true);
   }
 
   const sorted = [...g.players].sort((a, b) => (finalVpByPlayer[b.id] || 0) - (finalVpByPlayer[a.id] || 0));

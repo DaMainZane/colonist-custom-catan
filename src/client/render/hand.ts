@@ -20,7 +20,17 @@ export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', strin
 export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' | 'city', me: any): string {
   const baseList = BUILD_RECIPES[recipeKey];
   const isDouble = recipeKey !== 'dev' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
-  const list = isDouble ? baseList.flatMap(r => [r, r]) : baseList;
+  const customCost = recipeKey !== 'dev' ? me?.pieceCosts?.[recipeKey] : null;
+  let list: string[];
+  if (customCost && typeof customCost === 'object') {
+    list = [];
+    for (const [r, n] of Object.entries(customCost)) {
+      const cnt = Math.max(0, Number(n) || 0);
+      for (let i = 0; i < cnt; i++) list.push(r);
+    }
+  } else {
+    list = isDouble ? baseList.flatMap(r => [r, r]) : baseList;
+  }
   const seen: Record<string, number> = {};
   const hand = me?.resources || {};
   const cardsHtml = list.map(r => {

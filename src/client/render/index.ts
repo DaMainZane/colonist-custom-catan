@@ -7,6 +7,7 @@ import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderSetupPage } from './setup';
 import { renderBoard } from './board';
+import { renderTimerPopups } from './overlay';
 import { renderPresetRow } from '../presets';
 import { renderMapMenu, renderQuickStarts } from '../mapmenu';
 import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
@@ -55,6 +56,9 @@ export function renderAll(): void {
       setVal('setTurnInc', s.turnIncrementSec ?? 0);
       setVal('setTradeTime', s.tradeTimerSec ?? 20);
       if (document.getElementById('setBotChat')) setVal('setBotChat', s.botChat ?? 'normal');
+      const eventsCb = document.getElementById('setEventsOn') as HTMLInputElement | null;
+      if (eventsCb) eventsCb.checked = !!s.eventsOn;
+      if (document.getElementById('setFateTokens')) setVal('setFateTokens', s.fateTokens ?? 2);
       setVal('setGold', s.goldTiles);
       setVal('setDesert', s.desertTiles);
       if (document.getElementById('setFog')) setVal('setFog', s.fogTiles ?? 0);
@@ -140,6 +144,7 @@ export function renderAll(): void {
   renderInlineDrawer(me, isMyTurn);
   renderSidebar();
   renderSetupPage();
+  renderTimerPopups();
 
   const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
   if (state.status !== 'GAMEOVER') {

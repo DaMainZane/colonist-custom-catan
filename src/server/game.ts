@@ -6,7 +6,7 @@ import { noteBotEvents } from './bots/brain';
 import { captureTrainingSnapshot, commitTrainingStep, initGameTrainingLog } from './bots/trainingLog';
 import { refreshMap } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
-import { registry, rulesFromSettings, settingsForPlayers } from './runtime';
+import { gameRegistry, rulesFromSettings, settingsForPlayers } from './runtime';
 import { noteActionCompleted } from './turnClock';
 import type { LobbyPlayer, Room } from './types';
 
@@ -82,10 +82,11 @@ export function recordEffects(room: Room, events: GameEvent[]): void {
 export function runAction(room: Room, playerId: string, type: string, payload: any = {}): DispatchResult {
   const g = room.game;
   if (!g) return { ok: false, error: 'No game in progress' };
-  const snap = captureTrainingSnapshot(g, registry, playerId);
-  const res = dispatch(g, registry, { type, playerId, payload });
+  const reg = gameRegistry(g.rules);
+  const snap = captureTrainingSnapshot(g, reg, playerId);
+  const res = dispatch(g, reg, { type, playerId, payload });
   if (res.ok) {
-    commitTrainingStep(g, registry, room.code, snap, type, payload, res.events);
+    commitTrainingStep(g, reg, room.code, snap, type, payload, res.events);
     recordEffects(room, res.events);
     noteBotEvents(g, res.events);
     emitBotDialogue(room, playerId, type, res.events);
@@ -107,9 +108,11 @@ export function startGame(room: Room): string | null {
   if (room.board.vertices.length < need) return 'Map needs more land tiles for this player count!';
 
   room.setup = false;
-  room.game = createGame(registry, {
+  const rules = rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length, room.board.hexes.filter(h => h.type !== 'water').length));
+  const reg = gameRegistry(rules);
+  room.game = createGame(reg, {
     players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, isBot: p.isBot, difficulty: p.difficulty })),
-    rules: rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length, room.board.hexes.filter(h => h.type !== 'water').length)),
+    rules,
     board: structuredClone(room.board),
     shuffleSeats: true
   });
@@ -117,7 +120,7 @@ export function startGame(room: Room): string | null {
   room.animatingUntil = 0;
   room.startedAt = Date.now();
   room.finishedAt = null;
-  initGameTrainingLog(room.game, registry, room.code);
+  initGameTrainingLog(room.game, reg, room.code);
   emitGameStartDialogue(room);
   return null;
 }

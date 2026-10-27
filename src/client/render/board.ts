@@ -22,6 +22,7 @@ import {
   addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev
 } from '../store';
 import { renderHand } from './hand';
+import { overlayPatternDefsMarkup, renderHexOverlaysMarkup } from './overlay';
 import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
 
@@ -183,6 +184,7 @@ function ensureHexGeomCache(hexes: any[]): void {
 
 function ensureBoardLayers(svg: HTMLElement): {
   terrainLayer: HTMLElement;
+  overlayLayer: HTMLElement;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -194,7 +196,9 @@ function ensureBoardLayers(svg: HTMLElement): {
   let terrainLayer = document.getElementById('boardTerrainLayer');
   if (!terrainLayer || terrainLayer.parentElement !== svg) {
     svg.innerHTML = `
+      ${overlayPatternDefsMarkup()}
       <g id="boardTerrainLayer"></g>
+      <g id="boardOverlayLayer"></g>
       <g id="boardHexDynamicLayer"></g>
       <g id="boardPortsLayer"></g>
       <g id="roadHighlightLayer"></g>
@@ -213,6 +217,7 @@ function ensureBoardLayers(svg: HTMLElement): {
   }
   return {
     terrainLayer,
+    overlayLayer: document.getElementById('boardOverlayLayer')!,
     portsLayer: document.getElementById('boardPortsLayer')!,
     hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
     roadRimsLayer: document.getElementById('roadRimsLayer')!,
@@ -505,6 +510,11 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
   layers.hexDynamicLayer.innerHTML = hexDynHtml;
+  layers.overlayLayer.innerHTML = renderHexOverlaysMarkup(
+    hexes,
+    id => hexGeomCache.get(id)?.innerPoly,
+    (state as any).hexOverlays ?? null
+  );
 
   // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.
   const canPaintPort = isLobbyHost && activeBrush.type === 'port';
@@ -643,16 +653,14 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const robberVictimSet = new Set<string>(state.robberVictims || []);
   let verticesHtml = '';
   const staticSpots = vertices.length > 120;
-  const availWheat = me ? (me.resources?.wheat || 0) : 0;
-  const availOre = me ? (me.resources?.ore || 0) : 0;
-  const cityMult = isClientPieceDoubleCost('city', socket.id) ? 2 : 1;
+  const canAffordCity = me ? canClientAffordPiece(me, 'city') : false;
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
       const canUpgrade = isMyTurn && state.phase === 'MAIN' &&
         v.building.owner === socket.id && v.building.type === 'settlement' &&
-        me && availWheat >= 2 * cityMult && availOre >= 3 * cityMult && me.citiesLeft > 0;
+        me && canAffordCity && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
       const isCity = v.building.type === 'city';
@@ -932,6 +940,27 @@ export function isClientPieceDoubleCost(piece: 'road' | 'settlement' | 'city', o
   return countClientActivePieces(ownerId, piece) >= CLIENT_BASE_PIECE_LIMITS[piece];
 }
 
+const CLIENT_BASE_PIECE_COSTS: Record<'road' | 'settlement' | 'city', Record<string, number>> = {
+  road: { wood: 1, brick: 1 },
+  settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
+  city: { wheat: 2, ore: 3 }
+};
+
+export function getClientPieceCost(piece: 'road' | 'settlement' | 'city', ownerId: string = socket.id || ''): Record<string, number> {
+  const player = state?.players?.find(p => p.id === ownerId);
+  const srvCost = player?.pieceCosts?.[piece];
+  if (srvCost && typeof srvCost === 'object') return srvCost;
+  const mult = isClientPieceDoubleCost(piece, ownerId) ? 2 : 1;
+  const base = CLIENT_BASE_PIECE_COSTS[piece];
+  return Object.fromEntries(Object.entries(base).map(([r, n]) => [r, n * mult]));
+}
+
+export function canClientAffordPiece(me: any, piece: 'road' | 'settlement' | 'city'): boolean {
+  if (!me || !me.resources) return false;
+  const cost = getClientPieceCost(piece, me.id || socket.id || '');
+  return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
+}
+
 export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (!me || me.settlementsLeft <= 0) return false;
   for (const adjId of v.adjacentVertices) {
@@ -939,12 +968,7 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
   }
   if (state.phase === 'SETUP_SETTLEMENT') return true;
   if (state.phase !== 'MAIN') return false;
-  const mult = isClientPieceDoubleCost('settlement', socket.id) ? 2 : 1;
-  const wood = me.resources?.wood || 0;
-  const brick = me.resources?.brick || 0;
-  const sheep = me.resources?.sheep || 0;
-  const wheat = me.resources?.wheat || 0;
-  if (wood < mult || brick < mult || sheep < mult || wheat < mult) return false;
+  if (!canClientAffordPiece(me, 'settlement')) return false;
   return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
 }
 
@@ -954,10 +978,7 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
     return e.v1 === state.lastSetupVertexId || e.v2 === state.lastSetupVertexId;
   }
   if (state.phase !== 'MAIN') return false;
-  const mult = isClientPieceDoubleCost('road', socket.id) ? 2 : 1;
-  const wood = me.resources?.wood || 0;
-  const brick = me.resources?.brick || 0;
-  const canAfford = me.freeRoads > 0 || (wood >= mult && brick >= mult);
+  const canAfford = me.freeRoads > 0 || canClientAffordPiece(me, 'road');
   if (!canAfford) return false;
 
   for (const vId of [e.v1, e.v2]) {

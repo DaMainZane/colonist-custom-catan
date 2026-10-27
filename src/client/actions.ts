@@ -258,6 +258,66 @@ export function applyPreset(preset: string): void {
   playTone(520, 0.08);
 }
 
+export function applyScenario(scenarioId: string): void {
+  if (!state) return;
+  if (!requireHost('apply scenarios')) return;
+  socket.emit('applyScenario', { code: state.code, scenarioId });
+  playTone(560, 0.08);
+}
+
+export function toggleDlc(dlcId: string): void {
+  if (!state || !requireHost('change DLC settings')) return;
+  const curDlc = state.settings?.dlc && typeof state.settings.dlc === 'object' ? { ...state.settings.dlc } : {};
+  curDlc[dlcId] = !curDlc[dlcId];
+  socket.emit('updateSettings', { code: state.code, newSettings: { dlc: curDlc } });
+  playTone(curDlc[dlcId] ? 560 : 440, 0.05);
+}
+
+export function toggleAddon(addonId: string): void {
+  if (!state || !requireHost('change addon settings')) return;
+  const packId = addonId.split('.')[0];
+  const curDlc = state.settings?.dlc && typeof state.settings.dlc === 'object' ? { ...state.settings.dlc } : {};
+  if (!curDlc[packId]) curDlc[packId] = true;
+  const curAddons = state.settings?.addons && typeof state.settings.addons === 'object' ? { ...state.settings.addons } : {};
+  const currentlyOn = curAddons[addonId] !== false;
+  curAddons[addonId] = !currentlyOn;
+  socket.emit('updateSettings', { code: state.code, newSettings: { dlc: curDlc, addons: curAddons } });
+  playTone(curAddons[addonId] ? 540 : 460, 0.04);
+}
+
+export function enableAddonWithDeps(addonId: string): void {
+  if (!state || !requireHost('enable addon dependencies')) return;
+  const curDlc = state.settings?.dlc && typeof state.settings.dlc === 'object' ? { ...state.settings.dlc } : {};
+  const curAddons = state.settings?.addons && typeof state.settings.addons === 'object' ? { ...state.settings.addons } : {};
+  const enableRecursive = (id: string) => {
+    const packId = id.split('.')[0];
+    if (packId) curDlc[packId] = true;
+    curAddons[id] = true;
+  };
+  enableRecursive(addonId);
+  // Also enable known cross-addon and cross-DLC deps
+  const knownDeps: Record<string, string[]> = {
+    'heartland.harvest_festival': ['heartland.estates'],
+    'tidebound.harbors': ['tidebound.ships'],
+    'tidebound.rising_sea': ['tidebound.bridges'],
+    'bulwark.gates': ['bulwark.walls'],
+    'bulwark.garrison': ['bulwark.walls'],
+    'ledger.contracts': ['ledger.coins'],
+    'ledger.loans': ['ledger.coins'],
+    'wayfarers.relics': ['wayfarers.outposts'],
+    'crimson.siege': ['bulwark.walls'],
+    'crimson.bounties': ['crimson.raiders'],
+    'whispers.rumors': ['whispers.pacts'],
+    'whispers.overthrow': ['whispers.pacts'],
+    'wildlands.plague': ['wildlands.seasons']
+  };
+  for (const dep of knownDeps[addonId] || []) {
+    enableRecursive(dep);
+  }
+  socket.emit('updateSettings', { code: state.code, newSettings: { dlc: curDlc, addons: curAddons } });
+  playTone(580, 0.06);
+}
+
 let wheelSettingsTimer: any = null;
 let lastWheelEditAt = 0;
 
@@ -285,7 +345,8 @@ export function pushSettings(): void {
     renderAll();
     return;
   }
-  const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+  const val = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value;
+  const chk = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.checked;
   socket.emit('updateSettings', {
     code: state.code,
     newSettings: {
@@ -308,7 +369,9 @@ export function pushSettings(): void {
       devMonopoly: val('setDevMono'),
       maxRoads: val('setMaxRoad'),
       maxSettlements: val('setMaxSettle'),
-      maxCities: val('setMaxCity')
+      maxCities: val('setMaxCity'),
+      eventsOn: chk('setEventsOn'),
+      fateTokens: val('setFateTokens')
     }
   });
 }

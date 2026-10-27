@@ -1243,7 +1243,196 @@ svg#boardSvg.is-panning * {
   opacity: 0.92;
 }
 
+/* ---------- S0.12 Setup page DLC cards, scenario presets & active summary ---------- */
+.setup-active-summary {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 8px; padding: 7px 10px; border-radius: var(--r);
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-size: 11.5px;
+}
+.setup-active-summary .summary-lbl {
+  font-weight: 800; color: var(--ink-dim); margin-right: 2px;
+}
+.summary-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+}
+.summary-pill.dlc { border-color: var(--accent); color: var(--accent); }
+.summary-pill.addon { border-color: #0d9488; color: #0d9488; }
+.summary-pill.events { border-color: #d97706; color: #d97706; }
+
+.dlc-dep-prompt {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: var(--r);
+  background: rgba(217, 119, 6, 0.12); border: 1px solid rgba(217, 119, 6, 0.4);
+  font-size: 11.5px; color: var(--ink);
+}
+.dlc-dep-actions { display: inline-flex; gap: 6px; }
+
+.setup-dlc-section {
+  margin-top: 10px;
+}
+.setup-dlc-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px;
+  margin-top: 6px;
+}
+.dlc-card {
+  padding: 9px 11px; border-radius: var(--r);
+  background: var(--surface-2); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.dlc-card.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+}
+.dlc-card.empty {
+  font-size: 11.5px; color: var(--ink-dim);
+}
+.dlc-card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.dlc-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 800; color: var(--ink); cursor: pointer;
+}
+.dlc-name { font-weight: 800; }
+.dlc-desc {
+  font-size: 11px; color: var(--ink-dim); line-height: 1.35;
+}
+.dlc-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 6px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.02em;
+}
+.dlc-badge.tested {
+  background: rgba(22, 163, 74, 0.15); color: #16a34a; border: 1px solid rgba(22, 163, 74, 0.35);
+}
+.dlc-badge.untested {
+  background: rgba(217, 119, 6, 0.14); color: #d97706; border: 1px solid rgba(217, 119, 6, 0.35);
+}
+.dlc-addons {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-top: 5px; border-top: 1px dashed var(--line);
+}
+.dlc-addon-row {
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--ink); cursor: pointer;
+}
+.dlc-addon-row.on { font-weight: 700; }
+.addon-deps {
+  font-size: 10px; color: var(--ink-dim); font-style: italic;
+}
+
+.setup-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+
+/* ---------- S0.13 Overlay & popup kit ---------- */
+.hex-overlay-chip rect {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+.hex-overlay-label {
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.02em;
+  pointer-events: none; user-select: none;
+}
+
+.overlay-popup-stack {
+  position: fixed; top: 68px; right: 16px; z-index: 55;
+  display: flex; flex-direction: column; gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.overlay-timer-card {
+  pointer-events: auto;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 10px 12px 0 12px;
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.overlay-timer-card.tone-warn { border-color: #f59e0b; }
+.overlay-timer-card.tone-danger { border-color: #ef4444; }
+.overlay-timer-card.tone-accent { border-color: var(--accent); }
+.overlay-timer-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.overlay-timer-title { font-size: 12.5px; font-weight: 800; }
+.overlay-timer-close {
+  border: none; background: transparent; color: var(--ink-dim);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.overlay-timer-body { font-size: 11.5px; color: var(--ink-dim); line-height: 1.35; }
+.overlay-timer-actions { display: flex; justify-content: flex-end; padding-bottom: 4px; }
+.overlay-timer-track {
+  height: 3px; margin: 2px -12px 0 -12px;
+  background: var(--surface-2); overflow: hidden;
+}
+.overlay-timer-fill {
+  height: 100%; background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+.event-title-mount {
+  position: fixed; inset: 0; z-index: 65;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 86px; pointer-events: none;
+}
+.event-title-card {
+  background: var(--surface); color: var(--ink);
+  border: 2px solid var(--accent); border-radius: calc(var(--r) * 1.25);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  padding: 14px 24px; text-align: center; max-width: 440px;
+  animation: eventCardIn 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.event-title-card.tone-warn { border-color: #f59e0b; }
+.event-title-card.tone-danger { border-color: #ef4444; }
+.event-title-kicker {
+  font-size: 10px; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--accent); margin-bottom: 3px;
+}
+.event-title-main { font-size: 19px; font-weight: 900; letter-spacing: -0.01em; }
+.event-title-sub { font-size: 12px; color: var(--ink-dim); margin-top: 4px; }
+
+@keyframes eventCardIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.round-recap-mount {
+  position: fixed; inset: 0; z-index: 66;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+  padding: 16px;
+}
+.round-recap-card {
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: calc(var(--r) * 1.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  width: min(380px, 100%); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.round-recap-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.round-recap-title { font-size: 15px; font-weight: 900; }
+.round-recap-sub { font-size: 11.5px; color: var(--ink-dim); margin-top: -4px; }
+.round-recap-list { display: flex; flex-direction: column; gap: 6px; }
+.round-recap-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 8px; border-radius: var(--r); background: var(--surface-2);
+  font-size: 12px;
+}
+.round-recap-lbl { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-dim); font-weight: 700; }
+.round-recap-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.round-recap-val { font-weight: 800; color: var(--ink); }
+.round-recap-foot { display: flex; justify-content: flex-end; }
+
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+

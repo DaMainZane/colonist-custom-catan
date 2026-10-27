@@ -135,6 +135,12 @@
 
           <section class="setup-card setup-tools">
             <h3>Map and rules</h3>
+            <!-- Scenarios: one-click world setups (map + DLCs + VP target + events) -->
+            <div class="tool-row" id="scenarioRow">
+              <span class="tool-label">Scenarios</span>
+              <span id="scenarioPresets" class="tool-row"></span>
+            </div>
+
             <!-- Presets: quick starts come from the registry (drawn by mapmenu.ts); saved ones (host's browser) can be deleted after a confirmation -->
             <div class="tool-row" id="presetRow">
               <span class="tool-label">Presets</span>
@@ -147,6 +153,18 @@
             <div class="map-recipe-row">
               <span class="tool-label">Map</span>
               <div id="mapRecipe" class="map-recipe"></div>
+            </div>
+
+            <!-- Live summary strip: what is on (active DLCs, addons, dependency prompts, events) -->
+            <div id="setupActiveSummary" class="setup-active-summary"></div>
+
+            <!-- DLC cards: master switch + individual addon toggles -->
+            <div class="setup-dlc-section" id="setupDlcSection">
+              <div class="setup-dlc-head">
+                <h4>Expansions &amp; Addons</h4>
+                <span class="muted">Toggle a DLC pack or customize individual addons</span>
+              </div>
+              <div id="setupDlcGrid" class="setup-dlc-grid"></div>
             </div>
 
             <div class="rules-grid">
@@ -183,6 +201,11 @@
                 <label class="field" title="Scales with VP to win; roads built after your 15th cost 2× resources">Roads<input id="setMaxRoad" type="number" class="num" value="15" min="5" max="100" onchange="pushSettings()" /></label>
                 <label class="field" title="Scales with VP to win; settlements built after your 5th cost 2× resources">Settlements<input id="setMaxSettle" type="number" class="num" value="5" min="2" max="50" onchange="pushSettings()" /></label>
                 <label class="field" title="Scales with VP to win; cities built after your 4th cost 2× resources">Cities<input id="setMaxCity" type="number" class="num" value="4" min="1" max="50" onchange="pushSettings()" /></label>
+              </div>
+              <div class="rule-group">
+                <h4>Events and fate</h4>
+                <label class="field" title="Draw a seeded world event every few rounds.">Round events<input id="setEventsOn" type="checkbox" class="setup-check" onchange="pushSettings()" /></label>
+                <label class="field" title="Starting Fate tokens per player (spend to veto or reroll an event).">Fate tokens<input id="setFateTokens" type="number" class="num" value="2" min="0" max="10" onchange="pushSettings()" /></label>
               </div>
             </div>
           </section>
@@ -262,6 +285,11 @@
 
       <!-- Active trade offer -->
       <div id="activeTradeModal"></div>
+
+      <!-- S0.13 Overlay & popup kit mounts (timer-bar popups, dramatic event title card, round-end recap card) -->
+      <div id="overlayPopupStack" class="overlay-popup-stack"></div>
+      <div id="eventTitleMount" class="event-title-mount"></div>
+      <div id="roundRecapMount" class="round-recap-mount"></div>
 
       <!-- Board -->
       <svg id="boardSvg" viewBox="-500 -450 1000 900"></svg>

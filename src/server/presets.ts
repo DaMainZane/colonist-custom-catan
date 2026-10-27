@@ -11,7 +11,7 @@ import type { MapMeta, Room, Settings } from './types';
 export const PRESET_SETTING_KEYS = [
   'boardRadius', 'goldTiles', 'desertTiles', 'fogTiles', 'vpToWin', 'cardDiscardLimit', 'bankResourcePerType',
   'devKnights', 'devVp', 'devRoadBuilding', 'devYearOfPlenty', 'devMonopoly',
-  'maxSettlements', 'maxCities', 'maxRoads'
+  'maxSettlements', 'maxCities', 'maxRoads', 'fateTokens'
 ] as const;
 
 const MAX_HEXES = 8000;
@@ -38,6 +38,10 @@ export interface CustomPreset {
   recipe?: MapRecipe | null;
   /** v2: generator version of the recipe, so a client can tell that the seed may now give another map. */
   genVersion?: number | null;
+  /** Optional DLC/addon/event toggles carried by the preset. */
+  dlc?: Record<string, boolean>;
+  addons?: Record<string, boolean>;
+  eventsOn?: boolean;
 }
 
 export interface LoadedPreset {
@@ -79,7 +83,10 @@ export function serializePreset(board: Board, settings: Settings, name: any, met
     ports,
     robber: robberHex ? [robberHex.q, robberHex.r] : null,
     recipe,
-    genVersion: recipe ? recipe.g : null
+    genVersion: recipe ? recipe.g : null,
+    ...(settings.dlc && Object.keys(settings.dlc).length > 0 ? { dlc: { ...settings.dlc } } : {}),
+    ...(settings.addons && Object.keys(settings.addons).length > 0 ? { addons: { ...settings.addons } } : {}),
+    ...(settings.eventsOn ? { eventsOn: true } : {})
   };
 }
 
@@ -176,12 +183,15 @@ export function loadPreset(raw: any, old: Settings): LoadedPreset | { error: str
     if (spot && isLand(spot.type) && !spot.ext.hidden) board.robberHexId = spot.id;
   }
 
-  const input: Record<string, number> = {};
+  const input: Record<string, any> = {};
   const rawSettings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
   for (const key of PRESET_SETTING_KEYS) {
     const value = rawSettings[key];
     if (typeof value === 'number' && Number.isFinite(value)) input[key] = value;
   }
+  if (raw.dlc && typeof raw.dlc === 'object' && !Array.isArray(raw.dlc)) input.dlc = raw.dlc;
+  if (raw.addons && typeof raw.addons === 'object' && !Array.isArray(raw.addons)) input.addons = raw.addons;
+  if (typeof raw.eventsOn === 'boolean') input.eventsOn = raw.eventsOn;
 
   return { board, settings: mergeSettings(input, old), name: cleanPresetName(raw.name), recipe: cleanRecipe(raw.recipe) };
 }

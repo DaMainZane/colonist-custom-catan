@@ -1,11 +1,12 @@
 // MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { computeVP, encodeRecipe, getPlayer, isOtherVersion, totalCards } from '../shared';
+import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, totalCards } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
+import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
-import { registry } from './runtime';
+import { gameRegistry, registry } from './runtime';
 import { syncTurnClock, turnClockView } from './turnClock';
 import type { Room } from './types';
 
@@ -145,9 +146,10 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
         ore: p.stats.res_ore || 0
       }
     },
-    vp: computeVP(g, registry, p, reveal),
+    vp: score(g, gameRegistry(g.rules), p, reveal),
     // What other players see. Differs from `vp` only for the viewer's own hidden VP cards.
-    publicVp: computeVP(g, registry, p, over)
+    publicVp: over ? score(g, gameRegistry(g.rules), p, true) : publicVP(g, gameRegistry(g.rules), p),
+    pieceCosts: Object.fromEntries([...gameRegistry(g.rules).pieces.entries()].map(([id, def]) => [id, pieceCost(g, p, def, gameRegistry(g.rules))]))
   };
 }
 
@@ -301,7 +303,7 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
       ...shared,
       isSpectator,
       recentTransfers,
-      tradeRatios: g && !isSpectator ? tradeRatios(g, registry, viewerId) : defaultRatios,
+      tradeRatios: g && !isSpectator ? tradeRatios(g, gameRegistry(g.rules), viewerId) : defaultRatios,
       players: g
         ? g.players.map(p => enginePlayerView(g, p, viewerId, over, isSpectator))
         : room.lobbyPlayers.map(p => lobbyPlayerView(room, p))

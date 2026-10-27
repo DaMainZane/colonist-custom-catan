@@ -165,6 +165,28 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     maxCities = nextPieces.maxCities;
   }
 
+  const dlc: Record<string, boolean> = { ...(old.dlc ?? {}) };
+  if (s.dlc && typeof s.dlc === 'object' && !Array.isArray(s.dlc)) {
+    let n = 0;
+    for (const [k, v] of Object.entries(s.dlc)) {
+      if (++n > 32) break;
+      if (typeof k === 'string' && k.length > 0 && k.length <= 40 && typeof v === 'boolean') {
+        dlc[k] = v;
+      }
+    }
+  }
+
+  const addons: Record<string, boolean> = { ...(old.addons ?? {}) };
+  if (s.addons && typeof s.addons === 'object' && !Array.isArray(s.addons)) {
+    let n = 0;
+    for (const [k, v] of Object.entries(s.addons)) {
+      if (++n > 128) break;
+      if (typeof k === 'string' && k.length > 0 && k.length <= 64 && typeof v === 'boolean') {
+        addons[k] = v;
+      }
+    }
+  }
+
   const settings: Settings = {
     boardRadius: clamp(radiusIn, 1, 50, old.boardRadius),
     goldTiles: clamp(s.goldTiles, 0, 500, old.goldTiles),
@@ -190,7 +212,11 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     mapSeed,
     mapSeedLocked: typeof s.mapSeedLocked === 'boolean' ? s.mapSeedLocked : !!old.mapSeedLocked,
     mapPicks,
-    mapParams
+    mapParams,
+    dlc,
+    addons,
+    eventsOn: typeof s.eventsOn === 'boolean' ? s.eventsOn : !!old.eventsOn,
+    fateTokens: clamp(s.fateTokens, 0, 10, old.fateTokens ?? 2)
   };
   return { settings, dropped };
 }

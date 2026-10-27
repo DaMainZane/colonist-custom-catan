@@ -7,6 +7,7 @@ import { initBots } from './bots/scheduler';
 import { simulateGame } from './bots/sim';
 import { exportTrainingLogsJsonl, getAllTrainingLogs, getTrainingLogForRoom } from './bots/trainingLog';
 import { setIo } from './net';
+import { exportMemoryCode, importMemoryCode } from './persistence';
 import { registerSocketHandlers } from './socket';
 
 const app = express();
@@ -17,6 +18,26 @@ setIo(io);
 initBots();
 
 app.get('/health', (req, res) => res.status(200).send('ok'));
+
+// S0.15 Cross-game bot memory & player profile portable export/import for Render free tier
+app.get('/api/memory/export', (req, res) => {
+  try {
+    const code = exportMemoryCode();
+    res.status(200).json({ ok: true, code });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message || 'Export failed' });
+  }
+});
+
+app.post('/api/memory/import', (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code : '';
+    const result = importMemoryCode(code);
+    res.status(200).json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ ok: false, error: err?.message || 'Import failed' });
+  }
+});
 
 // AI Bot Training Data export endpoint (JSONL or JSON)
 app.get('/api/bot-training-logs', (req, res) => {

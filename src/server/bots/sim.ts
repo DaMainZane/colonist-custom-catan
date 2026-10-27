@@ -1,7 +1,7 @@
-// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and map matrix) | USED BY: tests/sim.test.ts, tests/bots.test.ts
+// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and S0.16 sim matrix) | USED BY: tests/sim.test.ts, tests/bots.test.ts, tests/simmatrix.test.ts
 import { createGame, dispatch, generateMap, mergeRules } from '../../shared';
 import type { GameState } from '../../shared';
-import { registry } from '../runtime';
+import { gameRegistry } from '../runtime';
 import { chooseBotAction, noteBotEvents } from './brain';
 import { TIER_IDS, normalizeTier, tierFromDifficulty, tierLabel } from './tiers';
 import type { TierId } from './tiers';
@@ -67,14 +67,15 @@ export function simulateGame(opts: SimOptions): SimResult {
   const maxTurns = opts.maxTurns ?? 1000;
   const rand = mulberry32(opts.seed);
   const tiers = opts.tiers && opts.tiers.length > 0 ? opts.tiers : ['secondary'];
+  const reg = gameRegistry(opts.rules);
 
   // A recipe-built board (the lobby path), so the bots can be run on every shape. The seed text is derived from the sim seed.
-  const mergedRules = mergeRules(registry.rules, opts.rules ?? {});
+  const mergedRules = mergeRules(reg.rules, opts.rules ?? {});
   const board = opts.picks
-    ? generateMap(registry, mergedRules, { seed: `SIM${opts.seed}`, picks: opts.picks, params: opts.mapParams, radius: mergedRules.boardRadius }).board
+    ? generateMap(reg, mergedRules, { seed: `SIM${opts.seed}`, picks: opts.picks, params: opts.mapParams, radius: mergedRules.boardRadius }).board
     : undefined;
 
-  const g = createGame(registry, {
+  const g = createGame(reg, {
     players: Array.from({ length: n }, (_, i) => ({
       id: `bot${i + 1}`,
       name: `Bot ${i + 1}`,
@@ -88,12 +89,12 @@ export function simulateGame(opts: SimOptions): SimResult {
   });
 
   const simCode = `SIM_${opts.seed}`;
-  const traj = opts.recordTrainingLog ? initGameTrainingLog(g, registry, simCode) : undefined;
+  const traj = opts.recordTrainingLog ? initGameTrainingLog(g, reg, simCode) : undefined;
 
   let steps = 0;
   const timing = { total: 0, max: 0, count: 0 };
   const result = (error: string | null): SimResult => {
-    if (traj && !traj.outcome) finalizeTrainingLog(g, registry, traj);
+    if (traj && !traj.outcome) finalizeTrainingLog(g, reg, traj);
     return {
       finished: g.phase === 'gameover',
       winner: g.winner ? g.winner.id : null,
@@ -116,16 +117,16 @@ export function simulateGame(opts: SimOptions): SimResult {
     let acted = false;
     for (const p of order) {
       const t0 = performance.now();
-      const move = chooseBotAction(g, registry, p.id, rand);
+      const move = chooseBotAction(g, reg, p.id, rand);
       const ms = performance.now() - t0;
       timing.total += ms;
       timing.count++;
       if (ms > timing.max) timing.max = ms;
       if (!move) continue;
-      const snap = traj ? captureTrainingSnapshot(g, registry, p.id) : null;
-      const res = dispatch(g, registry, { type: move.type, playerId: p.id, payload: move.payload });
+      const snap = traj ? captureTrainingSnapshot(g, reg, p.id) : null;
+      const res = dispatch(g, reg, { type: move.type, playerId: p.id, payload: move.payload });
       if (!res.ok) return result(`${p.id} ${move.type} rejected in phase ${g.phase}: ${res.error}`);
-      if (traj) commitTrainingStep(g, registry, simCode, snap, move.type, move.payload, res.events);
+      if (traj) commitTrainingStep(g, reg, simCode, snap, move.type, move.payload, res.events);
       noteBotEvents(g, res.events);
       acted = true;
       steps++;
@@ -202,3 +203,155 @@ export function runLadder(opts: LadderOptions): LadderResult {
     maxDecisionMs: maxMs
   };
 }
+
+// ---- S0.16 Sim matrix (Service 20) -------------------------------------------------------------------
+
+export interface SimMatrixScenarioSpec {
+  id: string;
+  picks?: string[];
+  mapParams?: Record<string, number>;
+  preset?: string;
+  rules?: Record<string, any>;
+}
+
+export interface SimMatrixDlcComboSpec {
+  id: string;
+  dlc?: Record<string, boolean>;
+  addons?: Record<string, boolean>;
+  eventsOn?: boolean;
+}
+
+export interface SimMatrixOptions {
+  seeds: number[];
+  players?: number;
+  maxTurns?: number;
+  scenarios?: SimMatrixScenarioSpec[];
+  dlcCombos?: SimMatrixDlcComboSpec[];
+  tierLineups?: TierId[][];
+}
+
+export interface SimMatrixCellResult {
+  scenarioId: string;
+  dlcComboId: string;
+  lineupLabel: string;
+  games: number;
+  finished: number;
+  errors: string[];
+  winsByTier: Record<TierId, number>;
+  avgTurns: number;
+  maxDecisionMs: number;
+  botTested: boolean;
+}
+
+export interface SimMatrixResult {
+  totalGames: number;
+  totalFinished: number;
+  totalErrors: string[];
+  cells: SimMatrixCellResult[];
+  /** Map from dlcComboId -> whether every cell with that combo finished 100% of games with zero invariant/action errors. */
+  botTestedByCombo: Record<string, boolean>;
+}
+
+const DEFAULT_MATRIX_SCENARIOS: SimMatrixScenarioSpec[] = [
+  { id: 'standard', picks: ['shape.hex', 'terrain.4p', 'numbers.spiral', 'perks.ports'] },
+  { id: 'islands', picks: ['shape.islands', 'terrain.gold', 'numbers.even', 'perks.ports', 'perks.fog'] }
+];
+
+const DEFAULT_MATRIX_COMBOS: SimMatrixDlcComboSpec[] = [
+  { id: 'base', dlc: {}, addons: {}, eventsOn: false }
+];
+
+const DEFAULT_MATRIX_LINEUPS: TierId[][] = [
+  ['main', 'secondary', 'overload']
+];
+
+/**
+ * S0.16 Sim matrix (Service 20): runs scenarios × DLC/addon combinations × bot tier lineups across seeds,
+ * checking invariant conservation, action validity, completion rates, and computing `botTested` status.
+ */
+export function runSimMatrix(opts: SimMatrixOptions): SimMatrixResult {
+  const scenarios = opts.scenarios && opts.scenarios.length > 0 ? opts.scenarios : DEFAULT_MATRIX_SCENARIOS;
+  const dlcCombos = opts.dlcCombos && opts.dlcCombos.length > 0 ? opts.dlcCombos : DEFAULT_MATRIX_COMBOS;
+  const lineups = opts.tierLineups && opts.tierLineups.length > 0 ? opts.tierLineups : DEFAULT_MATRIX_LINEUPS;
+  const players = opts.players ?? 3;
+  const cells: SimMatrixCellResult[] = [];
+  const totalErrors: string[] = [];
+  const botTestedByCombo: Record<string, boolean> = {};
+  let totalGames = 0;
+  let totalFinished = 0;
+
+  for (const combo of dlcCombos) {
+    botTestedByCombo[combo.id] = true;
+  }
+
+  for (const sc of scenarios) {
+    for (const combo of dlcCombos) {
+      for (const lineup of lineups) {
+        const winsByTier: Record<TierId, number> = { main: 0, secondary: 0, overload: 0 };
+        const cellErrors: string[] = [];
+        let finished = 0;
+        let turns = 0;
+        let maxMs = 0;
+
+        opts.seeds.forEach((seed, k) => {
+          const seats = Array.from({ length: players }, (_, i) => lineup[(i + k) % lineup.length]);
+          const rules: Record<string, any> = { ...(sc.rules ?? {}) };
+          if (combo.dlc && Object.keys(combo.dlc).length > 0) rules.dlc = { ...combo.dlc };
+          if (combo.addons && Object.keys(combo.addons).length > 0) rules.addons = { ...combo.addons };
+          if (combo.eventsOn) rules.eventsOn = true;
+
+          const res = simulateGame({
+            seed,
+            players,
+            preset: sc.preset,
+            picks: sc.picks,
+            mapParams: sc.mapParams,
+            rules: Object.keys(rules).length > 0 ? rules : undefined,
+            tiers: seats,
+            maxTurns: opts.maxTurns
+          });
+
+          totalGames++;
+          turns += res.turns;
+          maxMs = Math.max(maxMs, res.decisionMs.max);
+          if (res.error) {
+            const msg = `[${sc.id}/${combo.id}/seed ${seed}] ${res.error}`;
+            cellErrors.push(msg);
+            totalErrors.push(msg);
+          }
+          if (res.finished) {
+            finished++;
+            totalFinished++;
+            if (res.winnerTier) winsByTier[res.winnerTier]++;
+          }
+        });
+
+        const games = opts.seeds.length;
+        const botTested = games > 0 && finished === games && cellErrors.length === 0;
+        if (!botTested) botTestedByCombo[combo.id] = false;
+
+        cells.push({
+          scenarioId: sc.id,
+          dlcComboId: combo.id,
+          lineupLabel: lineup.join(' vs '),
+          games,
+          finished,
+          errors: cellErrors,
+          winsByTier,
+          avgTurns: games > 0 ? turns / games : 0,
+          maxDecisionMs: maxMs,
+          botTested
+        });
+      }
+    }
+  }
+
+  return {
+    totalGames,
+    totalFinished,
+    totalErrors,
+    cells,
+    botTestedByCombo
+  };
+}
+

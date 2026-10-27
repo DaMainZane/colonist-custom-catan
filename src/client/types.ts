@@ -25,6 +25,8 @@ export interface PlayerView {
   vp: number;
   /** What other players see (differs from `vp` only for your own hidden VP cards). */
   publicVp?: number;
+  /** Effective cost of each piece type for this player, including 2x above-base scaling and active addon modifiers. */
+  pieceCosts?: Record<string, Resources>;
   stats?: {
     resourcesEarned: number;
     tradesMade: number;
@@ -174,9 +176,40 @@ export interface MapOptionView {
   params: MapParamView[];
 }
 
+export interface AddonInfoView {
+  id: string;
+  name: string;
+  description?: string;
+  pack: string;
+  deps: string[];
+  links: { target: string; kind: string }[];
+}
+
+export interface DlcInfoView {
+  id: string;
+  name: string;
+  addons: string[];
+}
+
+export interface ScenarioPresetView {
+  id: string;
+  label: string;
+  description: string;
+  quickStart: string;
+  boardRadius: number;
+  vpToWin: number;
+  dlc: Record<string, boolean>;
+  addons?: Record<string, boolean>;
+  eventsOn?: boolean;
+  fateTokens?: number;
+}
+
 export interface MapOptionsView {
   options: MapOptionView[];
   quickStarts: { id: string; label: string; blank: boolean }[];
+  dlcs?: DlcInfoView[];
+  addons?: AddonInfoView[];
+  scenarios?: ScenarioPresetView[];
 }
 
 export interface MapIssueView { code: string; message: string }

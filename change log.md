@@ -1,5 +1,31 @@
 # Change Log
 
+## 2026-10-27 13:22:00 ICT (UTC+7) (Pass 36: Zane's Stage 0 Tasks — Rounds 1–9: `computeVP` audit, `pieceCost(..., reg)` wiring, `dlc`/`addons` settings block, S0.12 Setup UI rework, S0.13 Overlay & popup kit, S0.14 Bot goal registry, S0.15 Persistence, S0.16 Sim matrix)
+### Added & Changed
+- **Round 1 — `computeVP` audit -> `publicVP` / `score`** (`src/packs/base/actions/robber.ts`, `src/server/view.ts`, `src/server/bots/trainingLog.ts`, `src/server/bots/brain.ts`):
+  - Replaced `computeVP(g, reg, b, false)` in `robber.ts` victim ordering with `publicVP(g, reg, b)`.
+  - Replaced `computeVP` in `view.ts` and `trainingLog.ts` with `score(g, reg, p, true)` (for self/revealed/final score) and `publicVP(g, reg, p)` (for hidden opponents). Removed unused `computeVP` import from `brain.ts`.
+- **Round 2 — Pass `reg` to `pieceCost` in bots and client** (`src/server/bots/brain.ts`, `src/server/view.ts`, `src/client/types.ts`, `src/client/render/hand.ts`, `src/client/render/board.ts`):
+  - `brain.ts` (`planList` and `mainPhase` road affordability) now calls `pieceCost(g, p, def, reg)` so DLC/addon `COST_MODS` apply to bot planning and building.
+  - `view.ts` computes per-player `pieceCosts` using `pieceCost(g, p, def, reg)` and sends them in `PlayerView`. Client `hand.ts` and `board.ts` use `getClientPieceCost` / `canClientAffordPiece` so custom cost modifiers and 2× over-limit pricing match the server.
+- **Round 3 — `dlc` / `addons` settings block & dynamic registry** (`src/server/types.ts`, `src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/presets.ts`, `src/server/game.ts`, `src/server/bots/scheduler.ts`, `src/server/bots/sim.ts`):
+  - Added `dlc: Record<string, boolean>`, `addons: Record<string, boolean>`, `eventsOn: boolean`, and `fateTokens: number` to `Settings`, `defaultSettings()`, `rulesFromSettings()`, `mergeSettingsDetailed()`, and custom preset save/load (`presets.ts`).
+  - Added `gameRegistry(rules)` in `runtime.ts` (builds an addon-enabled registry via `registryFor(allPacks, rules)` when any DLC/addon is enabled, or returns the shared base registry when none are set so `tests/golden.test.ts` hashes remain identical). Wired `gameRegistry` through `game.ts`, `view.ts`, `scheduler.ts`, and `sim.ts`.
+- **Round 4 — S0.12 Setup page UI rework** (`src/server/mapmenu.ts`, `src/server/socket.ts`, `src/client/types.ts`, `public/index.html`, `src/client/render/setup.ts`, `src/client/render/index.ts`, `src/client/actions.ts`, `src/client/main.ts`, `src/client/styles.css`):
+  - Added `SCENARIO_PRESETS` (`standard`, `islands`, `gold_rush`, `fog_islands`, `continent_river`, `high_vp`), `dlcs`, and `addons` to `mapOptionsView()` and socket action `applyScenario`.
+  - Added Scenario Presets row (`#scenarioRow`), live "Active Configuration" summary pill strip (`#setupActiveSummary`), DLC & Addon cards with `Bot-tested` / `Bots untested` badges and missing-dependency one-click prompt (`#setupDlcSection`), plus Events deck (`#setEventsOn`) and Starting Fate tokens (`#setFateTokens`) controls on the World Setup page.
+- **Round 5 — S0.13 Overlay and popup kit (Service 11)** (`src/client/render/overlay.ts`, `src/client/render/board.ts`, `src/client/render/index.ts`, `src/client/main.ts`, `public/index.html`, `src/client/styles.css`):
+  - Created `src/client/render/overlay.ts` providing 6 colorblind-safe SVG pattern fills (`diagonal-hatch`, `cross-hatch`, `dots`, `waves`, `chevrons`, `grid`) with shape + icon + label (`setHexOverlay`, `clearHexOverlays`, `renderBoardOverlays`), a stacked timer-bar popup queue (`showTimerPopup`, `dismissTimerPopup`, `renderTimerPopups`), dramatic Event Title cards (`showEventTitleCard`), and Round-End Recap cards (`showRoundRecapCard`, `dismissRoundRecapCard`).
+- **Round 6 — S0.15 Persistence (Service 19)** (`src/server/persistence.ts`, `data/bots/_schema.md`, `src/server/main.ts`, `tests/persistence.test.ts`):
+  - Documented Render free-tier host persistence architecture in `data/bots/_schema.md`.
+  - Implemented `loadBotMemory`, `saveBotMemory`, `appendBotMemoryEvent`, `loadPlayerProfile`, `savePlayerProfile`, `migrateBotMemory` (`CURRENT_SCHEMA_VERSION = 2`), and portable `CTMEM1.<base64url>` export/import (`exportMemoryCode`, `importMemoryCode`, `GET /api/memory/export`, `POST /api/memory/import`).
+  - Enforced strict caps (`MAX_MEMORY_EVENTS = 50`, `MAX_RELATIONSHIPS = 24`, `MAX_FILE_BYTES = 16384`) and public-only event validation (`sanitizePublicMemoryEvent` rejects `resources`, `devCards`, `newDevCards`, `hand`, `secret`, and non-public event types).
+- **Round 7 & Round 8 — S0.14 Bot goal registry (Service 18)** (`src/shared/botGoals.ts`, `src/shared/index.ts`, `src/server/bots/brain.ts`, `tests/botgoals.test.ts`):
+  - Added `BOT_GOALS` keyed registry table, `BotGoalDef`, `BotGoalItem`, and tier-gated evaluators (`evaluateBotGoals`, `botGoalVertexDelta`, `botGoalEdgeDelta`, `botGoalActionScore`, `botGoalThreatDelta` where `main` reads `generic`, `secondary` reads `generic` + `basic`, and `overload` reads all including `advanced`).
+  - Integrated `BOT_GOALS` into `brain.ts` (`vertexScore`, `roadScore`, `robberScore`, `planList` missing-card pipeline for bank trades / player trades / discard / gold pick / dev cards, and `mainPhase` custom actions).
+- **Round 9 — S0.16 Sim matrix (Service 20)** (`src/server/bots/sim.ts`, `tests/simmatrix.test.ts`):
+  - Added `runSimMatrix(opts)` running scenarios × DLC/addon combinations × bot tier lineups across seeds, verifying invariants and action legality, and reporting per-cell stats plus `botTestedByCombo`.
+
 ## 2026-10-27 (Pass 35: Stage 0 start: DLC/addon layer, keyed registries, round clock, golden baseline test)
 ### Added
 - **DLC and addon layer** (`src/shared/addons.ts`, new; S0.1, service 1): `AddonDef` (id, deps, links, rules, `register`), `AddonInfo`/`DlcInfo` for the lobby, `LINK_KINDS`, the 20 `GENERAL_SERVICE_IDS`, `resolveAddons(packs, rules)` (DLC master switch `rules.dlc[packId]`, per-addon `rules.addons[id] === false`, blocked-by-dependency list), `addonOn(reg, id)`, `registryFor(packs, rules, overrides)`, and `auditAddons(packs)` (Rule of Two: 2+ distinct links, one to a General service; no unknown targets or kinds, no self links; DLC must list `base`; cross-DLC dependency needs `allowCrossDlcDep`).
@@ -23,13 +49,7 @@
 - `PieceDef.baseLimit` (road 15, settlement 5, city 4) replaces the hardcoded lookup. `BASE_PIECE_LIMITS` moved to `base/constants.ts` and is still re-exported from `base/building.ts`.
 - `base/building.ts`: `pieceCost(g, p, def, reg?)` (with `reg` it applies modifiers), `isAboveBaseLimit` kept as a wrapper. `validateBuild`, `placePiece` and the `build` action's `legal` pass the registry. The `vpToWin` supply scaling in `createGame` is untouched.
 - `tests/pricing.test.ts`.
-### Still open (S0.4)
-- Bot code (`brain.ts`) and the client still call `pieceCost(g, p, def)` without `reg`, so they ignore modifiers. Same answer as before until a DLC registers one.
-### Still open (S0.3)
-- Other direct `computeVP` callers not audited yet (rest of `brain.ts`, `view.ts`, `trainingLog.ts`, `game.ts`, `client/`). `shared/views.ts` keeps `computeVP` for the per-player `vp` field on purpose.
-### Still open (S0.1)
-- `rulesFromSettings` / `Settings` still wired per field; the `dlc` / `addons` block comes with the setup page work (S0.12).
-### Verified (S0.1 and S0.2 only; S0.3 not yet run)
+### Verified
 - `npm run typecheck`, `addons.test.ts`, `rounds.test.ts`, `golden.test.ts` and the full `npm test` pass (user-run, 2026-10-27). Golden snapshot recorded in `tests/golden.snapshot.json`.
 
 ## 2026-10-27 11:42:21 ICT (UTC+7) (Pass 34: Spectate Game Mode when joining or hosting)

@@ -4,7 +4,7 @@ import { openTrades } from '../../packs/base/trading';
 import { runAction } from '../game';
 import { broadcastRoom, setAfterBroadcast } from '../net';
 import { clearBotTimers } from '../rooms';
-import { registry } from '../runtime';
+import { gameRegistry } from '../runtime';
 import { ensureGrace, setTurnExpiryHandler, syncTurnClock } from '../turnClock';
 import type { Room } from '../types';
 import { chooseBotAction } from './brain';
@@ -35,10 +35,11 @@ function thinkFactor(room: Room, botId: string): number {
 function nextBotMove(room: Room): Move | null {
   const g = room.game;
   if (!g || g.phase === 'gameover') return null;
+  const reg = gameRegistry(g.rules);
   const order = [g.players[g.turn], ...g.players.filter((_, i) => i !== g.turn)];
   for (const p of order) {
     if (!p || !p.isBot) continue;
-    const move = chooseBotAction(g, registry, p.id);
+    const move = chooseBotAction(g, reg, p.id);
     if (move) return { botId: p.id, ...move };
   }
   return null;
@@ -97,13 +98,14 @@ export function ensureTradeTimers(room: Room): void {
 function handleTurnExpiry(room: Room): void {
   const g = room.game;
   if (!g || g.phase === 'gameover') return;
+  const reg = gameRegistry(g.rules);
 
   // A discard clock belongs to a human who owes cards (the turn itself may be a bot's): discard for every human who still owes.
   if (g.phase === 'discard') {
     let forced = false;
     for (const p of g.players) {
       if (p.isBot || !((p.pending.discard || 0) > 0)) continue;
-      const m = chooseBotAction(g, registry, p.id);
+      const m = chooseBotAction(g, reg, p.id);
       if (!m) continue;
       const res = runAction(room, p.id, m.type, m.payload);
       if (res.ok) forced = true;
@@ -120,12 +122,12 @@ function handleTurnExpiry(room: Room): void {
   if (!cur || cur.isBot) return;
 
   let move: Move | null = null;
-  if (legalActions(g, registry, cur.id).some(a => a.type === 'end_turn')) {
+  if (legalActions(g, reg, cur.id).some(a => a.type === 'end_turn')) {
     move = { botId: cur.id, type: 'end_turn', payload: {} };
   } else {
     // The current player first, then anyone else who owes something (for example a discard after a 7).
     for (const p of [cur, ...g.players.filter(x => x.id !== cur.id)]) {
-      const m = chooseBotAction(g, registry, p.id);
+      const m = chooseBotAction(g, reg, p.id);
       if (m) { move = { botId: p.id, ...m }; break; }
     }
   }
@@ -177,7 +179,7 @@ function runBotStep(room: Room): void {
   if (!res.ok) {
     console.error(`[bots] ${move.botId} ${move.type} rejected in ${g.phase}: ${res.error}`);
     // Never leave the game stuck on one bad decision: end the turn, or take any legal action.
-    const options = legalActions(g, registry, move.botId);
+    const options = legalActions(g, gameRegistry(g.rules), move.botId);
     const alt = options.find(a => a.type === 'end_turn') ?? options[0];
     if (!alt) return;
     res = runAction(room, move.botId, alt.type, alt.payload);

@@ -14,6 +14,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `.env.example` | Environment variables (`PORT`) |
 | `public/index.html` | The single HTML page: name page, setup page, lobby, board, menus |
 | `data/bot_training_logs.jsonl` | Bot training data written by `bots/trainingLog.ts` |
+| `data/bots/_schema.md` | S0.15 cross-game bot memory & player profile JSON schema, caps, and Render portable code spec |
 
 ## Docs
 
@@ -38,6 +39,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
 | `pricing.ts` | Piece cost and limit service: `priceOf`, `placedCount`, `aboveBaseLimit`, cost modifiers (`COST_MODS`) |
+| `botGoals.ts` | S0.14 Bot goal registry (`BOT_GOALS`, tier-gated `evaluateBotGoals`, `botGoalVertexDelta`, `botGoalEdgeDelta`, `botGoalActionScore`, `botGoalThreatDelta`) |
 | `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
 | `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
 | `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), round clock (`endRoundIfLastSeat`, `everyNRounds`), `score`, `publicVP`, `startTurn` |
@@ -97,17 +99,18 @@ What every file does. Paths are relative to the repo root. Most source files sta
 
 | File | What it does |
 |---|---|
-| `main.ts` | Entry: Express and Socket.io, `/health`, bot training log endpoints |
-| `socket.ts` | Socket handlers for lobby editing, spectating and game actions (all game actions go through engine `dispatch`) |
+| `main.ts` | Entry: Express and Socket.io, `/health`, bot training log endpoints, `/api/memory/export` and `/api/memory/import` |
+| `socket.ts` | Socket handlers for lobby editing, spectating, scenario presets and game actions (all game actions go through engine `dispatch`) |
 | `game.ts` | Game runner: start, rematch, run one action, turn engine events into client effects |
 | `rooms.ts` | Room registry, lobby roster, spectators, status, reconnect (`rebindPlayerId`) |
-| `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge, painting terrain, numbers, robber, ports |
-| `runtime.ts` | The one registry for the process, settings to rules mapping, defaults |
+| `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge (`dlc`, `addons`, `eventsOn`, `fateTokens`), painting terrain, numbers, robber, ports |
+| `runtime.ts` | Shared base registry, dynamic `gameRegistry(rules)`, settings to rules mapping, defaults |
 | `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots |
-| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal) |
+| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal and per-player `pieceCosts`) |
 | `turnClock.ts` | Per-turn clock for humans (base time plus increment per action) |
 | `presets.ts` | Custom map presets as plain JSON: save, validate, rebuild |
-| `mapmenu.ts` | Map options and quick starts as JSON for the lobby dropdown |
+| `mapmenu.ts` | Map options, quick starts, scenario presets, DLCs and addons as JSON for the lobby and setup page |
+| `persistence.ts` | S0.15 Cross-game bot memory & player profile store (`data/bots/*.json`, caps, public-only event filter, schema migration, Render `CTMEM1.` export/import) |
 | `types.ts` | Server room types: settings, room, spectators, client-facing effects |
 | `util.ts` | `clamp`, `getPips` |
 
@@ -115,11 +118,11 @@ What every file does. Paths are relative to the repo root. Most source files sta
 
 | File | What it does |
 |---|---|
-| `brain.ts` | Pure bot decision: game state to one action; reads tier, map profile and grudges |
+| `brain.ts` | Pure bot decision: game state to one action; reads tier, map profile, grudges, and `BOT_GOALS` |
 | `tiers.ts` | Tier profiles (Main, Secondary, Overload), personalities, hash helper |
 | `mapProfile.ts` | Landmasses, fog and gold share, average pips, port count, resource scarcity |
 | `scheduler.ts` | Waits a game-speed delay, then lets one bot act after each broadcast |
-| `sim.ts` | Bot-vs-bot simulator with invariant checks, `runLadder`, map matrix |
+| `sim.ts` | Bot-vs-bot simulator with invariant checks, `runLadder`, and S0.16 `runSimMatrix` |
 | `trainingLog.ts` | Training data logger: pre-action features, chosen actions, outcome labels |
 | `dialogue.ts` | One-line re-export of `dialogue/index.ts` (existing imports use this path) |
 | `dialogue/index.ts` | Entry: engine events to chat lines, game start, replies to human chat |
@@ -140,7 +143,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | File | What it does |
 |---|---|
 | `main.ts` | Client entry: wires DOM, socket and board input events |
-| `actions.ts` | Client-to-server actions (lobby, spectate, settings, game, rejoin, AI log download) |
+| `actions.ts` | Client-to-server actions (lobby, spectate, DLC/addon toggles, scenario presets, settings, game, rejoin, AI log download) |
 | `socket.ts` | Creates the socket.io connection |
 | `store.ts` | Shared mutable UI state |
 | `types.ts` | Loose client-side view types |
@@ -161,10 +164,11 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/drawer.ts` | Bottom-left sheet: bank trade, discard, gold, monopoly, robber victim picker |
 | `render/trade.ts` | Stacked trade offers, timers, responses, counter-offer editor |
 | `render/sidebar.ts` | Right sidebar: log, chat, bank, player rows, spectator strip |
-| `render/setup.ts` | World setup page (host only): screen switching, tile preview, player/spectator strip |
+| `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles, active summary strip, player/spectator strip |
+| `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
 
-## `tests/` (vitest)
+## `tests/` (node:test / tsx)
 
 | File | What it covers |
 |---|---|
@@ -191,4 +195,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
 | `score.test.ts` | `score()`, `publicVP()`, score modes, `checkWinner` |
 | `pricing.test.ts` | Piece cost and limit service, cost modifiers |
+| `botgoals.test.ts` | S0.14 Bot goal registry: tier gating (`main`/`secondary`/`overload`), missing-card integration, custom action execution |
+| `persistence.test.ts` | S0.15 Persistence: save/load round-trip, hard caps, public-only event filter, schema migration, Render `CTMEM1.` export/import |
+| `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × bot tiers, invariant checks, `botTested` badge flag |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
+

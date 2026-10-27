@@ -37,6 +37,14 @@ export interface Settings {
   mapPicks?: string[];
   /** Numeric params by id (see ParamDef), clamped to their ranges. */
   mapParams?: Record<string, number>;
+  /** Master switch per DLC pack id (`true` = DLC on). */
+  dlc?: Record<string, boolean>;
+  /** Per-addon toggle overrides (`false` = addon disabled inside an enabled DLC). */
+  addons?: Record<string, boolean>;
+  /** Seeded Event Deck toggle (draws an event every N rounds). */
+  eventsOn?: boolean;
+  /** Starting Fate tokens per player when events are on (default 2). */
+  fateTokens?: number;
 }
 
 /** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */

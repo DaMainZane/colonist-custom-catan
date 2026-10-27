@@ -31,16 +31,20 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
+  setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
+  showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
+} from './render/overlay';
+import {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
-  setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
+  setBrush, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
 } from './actions';
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
-  switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
+  switchLobbyTab, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
@@ -52,7 +56,9 @@ Object.assign(window as any, {
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible,
   pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
-  onRoadHover, onRoadMove, onRoadLeave
+  onRoadHover, onRoadMove, onRoadLeave,
+  setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
+  showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
 });
 
 function animateDice(sum?: number): void {

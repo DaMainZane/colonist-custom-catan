@@ -496,6 +496,34 @@ export function registerSocketHandlers(io: Server): void {
       broadcastRoom(room);
     }));
 
+    socket.on('applyScenario', safe(({ code, scenarioId }) => {
+      const room = hostLobbyRoom(code);
+      if (!room) return;
+      const sc = mapOptionsView().scenarios.find(s => s.id === scenarioId);
+      if (!sc) return;
+      if (isPreset(sc.quickStart)) {
+        applyMapStart(room, sc.quickStart);
+      }
+      const resetDlc: Record<string, boolean> = {};
+      for (const k of Object.keys(room.settings.dlc ?? {})) resetDlc[k] = false;
+      Object.assign(resetDlc, sc.dlc);
+      const { settings: next } = mergeSettingsDetailed(
+        {
+          boardRadius: sc.boardRadius,
+          vpToWin: sc.vpToWin,
+          dlc: resetDlc,
+          addons: sc.addons ?? {},
+          eventsOn: !!sc.eventsOn,
+          fateTokens: sc.fateTokens ?? 2
+        },
+        room.settings
+      );
+      room.settings = next;
+      refreshMap(room);
+      addLobbyLog(room, `Scenario "${sc.label}" applied`, null);
+      broadcastRoom(room);
+    }));
+
     // Custom presets live in the host's browser. The server only turns the lobby map into plain JSON (save)
     // and validates + rebuilds it (load), so a stored or edited preset can never put a bad board in a room.
     socket.on('savePreset', safe(({ code, name }) => {

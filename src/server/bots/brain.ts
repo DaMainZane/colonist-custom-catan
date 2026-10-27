@@ -1,5 +1,18 @@
 // MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | USED BY: bots/scheduler, bots/sim, server/game
-import { checkAction, computeVP, getPlayer, legalActions, makeCtx, score, totalCards } from '../../shared';
+import {
+  botGoalActionScore,
+  botGoalEdgeDelta,
+  botGoalThreatDelta,
+  botGoalVertexDelta,
+  checkAction,
+  evaluateBotGoals,
+  getPlayer,
+  hasBotGoals,
+  legalActions,
+  makeCtx,
+  score,
+  totalCards
+} from '../../shared';
 import type { Ctx, GameEvent, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 import { pieceCost } from '../../packs/base/building';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
@@ -17,11 +30,13 @@ interface Legal { type: string; payload: any }
 type HexT = GameState['board']['hexes'][number];
 
 interface Plan {
-  type: 'city' | 'settlement' | 'dev' | 'road';
+  type: 'city' | 'settlement' | 'dev' | 'road' | 'goal';
+  id?: string;
   priority: number;
   cost: Resources;
   /** One entry per missing card. */
   missing: string[];
+  action?: BotMove;
 }
 
 /** Award minimums of the base pack (packs/base/awards.ts). */
@@ -563,6 +578,7 @@ function vertexScore(dc: Dc, vertexId: number, prod: Record<string, number> = dc
   }
   if (tier.blocking > 0) score += blockBonus(dc, vertexId, score);
   if (tier.awardChase === 2) score += cutBonus(dc, vertexId);
+  if (hasBotGoals(reg)) score += botGoalVertexDelta(dc.ctx, dc.p.id, vertexId, tier.id);
 
   if (own) dc.vertexMemo.set(vertexId, score);
   return score;
@@ -710,6 +726,7 @@ function roadScore(dc: Dc, edgeId: number): number {
       if (tier.roadPlanning === 2) score += contested(dc, next) * 0.6;
     }
   }
+  if (hasBotGoals(dc.reg)) score += botGoalEdgeDelta(dc.ctx, dc.p.id, edgeId, tier.id);
   return score;
 }
 
@@ -759,6 +776,7 @@ function robberScore(dc: Dc, hexId: number): number | null {
     w *= 1 + tier.grudge * (dc.mem.grudge[piece.owner] || 0) * 0.35;
     if (tier.mercy && vp <= dc.mercyVp) w *= 0.15;
     if (lockdownOn(dc, piece.owner)) w *= 2.5;
+    if (hasBotGoals(reg)) w += botGoalThreatDelta(dc.ctx, dc.p.id, piece.owner, tier.id);
     weight += w;
     if (vp > maxOppVp) maxOppVp = vp;
   }
@@ -804,7 +822,7 @@ function planList(dc: Dc): Plan[] {
   const { reg, p, g } = dc;
   const cost = (id: string): Resources => {
     const def = reg.pieces.get(id);
-    return def ? pieceCost(g, p, def) : {};
+    return def ? pieceCost(g, p, def, reg) : {};
   };
   const pers = dc.personality;
   const chase = awardChase(dc);
@@ -836,6 +854,19 @@ function planList(dc: Dc): Plan[] {
   if ((p.pieces[ROAD] || 0) > 0 && !landlocked && (!canSettle || pers === 'roadHog' || chase.road)) {
     const missing = missingFor(p.resources, cost(ROAD));
     out.push({ type: 'road', priority: 65 - missing.length * 16 + (chase.road ? 25 : 0) + (pers === 'roadHog' ? 10 : 0), cost: cost(ROAD), missing });
+  }
+  if (hasBotGoals(reg)) {
+    for (const gItem of evaluateBotGoals(dc.ctx, p.id, dc.tier.id)) {
+      const missing = missingFor(p.resources, gItem.cost || {});
+      out.push({
+        type: 'goal',
+        id: gItem.id,
+        priority: gItem.priority - missing.length * 16,
+        cost: gItem.cost || {},
+        missing,
+        action: gItem.action
+      });
+    }
   }
   out.sort((a, b) => b.priority - a.priority);
   dc.plans = out;
@@ -1263,6 +1294,24 @@ function mainPhase(dc: Dc): BotMove | null {
   const { plans, topPlan, surplus } = analyze(dc);
   const overHand = totalCards(p) > dc.threshold;
 
+  // 4b. Addon / DLC goal actions (when ready) or highest-scored custom legal action.
+  if (hasBotGoals(reg)) {
+    for (const pl of plans) {
+      if (pl.type === 'goal' && pl.missing.length === 0 && pl.action) {
+        if (!checkAction(g, reg, { type: pl.action.type, playerId: p.id, payload: pl.action.payload })) {
+          return pl.action;
+        }
+      }
+    }
+    const scoredCustom = dc.legal
+      .map(a => ({ a, s: botGoalActionScore(dc.ctx, p.id, a, tier.id) }))
+      .filter(x => x.s > 0)
+      .sort((a, b) => b.s - a.s);
+    if (scoredCustom.length > 0) {
+      return { type: scoredCustom[0].a.type, payload: scoredCustom[0].a.payload };
+    }
+  }
+
   // 5. Bank / port swap toward the current plan, 6. offer to the table.
   const swap = bankTradeMove(dc, topPlan, surplus);
   if (swap) return swap;
@@ -1276,7 +1325,7 @@ function mainPhase(dc: Dc): BotMove | null {
   const roads = builds(ROAD);
   if (roads.length) {
     const roadDef = reg.pieces.get(ROAD);
-    const cost = roadDef ? pieceCost(g, p, roadDef) : {};
+    const cost = roadDef ? pieceCost(g, p, roadDef, reg) : {};
     const factor = dc.personality === 'roadHog' ? 1 : 2;
     const richInRoads = Object.entries(cost).every(([r, n]) => (p.resources[r] || 0) >= (n as number) * factor);
     const hasOpenSpot = placeable(dc, SETTLEMENT).length > 0;
