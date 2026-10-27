@@ -94,6 +94,7 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
     deck: rngShuffle(rng, deck),
     turn: order[0],
     turnCount: 0,
+    round: 0,
     phase: 'setup_settlement',
     phaseStack: [],
     setup: { order, step: 0, lastVertexId: null },

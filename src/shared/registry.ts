@@ -1,4 +1,5 @@
 // MODULE: registry + pack loader (all game content is registered here) | USED BY: engine, packs, UI generation, bots
+import type { AddonDef, AddonInfo, DlcInfo } from './addons';
 import type { Ctx } from './ctx';
 import type { MapOptionBase, NumbersDef, PerkDef, QuickStartDef, ShapeOpDef, TerrainDef } from './mapoptions';
 import type { RngState } from './rng';
@@ -132,6 +133,8 @@ export type HookName =
   | 'onGameStart'        // (ctx)
   | 'onTurnStart'        // (ctx)
   | 'onTurnEnd'          // (ctx)
+  | 'onRoundStart'       // (ctx) seat 0's turn is about to start; g.round is already the new round
+  | 'onRoundEnd'         // (ctx) the last seat has ended its turn; g.round is still the finished round
   | 'onRoll'             // (ctx, sum)
   | 'onBuild'            // (ctx, pieceDef, playerId, location)
   | 'afterAction'        // (ctx, actionType)
@@ -159,6 +162,14 @@ export interface Registry {
   quickStarts: Map<string, QuickStartDef>;
   /** Features a pack provides, e.g. 'crossing' (ships or bridges). An option with `requires` is refused until they exist. */
   capabilities: Set<string>;
+  /** Every addon in the catalog (enabled or not), so the lobby can draw DLC cards without registering content. */
+  addons: Map<string, AddonInfo>;
+  /** DLC packs (packs with addons), by pack id. */
+  dlcs: Map<string, DlcInfo>;
+  /** Addon ids whose content is registered for this game. */
+  enabled: Set<string>;
+  /** Keyed definitions added through `api.define(kind, def)`: kind -> id -> def. */
+  defs: Map<string, Map<string, any>>;
   hooks: Record<HookName, ((...args: any[]) => any)[]>;
 }
 
@@ -179,6 +190,8 @@ export interface PackApi {
   quickStart(def: QuickStartDef): void;
   /** Declares a capability. Several packs may declare the same one. */
   capability(id: string): void;
+  /** Registers a definition in a keyed registry of the given kind. Duplicate ids throw unless `replace: true`. Kinds are separate namespaces. */
+  define(kind: string, def: { id: string; replace?: boolean; [key: string]: any }): void;
   hook(name: HookName, fn: (...args: any[]) => any): void;
 }
 
@@ -189,6 +202,8 @@ export interface Pack {
   deps?: string[];
   /** Default rule parameters, deep-merged in load order. */
   rules?: Record<string, any>;
+  /** A DLC lists its addons here. Addon content is registered only for enabled addons (see addons.ts). */
+  addons?: AddonDef[];
   register(api: PackApi): void;
 }
 
@@ -220,7 +235,16 @@ function putOption<T extends MapOptionBase>(map: Map<string, T>, all: Map<string
   put(map, def.id, def, kind, packId);
 }
 
-export function createRegistry(packs: Pack[], overrides: Record<string, any> = {}): Registry {
+/** The keyed definitions of one kind (empty if none were registered). */
+export function defsOf<T = any>(reg: Registry, kind: string): Map<string, T> {
+  return (reg.defs.get(kind) ?? new Map()) as Map<string, T>;
+}
+
+/**
+ * `enabled` is the set of addon ids to register ('all' = every addon). Default: none, so a plain call builds the base game.
+ * Use `registryFor` (addons.ts) to derive the set from game rules.
+ */
+export function createRegistry(packs: Pack[], overrides: Record<string, any> = {}, enabled: Set<string> | 'all' = new Set()): Registry {
   const reg: Registry = {
     packs: [],
     rules: {} as Rules,
@@ -239,13 +263,22 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
     mapPerks: new Map(),
     quickStarts: new Map(),
     capabilities: new Set(),
+    addons: new Map(),
+    dlcs: new Map(),
+    enabled: new Set(),
+    defs: new Map(),
     hooks: {
-      onGameStart: [], onTurnStart: [], onTurnEnd: [], onRoll: [], onBuild: [],
+      onGameStart: [], onTurnStart: [], onTurnEnd: [], onRoundStart: [], onRoundEnd: [], onRoll: [], onBuild: [],
       afterAction: [], vp: [], afterMapGenerated: [], onView: []
     }
   };
 
   const optionMaps: Map<string, MapOptionBase>[] = [reg.mapShapes, reg.mapTerrains, reg.mapNumberings, reg.mapPerks];
+  const defsFor = (kind: string): Map<string, any> => {
+    let m = reg.defs.get(kind);
+    if (!m) { m = new Map(); reg.defs.set(kind, m); }
+    return m;
+  };
   const loaded = new Set<string>();
   for (const pack of packs) {
     if (loaded.has(pack.id)) throw new Error(`Pack "${pack.id}" listed twice`);
@@ -253,7 +286,7 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
       if (!loaded.has(dep)) throw new Error(`Pack "${pack.id}" needs "${dep}" loaded first`);
     }
     const id = pack.id;
-    const api: PackApi = {
+    const makeApi = (id: string): PackApi => ({
       resource: d => put(reg.resources, d.id, d, 'resource', id),
       tile: d => put(reg.tiles, d.id, d, 'tile', id),
       piece: d => put(reg.pieces, d.id, d, 'piece', id),
@@ -269,15 +302,43 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
       mapPerk: d => putOption(reg.mapPerks, optionMaps, d, 'map perk', id),
       quickStart: d => put(reg.quickStarts, d.id, d, 'quick start', id),
       capability: c => { reg.capabilities.add(c); },
+      define: (kind, d) => put(defsFor(kind), d.id, d, kind, id),
       hook: (name, fn) => {
         if (!reg.hooks[name]) throw new Error(`Pack "${id}": unknown hook "${name}"`);
         reg.hooks[name].push(fn);
       }
-    };
-    pack.register(api);
+    });
+    pack.register(makeApi(id));
     if (pack.rules) reg.rules = mergeRules(reg.rules, pack.rules);
+
+    if (pack.addons?.length) {
+      reg.dlcs.set(id, { id, name: pack.name, addons: pack.addons.map(a => a.id) });
+      for (const a of pack.addons) {
+        if (!a.id.startsWith(`${id}.`) || a.id.length <= id.length + 1) {
+          throw new Error(`Pack "${id}": addon "${a.id}" must start with "${id}."`);
+        }
+        if (reg.addons.has(a.id)) throw new Error(`Pack "${id}": duplicate addon "${a.id}"`);
+        for (const d of a.deps ?? []) {
+          if (!reg.addons.has(d)) throw new Error(`Pack "${id}": addon "${a.id}" depends on "${d}", which is not declared before it`);
+        }
+        reg.addons.set(a.id, { id: a.id, name: a.name, description: a.description, pack: id, deps: [...(a.deps ?? [])], links: [...(a.links ?? [])] });
+
+        if (enabled !== 'all' && !enabled.has(a.id)) continue;
+        for (const d of a.deps ?? []) {
+          if (!reg.enabled.has(d)) throw new Error(`Pack "${id}": addon "${a.id}" is enabled but its dependency "${d}" is not`);
+        }
+        a.register?.(makeApi(a.id));
+        if (a.rules) reg.rules = mergeRules(reg.rules, a.rules);
+        reg.enabled.add(a.id);
+      }
+    }
     loaded.add(id);
     reg.packs.push(id);
+  }
+  if (enabled !== 'all') {
+    for (const a of enabled) {
+      if (!reg.addons.has(a)) throw new Error(`Unknown addon "${a}" in the enabled set`);
+    }
   }
   reg.rules = mergeRules(reg.rules, overrides);
 

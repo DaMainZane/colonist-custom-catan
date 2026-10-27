@@ -1,5 +1,24 @@
 # Change Log
 
+## 2026-10-27 (Pass 34: Stage 0 start: DLC/addon layer, keyed registries, golden baseline test)
+### Added
+- **DLC and addon layer** (`src/shared/addons.ts`, new; S0.1, service 1): `AddonDef` (id, deps, links, rules, `register`), `AddonInfo`/`DlcInfo` for the lobby, `LINK_KINDS`, the 20 `GENERAL_SERVICE_IDS`, `resolveAddons(packs, rules)` (DLC master switch `rules.dlc[packId]`, per-addon `rules.addons[id] === false`, blocked-by-dependency list), `addonOn(reg, id)`, `registryFor(packs, rules, overrides)`, and `auditAddons(packs)` (Rule of Two: 2+ distinct links, one to a General service; no unknown targets or kinds, no self links; DLC must list `base`; cross-DLC dependency needs `allowCrossDlcDep`).
+- **Keyed registries**: `api.define(kind, def)` and `defsOf(reg, kind)`. Kinds are separate namespaces, duplicate ids throw unless `replace: true`. New kinds (events, techs, contract conditions, stats...) need no edit to `registry.ts`.
+- **Golden baseline** (`tests/golden.test.ts`, S0.0): five seeded bot-vs-bot games hashed (final state, log, turns, steps) against `tests/golden.snapshot.json`. First run records the snapshot; `UPDATE_GOLDEN=1` re-records on purpose.
+- `tests/addons.test.ts`: manifest, enabled sets, master switch, bad-manifest errors, keyed registries, "DLC off changes nothing", and the audit.
+### Changed
+- `src/shared/registry.ts`: `Pack.addons`; `Registry.addons`, `dlcs`, `enabled`, `defs`; `createRegistry(packs, overrides, enabled)` takes a set of addon ids or `'all'` (default none, so plain calls build the base game). Addon content, hooks and rules register only for enabled addons. Load-time errors for wrong id prefix, duplicate addon, dependency not declared earlier, enabled addon whose dependency is off, unknown id in the enabled set.
+- `src/shared/index.ts` exports `addons`.
+- `INDEX.md` lists the new source and test files and `Development Plan.md`.
+### Added (S0.2 round clock, service 2)
+- `g.round` (0 in setup; round 1 starts with the first normal turn; a new round each time seat 0 comes up). Robber, discard and pick sub-phases never start a round.
+- Hooks `onRoundStart` (g.round already the new round) and `onRoundEnd` (g.round still the finished round, fires when the last seat ends its turn, not after a winning turn), events `roundStarted` / `roundEnded`, helper `everyNRounds(n, fn, offset)`, `endRoundIfLastSeat(ctx)` called by `end_turn`. Code: `types.ts`, `registry.ts`, `engine.ts` (`round: 0`), `state.ts` (`startTurn`), `packs/base/actions/endTurn.ts`.
+- `tests/rounds.test.ts`. `tests/golden.test.ts` leaves `round` and `ext.core` out of the state hash so additive services do not break the baseline.
+### Not done yet (S0.1)
+- `rulesFromSettings` / `Settings` still wired per field; the `dlc` / `addons` block comes with the setup page work (S0.12).
+### Not verified
+- Written without a shell. Still to run: `npm run typecheck`, `npm test`, then `npx vitest run tests/golden.test.ts` to record the snapshot and commit it. For a true pre-change baseline, `git stash` first, record, `git stash pop`, run again.
+
 ## 2026-10-26 (Pass 33: world setup page between the name page and the board)
 ### Added
 - **Setup page** (`public/index.html` `#setupScreen`, `src/client/render/setup.ts`, `styles.css`): host only. Three boxes: bots and bot chat (with a player strip: avatar click, bot tier tag click), a tiles-only map preview, and map presets, map menu (seed) and all rules (game, timers, special tiles, bank and dev cards, pieces). Buttons: Continue to board, Start now. Controls keep their ids and handlers, so settings sync, presets and the seed work unchanged.
@@ -154,8 +173,3 @@ Design in `Map Generation Design.md`.
 ## Step 0
 - Skeleton deploy: old version tagged, Render host, `/health`, tested on phones.
 
-## Planned
-- Delete `src/server-legacy/` (and `legacy/` when not needed), then close Step 2.
-- Step 3 (identity and persistence) only when John says so.
-- Bot addon system, sim matrix and tier tuning.
-- Settings and navigation UI rework, board UI rework, reconnect, bot initial placement, bot data log, piece scaling with the VP setting.

@@ -108,6 +108,8 @@ export interface GameState {
   /** Index into players of the player whose turn it is. */
   turn: number;
   turnCount: number;
+  /** Full passes of the table. 0 during setup; round 1 starts with the first normal turn (seat 0) and a new round starts each time seat 0 comes up again. Robber, discard and pick sub-phases do not start rounds. */
+  round: number;
   phase: string;
   /** Phases to return to after the current one ends (robber, discard, pick...). */
   phaseStack: string[];

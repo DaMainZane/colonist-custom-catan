@@ -17,16 +17,17 @@ What every file does. Paths are relative to the repo root. Most source files sta
 
 ## Docs
 
-| File | What it holds |
-|---|---|
-| `README.md` | Overview, quick start, layout |
-| `change log.md` | What changed, pass by pass, plus the Planned list |
-| `Backlog Priority.md` | Open tasks ordered easiest to hardest |
-| `Ideas.md` | Idea dump |
+| File                       | What it holds                                      |
+| -------------------------- | -------------------------------------------------- |
+| `README.md`                | Overview, quick start, layout                      |
+| `change log.md`            | What changed, pass by pass                         |
+| `Backlog Priority.md`      | Open tasks ordered easiest to hardest              |
+| `Ideas.md`                 | Idea dump                                          |
+| `Development Plan.md`      | Stage 0 build plan (services, order, decisions)    |
 | `Map Generation Design.md` | Map generator design (recipes, stages, validation) |
-| `Bot AI Design.md` | Bot tiers and brain design |
-| `Bot Dialogue Design.md` | Bot chat design |
-| `Design UI Philosophy.md` | Visual direction and design tokens |
+| `Bot AI Design.md`         | Bot tiers and brain design                         |
+| `Bot Dialogue Design.md`   | Bot chat design                                    |
+| `Design UI Philosophy.md`  | Visual direction and design tokens                 |
 
 ## `src/shared/` (pure engine: no sockets, DOM or timers; runs on server and client)
 
@@ -34,10 +35,11 @@ What every file does. Paths are relative to the repo root. Most source files sta
 |---|---|
 | `index.ts` | Public entry that re-exports the engine |
 | `types.ts` | Core types: game state, board, players, rules |
-| `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry`, `mergeRules` |
+| `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
+| `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
 | `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
 | `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
-| `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), `startTurn` |
+| `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), round clock (`endRoundIfLastSeat`, `everyNRounds`), `startTurn` |
 | `views.ts` | `playerView`: per-player view that hides other hands, hidden tiles and dev cards |
 | `rng.ts` | Seeded RNG (mulberry32): `createRng`, `rngInt`, `rngPick`, `rngShuffle` |
 | `palette.ts` | Player colors and avatars |
@@ -183,3 +185,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapsettings.test.ts` | Map settings and option resolution |
 | `mapmenu.test.ts` | Map menu data and presets v2 |
 | `mapbudget.test.ts` | Generation time budget |
+| `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
+| `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
+| `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
+| `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |

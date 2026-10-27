@@ -115,7 +115,31 @@ export function popPhase(ctx: Ctx, fallback = 'main'): void {
   enterPhase(ctx, back);
 }
 
+/**
+ * Round clock. A round is one pass of the table: it starts when seat 0 begins a turn and ends when the last seat ends its turn.
+ * Setup is round 0. Robber, discard and pick sub-phases happen inside a turn and never start or end a round.
+ */
+export function endRoundIfLastSeat(ctx: Ctx): void {
+  const { g } = ctx;
+  if (g.turn !== g.players.length - 1) return;
+  for (const hook of ctx.reg.hooks.onRoundEnd) hook(ctx);
+  ctx.emit('roundEnded', { round: g.round });
+}
+
+/** A hook that runs `fn` on rounds n, 2n, 3n... (use it for onRoundStart or onRoundEnd). `offset` shifts the first round. */
+export function everyNRounds(n: number, fn: (ctx: Ctx) => void, offset = 0): (ctx: Ctx) => void {
+  return ctx => {
+    const r = ctx.g.round - offset;
+    if (n > 0 && r > 0 && r % n === 0) fn(ctx);
+  };
+}
+
 export function startTurn(ctx: Ctx): void {
+  if (ctx.g.turn === 0) {
+    ctx.g.round = (ctx.g.round ?? 0) + 1;
+    for (const hook of ctx.reg.hooks.onRoundStart) hook(ctx);
+    ctx.emit('roundStarted', { round: ctx.g.round });
+  }
   for (const p of ctx.g.players) p.flags = {};
   for (const hook of ctx.reg.hooks.onTurnStart) hook(ctx);
   setPhase(ctx, 'roll');

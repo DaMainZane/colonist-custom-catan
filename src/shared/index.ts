@@ -3,6 +3,7 @@ export * from './rng';
 export * from './types';
 export * from './palette';
 export * from './ctx';
+export * from './addons';
 export * from './registry';
 export * from './topology';
 export * from './numbers';
