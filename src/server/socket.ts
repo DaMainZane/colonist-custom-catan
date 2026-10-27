@@ -17,9 +17,54 @@ import type { Room } from './types';
 const BOT_NAMES = ['Breeze', 'Sonny', 'Jess', 'TupacShakur', 'IdrisElba', 'Cleopatra', 'Napoleon'];
 const ROOM_DISCONNECT_TTL_MS = 10 * 60 * 1000;
 
+function addSpectator(room: Room, socket: any, cleanName: string, cleanClientId: string, toastMsg?: string): void {
+  room.spectators = room.spectators || [];
+  if (
+    room.lobbyPlayers.some(p => p.id === socket.id) ||
+    room.game?.players.some(p => p.id === socket.id) ||
+    room.spectators.some(s => s.id === socket.id)
+  ) {
+    socket.join(room.code);
+    broadcastRoom(room);
+    return;
+  }
+
+  if (room.cleanupTimer) {
+    clearTimeout(room.cleanupTimer);
+    room.cleanupTimer = undefined;
+  }
+
+  const avatar = freeAvatar(room);
+  const color = PLAYER_COLORS[(room.lobbyPlayers.length + room.spectators.length) % PLAYER_COLORS.length];
+  room.spectators.push({
+    id: socket.id,
+    name: cleanName,
+    avatar,
+    color
+  });
+
+  if (cleanClientId) {
+    room.clientTokens = room.clientTokens || {};
+    room.clientTokens[cleanClientId] = socket.id;
+  }
+
+  socket.join(room.code);
+  if (room.game) {
+    room.game.log.push({ text: `👁️ ${cleanName} is spectating the game`, color });
+    if (room.game.log.length > 80) room.game.log.shift();
+  } else {
+    addLobbyLog(room, `👁️ ${avatar} ${cleanName} joined as spectator`, color);
+  }
+  if (toastMsg) {
+    socket.emit('errorMsg', toastMsg);
+  }
+  broadcastRoom(room);
+}
+
 function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: string): boolean {
   room.clientTokens = room.clientTokens || {};
   room.disconnectedSeats = room.disconnectedSeats || {};
+  room.spectators = room.spectators || [];
   const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
   const cleanName = typeof name === 'string' ? name.trim().substring(0, 16) : '';
   const lowerName = cleanName.toLowerCase();
@@ -42,6 +87,32 @@ function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: strin
   const restoreName = seatInfo.originalName || (cleanName || undefined);
   const restoreAvatar = seatInfo.originalAvatar;
   const wasHost = seatInfo.wasHost ?? (room.hostId === targetOldId);
+
+  if (seatInfo.isSpectator) {
+    if (!room.spectators.some(s => s.id === socket.id)) {
+      room.spectators.push({
+        id: socket.id,
+        name: restoreName || 'Spectator',
+        avatar: restoreAvatar || freeAvatar(room),
+        color: PLAYER_COLORS[(room.lobbyPlayers.length + room.spectators.length) % PLAYER_COLORS.length]
+      });
+    }
+    delete room.disconnectedSeats[targetOldId];
+    if (cleanClientId) {
+      room.clientTokens[cleanClientId] = socket.id;
+    }
+    if (wasHost || !humanIds(room).includes(room.hostId)) {
+      room.hostId = socket.id;
+    }
+    if (room.cleanupTimer) {
+      clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = undefined;
+    }
+    socket.join(room.code);
+    socket.emit('reconnected', { code: room.code, name: restoreName || '' });
+    broadcastRoom(room);
+    return true;
+  }
 
   if (!rebindPlayerId(room, targetOldId, socket.id, restoreName, restoreAvatar)) {
     return false;
@@ -115,10 +186,22 @@ export function registerSocketHandlers(io: Server): void {
 
     // ---- Lobby ------------------------------------------------------------
 
-    socket.on('createRoom', safe(({ name, clientId }) => {
+    socket.on('createRoom', safe(({ name, clientId, spectate }) => {
       const cleanName = String(name || '').trim().substring(0, 16);
       if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       const room = createRoom(socket.id, cleanName);
+      if (spectate) {
+        const hostPlayer = room.lobbyPlayers.shift();
+        if (hostPlayer) {
+          room.spectators.push({
+            id: hostPlayer.id,
+            name: hostPlayer.name,
+            avatar: hostPlayer.avatar,
+            color: hostPlayer.color
+          });
+          addLobbyLog(room, `👁️ ${hostPlayer.avatar} ${cleanName} is hosting as spectator`, hostPlayer.color);
+        }
+      }
       const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
       if (cleanClientId) {
         room.clientTokens = room.clientTokens || {};
@@ -128,24 +211,39 @@ export function registerSocketHandlers(io: Server): void {
       broadcastRoom(room);
     }));
 
-    socket.on('joinRoom', safe(({ code, name, clientId }) => {
+    socket.on('joinRoom', safe(({ code, name, clientId, spectate }) => {
       const cleanCode = (code || '').trim().toUpperCase();
       const cleanName = String(name || '').trim().substring(0, 16);
       if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
       const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
 
+      if (spectate) {
+        const targetRoom = cleanCode
+          ? rooms[cleanCode]
+          : Object.values(rooms).reverse()[0];
+        if (!targetRoom) {
+          return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game or lobby to spectate.');
+        }
+        return addSpectator(targetRoom, socket, cleanName, cleanClientId);
+      }
+
       const candidateRoom = cleanCode
         ? rooms[cleanCode]
-        : Object.values(rooms).reverse().find(r => !r.game && !r.setup && r.lobbyPlayers.length < r.settings.maxPlayers);
+        : (Object.values(rooms).reverse().find(r => !r.game && !r.setup && r.lobbyPlayers.length < r.settings.maxPlayers)
+           ?? Object.values(rooms).reverse().find(r => !!r.game || (!r.setup && r.lobbyPlayers.length >= r.settings.maxPlayers)));
 
       if (!candidateRoom) {
         return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
       }
 
-      if (candidateRoom.game) return socket.emit('errorMsg', 'Game already started!');
+      if (candidateRoom.game) {
+        return addSpectator(candidateRoom, socket, cleanName, cleanClientId, 'Game in progress — joined as spectator!');
+      }
       if (candidateRoom.setup) return socket.emit('errorMsg', 'Host is creating world');
-      if (candidateRoom.lobbyPlayers.some(p => p.id === socket.id)) return;
-      if (candidateRoom.lobbyPlayers.length >= candidateRoom.settings.maxPlayers) return socket.emit('errorMsg', 'Room is full!');
+      if (candidateRoom.lobbyPlayers.some(p => p.id === socket.id) || (candidateRoom.spectators || []).some(s => s.id === socket.id)) return;
+      if (candidateRoom.lobbyPlayers.length >= candidateRoom.settings.maxPlayers) {
+        return addSpectator(candidateRoom, socket, cleanName, cleanClientId, 'Lobby seats full — joined as spectator!');
+      }
 
       if (candidateRoom.cleanupTimer) {
         clearTimeout(candidateRoom.cleanupTimer);
@@ -163,6 +261,83 @@ export function registerSocketHandlers(io: Server): void {
       addLobbyLog(candidateRoom, `${newP.avatar} ${cleanName} joined the lobby`, newP.color);
       noteCrowding(candidateRoom);
       broadcastRoom(candidateRoom);
+    }));
+
+    socket.on('spectateRoom', safe(({ code, name, clientId }) => {
+      const cleanCode = (code || '').trim().toUpperCase();
+      const cleanName = String(name || '').trim().substring(0, 16);
+      if (!cleanName) return socket.emit('errorMsg', 'Please enter a nickname first.');
+      const cleanClientId = typeof clientId === 'string' ? clientId.trim().substring(0, 64) : '';
+
+      const targetRoom = cleanCode
+        ? rooms[cleanCode]
+        : Object.values(rooms).reverse()[0];
+
+      if (!targetRoom) {
+        return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No active game or lobby to spectate.');
+      }
+
+      addSpectator(targetRoom, socket, cleanName, cleanClientId);
+    }));
+
+    socket.on('toggleSpectate', safe(({ code }) => {
+      const room = rooms[code];
+      if (!room) return;
+      room.spectators = room.spectators || [];
+
+      if (!room.game) {
+        const pIdx = room.lobbyPlayers.findIndex(p => p.id === socket.id);
+        if (pIdx !== -1) {
+          const [lp] = room.lobbyPlayers.splice(pIdx, 1);
+          room.spectators.push({
+            id: lp.id,
+            name: lp.name,
+            avatar: lp.avatar,
+            color: lp.color
+          });
+          addLobbyLog(room, `👁️ ${lp.avatar} ${lp.name} switched to spectator`, lp.color);
+          broadcastRoom(room);
+          return;
+        }
+
+        const sIdx = room.spectators.findIndex(s => s.id === socket.id);
+        if (sIdx !== -1) {
+          if (room.lobbyPlayers.length >= room.settings.maxPlayers) {
+            return socket.emit('errorMsg', 'All player seats are full!');
+          }
+          const [sp] = room.spectators.splice(sIdx, 1);
+          const newP = createLobbyPlayer(sp.id, sp.name, room.lobbyPlayers.length, false);
+          newP.avatar = !room.lobbyPlayers.some(p => p.avatar === sp.avatar) ? sp.avatar : freeAvatar(room);
+          room.lobbyPlayers.push(newP);
+          addLobbyLog(room, `${newP.avatar} ${newP.name} joined a player seat`, newP.color);
+          noteCrowding(room);
+          broadcastRoom(room);
+        }
+        return;
+      }
+
+      // Mid-game: a seated human player can switch to spectating, handing their seat to a bot.
+      const g = room.game;
+      const p = g.players.find(pl => pl.id === socket.id && !pl.isBot);
+      if (!p) return;
+      const cleanOriginalName = p.name.replace(/\s*\(Bot\)$/i, '');
+      const botId = `bot_spec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      rebindPlayerId(room, socket.id, botId);
+      const botPlayer = g.players.find(pl => pl.id === botId);
+      if (botPlayer) {
+        botPlayer.isBot = true;
+        botPlayer.difficulty = tierLabel(TAKEOVER_TIER);
+        if (!botPlayer.name.includes('(Bot)')) botPlayer.name += ' (Bot)';
+      }
+      room.spectators.push({
+        id: socket.id,
+        name: cleanOriginalName,
+        avatar: p.avatar,
+        color: p.color
+      });
+      g.log.push({ text: `👁️ ${cleanOriginalName} switched to spectator — a ${tierLabel(TAKEOVER_TIER)} bot took over their seat.`, color: p.color });
+      if (g.log.length > 80) g.log.shift();
+      broadcastRoom(room);
     }));
 
     socket.on('reconnectRoom', safe(({ code, clientId, name }) => {
@@ -285,10 +460,14 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('setAvatar', safe(({ code, playerId, avatar }) => {
       const room = rooms[code];
       if (!room || room.game || typeof avatar !== 'string' || !AVATARS.includes(avatar)) return;
-      const target = room.lobbyPlayers.find(p => p.id === (playerId || socket.id));
+      const targetId = playerId || socket.id;
+      const target: any = room.lobbyPlayers.find(p => p.id === targetId) || (room.spectators || []).find(s => s.id === targetId);
       if (!target) return;
       if (target.id !== socket.id && !(target.isBot && room.hostId === socket.id)) return;
-      if (room.lobbyPlayers.some(p => p.id !== target.id && p.avatar === avatar)) {
+      if (
+        room.lobbyPlayers.some(p => p.id !== target.id && p.avatar === avatar) ||
+        (room.spectators || []).some(s => s.id !== target.id && s.avatar === avatar)
+      ) {
         return socket.emit('errorMsg', 'That avatar is already taken.');
       }
       target.avatar = avatar;
@@ -298,7 +477,9 @@ export function registerSocketHandlers(io: Server): void {
     // Lobby cursors: only the host edits, everyone else points with a cursor (Shift = laser). Relayed, never stored.
     socket.on('cursor', safe(({ code, x, y, laser, hide }) => {
       const room = rooms[code];
-      if (!room || room.game || !room.lobbyPlayers.some(p => p.id === socket.id)) return;
+      if (!room || room.game) return;
+      const inRoom = room.lobbyPlayers.some(p => p.id === socket.id) || (room.spectators || []).some(s => s.id === socket.id);
+      if (!inRoom) return;
       if (hide) {
         socket.to(room.code).volatile.emit('cursor', { id: socket.id, hide: true });
         return;
@@ -388,12 +569,12 @@ export function registerSocketHandlers(io: Server): void {
         return act(code, 'steal', { victimId: v.piece.owner });
       }
       if (v.piece && v.piece.owner === socket.id && v.piece.type === SETTLEMENT) {
-        return act(code, 'build', { piece: CITY, loc: vertexId });
+        return act(code, 'build', { piece: CITY, loc: vertexId }, true);
       }
-      if (!v.piece) act(code, 'build', { piece: SETTLEMENT, loc: vertexId });
+      if (!v.piece) act(code, 'build', { piece: SETTLEMENT, loc: vertexId }, true);
     }));
 
-    socket.on('clickEdge', safe(({ code, edgeId }) => act(code, 'build', { piece: ROAD, loc: edgeId })));
+    socket.on('clickEdge', safe(({ code, edgeId }) => act(code, 'build', { piece: ROAD, loc: edgeId }, true)));
     socket.on('clickHex', safe(({ code, hexId }) => act(code, 'move_robber', { hexId })));
     socket.on('stealFromPlayer', safe(({ code, victimId }) => act(code, 'steal', { victimId })));
 
@@ -428,7 +609,9 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('sendChat', safe(({ code, text }) => {
       const room = rooms[code];
       if (!room || !text) return;
-      const me = room.game ? room.game.players.find(p => p.id === socket.id) : room.lobbyPlayers.find(p => p.id === socket.id);
+      const me =
+        (room.game ? room.game.players.find(p => p.id === socket.id) : room.lobbyPlayers.find(p => p.id === socket.id)) ||
+        (room.spectators || []).find(s => s.id === socket.id);
       if (!me) return;
       const said = String(text).trim().substring(0, 120);
       room.chats.push({ sender: me.name, avatar: me.avatar, color: me.color, text: said });
@@ -445,8 +628,37 @@ export function registerSocketHandlers(io: Server): void {
           const room = rooms[code];
           const g = room.game;
           room.disconnectedSeats = room.disconnectedSeats || {};
+          room.spectators = room.spectators || [];
           const tokenEntry = Object.entries(room.clientTokens || {}).find(([, pid]) => pid === socket.id);
           const clientId = tokenEntry?.[0];
+
+          const specIdx = room.spectators.findIndex(s => s.id === socket.id);
+          if (specIdx !== -1) {
+            const [spec] = room.spectators.splice(specIdx, 1);
+            room.disconnectedSeats[socket.id] = {
+              playerId: socket.id,
+              clientId,
+              originalName: spec.name,
+              originalAvatar: spec.avatar,
+              wasHost: room.hostId === socket.id,
+              isSpectator: true,
+              disconnectedAt: Date.now()
+            };
+            const humans = humanIds(room).filter(id => !room.disconnectedSeats?.[id]);
+            if (humans.length === 0) {
+              clearBotTimers(room);
+              room.cleanupTimer = setTimeout(() => {
+                if (rooms[code] && humanIds(rooms[code]).filter(id => !rooms[code].disconnectedSeats?.[id]).length === 0) {
+                  clearBotTimers(rooms[code]);
+                  delete rooms[code];
+                }
+              }, ROOM_DISCONNECT_TTL_MS);
+              continue;
+            }
+            if (room.hostId === socket.id) room.hostId = humans[0];
+            broadcastRoom(room);
+            continue;
+          }
 
           if (!g) {
             const lp = room.lobbyPlayers.find(p => p.id === socket.id);
@@ -459,7 +671,7 @@ export function registerSocketHandlers(io: Server): void {
               wasHost: room.hostId === socket.id,
               disconnectedAt: Date.now()
             };
-            const humans = humanIds(room).filter(id => id !== socket.id);
+            const humans = humanIds(room).filter(id => id !== socket.id && !room.disconnectedSeats?.[id]);
             if (humans.length === 0) {
               clearBotTimers(room);
               room.cleanupTimer = setTimeout(() => {

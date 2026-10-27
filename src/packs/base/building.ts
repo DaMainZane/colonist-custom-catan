@@ -16,9 +16,16 @@ export const BASE_PIECE_LIMITS: Record<string, number> = {
 export function isAboveBaseLimit(g: GameState, p: PlayerState, pieceId: string): boolean {
   const baseLimit = BASE_PIECE_LIMITS[pieceId];
   if (!baseLimit) return false;
-  const maxLimit = g.rules.pieceLimits?.[pieceId] ?? baseLimit;
-  const left = p.pieces[pieceId] ?? 0;
-  const activeOnBoard = maxLimit - left;
+  let activeOnBoard = 0;
+  if (pieceId === ROAD) {
+    for (const e of g.board.edges) {
+      if (e.piece?.owner === p.id && e.piece.type === ROAD) activeOnBoard++;
+    }
+  } else {
+    for (const v of g.board.vertices) {
+      if (v.piece?.owner === p.id && v.piece.type === pieceId) activeOnBoard++;
+    }
+  }
   return activeOnBoard >= baseLimit;
 }
 

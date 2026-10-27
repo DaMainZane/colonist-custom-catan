@@ -127,7 +127,7 @@ function draw(): void {
       continue;
     }
     active = true;
-    const who = state.players.find(p => p.id === id);
+    const who = state.players.find(p => p.id === id) || (state.spectators || []).find(s => s.id === id);
     const color = who?.color || '#888';
 
     if (c.trail.length > 1) {

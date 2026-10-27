@@ -176,6 +176,18 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
       ${respBtns}
       <button class="trade-act-btn cancel" onclick="cancelTrade(${t.id})" title="Cancel this trade offer">${uiIcon('close', 18)}</button>
     `;
+  } else if (!me) {
+    const responders = headerPlayers.filter(p => p.id !== t.fromId && t.responses && t.responses[p.id] !== undefined);
+    actionsHtml = responders.map(p => {
+      const resp = (t.responses && t.responses[p.id]) || 'pending';
+      if (resp === 'accepted') {
+        return `<div class="trade-resp-box accepted" style="--resp-color:${esc(p.color)}" title="${esc(p.name)} accepted">${uiIcon('check', 18)}</div>`;
+      }
+      if (resp === 'declined') {
+        return `<div class="trade-resp-box declined" style="--resp-color:${esc(p.color)}" title="${esc(p.name)} declined">${uiIcon('close', 17)}</div>`;
+      }
+      return `<div class="trade-resp-box pending" style="--resp-color:${esc(p.color)}" title="Waiting for ${esc(p.name)}"><span class="wait-dots"></span></div>`;
+    }).join('');
   } else {
     const myResp = (t.responses && t.responses[socket.id]) || 'pending';
     const canAfford = !!me && RESOURCES.every(r => (t.request[r] || 0) <= (me.resources?.[r] || 0));

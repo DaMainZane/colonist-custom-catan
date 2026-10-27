@@ -1,12 +1,13 @@
 // MODULE: player hand (resource stacks + dev cards) and hand click handlers | USED BY: render/index.ts, main.ts
 import { RESOURCES, RES_META, DEV_META } from '../constants';
-import { getMiniSvg, getDevSvg, buildOverlappingStackHtml } from '../icons';
+import { getMiniSvg, getDevSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
-import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive, inFlightHandResources, inFlightMyDevCards } from '../store';
+import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive, inFlightHandResources, inFlightMyDevCards, spectateTargetId } from '../store';
 import { renderInlineDrawer } from './drawer';
 import { adjustCounter } from './trade';
 import { esc } from '../util';
+import { avatarFace } from '../avatars';
 import { isClientPieceDoubleCost } from './board';
 
 export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', string[]> = {
@@ -24,7 +25,7 @@ export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' |
   const hand = me?.resources || {};
   const cardsHtml = list.map(r => {
     seen[r] = (seen[r] || 0) + 1;
-    const avail = Math.max(0, (hand[r] || 0) - (inFlightHandResources[r] || 0));
+    const avail = Math.max(0, hand[r] || 0);
     const hasIt = avail >= seen[r];
     return `<div class="recipe-mini-card card-${r} ${hasIt ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
   }).join('');
@@ -61,13 +62,82 @@ function devCardHtml(type: string, oldCount: number, newCount: number, canPlay: 
     </div>`;
 }
 
+export function getSpectateTargetPlayer(): any {
+  const players = state?.players || [];
+  if (players.length === 0) return null;
+  if (spectateTargetId) {
+    const found = players.find(p => p.id === spectateTargetId);
+    if (found) return found;
+  }
+  return players[state?.turnIndex ?? 0] || players[0];
+}
+
 export function renderHand(me: any, isMyTurn: boolean): void {
-  updateActionRecipePopups(me);
   const panel = document.getElementById('myHandPanel')!;
   if (!me || !me.resources) {
-    panel.innerHTML = '<span class="hand-empty">Spectating</span>';
+    if (state?.status === 'LOBBY') {
+      updateActionRecipePopups(null);
+      panel.innerHTML = `
+        <div class="spectate-bar">
+          <span class="spectate-badge">${uiIcon('eye', 16)} Spectating lobby</span>
+          <button class="btn sm primary" onclick="toggleSpectate()" title="Take an open player seat">${uiIcon('users', 16)}Join seat</button>
+        </div>
+      `;
+      return;
+    }
+
+    const target = getSpectateTargetPlayer();
+    updateActionRecipePopups(target);
+    if (!target || !target.resources) {
+      panel.innerHTML = `<span class="hand-empty">${uiIcon('eye', 16)} Spectating</span>`;
+      return;
+    }
+
+    const players = state?.players || [];
+    const isAuto = !spectateTargetId || !players.some(p => p.id === spectateTargetId);
+    const chipsHtml = players.map(p => {
+      const active = !isAuto && p.id === target.id;
+      return `<button type="button" class="spec-pchip ${active ? 'active' : ''}" onclick="selectSpectateTarget('${esc(p.id)}')" title="Inspect ${esc(p.name)}'s hand">
+        <span class="avatar" style="background:${esc(p.color)};width:18px;height:18px">${avatarFace(p.avatar, p.name)}</span>
+        <span class="spec-pname">${esc(p.name)}</span>
+      </button>`;
+    }).join('');
+
+    const resHtml = RESOURCES.map(r => {
+      const count = Math.max(0, target.resources?.[r] || 0);
+      if (count <= 0) return '';
+      return buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), count, '', `${RES_META[r].name}: ${count}`);
+    }).join('');
+
+    const oldDevs: string[] = target.devCards || [];
+    const newDevs: string[] = target.newDevCards || [];
+    const oldCounts: Record<string, number> = {};
+    const newCounts: Record<string, number> = {};
+    oldDevs.forEach(c => { oldCounts[c] = (oldCounts[c] || 0) + 1; });
+    newDevs.forEach(c => { newCounts[c] = (newCounts[c] || 0) + 1; });
+    const devTypes = Array.from(new Set([...oldDevs, ...newDevs]));
+    const devHtml = devTypes.map(c => devCardHtml(c, oldCounts[c] || 0, newCounts[c] || 0, false)).join('');
+
+    let cardsHtml = resHtml;
+    if (resHtml && devHtml) cardsHtml += '<div class="hand-sep"></div>';
+    cardsHtml += devHtml;
+    if (!cardsHtml) {
+      cardsHtml = `<span class="hand-empty">${esc(target.name)}: No cards</span>`;
+    }
+
+    panel.innerHTML = `
+      <div class="spectate-bar">
+        <span class="spectate-badge" title="Spectator mode — click any player to view their cards">${uiIcon('eye', 15)}</span>
+        <button type="button" class="spec-pchip ${isAuto ? 'active' : ''}" onclick="selectSpectateTarget(null)" title="Follow active turn">Turn</button>
+        ${chipsHtml}
+      </div>
+      <div class="hand-sep"></div>
+      ${cardsHtml}
+    `;
     return;
   }
+
+  updateActionRecipePopups(me);
 
   let resHtml = RESOURCES.map(r => {
     // Hold back cards that are still flying toward the hand, plus cards placed in the active tray/counter
@@ -114,6 +184,10 @@ export function renderHand(me: any, isMyTurn: boolean): void {
   let html = resHtml;
   if (resHtml && devHtml) html += '<div class="hand-sep"></div>';
   html += devHtml;
+
+  if (state.status === 'LOBBY') {
+    html += `<div class="hand-sep"></div><button class="btn sm" onclick="toggleSpectate()" title="Switch to spectator mode">${uiIcon('eye', 15)}Spectate</button>`;
+  }
 
   if (!html) {
     html = `<span class="hand-empty">No cards in hand</span>`;

@@ -11,6 +11,7 @@ export let buildMode: string | null = null;
 export let drawerMode: string | null = null;
 export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
+export let spectateTargetId: string | null = null;
 
 export let camZoom = 1;
 export let camPanX = 0;
@@ -86,6 +87,7 @@ export function setBuildModeValue(v: string | null): void { buildMode = v; }
 export function setDrawerMode(v: string | null): void { drawerMode = v; }
 export function setVictoryTab(v: string): void { victoryTab = v; }
 export function setHideVictoryOverlay(v: boolean): void { hideVictoryOverlay = v; }
+export function setSpectateTargetId(v: string | null): void { spectateTargetId = v; }
 export function setCamZoom(v: number): void { camZoom = v; }
 export function setCamPan(x: number, y: number): void { camPanX = x; camPanY = y; }
 export function setIsPanning(v: boolean): void { isPanning = v; }

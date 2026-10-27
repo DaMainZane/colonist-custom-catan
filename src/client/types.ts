@@ -106,12 +106,21 @@ export interface TradeView {
   remainingMs?: number;
 }
 
+export interface SpectatorView {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+}
+
 export interface GameState {
   code: string;
   hostId: string;
   status: string;
   /** Lobby only: the host is on the world setup page, so everyone else waits and nobody new can join. */
   setup?: boolean;
+  isSpectator?: boolean;
+  spectators?: SpectatorView[];
   settings: any;
   board: { hexes: any[]; vertices: any[]; edges: any[]; robberHexId: number };
   bank: Resources;

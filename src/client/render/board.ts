@@ -17,9 +17,9 @@ import {
 } from '../audio';
 import { socket } from '../socket';
 import {
-  state, buildMode, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
+  state, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
   setBuildModeValue, setCamZoom, setCamPan, getClientSpeed,
-  addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev, inFlightHandResources
+  addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev
 } from '../store';
 import { renderHand } from './hand';
 import { renderSidebar, visibleRect } from './sidebar';
@@ -643,14 +643,14 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const robberVictimSet = new Set<string>(state.robberVictims || []);
   let verticesHtml = '';
   const staticSpots = vertices.length > 120;
-  const availWheat = me ? Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0)) : 0;
-  const availOre = me ? Math.max(0, (me.resources.ore || 0) - (inFlightHandResources.ore || 0)) : 0;
+  const availWheat = me ? (me.resources?.wheat || 0) : 0;
+  const availOre = me ? (me.resources?.ore || 0) : 0;
   const cityMult = isClientPieceDoubleCost('city', socket.id) ? 2 : 1;
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
-      const canUpgrade = isMyTurn && state.phase === 'MAIN' && (!buildMode || buildMode === 'city') &&
+      const canUpgrade = isMyTurn && state.phase === 'MAIN' &&
         v.building.owner === socket.id && v.building.type === 'settlement' &&
         me && availWheat >= 2 * cityMult && availOre >= 3 * cityMult && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
@@ -939,12 +939,11 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
   }
   if (state.phase === 'SETUP_SETTLEMENT') return true;
   if (state.phase !== 'MAIN') return false;
-  if (buildMode && buildMode !== 'settlement') return false;
   const mult = isClientPieceDoubleCost('settlement', socket.id) ? 2 : 1;
-  const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
-  const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
-  const sheep = Math.max(0, (me.resources.sheep || 0) - (inFlightHandResources.sheep || 0));
-  const wheat = Math.max(0, (me.resources.wheat || 0) - (inFlightHandResources.wheat || 0));
+  const wood = me.resources?.wood || 0;
+  const brick = me.resources?.brick || 0;
+  const sheep = me.resources?.sheep || 0;
+  const wheat = me.resources?.wheat || 0;
   if (wood < mult || brick < mult || sheep < mult || wheat < mult) return false;
   return v.edgeIds.some((eId: number) => state.board.edges[eId]?.road === socket.id);
 }
@@ -955,10 +954,9 @@ export function canClientPlaceRoad(e: any, me: any): boolean {
     return e.v1 === state.lastSetupVertexId || e.v2 === state.lastSetupVertexId;
   }
   if (state.phase !== 'MAIN') return false;
-  if (buildMode && buildMode !== 'road' && me.freeRoads === 0) return false;
   const mult = isClientPieceDoubleCost('road', socket.id) ? 2 : 1;
-  const wood = Math.max(0, (me.resources.wood || 0) - (inFlightHandResources.wood || 0));
-  const brick = Math.max(0, (me.resources.brick || 0) - (inFlightHandResources.brick || 0));
+  const wood = me.resources?.wood || 0;
+  const brick = me.resources?.brick || 0;
   const canAfford = me.freeRoads > 0 || (wood >= mult && brick >= mult);
   if (!canAfford) return false;
 
@@ -1036,6 +1034,9 @@ function syncInFlightUiImmediate(): void {
   const isMyTurn = !!current && current.id === socket.id;
   renderHand(me, isMyTurn);
   renderSidebar();
+  if (state.status !== 'GAMEOVER') {
+    renderBoard(me, isMyTurn);
+  }
 }
 
 function syncInFlightUi(): void {

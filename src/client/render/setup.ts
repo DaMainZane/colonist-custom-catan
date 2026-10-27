@@ -4,6 +4,7 @@
 import { socket } from '../socket';
 import { state } from '../store';
 import { avatarFace } from '../avatars';
+import { uiIcon } from '../icons';
 import { esc } from '../util';
 
 let lastPreviewSig = '';
@@ -39,7 +40,12 @@ function drawPreview(svg: Element): void {
 
 function drawRoster(el: HTMLElement): void {
   const players = state?.players || [];
-  const sig = players.map(p => `${p.id}|${p.name}|${p.avatar}|${p.color}|${p.difficulty ?? ''}`).join(';') + `|${state?.settings?.maxPlayers}`;
+  const spectators = state?.spectators || [];
+  const sig =
+    players.map(p => `${p.id}|${p.name}|${p.avatar}|${p.color}|${p.difficulty ?? ''}`).join(';') +
+    '||' +
+    spectators.map(s => `${s.id}|${s.name}|${s.avatar}|${s.color}`).join(';') +
+    `|${state?.settings?.maxPlayers}|${state?.hostId}`;
   if (sig === lastRosterSig) return;
   lastRosterSig = sig;
   const chips = players.map(p => {
@@ -54,7 +60,17 @@ function drawRoster(el: HTMLElement): void {
       <span class="nm">${esc(p.name)}</span>${tag}
     </div>`;
   }).join('');
-  el.innerHTML = `<div class="setup-count">${players.length} / ${esc(state?.settings?.maxPlayers ?? '')} seats</div>${chips}`;
+  const specChips = spectators.map(s => {
+    const hostTag = s.id === state?.hostId ? '<span class="tag accent">Host</span>' : '';
+    const pick = s.id === socket.id;
+    return `<div class="setup-chip is-spectator">
+      <div class="avatar p-avatar ${pick ? 'avatar-pick' : ''}" style="background:${esc(s.color)}"
+        ${pick ? `onclick="cycleAvatar('${esc(s.id)}')" title="Click to change avatar"` : ''}>${avatarFace(s.avatar, s.name)}</div>
+      <span class="nm">${esc(s.name)}</span>${hostTag}<span class="tag">${uiIcon('eye', 12)} Spectating</span>
+    </div>`;
+  }).join('');
+  const specCount = spectators.length > 0 ? ` · ${spectators.length} spectating` : '';
+  el.innerHTML = `<div class="setup-count">${players.length} / ${esc(state?.settings?.maxPlayers ?? '')} seats${specCount}</div>${chips}${specChips}`;
 }
 
 /** Host sees the setup page while `state.setup` is on; everyone else sees "Host is creating world" over the board. */
@@ -68,6 +84,12 @@ export function renderSetupPage(): void {
   page.style.display = showSetup ? 'flex' : 'none';
   wait.style.display = showWait ? 'flex' : 'none';
   if (!showSetup) return;
+  const specBtn = document.getElementById('btnSetupSpectate');
+  if (specBtn) {
+    const isSpec = !!state?.isSpectator;
+    specBtn.classList.toggle('primary', isSpec);
+    specBtn.innerHTML = `${uiIcon(isSpec ? 'users' : 'eye', 16)}<span>${isSpec ? 'Join seat' : 'Spectate'}</span>`;
+  }
   const svg = document.getElementById('setupPreview');
   const roster = document.getElementById('setupRoster');
   if (svg) drawPreview(svg);
