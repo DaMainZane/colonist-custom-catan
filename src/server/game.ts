@@ -97,11 +97,16 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
 
 export function startGame(room: Room): string | null {
   if (room.game) return 'Game already started!';
-  if (room.lobbyPlayers.length < 2) return 'Add at least 1 Bot or wait for a 2nd player!';
+  if (room.lobbyPlayers.length < 2) {
+    return (room.spectators || []).length > 0
+      ? 'Need at least 2 seated players or bots to start! Add bots or join a seat.'
+      : 'Add at least 1 Bot or wait for a 2nd player!';
+  }
   // Up to 4 players keep the old loose check. Bigger tables need real room: 2 settlements each, ~4 blocked spots per settlement.
   const need = room.lobbyPlayers.length > 4 ? room.lobbyPlayers.length * 8 : room.lobbyPlayers.length * 4;
   if (room.board.vertices.length < need) return 'Map needs more land tiles for this player count!';
 
+  room.setup = false;
   room.game = createGame(registry, {
     players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, isBot: p.isBot, difficulty: p.difficulty })),
     rules: rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length, room.board.hexes.filter(h => h.type !== 'water').length)),

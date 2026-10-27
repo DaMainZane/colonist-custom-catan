@@ -157,7 +157,9 @@ export function renderSidebar(): void {
   const stackTop = stackEl.scrollTop;
   bindStackGuards(stackEl);
 
-  stackEl.innerHTML = state.players.map((p, idx) => {
+  const isSpectatingGame = !!state.isSpectator && state.status !== 'LOBBY';
+
+  const playerRowsHtml = state.players.map((p, idx) => {
     const isVictim = canPickVictim && victimSet.has(p.id);
     const isTurn = idx === state.turnIndex && state.status !== 'LOBBY';
     const shownResCount = Math.max(0, p.resourceCount - (inFlightPlayerResCount[p.id] || 0));
@@ -172,12 +174,18 @@ export function renderSidebar(): void {
     ].filter(Boolean).join('');
 
     const pub = p.publicVp ?? p.vp;
-    const vpHtml = pub !== p.vp ? `${pub}<span class="vp-hidden" title="Your real score. Others see ${pub}.">(${p.vp})</span>` : `${p.vp}`;
+    const vpHtml = pub !== p.vp ? `${pub}<span class="vp-hidden" title="Real score: ${p.vp}. Public score: ${pub}.">(${p.vp})</span>` : `${p.vp}`;
+
+    const rowClickAttr = isVictim
+      ? `onclick="chooseRobberVictim('${esc(p.id)}')" title="Click to rob ${esc(p.name)}"`
+      : isSpectatingGame
+      ? `onclick="selectSpectateTarget('${esc(p.id)}')" title="Click to inspect ${esc(p.name)}'s hand"`
+      : '';
 
     return `
-    <div class="p-row ${isTurn ? 'is-turn' : ''} ${isVictim ? 'can-rob' : ''}"
+    <div class="p-row ${isTurn ? 'is-turn' : ''} ${isVictim ? 'can-rob' : ''} ${isSpectatingGame ? 'spec-clickable' : ''}"
       id="playerRow_${esc(p.id)}"
-      ${isVictim ? `onclick="chooseRobberVictim('${esc(p.id)}')" title="Click to rob ${esc(p.name)}"` : ''}>
+      ${rowClickAttr}>
       <div class="avatar p-avatar ${canPickAvatar(p) ? 'avatar-pick' : ''}" style="background:${esc(p.color)}"
         ${canPickAvatar(p) ? `onclick="cycleAvatar('${esc(p.id)}')" title="Click to change avatar"` : ''}>${avatarFace(p.avatar, p.name)}</div>
       <div>
@@ -194,6 +202,26 @@ export function renderSidebar(): void {
     </div>
   `;
   }).join('');
+
+  const spectators = state.spectators || [];
+  const specRowsHtml = spectators.length > 0
+    ? `<div class="spec-sidebar-strip">
+        <span class="spec-sidebar-lbl">${uiIcon('eye', 13)} Spectators (${spectators.length})</span>
+        <div class="spec-sidebar-chips">
+          ${spectators.map(s => {
+            const pick = state.status === 'LOBBY' && s.id === socket.id;
+            const hostBadge = s.id === state.hostId ? '<span class="tag accent">Host</span>' : '';
+            return `<span class="spec-sidebar-chip">
+              <span class="avatar ${pick ? 'avatar-pick' : ''}" style="background:${esc(s.color)};width:18px;height:18px"
+                ${pick ? `onclick="cycleAvatar('${esc(s.id)}')" title="Click to change avatar"` : ''}>${avatarFace(s.avatar, s.name)}</span>
+              <span>${esc(s.name)}</span>${hostBadge}
+            </span>`;
+          }).join('')}
+        </div>
+      </div>`
+    : '';
+
+  stackEl.innerHTML = playerRowsHtml + specRowsHtml;
   stackEl.scrollTop = stackTop;
 
   // Follow the turn: when the current player changes, scroll them into view. Lobby and game over reset to the top.

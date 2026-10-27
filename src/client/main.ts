@@ -6,7 +6,7 @@ import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   activeBrush, hasDraggedMap,
   setState, setIsMouseDown, setIsPanning, setHasDraggedMap, setCamZoom, setCamPan, setDrawerMode,
-  setHideVictoryOverlay, clearRes, clearAllInFlight
+  setBuildModeValue, setHideVictoryOverlay, clearRes, clearAllInFlight
 } from './store';
 import { renderAll } from './render/index';
 import {
@@ -31,7 +31,7 @@ import {
 } from './render/drawer';
 import { sendChat } from './render/sidebar';
 import {
-  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
+  createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
   setBrush, applyPreset, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
@@ -39,7 +39,7 @@ import {
 
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
-  createRoom, joinRoom, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
+  createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
   switchLobbyTab, applyPreset, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
@@ -99,7 +99,7 @@ socket.on('reconnectFailed', () => {
 
 socket.on('disconnect', () => {
   if (state?.code) {
-    const me = state.players?.find((p: any) => p.id === socket.id);
+    const me = state.players?.find((p: any) => p.id === socket.id) || state.spectators?.find((s: any) => s.id === socket.id);
     saveSessionInfo(state.code, me?.name?.replace(/\s*\(Bot\)$/i, ''));
     setState(null);
     document.getElementById('gameViewport')!.style.display = 'none';
@@ -120,7 +120,7 @@ socket.on('gameState', (newState: any) => {
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
   setState(newState);
-  const meInNewState = newState?.players?.find((p: any) => p.id === socket.id);
+  const meInNewState = newState?.players?.find((p: any) => p.id === socket.id) || newState?.spectators?.find((s: any) => s.id === socket.id);
   if (newState?.code && meInNewState) {
     saveSessionInfo(newState.code, meInNewState.name?.replace(/\s*\(Bot\)$/i, ''));
   }
@@ -136,6 +136,9 @@ socket.on('gameState', (newState: any) => {
   document.getElementById('gameViewport')!.style.display = 'flex';
 
   const isNowMyTurn = Boolean(state.status !== 'LOBBY' && state.status !== 'GAMEOVER' && state.currentPlayerId === socket.id);
+  if (!isNowMyTurn || (state.phase !== 'MAIN' && state.phase !== 'SETUP_SETTLEMENT' && state.phase !== 'SETUP_ROAD')) {
+    setBuildModeValue(null);
+  }
   if (!wasMyTurn && isNowMyTurn) {
     playYourTurnSound();
   }

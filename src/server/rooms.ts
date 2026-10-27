@@ -24,7 +24,10 @@ export function createLobbyPlayer(id: string, name: string, index: number, isBot
 
 /** First avatar nobody in the lobby is using yet (falls back to the first one if all are taken). */
 export function freeAvatar(room: Room): string {
-  return AVATARS.find(a => !room.lobbyPlayers.some(p => p.avatar === a)) ?? AVATARS[0];
+  return AVATARS.find(a =>
+    !room.lobbyPlayers.some(p => p.avatar === a) &&
+    !(room.spectators || []).some(s => s.avatar === a)
+  ) ?? AVATARS[0];
 }
 
 export function createRoom(hostId: string, hostName: string): Room {
@@ -41,6 +44,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     hostId,
     settings,
     lobbyPlayers: [createLobbyPlayer(hostId, hostName, 0, false)],
+    spectators: [],
     board,
     mapMeta: meta,
     game: null,
@@ -79,7 +83,14 @@ export function roster(room: Room): { id: string; name: string; isBot: boolean }
 }
 
 export function humanIds(room: Room): string[] {
-  return roster(room).filter(p => !p.isBot).map(p => p.id);
+  const ids = new Set<string>();
+  for (const p of roster(room)) {
+    if (!p.isBot) ids.add(p.id);
+  }
+  for (const s of room.spectators || []) {
+    ids.add(s.id);
+  }
+  return [...ids];
 }
 
 export function enginePlayer(room: Room, id: string): PlayerState | undefined {
@@ -110,6 +121,15 @@ export function rebindPlayerId(
       lp.difficulty = null;
       if (restoreName) lp.name = restoreName;
       if (restoreAvatar) lp.avatar = restoreAvatar;
+      found = true;
+    }
+  }
+
+  for (const sp of room.spectators || []) {
+    if (sp.id === oldId) {
+      sp.id = newId;
+      if (restoreName) sp.name = restoreName;
+      if (restoreAvatar) sp.avatar = restoreAvatar;
       found = true;
     }
   }

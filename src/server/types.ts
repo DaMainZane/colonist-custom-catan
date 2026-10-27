@@ -56,6 +56,13 @@ export interface LobbyPlayer {
   difficulty: string | null;
 }
 
+export interface Spectator {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
+}
+
 export interface ChatEntry {
   sender: string;
   avatar: string;
@@ -93,6 +100,7 @@ export interface DisconnectedSeat {
   originalName: string;
   originalAvatar: string;
   wasHost: boolean;
+  isSpectator?: boolean;
   disconnectedAt: number;
 }
 
@@ -102,6 +110,8 @@ export interface Room {
   settings: Settings;
   /** Roster while in the lobby. During a game the engine's players are the roster. */
   lobbyPlayers: LobbyPlayer[];
+  /** Connected spectators watching the lobby or game without occupying a player seat. */
+  spectators: Spectator[];
   /** Lobby board (editable). Copied into the game at start. */
   board: Board;
   /** Recipe and report of the lobby board. Undefined for blank, legacy-preset and loaded-preset boards. */

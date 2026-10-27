@@ -29,6 +29,7 @@
         <!-- Filled from an invite link (?room=CODE). Otherwise Join takes the newest open lobby. -->
         <input id="roomCodeInput" type="hidden" />
         <button class="btn" onclick="joinRoom()"><span data-icon="users" data-size="18"></span>Join game</button>
+        <button class="btn" onclick="spectateRoom()"><span data-icon="eye" data-size="18"></span>Spectate game</button>
       </div>
     </div>
   </div>
@@ -55,6 +56,7 @@
         </div>
         <div class="menu-actions">
           <button class="btn sm" onclick="resetCamera()"><span data-icon="fit" data-size="16"></span>Fit board</button>
+          <button class="btn sm" id="btnMenuSpectate" onclick="toggleSpectate()" title="Switch between playing and spectating"><span data-icon="eye" data-size="16"></span><span>Spectate</span></button>
           <button class="btn sm" onclick="downloadTrainingLog()" title="Download AI Bot Training Data Log (.jsonl)"><span data-icon="cards" data-size="16"></span>AI Log</button>
           <button class="btn sm" id="btnBackToLobby" onclick="rematchLobby()"><span data-icon="refresh" data-size="16"></span>Back to lobby</button>
         </div>
@@ -111,6 +113,8 @@
                 </select>
                 <button class="btn sm" onclick="addBot()"><span data-icon="plus" data-size="16"></span>Bot</button>
                 <button class="btn sm" onclick="removeBot()"><span data-icon="minus" data-size="16"></span>Bot</button>
+                <span class="tool-sep"></span>
+                <button id="btnSetupSpectate" class="btn sm" onclick="toggleSpectate()" title="Switch between playing in a seat and spectating"><span data-icon="eye" data-size="16"></span><span>Spectate</span></button>
               </div>
               <div class="tool-row">
                 <span class="tool-label">Bot chat</span>
@@ -203,6 +207,7 @@
             <button class="tab active" id="tabBtnMap" onclick="switchLobbyTab('map')">Map painter</button>
           </div>
           <div class="dock-actions">
+            <button id="btnDockSpectate" class="btn sm" onclick="toggleSpectate()" title="Switch between playing in a seat and spectating"><span data-icon="eye" data-size="16"></span><span>Spectate</span></button>
             <button class="btn sm" onclick="setSetupOpen(true)" title="Back to bots, presets, map and rules"><span data-icon="sliders" data-size="16"></span>World setup</button>
             <button class="btn sm primary" onclick="startGame()"><span data-icon="play" data-size="16"></span>Start</button>
           </div>

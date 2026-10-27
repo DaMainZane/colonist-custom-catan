@@ -2,7 +2,7 @@ import { socket } from '../socket';
 import { state, buildMode, victoryTab, hideVictoryOverlay } from '../store';
 import { isPendingSettingsPush } from '../actions';
 import { renderActiveTradeModal } from './trade';
-import { renderHand } from './hand';
+import { renderHand, getSpectateTargetPlayer } from './hand';
 import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderSetupPage } from './setup';
@@ -20,6 +20,7 @@ let lastBoardGameOverKey = '';
 
 export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
+  const isSpec = !!state.isSpectator || !me;
   const current = state.players[state.turnIndex];
   const isMyTurn = !!current && current.id === socket.id;
 
@@ -29,6 +30,20 @@ export function renderAll(): void {
   // "Back to lobby" means nothing while you are already there.
   const backBtn = document.getElementById('btnBackToLobby');
   if (backBtn) backBtn.style.display = state.status === 'LOBBY' ? 'none' : '';
+
+  const dockSpecBtn = document.getElementById('btnDockSpectate');
+  if (dockSpecBtn) {
+    dockSpecBtn.classList.toggle('primary', isSpec);
+    dockSpecBtn.innerHTML = `${uiIcon(isSpec ? 'users' : 'eye', 16)}<span>${isSpec ? 'Join seat' : 'Spectate'}</span>`;
+  }
+
+  const menuSpecBtn = document.getElementById('btnMenuSpectate');
+  if (menuSpecBtn) {
+    const canToggleSpec = state.status === 'LOBBY' || (!isSpec && state.status !== 'GAMEOVER');
+    menuSpecBtn.style.display = canToggleSpec ? '' : 'none';
+    menuSpecBtn.innerHTML = `${uiIcon(isSpec ? 'users' : 'eye', 16)}<span>${isSpec ? 'Join seat' : 'Spectate'}</span>`;
+  }
+
   if (state.status === 'LOBBY') {
     if (!isPendingSettingsPush()) {
       const setVal = (id: string, v: any) => { (document.getElementById(id) as HTMLInputElement).value = v; };
@@ -64,18 +79,20 @@ export function renderAll(): void {
   document.getElementById('die2')!.innerHTML = dieFaceSvg(state.lastDice[1]);
 
   // Piece badges on buttons
-  if (me) {
-    document.getElementById('badgeRoadCnt')!.textContent = String(me.roadsLeft);
-    document.getElementById('badgeSettleCnt')!.textContent = String(me.settlementsLeft);
-    document.getElementById('badgeCityCnt')!.textContent = String(me.citiesLeft);
+  const badgeTarget = me || getSpectateTargetPlayer();
+  if (badgeTarget) {
+    document.getElementById('badgeRoadCnt')!.textContent = String(badgeTarget.roadsLeft);
+    document.getElementById('badgeSettleCnt')!.textContent = String(badgeTarget.settlementsLeft);
+    document.getElementById('badgeCityCnt')!.textContent = String(badgeTarget.citiesLeft);
   }
 
   const pill = document.getElementById('turnStatusPill')!;
   pill.classList.toggle('mine', isMyTurn && state.status !== 'LOBBY' && state.status !== 'GAMEOVER');
   if (state.status === 'LOBBY') {
+    const specSuffix = isSpec ? ' · Spectating' : '';
     pill.innerHTML = state.hostId === socket.id
-      ? `Lobby · paint the map or add bots`
-      : `Lobby · only the host edits · move your cursor, hold Shift for a laser`;
+      ? `Lobby · paint the map or add bots${specSuffix}`
+      : `Lobby · only the host edits · move your cursor, hold Shift for a laser${specSuffix}`;
   } else if (state.status === 'GAMEOVER') {
     pill.innerHTML = `<strong>${esc(state.winner?.name)}</strong> won the game`;
   } else {

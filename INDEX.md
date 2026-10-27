@@ -97,17 +97,17 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | File | What it does |
 |---|---|
 | `main.ts` | Entry: Express and Socket.io, `/health`, bot training log endpoints |
-| `socket.ts` | Socket handlers for lobby editing and game actions (all game actions go through engine `dispatch`) |
+| `socket.ts` | Socket handlers for lobby editing, spectating and game actions (all game actions go through engine `dispatch`) |
 | `game.ts` | Game runner: start, rematch, run one action, turn engine events into client effects |
-| `rooms.ts` | Room registry, lobby roster, status, reconnect (`rebindPlayerId`) |
+| `rooms.ts` | Room registry, lobby roster, spectators, status, reconnect (`rebindPlayerId`) |
 | `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge, painting terrain, numbers, robber, ports |
 | `runtime.ts` | The one registry for the process, settings to rules mapping, defaults |
-| `net.ts` | Broadcast: sends each human their own view, clears one-shot effects, wakes the bots |
-| `view.ts` | Builds the `gameState` shape the client renders |
+| `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots |
+| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal) |
 | `turnClock.ts` | Per-turn clock for humans (base time plus increment per action) |
 | `presets.ts` | Custom map presets as plain JSON: save, validate, rebuild |
 | `mapmenu.ts` | Map options and quick starts as JSON for the lobby dropdown |
-| `types.ts` | Server room types: settings, room, client-facing effects |
+| `types.ts` | Server room types: settings, room, spectators, client-facing effects |
 | `util.ts` | `clamp`, `getPips` |
 
 ### `src/server/bots/`
@@ -139,7 +139,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | File | What it does |
 |---|---|
 | `main.ts` | Client entry: wires DOM, socket and board input events |
-| `actions.ts` | Client-to-server actions (lobby, settings, game, rejoin, AI log download) |
+| `actions.ts` | Client-to-server actions (lobby, spectate, settings, game, rejoin, AI log download) |
 | `socket.ts` | Creates the socket.io connection |
 | `store.ts` | Shared mutable UI state |
 | `types.ts` | Loose client-side view types |
@@ -156,11 +156,11 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `styles.css` | All styling and design tokens (copied to `dist/public/app.css`) |
 | `render/index.ts` | Render coordinator and the 6-tab post-game victory screen |
 | `render/board.ts` | Board SVG renderer, camera, board input and board animations |
-| `render/hand.ts` | Player hand (resources and dev cards) and click handlers |
+| `render/hand.ts` | Player hand (resources, dev cards, spectator hand inspector) and click handlers |
 | `render/drawer.ts` | Bottom-left sheet: bank trade, discard, gold, monopoly, robber victim picker |
 | `render/trade.ts` | Stacked trade offers, timers, responses, counter-offer editor |
-| `render/sidebar.ts` | Right sidebar: log, chat, bank, player rows |
-| `render/setup.ts` | World setup page (host only): screen switching, tile preview, player strip |
+| `render/sidebar.ts` | Right sidebar: log, chat, bank, player rows, spectator strip |
+| `render/setup.ts` | World setup page (host only): screen switching, tile preview, player/spectator strip |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
 
 ## `tests/` (vitest)
@@ -171,7 +171,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `topology.test.ts` | Board topology and standard board |
 | `ports.test.ts` | Port layout on hexagons |
 | `presets.test.ts` | Custom preset save and load |
-| `setuppage.test.ts` | World setup page flag |
+| `setuppage.test.ts` | World setup page flag and spectator mode |
 | `numbers.test.ts` | Number token pool and placement |
 | `bots.test.ts` | Bot tiers and the tier ladder |
 | `dialogue.test.ts` | Bot dialogue engine and lines |

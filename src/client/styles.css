@@ -1183,6 +1183,66 @@ svg#boardSvg.is-panning * {
 }
 @media (max-width: 760px) { .setup-top { grid-template-columns: 1fr; } }
 
+/* ---------- Spectator mode (hand inspector, sidebar strip, setup chips) ---------- */
+.spectate-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 2px 4px;
+}
+.spectate-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(217, 137, 59, 0.16); color: var(--accent);
+  border: 1px solid rgba(217, 137, 59, 0.45);
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap;
+}
+.spec-pchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 28px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+.spec-pchip:hover { border-color: var(--accent); }
+.spec-pchip.active {
+  background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+}
+.spec-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.spec-pchip-nm { max-width: 84px; overflow: hidden; text-overflow: ellipsis; }
+.spec-pchip-cnt {
+  padding: 0 5px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14); font-size: 10.5px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.spec-pchip.active .spec-pchip-cnt { background: rgba(255, 255, 255, 0.22); }
+
+.p-row.spec-clickable { cursor: pointer; }
+.p-row.spec-clickable:hover { filter: brightness(1.04); }
+
+.spec-sidebar-strip {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: var(--r);
+  background: var(--surface); box-shadow: var(--shadow);
+  font-size: 11.5px; color: var(--ink-dim);
+}
+.spec-sidebar-lbl {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-weight: 800; color: var(--ink);
+}
+.spec-sidebar-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--surface-2); color: var(--ink); font-weight: 700;
+}
+
+.setup-chip.is-spectator {
+  border: 1px dashed var(--line);
+  opacity: 0.92;
+}
+
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

@@ -51,9 +51,9 @@ function fillResources(partial: Record<string, number>): Record<string, number> 
   return { ...zeroResources(), ...partial };
 }
 
-function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: boolean): any {
+function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: boolean, isSpectator = false): any {
   const self = p.id === viewerId;
-  const reveal = self || over;
+  const reveal = self || over || isSpectator;
 
   let settlementsOnBoard = 0;
   let citiesOnBoard = 0;
@@ -272,6 +272,12 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     winner: g ? g.winner : null,
     logs: g ? g.log : room.lobbyLog,
     chats: room.chats,
+    spectators: (room.spectators || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      avatar: s.avatar,
+      color: s.color
+    })),
     // How the lobby map was made: recipe, one-line share code, the generator's report. The seed is shown even with Fog (design 5.8).
     mapMeta: !g && room.mapMeta
       ? {
@@ -285,16 +291,19 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   };
 
   return (viewerId: string) => {
+    const isSpectator = (room.spectators || []).some(s => s.id === viewerId) ||
+      (!!g && !g.players.some(p => p.id === viewerId));
     const recentTransfers = room.fx.recentTransfers.map(t => {
-      if (t.secretForOthers && viewerId !== t.from && viewerId !== t.to && !over) return { ...t, resource: 'mystery' };
+      if (t.secretForOthers && viewerId !== t.from && viewerId !== t.to && !over && !isSpectator) return { ...t, resource: 'mystery' };
       return t;
     });
     return {
       ...shared,
+      isSpectator,
       recentTransfers,
-      tradeRatios: g ? tradeRatios(g, registry, viewerId) : defaultRatios,
+      tradeRatios: g && !isSpectator ? tradeRatios(g, registry, viewerId) : defaultRatios,
       players: g
-        ? g.players.map(p => enginePlayerView(g, p, viewerId, over))
+        ? g.players.map(p => enginePlayerView(g, p, viewerId, over, isSpectator))
         : room.lobbyPlayers.map(p => lobbyPlayerView(room, p))
     };
   };

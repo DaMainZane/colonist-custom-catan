@@ -1,5 +1,6 @@
 # Change Log
 
+<<<<<<< HEAD
 ## 2026-10-27 (Pass 34: Stage 0 start: DLC/addon layer, keyed registries, golden baseline test)
 ### Added
 - **DLC and addon layer** (`src/shared/addons.ts`, new; S0.1, service 1): `AddonDef` (id, deps, links, rules, `register`), `AddonInfo`/`DlcInfo` for the lobby, `LINK_KINDS`, the 20 `GENERAL_SERVICE_IDS`, `resolveAddons(packs, rules)` (DLC master switch `rules.dlc[packId]`, per-addon `rules.addons[id] === false`, blocked-by-dependency list), `addonOn(reg, id)`, `registryFor(packs, rules, overrides)`, and `auditAddons(packs)` (Rule of Two: 2+ distinct links, one to a General service; no unknown targets or kinds, no self links; DLC must list `base`; cross-DLC dependency needs `allowCrossDlcDep`).
@@ -18,6 +19,15 @@
 - `rulesFromSettings` / `Settings` still wired per field; the `dlc` / `addons` block comes with the setup page work (S0.12).
 ### Not verified
 - Written without a shell. Still to run: `npm run typecheck`, `npm test`, then `npx vitest run tests/golden.test.ts` to record the snapshot and commit it. For a true pre-change baseline, `git stash` first, record, `git stash pop`, run again.
+=======
+## 2026-10-27 11:42:21 ICT (UTC+7) (Pass 34: Spectate Game Mode when joining or hosting)
+### Added
+- **Spectate Game Mode (`spectateRoom`, `toggleSpectate`, `room.spectators`)**:
+  - **Landing screen & Auto-Spectate on Join** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`): Added a dedicated **Spectate game** button on `#authScreen`. Clicking **Join game** when a game has already started or all player seats are full now automatically joins the user as a **Spectator** instead of blocking them with `"Game already started!"` or `"Room is full!"`.
+  - **Host & Player Spectate Toggle** (`public/index.html`, `src/server/socket.ts`, `src/client/render/setup.ts`, `src/client/render/hand.ts`, `src/client/render/index.ts`): Added **Spectate / Join seat** buttons on the **World Setup** screen (`#btnSetupSpectate`), **Lobby Map Painter dock** (`#btnDockSpectate`), **Bottom Hand Bar** (`#myHandPanel`), and **In-Game Menu** (`#btnMenuSpectate`). When the host switches to spectator, they leave `room.lobbyPlayers` and move to `room.spectators` while keeping `room.hostId` so they can configure rules, paint the map, add up to 8 bots, and start a 100% bot match. Seated human players in an active match can also switch to spectator mid-game, handing their seat to a takeover bot.
+  - **Live Spectator Hand Inspector & Bot Keep-Alive** (`src/server/rooms.ts`, `src/server/view.ts`, `src/client/render/hand.ts`, `src/client/render/sidebar.ts`, `src/client/render/trade.ts`, `src/client/styles.css`): Included `room.spectators` in `humanIds(room)` so `broadcastRoom` streams live state updates and keeps bot-only games running while spectators are connected. Spectators receive full resource and development card visibility (`reveal = self || over || isSpectator`) and can inspect any player's hand and piece counts by clicking `Turn` (auto-follow active player), player chips in `#myHandPanel`, or any player row in `#playersStack`.
+- **Tests** (`tests/setuppage.test.ts`): Added unit test covering a host spectating a bot-only game, `humanIds(room)` spectator inclusion, and full resource card visibility in `makeStateBuilder`.
+>>>>>>> origin/main
 
 ## 2026-10-26 (Pass 33: world setup page between the name page and the board)
 ### Added

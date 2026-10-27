@@ -2,7 +2,7 @@ import { playTone } from './audio';
 import { socket } from './socket';
 import {
   state, activeBrush, buildMode, setBuildModeValue, setDrawerMode,
-  setVictoryTab, setHideVictoryOverlay
+  setVictoryTab, setHideVictoryOverlay, spectateTargetId, setSpectateTargetId
 } from './store';
 import { renderAll, renderVictoryScreen } from './render/index';
 import { showToast } from './ui';
@@ -18,9 +18,12 @@ function requireHost(what: string): boolean {
 /** Click your avatar in the lobby to step to the next free one (the host can do it for bots). */
 export function cycleAvatar(playerId: string): void {
   if (!state || state.status !== 'LOBBY') return;
-  const player = state.players.find(p => p.id === playerId);
+  const player = state.players.find(p => p.id === playerId) || (state.spectators || []).find(s => s.id === playerId);
   if (!player) return;
-  const taken = new Set(state.players.filter(p => p.id !== playerId).map(p => p.avatar));
+  const taken = new Set([
+    ...state.players.filter(p => p.id !== playerId).map(p => p.avatar),
+    ...(state.spectators || []).filter(s => s.id !== playerId).map(s => s.avatar)
+  ]);
   const start = AVATAR_CHOICES.indexOf(player.avatar);
   for (let i = 1; i <= AVATAR_CHOICES.length; i++) {
     const next = AVATAR_CHOICES[(start + i + AVATAR_CHOICES.length) % AVATAR_CHOICES.length];
@@ -106,10 +109,10 @@ function getRequiredPlayerName(): string | null {
   return name;
 }
 
-export function createRoom(): void {
+export function createRoom(spectate = false): void {
   const name = getRequiredPlayerName();
   if (!name) return;
-  socket.emit('createRoom', { name, clientId: getClientId() });
+  socket.emit('createRoom', { name, clientId: getClientId(), spectate });
 }
 
 export function joinRoom(): void {
@@ -120,6 +123,29 @@ export function joinRoom(): void {
     name,
     clientId: getClientId()
   });
+}
+
+export function spectateRoom(): void {
+  const name = getRequiredPlayerName();
+  if (!name) return;
+  socket.emit('spectateRoom', {
+    code: (document.getElementById('roomCodeInput') as HTMLInputElement).value,
+    name,
+    clientId: getClientId()
+  });
+}
+
+export function toggleSpectate(): void {
+  if (!state?.code) return;
+  socket.emit('toggleSpectate', { code: state.code });
+  playTone(520, 0.06);
+}
+
+export function selectSpectateTarget(playerId: string | null): void {
+  const next = playerId && spectateTargetId === playerId ? null : playerId;
+  setSpectateTargetId(next);
+  playTone(500, 0.04);
+  renderAll();
 }
 
 export function rejoinSavedRoom(): void {
