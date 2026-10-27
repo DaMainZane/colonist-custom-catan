@@ -1,5 +1,13 @@
 # Change Log
 
+## 2026-10-27 11:42:21 ICT (UTC+7) (Pass 34: Spectate Game Mode when joining or hosting)
+### Added
+- **Spectate Game Mode (`spectateRoom`, `toggleSpectate`, `room.spectators`)**:
+  - **Landing screen & Auto-Spectate on Join** (`public/index.html`, `src/client/actions.ts`, `src/server/socket.ts`): Added a dedicated **Spectate game** button on `#authScreen`. Clicking **Join game** when a game has already started or all player seats are full now automatically joins the user as a **Spectator** instead of blocking them with `"Game already started!"` or `"Room is full!"`.
+  - **Host & Player Spectate Toggle** (`public/index.html`, `src/server/socket.ts`, `src/client/render/setup.ts`, `src/client/render/hand.ts`, `src/client/render/index.ts`): Added **Spectate / Join seat** buttons on the **World Setup** screen (`#btnSetupSpectate`), **Lobby Map Painter dock** (`#btnDockSpectate`), **Bottom Hand Bar** (`#myHandPanel`), and **In-Game Menu** (`#btnMenuSpectate`). When the host switches to spectator, they leave `room.lobbyPlayers` and move to `room.spectators` while keeping `room.hostId` so they can configure rules, paint the map, add up to 8 bots, and start a 100% bot match. Seated human players in an active match can also switch to spectator mid-game, handing their seat to a takeover bot.
+  - **Live Spectator Hand Inspector & Bot Keep-Alive** (`src/server/rooms.ts`, `src/server/view.ts`, `src/client/render/hand.ts`, `src/client/render/sidebar.ts`, `src/client/render/trade.ts`, `src/client/styles.css`): Included `room.spectators` in `humanIds(room)` so `broadcastRoom` streams live state updates and keeps bot-only games running while spectators are connected. Spectators receive full resource and development card visibility (`reveal = self || over || isSpectator`) and can inspect any player's hand and piece counts by clicking `Turn` (auto-follow active player), player chips in `#myHandPanel`, or any player row in `#playersStack`.
+- **Tests** (`tests/setuppage.test.ts`): Added unit test covering a host spectating a bot-only game, `humanIds(room)` spectator inclusion, and full resource card visibility in `makeStateBuilder`.
+
 ## 2026-10-26 (Pass 33: world setup page between the name page and the board)
 ### Added
 - **Setup page** (`public/index.html` `#setupScreen`, `src/client/render/setup.ts`, `styles.css`): host only. Three boxes: bots and bot chat (with a player strip: avatar click, bot tier tag click), a tiles-only map preview, and map presets, map menu (seed) and all rules (game, timers, special tiles, bank and dev cards, pieces). Buttons: Continue to board, Start now. Controls keep their ids and handlers, so settings sync, presets and the seed work unchanged.
