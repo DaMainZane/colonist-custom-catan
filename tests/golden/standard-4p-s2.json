@@ -1,0 +1,39 @@
+{
+  "scenario": "standard-4p-s2",
+  "options": {
+    "seed": 2,
+    "players": 4,
+    "preset": "standard"
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot1",
+    "turns": 66,
+    "steps": 532
+  },
+  "finalVP": {
+    "bot2": 6,
+    "bot1": 10,
+    "bot4": 8,
+    "bot3": 6
+  },
+  "diceStats": {
+    "2": 1,
+    "3": 3,
+    "4": 9,
+    "5": 8,
+    "6": 9,
+    "7": 11,
+    "8": 8,
+    "9": 9,
+    "10": 4,
+    "11": 3,
+    "12": 1
+  },
+  "fingerprint": {
+    "state": "dba072858c3cb831",
+    "stats": "09974983dc1be3f9",
+    "log": "947c5b870c5e075e"
+  }
+}

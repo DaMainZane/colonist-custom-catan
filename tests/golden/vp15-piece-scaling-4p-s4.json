@@ -1,0 +1,41 @@
+{
+  "scenario": "vp15-piece-scaling-4p-s4",
+  "options": {
+    "seed": 4,
+    "players": 4,
+    "rules": {
+      "vpToWin": 15
+    }
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot4",
+    "turns": 197,
+    "steps": 1584
+  },
+  "finalVP": {
+    "bot4": 15,
+    "bot2": 13,
+    "bot1": 13,
+    "bot3": 10
+  },
+  "diceStats": {
+    "2": 4,
+    "3": 3,
+    "4": 10,
+    "5": 23,
+    "6": 35,
+    "7": 38,
+    "8": 18,
+    "9": 21,
+    "10": 29,
+    "11": 12,
+    "12": 4
+  },
+  "fingerprint": {
+    "state": "b7ad995360d9261f",
+    "stats": "609a01ae3a176c98",
+    "log": "6b76cc5d41f0c9ed"
+  }
+}

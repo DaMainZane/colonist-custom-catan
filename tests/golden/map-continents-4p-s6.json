@@ -1,0 +1,41 @@
+{
+  "scenario": "map-continents-4p-s6",
+  "options": {
+    "seed": 6,
+    "players": 4,
+    "picks": [
+      "continents"
+    ]
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot1",
+    "turns": 91,
+    "steps": 739
+  },
+  "finalVP": {
+    "bot4": 7,
+    "bot2": 4,
+    "bot1": 10,
+    "bot3": 4
+  },
+  "diceStats": {
+    "2": 2,
+    "3": 1,
+    "4": 11,
+    "5": 13,
+    "6": 8,
+    "7": 20,
+    "8": 12,
+    "9": 9,
+    "10": 8,
+    "11": 5,
+    "12": 2
+  },
+  "fingerprint": {
+    "state": "f622d6dd2c51233f",
+    "stats": "4526b4b4d48177bb",
+    "log": "7108b3626eb9c7e2"
+  }
+}

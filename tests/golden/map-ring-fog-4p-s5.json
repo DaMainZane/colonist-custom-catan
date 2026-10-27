@@ -1,0 +1,42 @@
+{
+  "scenario": "map-ring-fog-4p-s5",
+  "options": {
+    "seed": 5,
+    "players": 4,
+    "picks": [
+      "ring",
+      "fog"
+    ]
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot3",
+    "turns": 164,
+    "steps": 1168
+  },
+  "finalVP": {
+    "bot2": 7,
+    "bot1": 7,
+    "bot4": 6,
+    "bot3": 10
+  },
+  "diceStats": {
+    "2": 7,
+    "3": 5,
+    "4": 17,
+    "5": 19,
+    "6": 25,
+    "7": 29,
+    "8": 25,
+    "9": 15,
+    "10": 13,
+    "11": 6,
+    "12": 3
+  },
+  "fingerprint": {
+    "state": "34363067782d763b",
+    "stats": "cc663a4b6998768c",
+    "log": "cb493cd005e4dccb"
+  }
+}

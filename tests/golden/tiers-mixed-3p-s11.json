@@ -1,0 +1,43 @@
+{
+  "scenario": "tiers-mixed-3p-s11",
+  "options": {
+    "seed": 11,
+    "players": 3,
+    "preset": "standard",
+    "tiers": [
+      "main",
+      "secondary",
+      "overload"
+    ]
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot2",
+    "turns": 80,
+    "steps": 470
+  },
+  "finalVP": {
+    "bot3": 7,
+    "bot2": 10,
+    "bot1": 8
+  },
+  "diceStats": {
+    "2": 3,
+    "3": 3,
+    "4": 9,
+    "5": 10,
+    "6": 13,
+    "7": 14,
+    "8": 8,
+    "9": 8,
+    "10": 5,
+    "11": 4,
+    "12": 3
+  },
+  "fingerprint": {
+    "state": "d5171370abf07796",
+    "stats": "ce4a828495ee5da6",
+    "log": "bcf8e36174018d83"
+  }
+}

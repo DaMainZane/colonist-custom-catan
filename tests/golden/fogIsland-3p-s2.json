@@ -1,0 +1,38 @@
+{
+  "scenario": "fogIsland-3p-s2",
+  "options": {
+    "seed": 2,
+    "players": 3,
+    "preset": "fogIsland"
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot1",
+    "turns": 108,
+    "steps": 645
+  },
+  "finalVP": {
+    "bot2": 8,
+    "bot3": 3,
+    "bot1": 10
+  },
+  "diceStats": {
+    "2": 0,
+    "3": 7,
+    "4": 10,
+    "5": 13,
+    "6": 15,
+    "7": 27,
+    "8": 13,
+    "9": 12,
+    "10": 6,
+    "11": 5,
+    "12": 0
+  },
+  "fingerprint": {
+    "state": "3709635015a56acf",
+    "stats": "68776cbc1e90197e",
+    "log": "b06aa386607152c4"
+  }
+}

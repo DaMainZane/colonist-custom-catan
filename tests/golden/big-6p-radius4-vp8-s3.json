@@ -1,0 +1,45 @@
+{
+  "scenario": "big-6p-radius4-vp8-s3",
+  "options": {
+    "seed": 3,
+    "players": 6,
+    "rules": {
+      "boardRadius": 4,
+      "maxPlayers": 6,
+      "vpToWin": 8
+    }
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot5",
+    "turns": 36,
+    "steps": 346
+  },
+  "finalVP": {
+    "bot2": 4,
+    "bot1": 4,
+    "bot4": 4,
+    "bot3": 6,
+    "bot6": 6,
+    "bot5": 8
+  },
+  "diceStats": {
+    "2": 2,
+    "3": 0,
+    "4": 7,
+    "5": 3,
+    "6": 3,
+    "7": 4,
+    "8": 9,
+    "9": 4,
+    "10": 0,
+    "11": 3,
+    "12": 1
+  },
+  "fingerprint": {
+    "state": "056bfd14e480e74f",
+    "stats": "5de046a0d65aab4a",
+    "log": "ab58b1ed1e1feddb"
+  }
+}

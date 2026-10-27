@@ -1,0 +1,41 @@
+{
+  "scenario": "discard4-sevens-4p-s8",
+  "options": {
+    "seed": 8,
+    "players": 4,
+    "rules": {
+      "discardLimit": 4
+    }
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot1",
+    "turns": 87,
+    "steps": 644
+  },
+  "finalVP": {
+    "bot4": 5,
+    "bot3": 5,
+    "bot1": 10,
+    "bot2": 8
+  },
+  "diceStats": {
+    "2": 1,
+    "3": 5,
+    "4": 9,
+    "5": 9,
+    "6": 16,
+    "7": 9,
+    "8": 17,
+    "9": 7,
+    "10": 11,
+    "11": 3,
+    "12": 0
+  },
+  "fingerprint": {
+    "state": "9587266b2b61da49",
+    "stats": "364575ebafee5c01",
+    "log": "9aa378fd3a4afbd5"
+  }
+}

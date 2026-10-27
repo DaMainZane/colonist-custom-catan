@@ -1,0 +1,39 @@
+{
+  "scenario": "goldRush-4p-s1",
+  "options": {
+    "seed": 1,
+    "players": 4,
+    "preset": "goldRush"
+  },
+  "result": {
+    "error": null,
+    "finished": true,
+    "winner": "bot4",
+    "turns": 58,
+    "steps": 461
+  },
+  "finalVP": {
+    "bot3": 8,
+    "bot4": 10,
+    "bot1": 6,
+    "bot2": 6
+  },
+  "diceStats": {
+    "2": 2,
+    "3": 8,
+    "4": 4,
+    "5": 7,
+    "6": 8,
+    "7": 10,
+    "8": 11,
+    "9": 2,
+    "10": 2,
+    "11": 2,
+    "12": 2
+  },
+  "fingerprint": {
+    "state": "19e94e1275b2d4e6",
+    "stats": "bc616f25b1b8d8c4",
+    "log": "43020d3f5ae82706"
+  }
+}
