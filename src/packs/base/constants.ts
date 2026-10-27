@@ -3,6 +3,13 @@ export const ROAD = 'road';
 export const SETTLEMENT = 'settlement';
 export const CITY = 'city';
 
+/** Base piece limits at the standard 10 VP setting. Pieces built beyond these limits cost double (`PieceDef.baseLimit`, shared/pricing.ts). */
+export const BASE_PIECE_LIMITS: Record<string, number> = {
+  [ROAD]: 15,
+  [SETTLEMENT]: 5,
+  [CITY]: 4
+};
+
 /** Port id of the generic 3:1 port. Resource ports use the resource id. */
 export const GENERIC_PORT = '3:1';
 

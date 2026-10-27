@@ -50,6 +50,8 @@ export interface PieceDef {
   produces: number;
   /** Replaces this piece type when built (city upgrades settlement). */
   upgradeFrom?: string;
+  /** Pieces on the board at which the next one costs double (standard 10 VP setting). See shared/pricing.ts. */
+  baseLimit?: number;
   icon?: string;
   /** Placement rule only (geometry/ownership). Cost and supply are checked by the build action. */
   canPlace(ctx: Ctx, pid: Id, loc: number, mode: 'setup' | 'build'): boolean;

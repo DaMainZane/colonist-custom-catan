@@ -4,7 +4,7 @@
 // board, the awards, the rules, how many cards a player holds (a count, never which cards) and the VP shown to others.
 // Anything private is not on the DialogueCtx, so a line cannot reference it. tests/dialogue.test.ts scans this file's
 // source for the names of the private fields and fails if one appears.
-import { computeVP, totalCards } from '../../../shared';
+import { publicVP, totalCards } from '../../../shared';
 import type { GameState } from '../../../shared';
 import { registry } from '../../runtime';
 import type { Room } from '../../types';
@@ -34,7 +34,7 @@ export interface Standing {
 
 export function publicStanding(g: GameState): Standing {
   const vps = new Map<string, number>();
-  for (const p of g.players) vps.set(p.id, computeVP(g, registry, p, false));
+  for (const p of g.players) vps.set(p.id, publicVP(g, registry, p));
   let leaderId: string | null = null;
   let best = -1;
   let tie = false;

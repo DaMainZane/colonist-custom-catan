@@ -1,5 +1,5 @@
 // MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | USED BY: bots/scheduler, bots/sim, server/game
-import { checkAction, computeVP, getPlayer, legalActions, makeCtx, totalCards } from '../../shared';
+import { checkAction, computeVP, getPlayer, legalActions, makeCtx, score, totalCards } from '../../shared';
 import type { Ctx, GameEvent, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 import { pieceCost } from '../../packs/base/building';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
@@ -160,7 +160,8 @@ function makeDc(g: GameState, reg: Registry, p: PlayerState, legal: Legal[], ran
   const limit = g.rules.discardLimit;
 
   const vps = new Map<Id, number>();
-  for (const o of g.players) vps.set(o.id, computeVP(g, reg, o, o.id === p.id));
+  // A bot sees its own hidden VP and only the public score of everyone else.
+  for (const o of g.players) vps.set(o.id, score(g, reg, o, o.id === p.id));
   const myVp = vps.get(p.id) ?? 0;
   let leaderId: Id | null = null;
   let leaderVp = 0;

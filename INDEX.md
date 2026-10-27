@@ -37,9 +37,10 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `types.ts` | Core types: game state, board, players, rules |
 | `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
+| `pricing.ts` | Piece cost and limit service: `priceOf`, `placedCount`, `aboveBaseLimit`, cost modifiers (`COST_MODS`) |
 | `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
 | `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
-| `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), round clock (`endRoundIfLastSeat`, `everyNRounds`), `startTurn` |
+| `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), round clock (`endRoundIfLastSeat`, `everyNRounds`), `score`, `publicVP`, `startTurn` |
 | `views.ts` | `playerView`: per-player view that hides other hands, hidden tiles and dev cards |
 | `rng.ts` | Seeded RNG (mulberry32): `createRng`, `rngInt`, `rngPick`, `rngShuffle` |
 | `palette.ts` | Player colors and avatars |
@@ -188,4 +189,6 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
+| `score.test.ts` | `score()`, `publicVP()`, score modes, `checkWinner` |
+| `pricing.test.ts` | Piece cost and limit service, cost modifiers |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |

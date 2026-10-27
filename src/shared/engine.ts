@@ -6,7 +6,7 @@ import { AVATARS, PLAYER_COLORS } from './palette';
 import { mergeRules } from './registry';
 import type { Registry } from './registry';
 import { createRng, randomSeed, rngShuffle } from './rng';
-import { computeVP, currentPlayer, getPlayer, setPhase } from './state';
+import { currentPlayer, getPlayer, score, setPhase } from './state';
 import type { Board, GameState, Id, PlayerState, Rules } from './types';
 
 export interface PlayerInit {
@@ -187,7 +187,7 @@ export function checkWinner(ctx: Ctx): boolean {
   const { g, reg } = ctx;
   if (g.phase === 'gameover') return true;
   for (const p of g.players) {
-    const vp = computeVP(g, reg, p, true);
+    const vp = score(g, reg, p);
     if (vp >= g.rules.vpToWin) {
       g.winner = { id: p.id, name: p.name, vp, color: p.color };
       g.trade = null;

@@ -22,7 +22,7 @@ export const buildAction: ActionDef = {
     const p = getPlayer(g, pid)!;
     for (const def of reg.pieces.values()) {
       if (mode === 'setup' && SETUP_PIECE[g.phase] !== def.id) continue;
-      if (mode === 'build' && !isFree(p, def) && !canAfford(p, pieceCost(g, p, def))) continue;
+      if (mode === 'build' && !isFree(p, def) && !canAfford(p, pieceCost(g, p, def, reg))) continue;
       if ((p.pieces[def.id] || 0) <= 0) continue;
       const count = def.target === 'vertex' ? g.board.vertices.length : g.board.edges.length;
       for (let loc = 0; loc < count; loc++) out.push({ piece: def.id, loc });

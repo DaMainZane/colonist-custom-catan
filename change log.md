@@ -1,7 +1,6 @@
 # Change Log
 
-<<<<<<< HEAD
-## 2026-10-27 (Pass 34: Stage 0 start: DLC/addon layer, keyed registries, golden baseline test)
+## 2026-10-27 (Pass 35: Stage 0 start: DLC/addon layer, keyed registries, round clock, golden baseline test)
 ### Added
 - **DLC and addon layer** (`src/shared/addons.ts`, new; S0.1, service 1): `AddonDef` (id, deps, links, rules, `register`), `AddonInfo`/`DlcInfo` for the lobby, `LINK_KINDS`, the 20 `GENERAL_SERVICE_IDS`, `resolveAddons(packs, rules)` (DLC master switch `rules.dlc[packId]`, per-addon `rules.addons[id] === false`, blocked-by-dependency list), `addonOn(reg, id)`, `registryFor(packs, rules, overrides)`, and `auditAddons(packs)` (Rule of Two: 2+ distinct links, one to a General service; no unknown targets or kinds, no self links; DLC must list `base`; cross-DLC dependency needs `allowCrossDlcDep`).
 - **Keyed registries**: `api.define(kind, def)` and `defsOf(reg, kind)`. Kinds are separate namespaces, duplicate ids throw unless `replace: true`. New kinds (events, techs, contract conditions, stats...) need no edit to `registry.ts`.
@@ -15,11 +14,24 @@
 - `g.round` (0 in setup; round 1 starts with the first normal turn; a new round each time seat 0 comes up). Robber, discard and pick sub-phases never start a round.
 - Hooks `onRoundStart` (g.round already the new round) and `onRoundEnd` (g.round still the finished round, fires when the last seat ends its turn, not after a winning turn), events `roundStarted` / `roundEnded`, helper `everyNRounds(n, fn, offset)`, `endRoundIfLastSeat(ctx)` called by `end_turn`. Code: `types.ts`, `registry.ts`, `engine.ts` (`round: 0`), `state.ts` (`startTurn`), `packs/base/actions/endTurn.ts`.
 - `tests/rounds.test.ts`. `tests/golden.test.ts` leaves `round` and `ext.core` out of the state hash so additive services do not break the baseline.
-### Not done yet (S0.1)
+### Added (S0.3 score and publicVP, service 3)
+- `score(g, reg, p, includeHidden = true)` in `state.ts`: ranks by `rules.scoreMode` (`'vp'` default = `computeVP`; `'produced'` = `stats.resProduced`, for Sandbox). `publicVP(g, reg, p)` = victory points without hidden dev cards.
+- Routed through them: `checkWinner` (`engine.ts`), bot decision context `makeDc` (`bots/brain.ts`: own hidden VP counted, opponents public only), dialogue `publicStanding` (`bots/dialogue/context.ts`). Behavior in `vp` mode is unchanged.
+- `tests/score.test.ts`.
+### Added (S0.4 piece cost and limit service, service 4)
+- `src/shared/pricing.ts` (new): `placedCount`, `aboveBaseLimit`, `doubledCost`, `priceOf(g, reg, p, def)`, `CostModifier`, `COST_MODS`. Rule: double cost once a player has `PieceDef.baseLimit` of that piece on the board, then every registered cost modifier runs in order. DLCs register one with `api.define(COST_MODS, { id, apply })`; a disabled addon registers nothing.
+- `PieceDef.baseLimit` (road 15, settlement 5, city 4) replaces the hardcoded lookup. `BASE_PIECE_LIMITS` moved to `base/constants.ts` and is still re-exported from `base/building.ts`.
+- `base/building.ts`: `pieceCost(g, p, def, reg?)` (with `reg` it applies modifiers), `isAboveBaseLimit` kept as a wrapper. `validateBuild`, `placePiece` and the `build` action's `legal` pass the registry. The `vpToWin` supply scaling in `createGame` is untouched.
+- `tests/pricing.test.ts`.
+### Still open (S0.4)
+- Bot code (`brain.ts`) and the client still call `pieceCost(g, p, def)` without `reg`, so they ignore modifiers. Same answer as before until a DLC registers one.
+### Still open (S0.3)
+- Other direct `computeVP` callers not audited yet (rest of `brain.ts`, `view.ts`, `trainingLog.ts`, `game.ts`, `client/`). `shared/views.ts` keeps `computeVP` for the per-player `vp` field on purpose.
+### Still open (S0.1)
 - `rulesFromSettings` / `Settings` still wired per field; the `dlc` / `addons` block comes with the setup page work (S0.12).
-### Not verified
-- Written without a shell. Still to run: `npm run typecheck`, `npm test`, then `npx vitest run tests/golden.test.ts` to record the snapshot and commit it. For a true pre-change baseline, `git stash` first, record, `git stash pop`, run again.
-=======
+### Verified (S0.1 and S0.2 only; S0.3 not yet run)
+- `npm run typecheck`, `addons.test.ts`, `rounds.test.ts`, `golden.test.ts` and the full `npm test` pass (user-run, 2026-10-27). Golden snapshot recorded in `tests/golden.snapshot.json`.
+
 ## 2026-10-27 11:42:21 ICT (UTC+7) (Pass 34: Spectate Game Mode when joining or hosting)
 ### Added
 - **Spectate Game Mode (`spectateRoom`, `toggleSpectate`, `room.spectators`)**:
@@ -27,7 +39,6 @@
   - **Host & Player Spectate Toggle** (`public/index.html`, `src/server/socket.ts`, `src/client/render/setup.ts`, `src/client/render/hand.ts`, `src/client/render/index.ts`): Added **Spectate / Join seat** buttons on the **World Setup** screen (`#btnSetupSpectate`), **Lobby Map Painter dock** (`#btnDockSpectate`), **Bottom Hand Bar** (`#myHandPanel`), and **In-Game Menu** (`#btnMenuSpectate`). When the host switches to spectator, they leave `room.lobbyPlayers` and move to `room.spectators` while keeping `room.hostId` so they can configure rules, paint the map, add up to 8 bots, and start a 100% bot match. Seated human players in an active match can also switch to spectator mid-game, handing their seat to a takeover bot.
   - **Live Spectator Hand Inspector & Bot Keep-Alive** (`src/server/rooms.ts`, `src/server/view.ts`, `src/client/render/hand.ts`, `src/client/render/sidebar.ts`, `src/client/render/trade.ts`, `src/client/styles.css`): Included `room.spectators` in `humanIds(room)` so `broadcastRoom` streams live state updates and keeps bot-only games running while spectators are connected. Spectators receive full resource and development card visibility (`reveal = self || over || isSpectator`) and can inspect any player's hand and piece counts by clicking `Turn` (auto-follow active player), player chips in `#myHandPanel`, or any player row in `#playersStack`.
 - **Tests** (`tests/setuppage.test.ts`): Added unit test covering a host spectating a bot-only game, `humanIds(room)` spectator inclusion, and full resource card visibility in `makeStateBuilder`.
->>>>>>> origin/main
 
 ## 2026-10-26 (Pass 33: world setup page between the name page and the board)
 ### Added

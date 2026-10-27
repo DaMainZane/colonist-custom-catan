@@ -85,6 +85,24 @@ export function computeVP(g: GameState, reg: Registry, p: PlayerState, includeHi
   return vp;
 }
 
+// ---- Score --------------------------------------------------------------
+
+export type ScoreMode = 'vp' | 'produced';
+
+/**
+ * The number a player is ranked and wins by. `rules.scoreMode` picks the meaning: 'vp' (default) is victory points,
+ * 'produced' is resources produced (Sandbox). Win checks go through here, so a new mode needs no engine edit.
+ */
+export function score(g: GameState, reg: Registry, p: PlayerState, includeHidden = true): number {
+  if ((g.rules.scoreMode ?? 'vp') === 'produced') return p.stats.resProduced || 0;
+  return computeVP(g, reg, p, includeHidden);
+}
+
+/** What every player can see: victory points without hidden dev cards. Anything that reacts to who is ahead (catch-up, taxes, bot grudges) reads this, never the hidden total. */
+export function publicVP(g: GameState, reg: Registry, p: PlayerState): number {
+  return computeVP(g, reg, p, false);
+}
+
 // ---- Phases -------------------------------------------------------------
 
 function enterPhase(ctx: Ctx, id: string): void {
