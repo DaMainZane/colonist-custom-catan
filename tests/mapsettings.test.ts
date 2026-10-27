@@ -233,33 +233,40 @@ describe('lobby settings and map', () => {
     expect(room.mapMeta.recipe.seed).toBe(room.settings.mapSeed);
   });
 
-  it('quick starts set the picks and roll a new seed', () => {
+  it('quick starts set the picks, roll a new seed, and fix radius to 5 (except standard which is 2)', () => {
     const room = fakeRoom({ mapSeed: 'OLD1' });
     applyMapStart(room, 'goldRush');
+    expect(room.settings.boardRadius).toBe(5);
     expect(room.settings.mapPicks).toEqual(['gold']);
     expect(room.settings.mapSeed).toMatch(/^[0-9A-Z]{7}$/);
-    expect(count(room.board, 'gold')).toBe(goldRushCount(19));
+    expect(count(room.board, 'gold')).toBe(goldRushCount(91));
     expect(room.mapMeta?.recipe.picks).toEqual(['gold']);
 
     applyMapStart(room, 'fogIsland');
+    expect(room.settings.boardRadius).toBe(5);
     expect(room.settings.mapPicks).toEqual(['fog']);
     expect(room.board.hexes.some(h => h.ext.hidden)).toBe(true);
 
     applyMapStart(room, 'standard');
+    expect(room.settings.boardRadius).toBe(2);
+    expect(room.board.hexes).toHaveLength(19);
     expect(room.settings.mapPicks).toEqual([]);
     expect(count(room.board, 'gold')).toBe(0);
     expect(room.board.hexes.some(h => h.ext.hidden)).toBe(false);
   });
 
-  it('blank stays special, and the Archipelago chip is a recipe now (M3 shape)', () => {
+  it('blank stays special, and the Archipelago chip is a recipe now (M3 shape) at radius 5', () => {
     const room = fakeRoom({ mapPicks: ['gold'] });
     applyMapStart(room, 'blank');
+    expect(room.settings.boardRadius).toBe(5);
+    expect(room.board.hexes).toHaveLength(91);
     expect(room.board.hexes.every(h => h.type === 'water')).toBe(true);
     expect(room.mapMeta).toBeUndefined();
     expect(room.settings.mapPicks).toEqual([]);
 
     applyMapStart(room, 'archipelago');
-    expect(room.board.hexes).toHaveLength(19);
+    expect(room.settings.boardRadius).toBe(5);
+    expect(room.board.hexes).toHaveLength(91);
     expect(room.settings.mapPicks).toEqual(['archipelago']);
     expect(room.mapMeta?.recipe.picks).toEqual(['archipelago']);
     expect(room.settings.mapSeed).toMatch(/^[0-9A-Z]{7}$/);

@@ -254,6 +254,14 @@ export function setBrush(type: string, value: string, btn?: HTMLElement): void {
 export function applyPreset(preset: string): void {
   if (!state) return;
   if (!requireHost('apply map presets')) return;
+  if (wheelSettingsTimer !== null) {
+    clearTimeout(wheelSettingsTimer);
+    wheelSettingsTimer = null;
+  }
+  lastWheelEditAt = 0;
+  const targetRadius = preset === 'standard' ? 2 : 5;
+  const radiusEl = document.getElementById('setRadius') as HTMLInputElement | null;
+  if (radiusEl) radiusEl.value = String(targetRadius);
   socket.emit('applyMapPreset', { code: state.code, preset });
   playTone(520, 0.08);
 }
@@ -261,6 +269,14 @@ export function applyPreset(preset: string): void {
 export function applyScenario(scenarioId: string): void {
   if (!state) return;
   if (!requireHost('apply scenarios')) return;
+  if (wheelSettingsTimer !== null) {
+    clearTimeout(wheelSettingsTimer);
+    wheelSettingsTimer = null;
+  }
+  lastWheelEditAt = 0;
+  const targetRadius = scenarioId === 'standardCatan' ? 2 : 5;
+  const radiusEl = document.getElementById('setRadius') as HTMLInputElement | null;
+  if (radiusEl) radiusEl.value = String(targetRadius);
   socket.emit('applyScenario', { code: state.code, scenarioId });
   playTone(560, 0.08);
 }

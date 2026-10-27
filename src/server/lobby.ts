@@ -60,6 +60,7 @@ export function refreshMap(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>): 
  */
 export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>, id: string): void {
   const quick = registry.quickStarts.get(id);
+  room.settings.boardRadius = id === 'standard' ? 2 : 5;
   if (quick) {
     room.settings.mapPicks = resolvePicks(registry, quick.picks).picks;
     room.settings.mapParams = { ...(quick.params ?? {}) };

@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-10-27 16:12:00 ICT (UTC+7) (Pass 37: Fix map radius to 5 for non-standard presets and scenarios & sync Map radius (1-50) input)
+### Changed
+- **Map presets & quick starts radius (`src/server/lobby.ts`)**: `applyMapStart(room, id)` now sets `room.settings.boardRadius = 5` for every preset apart from `'standard'` (which sets `room.settings.boardRadius = 2`).
+- **Scenario presets radius (`src/server/mapmenu.ts`)**: Updated all non-standard scenarios in `SCENARIO_PRESETS` (`islandHoppers`, `siegeOfCatan`, `merchantRepublic`, `realmOfWhispers`, `ageOfWonders`, `wildFrontier`, `kitchenSink`) to `boardRadius: 5` while keeping `standardCatan` at `boardRadius: 2`.
+- **Map radius `(1-50)` input sync (`src/client/actions.ts`)**: `applyPreset` and `applyScenario` clear any pending wheel settings push timer and immediately set `#setRadius` (`Map radius (1-50)`) to `5` (or `2` for `standard` / `standardCatan`), in addition to server state broadcast sync in `renderAll()`.
+- **Tests (`tests/mapsettings.test.ts`)**: Updated `applyMapStart` unit tests to assert `boardRadius === 5` (91 hexes) on non-standard presets and `boardRadius === 2` (19 hexes) on `standard`.
+
 ## 2026-10-27 13:22:00 ICT (UTC+7) (Pass 36: Zane's Stage 0 Tasks — Rounds 1–9: `computeVP` audit, `pieceCost(..., reg)` wiring, `dlc`/`addons` settings block, S0.12 Setup UI rework, S0.13 Overlay & popup kit, S0.14 Bot goal registry, S0.15 Persistence, S0.16 Sim matrix)
 ### Added & Changed
 - **Round 1 — `computeVP` audit -> `publicVP` / `score`** (`src/packs/base/actions/robber.ts`, `src/server/view.ts`, `src/server/bots/trainingLog.ts`, `src/server/bots/brain.ts`):
