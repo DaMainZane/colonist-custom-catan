@@ -78,6 +78,8 @@ export function computeVP(g: GameState, reg: Registry, p: PlayerState, includeHi
   for (const a of reg.awards.values()) {
     if (g.awards[a.id] === p.id) vp += a.vp;
   }
+  // Claimed public contracts count as public VP (0 when no contracts have been claimed).
+  vp += Number(g.ext?.core?.contracts?.vpByPlayer?.[p.id]) || 0;
   if (includeHidden) {
     for (const c of [...p.devCards, ...p.newDevCards]) vp += reg.devcards.get(c)?.vp || 0;
   }

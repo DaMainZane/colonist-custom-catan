@@ -39,6 +39,14 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
 | `pricing.ts` | Piece cost and limit service: `priceOf`, `placedCount`, `aboveBaseLimit`, cost modifiers (`COST_MODS`) |
+| `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `tradeRatiosFor`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption |
+| `production.ts` | S0.6 Production pipeline: ordered stages (`PRODUCTION_STEPS`), `effectiveHexNumber`, `matchingHexesForRoll`, `runProductionPipeline` |
+| `tileState.ts` | S0.7 Tile state (`TILE_STATES`, `getTileState`, `setTileState`, `tickTileStates`), durability & repair (`DURABILITY_DEFS`, `damagePiece`, `repairPiece`), wild tokens (`WILD_TOKENS`, `grantWildPick`, `spendWildToken`) |
+| `sevenResolver.ts` | S0.8 Seven Resolver: ordered step pipeline (`SEVEN_STEPS`), `DISCARD_LIMIT_MODS`, `effectiveDiscardLimit`, `resolveSeven` with side-effect cap |
+| `coreServices.ts` | S0.9 Marker system (`addMarker`, `tickMarkers`), Ledger (`addLedgerEntry`, `settleLedgerEntry`), Strength & defense (`vertexDefense`, `playerTotalStrength`), Relations matrix (`getRelation`, `addOpinion`, `breakTreaty`) |
+| `history.ts` | S0.10 Public history ring buffer (`appendPublicHistory`, `getPublicHistory`, `detectStreaks`) and stats registry (`STAT_HANDLERS`, `runStatHandlers`) |
+| `eventDeck.ts` | S0.11 Seeded event deck (`EVENT_CARDS`, `ensureEventDeck`, `peekNextEvent`, `vetoPreviewEvent`, `upholdPreviewEvent`, `drawAndApplyRoundEvent`) |
+| `stage1.ts` | Stage 1 core systems & proving-ground content: S1.1 Taxes & Catch-up levers, S1.2 Public Contract Board & rarity tiers, S1.3 Spies & intel ladder, S1.4 Tech tree & Local Nemesis & Round recap, S1.5 Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `botGoals.ts` | S0.14 Bot goal registry (`BOT_GOALS`, tier-gated `evaluateBotGoals`, `botGoalVertexDelta`, `botGoalEdgeDelta`, `botGoalActionScore`, `botGoalThreatDelta`) |
 | `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
 | `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
@@ -198,5 +206,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `botgoals.test.ts` | S0.14 Bot goal registry: tier gating (`main`/`secondary`/`overload`), missing-card integration, custom action execution |
 | `persistence.test.ts` | S0.15 Persistence: save/load round-trip, hard caps, public-only event filter, schema migration, Render `CTMEM1.` export/import |
 | `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × bot tiers, invariant checks, `botTested` badge flag |
+| `clankerton_s0.test.ts` | S0.5–S0.11 shared engine services: trade ratios, production pipeline, tile state/durability/wild tokens, Seven Resolver, markers/ledger/strength/relations, history/stats, seeded event deck |
+| `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
 

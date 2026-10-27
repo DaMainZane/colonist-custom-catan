@@ -1,8 +1,9 @@
-// MODULE: trade helpers (bank ratios from ports, resource parsing, multi-offer stack, player trade execution) | USED BY: actions/bankTrade, actions/tradeOffers, hooks
-import { getPlayer } from '../../shared';
+// MODULE: trade helpers (bank ratios from ratioFor service, resource parsing, multi-offer stack, player trade execution) | USED BY: actions/bankTrade, actions/tradeOffers, hooks
+import { getPlayer, ratioFor, tradeRatiosFor } from '../../shared';
 import type { Ctx, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 
 export const MAX_OPEN_TRADES = 5;
+export { ratioFor };
 
 /** All currently open trade offers (newest first). */
 export function openTrades(g: GameState): TradeState[] {
@@ -68,19 +69,9 @@ export function pruneInvalidTrades(g: GameState): void {
   syncPrimaryTrade(g);
 }
 
-/** Bank ratio per resource for a player: bankRatio, improved by ports on owned pieces. */
+/** Bank ratio per resource for a player: thin wrapper around the shared S0.5 `ratioFor` / `tradeRatiosFor` service. */
 export function tradeRatios(g: GameState, reg: Registry, pid: Id): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const r of reg.resources.keys()) out[r] = g.rules.bankRatio;
-  for (const v of g.board.vertices) {
-    if (!v.piece || v.piece.owner !== pid || !v.port) continue;
-    const port = reg.ports.get(v.port);
-    if (!port) continue;
-    for (const r of reg.resources.keys()) {
-      if (port.resource === null || port.resource === r) out[r] = Math.min(out[r], port.ratio);
-    }
-  }
-  return out;
+  return tradeRatiosFor(g, reg, pid);
 }
 
 /** Keeps only registered resources with positive whole amounts. Returns null if the input is malformed. */

@@ -52,6 +52,8 @@ export interface PieceDef {
   upgradeFrom?: string;
   /** Pieces on the board at which the next one costs double (standard 10 VP setting). See shared/pricing.ts. */
   baseLimit?: number;
+  /** Base defense strength of a vertex building (settlement 1, city 2, castle 3). See shared/coreServices.ts. */
+  baseDefense?: number;
   icon?: string;
   /** Placement rule only (geometry/ownership). Cost and supply are checked by the build action. */
   canPlace(ctx: Ctx, pid: Id, loc: number, mode: 'setup' | 'build'): boolean;
@@ -116,6 +118,8 @@ export interface PortDef {
   resource: string | null;
   /** How many of this port are generated on a board (default 1). */
   copies?: number;
+  /** True for gem ports (emerald/diamond) exempt from the hard 2:1 trade ratio floor. */
+  exemptFloor?: boolean;
   replace?: boolean;
 }
 
@@ -194,6 +198,8 @@ export interface PackApi {
   capability(id: string): void;
   /** Registers a definition in a keyed registry of the given kind. Duplicate ids throw unless `replace: true`. Kinds are separate namespaces. */
   define(kind: string, def: { id: string; replace?: boolean; [key: string]: any }): void;
+  /** Registers an ordered step in the S0.6 production pipeline (`productionSteps`). */
+  productionStep(order: number, fn: (ctx: Ctx, item: any, sum?: number) => void, stepId?: string): void;
   hook(name: HookName, fn: (...args: any[]) => any): void;
 }
 
@@ -305,6 +311,11 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
       quickStart: d => put(reg.quickStarts, d.id, d, 'quick start', id),
       capability: c => { reg.capabilities.add(c); },
       define: (kind, d) => put(defsFor(kind), d.id, d, kind, id),
+      productionStep: (order, fn, stepId) => {
+        const map = defsFor('productionSteps');
+        const key = stepId ?? `${id}.step_${order}_${map.size + 1}`;
+        put(map, key, { id: key, order, run: fn }, 'productionSteps', id);
+      },
       hook: (name, fn) => {
         if (!reg.hooks[name]) throw new Error(`Pack "${id}": unknown hook "${name}"`);
         reg.hooks[name].push(fn);

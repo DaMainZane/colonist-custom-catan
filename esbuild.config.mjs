@@ -12,13 +12,22 @@ function copyStatic() {
 }
 
 let child = null;
+const startChild = () => {
+  child = spawn(process.execPath, ['--enable-source-maps', 'dist/main.js'], { stdio: 'inherit' });
+};
 const restartServer = {
   name: 'restart-server',
   setup(b) {
     b.onEnd(result => {
       if (result.errors.length > 0) return;
-      if (child) child.kill();
-      child = spawn(process.execPath, ['--enable-source-maps', 'dist/main.js'], { stdio: 'inherit' });
+      if (child && child.exitCode === null && !child.killed) {
+        const prev = child;
+        child = null;
+        prev.once('exit', () => startChild());
+        prev.kill('SIGTERM');
+      } else {
+        startChild();
+      }
     });
   }
 };

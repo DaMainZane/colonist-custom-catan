@@ -42,6 +42,8 @@ export function rngShuffle<T>(r: RngState, arr: T[]): T[] {
   return a;
 }
 
+export const shuffle = rngShuffle;
+
 /** Only for creating a new game outside the engine. The engine itself never calls Math.random. */
 export function randomSeed(): number {
   return Math.floor(Math.random() * 4294967296);
