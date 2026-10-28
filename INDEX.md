@@ -29,6 +29,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `Bot AI Design.md`         | Bot tiers and brain design                         |
 | `Bot Dialogue Design.md`   | Bot chat design                                    |
 | `Design UI Philosophy.md`  | Visual direction and design tokens                 |
+| `Tech Tree Design.md`      | Locked spec for the 5 root techs, per-player building-value cost formula, and per-tech hooks |
+| `Handoff - Tech Tree Roots.md` | Handoff guide and step-by-step work order for implementing the 5 tech tree roots |
 
 ## `src/shared/` (pure engine: no sockets, DOM or timers; runs on server and client)
 

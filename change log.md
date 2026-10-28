@@ -56,6 +56,23 @@
   - `TechDef.prereq` is now `string | string[]` (new helper `techPrereqs`); `researchTech` checks every listed prereq.
 - **Tests (`tests/stage1.test.ts`)**: the old combined tech test now expects Literacy to give no discount (cost stays 3). Added a formula test over V = 0 / 2 / 5 / 9 / 14 with offsets 0 to 2, and a Catch-up discount test.
 - Old base techs and their modifiers are still in place (removed in step 3).
+## 2026-10-28 01:12:00 ICT (UTC+7) (Pass 47: Align DLC catalog and Scenario presets strictly with the 6 DLCs in Ideas.md)
+### Fixed & Changed
+- **DLC & Addon Setup Catalog (`src/client/render/setup.ts`)**:
+  - Removed the invented 8-DLC placeholder catalog (`heartland`, `ledger`, `wayfarers`, `crimson`, `whispers`, `wildlands`) and replaced it with the exact 6 DLC packs from `Ideas.md`:
+    1. **Tidebound** (`tidebound`): Bridges, Rickety Bridges, Tides, Rising Sea, Harbor Upgrade, Shipwreck Salvage, Flood Warnings, Fishing, Pirates, Lighthouse Tide Sight.
+    2. **Bulwark** (`bulwark`): Walls & Zone Control, Wall Tiers, Siege, Castle, Wall Decay, Gatehouse, Castle Sieges, Sea Wall.
+    3. **Warlords** (`warlords`): Knights as Armies, Mercenaries, War Mechanic, Diplomacy & Embassies, Alliances & Betrayal, Wave Defense (Co-op), King vs. Peasant, Player vs. AI Warlord, War Weariness.
+    4. **Wild Earth** (`wildearth`): Emerald & Diamond Tiles, Gem Market, Volcano, Oasis in the Desert, Seasons, Meteor Crater, Plague, Aftermath & Ground Work, Biome Tags, Quarantine Card, Plague Doctor Tech.
+    5. **Guildhall** (`guildhall`): Sheep Economy, Debt, Debt Tie-ins, Landmarks, Landmark Set Bonus, Ruins (Landmark), Monuments, Trade Caravans.
+    6. **Rowdy Tavern** (`rowdy`): Hat Day, Drunk Robber, Karaoke 7, Robbery Minigames, Bot Drinking Game, Instigation, Hat Unlocks, Hat of Shame.
+- **Scenario Presets (`src/server/mapmenu.ts`)**:
+  - Replaced placeholder scenarios with the exact scenario presets from `Ideas.md`: **Standard Catan**, **Kingdoms** (`bulwark` + `warlords`), **Drowned World** (`tidebound` + `wildearth`), **Party Night** (`rowdy`), **Merchant Republic** (`guildhall` + `tidebound`), **Cataclysm** (`wildearth`), and **Everything Bagel** (all 6 DLCs).
+- **Tech Tree Spec, Handoff & Docs (`Tech Tree Design.md`, `Handoff - Tech Tree Roots.md`, `Development Plan.md`, `Ideas.md`, `INDEX.md`)**:
+  - Added `Tech Tree Design.md` locking the 5 root techs (`tidebound.harbor_charters`, `bulwark.stockpiling`, `warlords.plunder`, `wildearth.ground_work`, `guildhall.road_levy`), per-player building-value cost formula, and per-tech hook specifications.
+  - Added `Handoff - Tech Tree Roots.md` with the 7-step implementation order and DLC extensibility rules.
+  - Updated `Development Plan.md` and `Ideas.md` to mark completed Stage 0 items, partial Stage 1 infrastructure, and link Stage 1 step 1 to `Tech Tree Design.md`.
+  - Registered `Tech Tree Design.md` and `Handoff - Tech Tree Roots.md` in `INDEX.md`.
 
 ## 2026-10-28 00:18:00 ICT (UTC+7) (Pass 46: Restore rich player avatars and game theme colors in trading modal)
 ### Fixed & Improved
