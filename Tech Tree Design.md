@@ -45,13 +45,13 @@ Cost in cards for a tier 1 root, by building value V:
 
 ## 3. The five root techs
 
-| DLC | Tech id | Effect | Offset | Cost at V = 2 / 5 / 9 / 14 |
-|---|---|---|---|---|
-| Tidebound | `tidebound.harbor_charters` | Unlocks upgrading a 3:1 port to 2:1 | 0 | 2 / 3 / 4 / 6 |
-| Bulwark | `bulwark.stockpiling` | +2 discard limit | 0 | 2 / 3 / 4 / 6 |
-| Warlords | `warlords.plunder` | Knight steals 1 extra card | +1 | 3 / 4 / 5 / 7 |
-| Wild Earth | `wildearth.ground_work` | Convert a tile you touch into a basic resource tile of your choice | +2 | 4 / 5 / 6 / 8 |
-| Guildhall | `guildhall.road_levy` | Past the road cap (2x price), roads cost 1 less brick or wood | 0 | 2 / 3 / 4 / 6 |
+| DLC        | Tech id                     | Effect                                                             | Offset | Cost at V = 2 / 5 / 9 / 14 |
+| ---------- | --------------------------- | ------------------------------------------------------------------ | ------ | -------------------------- |
+| Tidebound  | `tidebound.harbor_charters` | Unlocks upgrading a 3:1 port to 2:1                                | 0      | 2 / 3 / 4 / 6              |
+| Bulwark    | `bulwark.stockpiling`       | +2 discard limit                                                   | 0      | 2 / 3 / 4 / 6              |
+| Warlords   | `warlords.plunder`          | Knight steals 1 extra card                                         | +1     | 3 / 4 / 5 / 7              |
+| Wild Earth | `wildearth.ground_work`     | Convert a tile you touch into a basic resource tile of your choice | +2     | 4 / 5 / 6 / 8              |
+| Guildhall  | `guildhall.road_levy`       | Past the road cap (2x price), roads cost 1 less brick or wood      | 0      | 2 / 3 / 4 / 6              |
 
 Offsets are placeholders. Tune them in the sim matrix.
 
@@ -83,7 +83,7 @@ Offsets are placeholders. Tune them in the sim matrix.
 - **Tests:** knight steals 2, a 7 steals 1, a victim with 1 card loses 1, DLC off has no effect.
 
 ### Wild Earth: Ground work
-- **Rule:** single-use ability. The player converts one tile that touches their own **settlement or city** (not roads) into one of the 5 basic resources of their choice. The source tile can be any **land** tile type, desert and modded or special tiles included. Sea tiles are not valid. The number token stays. Once used, the tech has no further effect.
+- **Rule:** single-use ability. The player converts one tile that touches their own **settlement or city** (not roads) into one of the 5 basic resources of their choice. The source tile can be any **land** tile type, desert and modded or special tiles included. Sea tiles are not valid. The number token stays. Once used, the tech has no further effect. If convert a desert tile, roll a random number. If tile already have a number, then the newly convert resource tile will inherit the number. 
 - **Hook:** the tile state layer (`shared/tileState.ts`).
 - **Add:** a `convertTile` action (single use, tracked per player); a **special tile filter** like the 7 filter. It tints only the tiles that qualify, in a distinct tint with a pattern as well as a color; a resource picker; persistence of the changed tile in game state and export codes.
 - **UI:** overlay kit tint, tile click, then resource choice.
