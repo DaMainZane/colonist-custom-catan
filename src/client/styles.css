@@ -330,8 +330,8 @@ svg#boardSvg.is-panning * {
 
 /* ---------- Active trade offer stack (top right) ---------- */
 #activeTradeModal {
-  position: absolute; top: 12px; right: 16px; width: 416px; max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 150px); display: none; flex-direction: column; gap: 6px; z-index: 50;
+  position: absolute; top: 12px; right: 16px; width: 440px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px); display: none; flex-direction: column; gap: 6px; z-index: 50;
 }
 .trade-top-avatars {
   background: var(--surface); border-radius: var(--r-lg); padding: 7px 12px; box-shadow: var(--shadow);
@@ -372,7 +372,7 @@ svg#boardSvg.is-panning * {
 .trade-offer-body {
   position: relative; overflow: hidden; flex-shrink: 0;
   background: var(--surface); border-radius: var(--r-lg); padding: 10px 12px 13px; box-shadow: var(--shadow);
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
+  display: flex; flex-direction: column; gap: 8px;
 }
 .trade-offer-body.trade-card-enter {
   animation: tradeSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -381,27 +381,58 @@ svg#boardSvg.is-panning * {
   from { opacity: 0; transform: translateY(-12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.trade-rows { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
-.trade-row { display: flex; align-items: center; gap: 8px; min-height: var(--card-h); flex-wrap: nowrap; }
+
+.trade-row {
+  display: flex; align-items: center; gap: 8px; min-height: 52px; flex-wrap: nowrap;
+}
+.trade-row.get {
+  display: flex; align-items: center; gap: 8px;
+}
+.trade-row.give {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.trade-row-left {
+  display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+}
+.trade-actions {
+  display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; margin-left: auto;
+}
+
 .trade-dir-badge {
-  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
 }
 .trade-who-avatar {
-  width: 30px; height: 30px; font-size: 13px; box-shadow: 0 0 0 2px var(--surface-3);
+  width: 32px; height: 32px; font-size: 13px; box-shadow: 0 0 0 2px var(--surface-3);
 }
 .trade-who-group {
-  width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); color: var(--ink-dim);
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); color: var(--ink-dim);
   display: inline-flex; align-items: center; justify-content: center;
 }
 .trade-arrow {
-  display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0;
 }
 .trade-arrow.get { color: var(--ok); }
 .trade-arrow.give { color: var(--danger); }
-.trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.trade-actions { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; }
 
-/* Flat rounded-square responder & action boxes (Colonist layout in our matte token palette) */
+.trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.trade-cards-empty { font-size: 12px; color: var(--ink-dim); font-style: italic; }
+
+/* Flat matte resource cards matching game theme tokens */
+.trade-res-card {
+  position: relative; width: 42px; height: 54px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16); transition: transform 0.1s ease;
+}
+.trade-res-card.clickable { cursor: pointer; }
+.trade-res-card.clickable:hover { transform: translateY(-2px); }
+.trade-res-card svg.glyph { width: 28px; height: 28px; }
+.trade-card-count {
+  position: absolute; top: 1px; right: 2px; min-width: 16px; height: 16px; padding: 0 3px;
+  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 11px; font-weight: 800; line-height: 16px;
+  text-align: center; border-radius: 4px;
+}
+
+/* Flat rounded-square responder & action boxes (matching theme tokens) */
 .trade-resp-box, .trade-act-btn {
   width: 36px; height: 36px; border-radius: var(--r); border: 0;
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -433,7 +464,7 @@ svg#boardSvg.is-panning * {
 .trade-act-btn.decline, .trade-act-btn.cancel { background: var(--danger); color: #fff; }
 .trade-act-btn.off { opacity: 0.38; cursor: not-allowed; transform: none; }
 
-/* Per-offer time limit countdown bar along the bottom edge (fill width is set from render/trade.ts) */
+/* Per-offer time limit countdown bar along the bottom edge */
 .trade-timer-track {
   position: absolute; left: 0; right: 0; bottom: 0; height: 3.5px;
   background: var(--surface-3); overflow: hidden; pointer-events: none;

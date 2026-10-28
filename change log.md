@@ -1,5 +1,43 @@
 # Change Log
 
+## 2026-10-28 00:18:00 ICT (UTC+7) (Pass 46: Restore rich player avatars and game theme colors in trading modal)
+### Fixed & Improved
+- **Avatar Background & Contrast Restoration (`src/client/render/trade.ts`, `src/client/styles.css`, `src/client/avatars.ts`)**:
+  - Removed the white background circle and radial gradients that washed out the cream animal avatars (`🦊`, `🐼`, `🦁`, `🐸`).
+  - Restored classic round `.avatar` styling with solid player-color backgrounds (`style="background:${p.color}"`), ensuring crisp contrast for both player and bot faces in the trade header and proposer rows, consistent with the sidebar player roster.
+  - Restored `avatars.ts` glyphs.
+- **Trade Modal Theme Harmonization (`src/client/styles.css`, `src/client/render/trade.ts`)**:
+  - Replaced hardcoded electric blue border (`#2772b0`) and harsh tan/cream backgrounds (`#ede4d4` / `#fbf8f2`) with the project's native theme tokens (`var(--surface)`, `var(--surface-2)`, `var(--line)`, `var(--shadow)`, `var(--r-lg)`).
+  - Preserved the streamlined 2-row layout from Colonist (Row 1 receiving with green arrow; Row 2 offering with red arrow and action buttons on the right).
+  - Used theme resource colors (`--tile-wood`, `--tile-wheat`, `--tile-ore`, etc.) for trade cards and standard theme action button colors (`--ok`, `--danger`, `--accent`).
+  - Maintained all rapid bot trading, instant trade resolution, counter offering, and multiplayer confirmation capabilities.
+
+## 2026-10-28 00:05:00 ICT (UTC+7) (Pass 45: Complete Colonist trade card UI overhaul following visual spec and Design UI Philosophy)
+### Added & Changed
+- **Colonist Trade Card Layout & Framing (`src/client/render/trade.ts`, `src/client/styles.css`)**:
+  - Restructured `#activeTradeModal` to match the exact Colonist 2-row layout with signature blue framing border (`#2772b0`), warm tan/cream header (`#ede4d4`), and off-white parchment card body (`#fbf8f2`).
+  - Top header strip now centers circular opponent/bot avatars (`.colonist-header-avatar`) with color-accented rings, radial gradients, and response indicators.
+  - Positioned collapse toggle on header right edge to keep player avatars centered.
+- **2-Row Directional Trade View (`src/client/render/trade.ts`, `src/client/styles.css`)**:
+  - **Row 1 (Receiving)**: Clean 3-person silhouette group outline icon (`trade-who-group-svg`), chunky solid green down arrow (`.colonist-arrow-down`), and requested resource card tiles.
+  - **Row 2 (Offering & Actions)**: Proposer avatar circle with player color outline and silhouette face (`.colonist-who-avatar`), chunky solid red up arrow (`.colonist-arrow-up`), offered resource card tiles, and the full strip of square action buttons on the right.
+- **Colonist Resource Card Tiles (`src/client/render/trade.ts`, `src/client/styles.css`)**:
+  - Rendered distinct vertical card tiles (`.colonist-card`) per resource with color-coded borders (e.g. gold wheat border `#dfa612`, forest wood `#2e7d32`, slate ore `#546e7a`).
+  - Added royal-blue square count badge (`.colonist-card-badge`) docked in the top-right corner of each card displaying quantity (e.g. `[1]`), matching the screenshot.
+  - High-contrast, clean matte vector pictograms following `Design UI Philosophy.md`.
+- **Colonist Square Action Buttons (`src/client/render/trade.ts`, `src/client/styles.css`, `src/client/icons.ts`)**:
+  - Rounded square buttons (`36x36px`, `border-radius: 8px`, white outer bevel/border, bold icons):
+    - **Declined responder**: Pastel salmon/pink square with soft red `✖` (`.colonist-act-btn.resp-declined`).
+    - **Accepted responder**: Vibrant player-color square with bold white checkmark `✔` (`.colonist-act-btn.resp-accepted`) enabling the proposer to complete the trade in one click.
+    - **Pending responder**: Subtle dashed square with pulsing player-color dot (`.colonist-act-btn.resp-pending`).
+    - **Counter / Edit**: Vibrant cyan square with crisp white pencil icon (`.colonist-act-btn.btn-counter`).
+    - **Cancel offer**: Teal square with crisp white `✖` (`.colonist-act-btn.btn-cancel`).
+    - **Responder Accept/Decline**: Solid green checkmark and red X buttons for active trade responders.
+- **Avatars & Icons (`src/client/avatars.ts`, `src/client/icons.ts`)**:
+  - Enhanced retro computer robot avatar glyph (`🤖`) with monitor screen, eyes, mouth, and keyboard base matching the screenshot.
+  - Added hat avatar glyph (`🤠`) for bowler/farmer hat proposer avatars.
+  - Added `pencil` SVG icon to `UI_ICONS` in `src/client/icons.ts`.
+
 ## 2026-10-27 23:59:00 ICT (UTC+7) (Pass 44: Colonist-paced bot trading - snappy responses, natural seat stagger, and prompt trade resolution)
 ### Changed & Fixed
 - **Bot Trade Response Speed (`src/server/bots/scheduler.ts`)**:
