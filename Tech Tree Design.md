@@ -1,6 +1,6 @@
 # Tech Tree Design
 
-Locked 2026-10-28. This file is the spec for the next agent. Only the root tier is decided. Deeper nodes come later and may change.
+Locked 2026-10-28, updated the same evening. This file is the spec for the next agent. Sections 1 to 5 cover the 5 roots. Sections 6 to 8 add the 4 tiers, the two-lane split and the first full branch (Tidebound). The other four branches are not designed yet, and everything beyond the roots may change.
 
 ---
 
@@ -13,6 +13,7 @@ Locked 2026-10-28. This file is the spec for the next agent. Only the root tier 
 - **Roots touch base gameplay only.** Each root changes something that exists with every DLC off (ports, discards, knight steals, tiles, road cost), which is why roots stay open without their DLC.
 - **Game toggle.** `rules.techTreeOn` in the lobby. Off means nobody can research. This toggle is the only thing that turns the whole tree off; turning DLCs off does not.
 - **Prices are per player** and scale with that player's buildings (section 2).
+- **Four tiers, two lanes per branch.** Each DLC branch is a root followed by a fork into two lanes. Tiers are in section 6, the split in section 7, and Tidebound is designed in full in section 8.
 - **Registration only.** Techs register through `api.define(TECH_DEFS, ...)`. Do not edit `engine.ts` or base files for tech content. A disabled DLC or tech tree must have zero effect (no `g.rng` draws, no state, no new legal actions). The golden test stays green.
 
 ---
@@ -66,6 +67,7 @@ Offsets are placeholders. Tune them in the sim matrix.
 - **UI:** highlight upgradable port cities with the overlay kit, plus an upgrade button.
 - **Bots:** Secondary and up upgrade the port that matches their main resource. Main ignores it.
 - **Tests:** only cities, only 3:1 ports, ratio floor, DLC off has no effect.
+- **Changed 2026-10-28:** the upgrade is a ratio change only. The whole port goes from 3:1 to 2:1 and stays 'any resource'. The first build let the player pick one resource, which is no longer wanted. See section 8.
 
 ### Bulwark: Stockpiling
 - **Hook:** a `DiscardLimitModifier` registered with `api.define(DISCARD_LIMIT_MODS, ...)`, gated by `hasTech`. It stacks with the Catch-up bonus.
@@ -116,12 +118,97 @@ The 5 roots need no DLC pack, since they only change base gameplay. Extension no
 
 ---
 
-## 6. Open questions
+## 6. Tiers (locked 2026-10-28)
 
-- None open.
+Trees are balanced for long games: 25 or more VP to win, every player with a large settlement network. Do not hold back on power.
+
+| Tier | Role | What it does | Offset band | Price at V = 2 |
+| --- | --- | --- | --- | --- |
+| 1 | Base | Themed. Mostly leaves the gameplay cycle alone, still a decent power boost. The 5 roots are tier 1. | 0 to +2 | 2 to 4 |
+| 2 | Lock-in | Shapes the playstyle and strongly pushes the player toward one strategy. First node of a lane. | +2 to +4 | 5 to 7 |
+| 3 | Boost | Strengthens that strategy and visibly changes the pace of the mid game. | +4 to +7 | 8 to 11 |
+| 4 | Defining | Game-changing. Whoever gets it defines the outcome of the game. | +7 to +11 | 12 to 16 |
+
+- Price at V = 2 is `tier + offset + ceil(2 / 3)`, from section 2. The bands are starting points for the sim matrix.
+- A lane can hold more than one node in a tier. Tidebound has two in tier 3 (3a, then 3b). Both are priced as tier 3, each with its own offset.
+- Tier 4 must stay answerable: every tier 4 effect has a counter other players can use (take it, break it, or deny what it needs).
 
 ---
 
-## 7. Later (not locked)
+## 7. The two-lane split (locked 2026-10-28)
 
-Deeper nodes per branch, a free starting tech setting, techs that need another branch, a second robber move.
+After its root, every DLC branch forks into two lanes. The fork is the strategic choice: pick a lane at tier 2 and the later tiers deepen it.
+
+- **Names are themes, not rules.** Tidebound uses Expansion and Industrial. Another branch can use any pair of playstyles. What matters is that the two lanes pull in different directions.
+- **Each lane has a tempo, a weakness and a counter.** Write all three before adding a lane (see the lane identity notes in section 8).
+- **Nothing is exclusive.** A player can climb both lanes, but every tech is priced on its own, so the second lane competes with the first for the same wheat and ore. The lock is economic, not a rule. Open question 4 asks if price alone is enough.
+- **Roots stay shared.** Both lanes need the root. Tier 2 is the first node of each lane.
+- **Tech panel.** The panel must draw two lanes per branch. Group nodes by lane (it can be derived from the prerequisite chain, so no new row field is needed for layout), widen the angle between nodes of the same tier (9 degrees is too tight, use about 16 to 18), and let the outer rings use smaller nodes so four rings fit.
+
+---
+
+## 8. Tidebound tree (first full branch, designed 2026-10-28)
+
+The root plus two lanes. All numbers are placeholders for the sim matrix. Nodes beyond the root are design only; none is registered in code yet.
+
+```text
+EXPANSION lane                 INDUSTRIAL lane
+bridges, wrecks, pirates       nets, harbor
+
+T4   Grand Causeway            Harbor empire
+T3b  Pirate hunter             Harbor master
+T3a  Salvage crew              Net works
+T2   Rickety bridges           Fishing nets
+        |_____ T1  Raise the Port _____|
+```
+
+| Tier | Node (id) | Effect | Offset | Price at V = 2 |
+| --- | --- | --- | --- | --- |
+| 1 | Raise the Port (`tidebound.harbor_charters`) | A port you hold with a city goes from 3:1 to 2:1. It stays 'any resource', only the ratio changes. Cost 2 wood + 1 brick + 1 ore. | 0 | 2 |
+| 2 Expansion | Rickety bridges (`tidebound.rickety_bridges`) | Unlocks rickety bridges (1 wood, health 1, upgrade later for 1 brick + 1 ore). The normal bridge cap goes up by 4. | +3 | 6 |
+| 2 Industrial | Fishing nets (`tidebound.fishing_nets`) | Unlocks building fishing nets. Raising a port from 3:1 to 2:1 now needs only a settlement, not a city. | +3 | 6 |
+| 3a Expansion | Salvage crew (`tidebound.salvage_crew`) | Demolish one of your bridges to get back half of what you paid (rounded down) and free its slot in the cap. Wreck loot +25%. | +5 | 9 |
+| 3a Industrial | Net works (`tidebound.net_works`) | Nets cost 1 less. A second net tier (catch chance about 1 in 4 instead of 1 in 6). Each catch has a 1 in 3 chance not to use up a fish icon. | +5 | 9 |
+| 3b Expansion | Pirate hunter (`tidebound.pirate_hunter`) | Pirates need 2 fewer knights to beat for you (never below 1). Pirate loot +50% for you. | +7 | 11 |
+| 3b Industrial | Harbor master (`tidebound.harbor_master`) | Unlocks the Harbor (see the port ladder). Unlocks feeding: pay 1 wheat to feed a sea tile next to one of your nets. A sea tile with no fish icon gets one at max; a depleted one is refilled to max at once. | +7 | 11 |
+| 4 Expansion | Grand Causeway (`tidebound.grand_causeway`) | Longest Road is worth 16 VP instead of 2 while you hold it and its path contains at least one bridge (a rickety bridge counts). | +10 | 15 |
+| 4 Industrial | Harbor empire (`tidebound.harbor_empire`) | One more harbor is allowed (2 in total). One time: take X random cards from the bank, X = ceil(V / 2), as many as the bank has. | +10 | 15 |
+
+**Port ladder**
+- Every port upgrade lowers the ratio by one step. A 3:1 any port becomes 2:1 any (Raise the Port), then 1:1 any (Harbor). A specialised 2:1 port (for example brick) becomes 1:1 brick (Harbor).
+- Raise the Port only applies to 3:1 ports. The Harbor applies to any port, and the new ratio follows the port's current ratio.
+- Raise the Port has no count limit (each one costs resources). Harbors are limited to 1 per player, 2 with Harbor empire.
+- Raise the Port needs a city on the port, or a settlement once Fishing nets is researched. The Harbor always needs a city.
+- The shared ratio function has a 2:1 floor. A Harbor gets a 1:1 exception. Market, War weariness and every other modifier keep the 2:1 floor.
+
+**Lane identity**
+- **Expansion** (bridge maxing, offshore play, wreck hunting, movement). Tempo: a power house in the early to mid game that fades at the end. Weakness: its income (wrecks and pirates) is capped and non-renewable, and the final payoff is a road that can be taken away. It gives no combat power, only resource drain. Counters to Grand Causeway: split the road with a settlement, a rickety bridge collapsing on a 7, or a longer road.
+- **Industrial** (harbor and fishing). Tempo: less mobile and slower to start, with more production and efficiency, strong late. Weakness: nets and harbors are fixed in place. Counters: with Warlords on, knights and the robber on a harbor tile stop its trading, and Blockade drops its ratio.
+
+**Notes**
+- Grand Causeway swing: the holder gains 16 VP, a player who takes the title without the tech gains 2, so losing it is a 14 VP swing. It is public VP, so Taxes, Catch-up and the bot leaderCutoff react at once. Check this in a 25 VP sim.
+- Nodes beyond the root only show when Tidebound is on (section 1). Bridges, nets, wrecks, pirates and fish are Tidebound addons that must exist before tiers 2 to 4 can work, so build these nodes after Tidebound (`Ideas.md` build order, step 3).
+
+**Code impact for the next agent**
+1. Root: the step 6 build upgrades one chosen resource (`harborCharterModifier` in `techEffects.ts`, `upgrade_port` in `actions/techActions.ts`, the Harbor controls in `techpanel.ts` and `tests/techroots.test.ts`). Change it to a whole-port 3:1 to 2:1 upgrade with no resource choice.
+2. Port state: `g.ext.core.portUpgrades[vertexId]` holds a resource today. It becomes a level per vertex (raised, harbor).
+3. Ratio function (`shared/tradeRatio.ts`): a 1:1 floor for harbors only.
+4. Port upgrade check: read `hasTech` for Fishing nets to allow a settlement.
+5. Tech panel: draw the fork (section 7).
+6. Add an optional `path` ('expansion' or 'industrial') to `TechDef` and `TechRowView`, used for the lane label in the tooltip.
+
+---
+
+## 9. Open questions
+
+1. **Five levels or four tiers.** The Tidebound drawing has a root plus four nodes per lane, which is five levels. There are four tiers, so tier 3 holds two nodes in a row (3a, 3b). Alternatives: merge 3a and 3b into one node, or allow five tiers.
+2. **Does the tree gate the DLC content?** Assumed yes: with the tree on, rickety bridges, fishing nets, feeding and the Harbor only exist after their tech. With the tree off they are available from the start as normal Tidebound addons.
+3. **Port ladder reading.** Assumed: each upgrade lowers a port one step, the Harbor works on any port, and the settlement-only rule covers only the 3:1 to 2:1 upgrade and sits on Fishing nets (move it to Net works if it is too strong early).
+4. **Soft lock.** Is rising price enough to keep a player in one lane, or add a surcharge (for example +2 cards at tiers 3 and 4 if you own a node in the other lane)?
+5. **Price at 25+ VP.** At 25 or more VP, building value V reaches 25 to 35, so `ceil(V / 3)` alone is 9 to 12 cards, more than a whole tier 1 price band. Suggest the divisor scales with `vpToWin`, for example `round(0.3 x vpToWin)` (3 at 10 VP, 8 at 25 VP). Retune in the sim matrix.
+
+---
+
+## 10. Later (not locked)
+
+The other four branches (each a root plus two lanes, written like section 8), a free starting tech setting, techs that need another branch, a second robber move.

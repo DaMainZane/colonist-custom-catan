@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-28 (Pass 55: Tech tree tiers, the two-lane split and the Tidebound tree; docs only, no code)
+### Added
+- **`Tech Tree Design.md`**: section 6 (the 4 tiers: base, lock-in, boost, defining, each with an offset band and a price at V = 2), section 7 (every DLC branch forks into two lanes after its root; the lock is economic, not a rule; tech panel needs fork layout), section 8 (the full Tidebound tree: root Raise the Port, Expansion lane with Rickety bridges, Salvage crew, Pirate hunter and Grand Causeway, Industrial lane with Fishing nets, Net works, Harbor master and Harbor empire; port ladder; lane identity; code impact list), section 9 (5 open questions), section 10 (later).
+- **`Ideas.md`**: a General bullet for the tiers and lanes, and a Tidebound skill tree block with 10 new ideas (each with links): Raise the Port, Port ladder, settlement-only port upgrades, Net tiers, Feed the sea, Harbor limit and Harbor +1, Demolish a bridge, wreck and pirate scaling, Grand Causeway, Harbor empire.
+### Changed (design only)
+- The root now upgrades a whole port 3:1 -> 2:1 'any resource' (ratio only). The step 6 code still lets the player pick one resource; this is listed in the code impact of section 8.
+### Not done
+- No code changed. The nodes beyond the root are not registered. Open: 5 levels vs 4 tiers, whether the tree gates DLC content, and the cost divisor at 25+ VP (see section 9).
+
 ## 2026-10-28 (Pass 54: Tech tree step 7, sim matrix with the tree on and off)
 ### Changed
 - **Sim matrix (`src/server/bots/sim.ts`)**: added `techTreeOn` and optional `scenarioIds` filtering to `SimMatrixDlcComboSpec` and `techTreeOn` to `SimMatrixCellResult`. `runSimMatrix` only sets `rules.techTreeOn = true` when a combo enables it, leaving tree-off rows and their rules untouched.
