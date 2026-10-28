@@ -136,7 +136,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `tiers.ts` | Tier profiles (Main, Secondary, Overload), personalities, hash helper |
 | `mapProfile.ts` | Landmasses, fog and gold share, average pips, port count, resource scarcity |
 | `scheduler.ts` | Waits a game-speed delay, then lets one bot act after each broadcast |
-| `sim.ts` | Bot-vs-bot simulator with invariant checks, `runLadder`, and S0.16 `runSimMatrix` |
+| `sim.ts` | Bot-vs-bot simulator with invariant checks, `runLadder`, and S0.16 `runSimMatrix` (with `techTreeOn` on/off and scenario subset support) |
 | `trainingLog.ts` | Training data logger: pre-action features, chosen actions, outcome labels |
 | `dialogue.ts` | One-line re-export of `dialogue/index.ts` (existing imports use this path) |
 | `dialogue/index.ts` | Entry: engine events to chat lines, game start, replies to human chat |
@@ -212,7 +212,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `pricing.test.ts` | Piece cost and limit service, cost modifiers |
 | `botgoals.test.ts` | S0.14 Bot goal registry: tier gating (`main`/`secondary`/`overload`), missing-card integration, custom action execution |
 | `persistence.test.ts` | S0.15 Persistence: save/load round-trip, hard caps, public-only event filter, schema migration, Render `CTMEM1.` export/import |
-| `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × bot tiers, invariant checks, `botTested` badge flag |
+| `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × tech tree on/off × bot tiers, invariant checks, `botTested` badge flag |
 | `clankerton_s0.test.ts` | S0.5–S0.11 shared engine services: trade ratios, production pipeline, tile state/durability/wild tokens, Seven Resolver, markers/ledger/strength/relations, history/stats, seeded event deck |
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, and the tree-off no-effect check |
