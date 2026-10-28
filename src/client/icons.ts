@@ -122,7 +122,7 @@ const UI_ICONS: Record<string, string> = {
   minus: `<path d="M5 12h14"/>`,
   play: `<path ${FILL} d="M8 5l11 7-11 7z"/>`,
   swap: `<path d="M5 8h13M14 4l4 4-4 4M19 16H6M10 12l-4 4 4 4"/>`,
-  pencil: `<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>`,
+  pencil: `<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>`,
   users: `<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16.5 5a3 3 0 0 1 0 6M19 14c1.8.6 3 2.2 3 5"/>`,
   bank: `<path d="M3 10l9-6 9 6M5.5 10v8M9.8 10v8M14.2 10v8M18.5 10v8M3 21h18"/>`,
   dice: `<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.3" ${FILL}/><circle cx="15" cy="15" r="1.3" ${FILL}/><circle cx="12" cy="12" r="1.3" ${FILL}/>`,

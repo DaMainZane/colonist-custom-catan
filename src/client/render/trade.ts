@@ -25,14 +25,11 @@ function renderTradeCards(counts: Record<string, number>, side?: 'get' | 'give',
   }
   return activeRes.map(r => {
     const count = counts[r];
-    const clickAttr = isEditor && side ? `onclick="adjustCounter('${side}','${r}',-1)" title="${RES_META[r].name}: click to remove one"` : `title="${RES_META[r].name}: ${count}"`;
-    const cursorCls = isEditor ? 'clickable' : '';
-    return `
-      <div class="trade-res-card card-${r} ${cursorCls}" ${clickAttr}>
-        <div class="trade-card-glyph">${getMiniSvg(r)}</div>
-        <span class="trade-card-count">${count}</span>
-      </div>
-    `;
+    const onClick = isEditor && side ? `adjustCounter('${side}','${r}',-1)` : '';
+    const title = isEditor && side
+      ? `${RES_META[r].name}: click to remove one`
+      : `${RES_META[r].name}: ${count}`;
+    return buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), count, onClick, title);
   }).join('');
 }
 
@@ -97,9 +94,35 @@ function ensureTimerLoop(): void {
   if (!timerRaf) timerRaf = requestAnimationFrame(tickTradeTimerBars);
 }
 
-// Redraws the editor and the hand
+function canSendCounterOffer(me: any): boolean {
+  const mine = me || myPlayerView();
+  return sum(counterGive) > 0 && sum(counterGet) > 0 &&
+    !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
+}
+
+// Updates the counter editor in place when possible so editing cards never reloads or flashes the trade window.
 function refreshCounterView(): void {
   const me = myPlayerView();
+  const existingCounter = counterTradeId !== null
+    ? document.querySelector<HTMLElement>(`.trade-counter[data-counter-for="${counterTradeId}"]`)
+    : null;
+
+  if (existingCounter && counterTradeId !== null) {
+    const getLine = existingCounter.querySelector<HTMLElement>('[data-counter-get]');
+    const giveLine = existingCounter.querySelector<HTMLElement>('[data-counter-give]');
+    const sendBtn = existingCounter.querySelector<HTMLButtonElement>('[data-counter-send]');
+    if (getLine && giveLine && sendBtn) {
+      getLine.innerHTML = renderTradeCards(counterGet, 'get', true);
+      giveLine.innerHTML = renderTradeCards(counterGive, 'give', true);
+      const canSend = canSendCounterOffer(me);
+      sendBtn.disabled = !canSend;
+      sendBtn.classList.toggle('off', !canSend);
+      sendBtn.title = canSend ? 'Send counter offer' : 'Pick cards you give (that you hold) and cards you get';
+      renderHand(me, state.players[state.turnIndex]?.id === socket.id);
+      return;
+    }
+  }
+
   renderActiveTradeModal(me);
   renderHand(me, state.players[state.turnIndex]?.id === socket.id);
 }
@@ -109,7 +132,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
   const editing = counterTradeId === t.id && !isMyOffer;
   const animCls = isNew ? 'trade-card-enter' : '';
 
-  // Proposer badge with rich solid player background
+  // Proposer badge with solid player background
   const proposerBadge = `<span class="avatar trade-who-avatar" style="background:${esc(t.fromColor)}" title="From ${esc(t.fromName)}">${avatarFace(t.fromAvatar, t.fromName)}</span>`;
   const myBadge = me
     ? `<span class="avatar trade-who-avatar" style="background:${esc(me.color)}" title="You (${esc(me.name)})">${avatarFace(me.avatar, me.name)}</span>`
@@ -139,7 +162,6 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
 
     actionsHtml = `
       ${respBtns}
-      <button type="button" class="trade-act-btn edit" onclick="${editing ? 'cancelCounter()' : `startCounter(${t.id})`}" title="Edit trade offer">${uiIcon('pencil', 18)}</button>
       <button type="button" class="trade-act-btn cancel" onclick="cancelTrade(${t.id})" title="Cancel this trade offer">${uiIcon('close', 18)}</button>
     `;
   } else if (!me) {
@@ -167,32 +189,32 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
 
   let counterCardHtml = '';
   if (editing) {
-    const mine = me || myPlayerView();
-    const canSend = sum(counterGive) > 0 && sum(counterGet) > 0 &&
-      !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
+    const canSend = canSendCounterOffer(me);
     counterCardHtml = `
-      <div class="trade-offer-body trade-counter trade-card-enter" data-trade-id="${t.id}">
+      <div class="trade-offer-body trade-counter" data-trade-id="${t.id}" data-counter-for="${t.id}">
         <div class="trade-timer-track" title="Time left"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
         <div class="counter-picker" title="Click a resource to ask for it">
-          ${RESOURCES.map(r => `<div class="trade-res-card card-${r} clickable" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}"><div class="trade-card-glyph">${getMiniSvg(r)}</div></div>`).join('')}
+          ${RESOURCES.map(r => `<div class="mini-res-card card-${r}" onclick="adjustCounter('get','${r}',1)" title="Ask for ${esc(RES_META[r].name)}">${getMiniSvg(r)}</div>`).join('')}
         </div>
-        <div class="trade-row get" title="What you receive (click a card to remove one)">
-          <div class="trade-dir-badge">
-            ${topWhoHtml}
-            <span class="trade-arrow get">${uiIcon('arrowDown', 16)}</span>
-          </div>
-          <div class="trade-cards-line">${renderTradeCards(counterGet, 'get', true)}</div>
-        </div>
-        <div class="trade-row give" title="What you give (click your hand cards to add, click here to remove)">
-          <div class="trade-row-left">
-            <div class="trade-dir-badge">
-              ${bottomWhoHtml}
-              <span class="trade-arrow give">${uiIcon('arrowUp', 16)}</span>
+        <div class="trade-offer-main">
+          <div class="trade-rows">
+            <div class="trade-row get" title="What you receive (click a card to remove one)">
+              <div class="trade-dir-badge">
+                ${topWhoHtml}
+                <span class="trade-arrow get">${uiIcon('arrowDown', 16)}</span>
+              </div>
+              <div class="trade-cards-line" data-counter-get>${renderTradeCards(counterGet, 'get', true)}</div>
             </div>
-            <div class="trade-cards-line">${renderTradeCards(counterGive, 'give', true)}</div>
+            <div class="trade-row give" title="What you give (click your hand cards to add, click here to remove)">
+              <div class="trade-dir-badge">
+                ${bottomWhoHtml}
+                <span class="trade-arrow give">${uiIcon('arrowUp', 16)}</span>
+              </div>
+              <div class="trade-cards-line" data-counter-give>${renderTradeCards(counterGive, 'give', true)}</div>
+            </div>
           </div>
           <div class="trade-actions">
-            <button type="button" class="trade-act-btn accept ${canSend ? '' : 'off'}" ${canSend ? `onclick="sendCounter(${t.id})"` : 'disabled'}
+            <button type="button" data-counter-send class="trade-act-btn accept ${canSend ? '' : 'off'}" ${canSend ? '' : 'disabled'} onclick="sendCounter(${t.id})"
               title="${canSend ? 'Send counter offer' : 'Pick cards you give (that you hold) and cards you get'}">${uiIcon('check', 18)}</button>
             <button type="button" class="trade-act-btn cancel" onclick="cancelCounter()" title="Cancel counter offer">${uiIcon('close', 18)}</button>
           </div>
@@ -203,20 +225,22 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
   return `
     <div class="trade-offer-body ${animCls}" data-trade-id="${t.id}">
       <div class="trade-timer-track" title="Time left"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
-      <div class="trade-row get" title="What you receive">
-        <div class="trade-dir-badge">
-          ${topWhoHtml}
-          <span class="trade-arrow get">${uiIcon('arrowDown', 16)}</span>
-        </div>
-        <div class="trade-cards-line">${topCardsHtml}</div>
-      </div>
-      <div class="trade-row give" title="What you give">
-        <div class="trade-row-left">
-          <div class="trade-dir-badge">
-            ${bottomWhoHtml}
-            <span class="trade-arrow give">${uiIcon('arrowUp', 16)}</span>
+      <div class="trade-offer-main">
+        <div class="trade-rows">
+          <div class="trade-row get" title="What you receive">
+            <div class="trade-dir-badge">
+              ${topWhoHtml}
+              <span class="trade-arrow get">${uiIcon('arrowDown', 16)}</span>
+            </div>
+            <div class="trade-cards-line">${topCardsHtml}</div>
           </div>
-          <div class="trade-cards-line">${bottomCardsHtml}</div>
+          <div class="trade-row give" title="What you give">
+            <div class="trade-dir-badge">
+              ${bottomWhoHtml}
+              <span class="trade-arrow give">${uiIcon('arrowUp', 16)}</span>
+            </div>
+            <div class="trade-cards-line">${bottomCardsHtml}</div>
+          </div>
         </div>
         <div class="trade-actions">${actionsHtml}</div>
       </div>
@@ -319,7 +343,8 @@ export function startCounter(tradeId?: number): void {
     counterGive[r] = t.request[r] || 0;
   }
   playTone(520, 0.06);
-  refreshCounterView();
+  renderActiveTradeModal(myPlayerView());
+  renderHand(myPlayerView(), state.players[state.turnIndex]?.id === socket.id);
 }
 
 export function adjustCounter(side: 'get' | 'give', r: string, delta: number): void {
@@ -344,10 +369,12 @@ export function sendCounter(tradeId?: number): void {
   playTone(580, 0.1);
   socket.emit('counterTrade', { code: state.code, tradeId: t.id, offer: { ...counterGive }, request: { ...counterGet } });
   setCounterTradeId(null);
-  refreshCounterView();
+  renderActiveTradeModal(myPlayerView());
+  renderHand(myPlayerView(), state.players[state.turnIndex]?.id === socket.id);
 }
 
 export function cancelCounter(): void {
   setCounterTradeId(null);
-  refreshCounterView();
+  renderActiveTradeModal(myPlayerView());
+  renderHand(myPlayerView(), state.players[state.turnIndex]?.id === socket.id);
 }

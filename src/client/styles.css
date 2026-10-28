@@ -334,13 +334,14 @@ svg#boardSvg.is-panning * {
   max-height: calc(100vh - 120px); display: none; flex-direction: column; gap: 6px; z-index: 50;
 }
 .trade-top-avatars {
-  background: var(--surface); border-radius: var(--r-lg); padding: 7px 12px; box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  position: relative; background: var(--surface); border-radius: var(--r-lg); padding: 7px 46px; box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center; min-height: 50px;
 }
 .trade-top-avatars-list {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
 }
 .trade-collapse-btn {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
   border: 0; background: var(--surface-2); color: var(--ink); border-radius: var(--r-sm);
   height: 30px; min-width: 30px; padding: 0 7px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
@@ -382,20 +383,17 @@ svg#boardSvg.is-panning * {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+.trade-offer-main {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.trade-rows {
+  display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0;
+}
 .trade-row {
-  display: flex; align-items: center; gap: 8px; min-height: 52px; flex-wrap: nowrap;
-}
-.trade-row.get {
-  display: flex; align-items: center; gap: 8px;
-}
-.trade-row.give {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-}
-.trade-row-left {
-  display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+  display: flex; align-items: center; gap: 8px; min-height: var(--card-h); flex-wrap: nowrap;
 }
 .trade-actions {
-  display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0; margin-left: auto;
+  display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; justify-content: flex-end; flex-shrink: 0;
 }
 
 .trade-dir-badge {
@@ -414,27 +412,14 @@ svg#boardSvg.is-panning * {
 .trade-arrow.get { color: var(--ok); }
 .trade-arrow.give { color: var(--danger); }
 
-.trade-cards-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.trade-cards-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.trade-cards-line .stacked-group:not([onclick]) { cursor: default; }
+.trade-cards-line .stacked-group:not([onclick]):hover { transform: none; }
 .trade-cards-empty { font-size: 12px; color: var(--ink-dim); font-style: italic; }
-
-/* Flat matte resource cards matching game theme tokens */
-.trade-res-card {
-  position: relative; width: 42px; height: 54px; border-radius: var(--r-sm);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16); transition: transform 0.1s ease;
-}
-.trade-res-card.clickable { cursor: pointer; }
-.trade-res-card.clickable:hover { transform: translateY(-2px); }
-.trade-res-card svg.glyph { width: 28px; height: 28px; }
-.trade-card-count {
-  position: absolute; top: 1px; right: 2px; min-width: 16px; height: 16px; padding: 0 3px;
-  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 11px; font-weight: 800; line-height: 16px;
-  text-align: center; border-radius: 4px;
-}
 
 /* Flat rounded-square responder & action boxes (matching theme tokens) */
 .trade-resp-box, .trade-act-btn {
-  width: 36px; height: 36px; border-radius: var(--r); border: 0;
+  width: 38px; height: 38px; border-radius: var(--r); border: 0;
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   transition: transform 0.1s, background 0.12s, opacity 0.12s;
 }
