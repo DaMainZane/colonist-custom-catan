@@ -21,16 +21,16 @@ describe('world setup page flag and spectator mode', () => {
     try {
       // Host switches from lobbyPlayers to spectators while keeping hostId
       const hostSeat = room.lobbyPlayers.pop()!;
-      room.spectators.push({ id: hostSeat.id, name: hostSeat.name, avatar: hostSeat.avatar });
+      room.spectators.push({ id: hostSeat.id, name: hostSeat.name, avatar: hostSeat.avatar, color: hostSeat.color });
       room.lobbyPlayers.push(
-        { id: 'bot_1', name: 'Bot Alpha', color: '#e03131', avatar: 1, isBot: true, botTier: 'main' },
-        { id: 'bot_2', name: 'Bot Beta', color: '#1971c2', avatar: 2, isBot: true, botTier: 'main' },
+        { id: 'bot_1', name: 'Bot Alpha', color: '#e03131', avatar: '🤖', isBot: true, difficulty: 'Main' },
+        { id: 'bot_2', name: 'Bot Beta', color: '#1971c2', avatar: '🤖', isBot: true, difficulty: 'Main' },
       );
 
       // humanIds includes spectators so broadcastRoom and bot turns keep running
       expect(humanIds(room)).toContain('host-socket');
 
-      startGame(room, 'host-socket');
+      startGame(room);
       expect(room.game).not.toBeNull();
       expect(room.setup).toBe(false);
 

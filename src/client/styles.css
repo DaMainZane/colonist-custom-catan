@@ -1479,9 +1479,13 @@ svg#boardSvg.is-panning * {
 
 .round-recap-mount {
   position: fixed; inset: 0; z-index: 66;
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, 0.38);
   padding: 16px;
+}
+.round-recap-mount:empty {
+  display: none !important;
+  pointer-events: none !important;
 }
 .round-recap-card {
   background: var(--surface); color: var(--ink);

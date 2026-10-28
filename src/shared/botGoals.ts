@@ -1,6 +1,8 @@
 // MODULE: bot goal registry (Service 18 — S0.14; lets addons publish bot goals, vertex/edge deltas, action scores, and threat deltas) | USED BY: packs, server/bots/brain, tests
 import { defsOf } from './registry';
-import type { Ctx, Id, Registry, Resources } from './types';
+import type { Registry } from './registry';
+import type { Ctx } from './ctx';
+import type { Id, Resources } from './types';
 
 /** Registry table name for addon-contributed bot goal definitions. */
 export const BOT_GOALS = 'botGoals';

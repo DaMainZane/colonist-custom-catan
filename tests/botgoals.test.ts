@@ -73,7 +73,7 @@ describe('S0.14 Bot goal registry (Service 18)', () => {
     };
 
     const reg = createRegistry([basePack, addonPack]);
-    const rules = rulesFromSettings(defaultSettings(), reg);
+    const rules = rulesFromSettings(defaultSettings());
     const g = createGame(reg, {
       players: [
         { id: 'b1', name: 'Bot1', isBot: true, difficulty: 'Main' },
@@ -123,7 +123,7 @@ describe('S0.14 Bot goal registry (Service 18)', () => {
 
     const reg = createRegistry([basePack, pack]);
     reg.phases.get('main')!.actions.push('custom_ritual');
-    const rules = rulesFromSettings(defaultSettings(), reg);
+    const rules = rulesFromSettings(defaultSettings());
     const g = createGame(reg, {
       players: [
         { id: 'b1', name: 'Bot1', isBot: true, difficulty: 'Secondary' },

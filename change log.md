@@ -1,5 +1,13 @@
 # Change Log
 
+## 2026-10-27 23:35:00 ICT (UTC+7) (Pass 41: Fix darkened display and blocked clicks caused by unhidden round-recap mount overlay)
+### Fixed
+- **Screen Darkening and Click Interception Bug (`public/index.html`, `src/client/styles.css`, `src/client/render/overlay.ts`)**:
+  - Identified that `#roundRecapMount` was declared in `public/index.html` without `style="display:none;"`, while `.round-recap-mount` in `src/client/styles.css` was styled with `position: fixed; inset: 0; z-index: 66; display: flex; background: rgba(0, 0, 0, 0.38);`.
+  - On page load, this mounted an empty, full-screen dark backdrop overlay across the entire viewport at `z-index: 66`, intercepting all pointer events and darkening the board, map painter, and game controls.
+  - Added `style="display:none;"` to `<div id="roundRecapMount">` in `public/index.html`, updated `.round-recap-mount` to `display: none` by default in `src/client/styles.css`, and added `.round-recap-mount:empty { display: none !important; pointer-events: none !important; }` to guard against any lingering overlays.
+  - Resolved TypeScript import and type signatures in `src/shared/botGoals.ts`, `tests/botgoals.test.ts`, and `tests/setuppage.test.ts`. All 339 tests across 29 suites pass cleanly.
+
 ## 2026-10-27 23:25:00 ICT (UTC+7) (Pass 40: Implement 'Turn History' view within log section summarizing key player actions across previous rounds)
 ### Added & Changed
 - **Turn History Recorder & Engine (`src/server/turnHistory.ts`, `src/server/game.ts`, `src/server/types.ts`, `src/server/view.ts`, `tests/turnhistory.test.ts`)**:
