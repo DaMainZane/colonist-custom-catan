@@ -9,7 +9,7 @@ Scope: Stages 2 to 9 follow `Ideas.md` > Suggested order of build and get re-pla
 ## 1. Done
 
 - **Stage 0 (all of S0.0 to S0.16):** golden baseline, DLC/addon layer and keyed registries, round clock, `score()` / `publicVP()`, piece cost service, trade ratio, production pipeline, tile state, durability and repair, wild token, seven resolver, markers / ledger / strength / relations, history and stats registry, event deck, setup page rework, overlay kit, bot goal registry, persistence (export codes), sim matrix.
-- **Stage 1:** 9 addons across 6 DLC packs (heartland, tidebound, bulwark, ledger, wayfarers, crimson, whispers, wildlands).
+- **Stage 1 (infrastructure only):** DLC manifest and lobby cards for 9 addons, plus General-service code in `stage1.ts`. **No addon has gameplay code yet.** `allPacks` still loads only base, gold and fog.
 - Stage 0 gate passed 2026-10-28: `npm run typecheck` and `npm test` clean (golden, sim, addon link audit).
 - Not in the plan, also done: Turn History tab, Colonist-style trade modal, bot trade pacing, click-to-roll dice.
 
@@ -29,7 +29,7 @@ Scope: Stages 2 to 9 follow `Ideas.md` > Suggested order of build and get re-pla
 
 ## 3. Next steps
 
-1. **Stage 1 gate:** the Stage 1 scenario passes sims with the DLCs on and off (sim matrix coverage). Log the result.
+1. **Build the first real addon** (pack under `src/packs/<dlc>/`, registered in `allPacks`), with sim matrix coverage with its DLC on and off. The Stage 1 gate happens only after addons exist. Tech tree spec (5 root techs, cost formula, per-tech work list): `Tech Tree Design.md`.
 2. **Check the loose ends from Stage 0:**
    - Seven Resolver: confirm the default cap on DLC side effects per 7 (the plan assumed 2) and its priority order.
    - Held wild tokens (fish, oasis): confirm a player can actually spend them (action, UI, bot), or note it as a Stage 2+ task.
