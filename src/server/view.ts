@@ -272,6 +272,8 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     activeTrades,
     turnClock: g ? turnClockView(room) : null,
     winner: g ? g.winner : null,
+    round: g ? (g.round || 0) : 0,
+    turnHistory: room.turnHistory || [],
     logs: g ? g.log : room.lobbyLog,
     chats: room.chats,
     spectators: (room.spectators || []).map(s => ({

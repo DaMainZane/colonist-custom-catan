@@ -8,6 +8,7 @@ import { refreshMap } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { gameRegistry, rulesFromSettings, settingsForPlayers } from './runtime';
 import { noteActionCompleted } from './turnClock';
+import { recordTurnHistory } from './turnHistory';
 import type { LobbyPlayer, Room } from './types';
 
 /** Engine events -> the one-shot effects the client animates (productions, card transfers, rolled hexes). */
@@ -91,6 +92,7 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
     noteBotEvents(g, res.events);
     emitBotDialogue(room, playerId, type, res.events);
     noteActionCompleted(room, playerId);
+    recordTurnHistory(room, playerId, type, payload, res.events);
   }
   else if (res.error.startsWith('Internal error')) console.error(`[engine] ${type} by ${playerId}: ${res.error}`);
   return res;
@@ -98,6 +100,7 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
 
 export function startGame(room: Room): string | null {
   if (room.game) return 'Game already started!';
+  room.turnHistory = [];
   if (room.lobbyPlayers.length < 2) {
     return (room.spectators || []).length > 0
       ? 'Need at least 2 seated players or bots to start! Add bots or join a seat.'

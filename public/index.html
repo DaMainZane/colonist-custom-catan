@@ -355,7 +355,14 @@
 
     <!-- Right sidebar -->
     <div class="right-sidebar">
-      <div id="logSection"></div>
+      <div id="logSection">
+        <div class="log-head-tabs">
+          <button class="log-tab-btn active" id="tabBtnLogLive" onclick="setLogTab('live')" title="Real-time action log">Live Log</button>
+          <button class="log-tab-btn" id="tabBtnLogHistory" onclick="setLogTab('history')" title="Summarize rounds and player turns">Turn History</button>
+        </div>
+        <div id="logFeed" class="log-feed"></div>
+        <div id="turnHistoryFeed" class="turn-history-feed" style="display:none;"></div>
+      </div>
       <div id="chatSection">
         <div id="chatFeed"></div>
         <div class="chat-input-wrap">

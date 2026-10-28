@@ -12,6 +12,11 @@ export let drawerMode: string | null = null;
 export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
 export let spectateTargetId: string | null = null;
+export let logTab: 'live' | 'history' = 'live';
+
+export function setLogTab(tab: 'live' | 'history'): void {
+  logTab = tab;
+}
 
 export let camZoom = 1;
 export let camPanX = 0;

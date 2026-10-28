@@ -148,6 +148,8 @@ export interface GameState {
   activeTrades?: TradeView[];
   /** Turn clock of the human on turn (null when timers are off or a bot is playing). */
   turnClock?: { playerId: string; remainingMs: number } | null;
+  round?: number;
+  turnHistory?: RoundSummary[];
   winner: { id: string; name: string; vp: number; color: string } | null;
   logs: { text: string; color: string | null }[];
   chats: { sender: string; avatar: string; color: string; text: string }[];
@@ -155,6 +157,30 @@ export interface GameState {
   players: PlayerView[];
   /** How the lobby map was made (lobby only; null for blank, snapshot and legacy boards). */
   mapMeta?: MapMetaView | null;
+}
+
+export interface TurnActionItem {
+  category: 'roll' | 'produce' | 'build' | 'rob' | 'dev' | 'trade' | 'discard' | 'event' | 'award';
+  icon: string;
+  text: string;
+  badge?: string;
+  timestamp: number;
+}
+
+export interface PlayerTurnSummary {
+  turnCount: number;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  playerColor: string;
+  isBot: boolean;
+  actions: TurnActionItem[];
+}
+
+export interface RoundSummary {
+  round: number;
+  title: string;
+  turns: PlayerTurnSummary[];
 }
 
 // ---- Map menu (lobby) ----

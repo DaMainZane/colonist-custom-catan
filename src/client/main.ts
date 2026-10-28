@@ -6,7 +6,7 @@ import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   activeBrush, hasDraggedMap,
   setState, setIsMouseDown, setIsPanning, setHasDraggedMap, setCamZoom, setCamPan, setDrawerMode,
-  setBuildModeValue, setHideVictoryOverlay, clearRes, clearAllInFlight
+  setBuildModeValue, setHideVictoryOverlay, clearRes, clearAllInFlight, setLogTab
 } from './store';
 import { renderAll } from './render/index';
 import {
@@ -29,7 +29,7 @@ import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
   confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade
 } from './render/drawer';
-import { sendChat } from './render/sidebar';
+import { sendChat, toggleRoundCollapse, renderSidebar } from './render/sidebar';
 import {
   setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
   showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
@@ -41,6 +41,11 @@ import {
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
 } from './actions';
 
+function onSetLogTab(tab: 'live' | 'history'): void {
+  setLogTab(tab);
+  renderSidebar();
+}
+
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
@@ -48,6 +53,7 @@ Object.assign(window as any, {
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
+  setLogTab: onSetLogTab, toggleRoundCollapse,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
   startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier, setSetupOpen,
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset, applyPresetStyle,

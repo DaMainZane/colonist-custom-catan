@@ -151,6 +151,8 @@ export interface Room {
   turnClock?: { key: string; playerId: string; deadline: number; timer?: any };
   /** What a turn clock had left when a discard clock cut in; given back when the turn owner is on the clock again. */
   savedTurnClock?: { key: string; remainingMs: number };
+  /** Complete round-by-round turn history summarizing key player actions for high transparency. */
+  turnHistory?: import('./turnHistory').RoundSummary[];
 }
 
 /** Legacy status strings the client switches on. */

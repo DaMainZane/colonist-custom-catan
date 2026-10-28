@@ -1,5 +1,30 @@
 # Change Log
 
+## 2026-10-27 23:25:00 ICT (UTC+7) (Pass 40: Implement 'Turn History' view within log section summarizing key player actions across previous rounds)
+### Added & Changed
+- **Turn History Recorder & Engine (`src/server/turnHistory.ts`, `src/server/game.ts`, `src/server/types.ts`, `src/server/view.ts`, `tests/turnhistory.test.ts`)**:
+  - Created `src/server/turnHistory.ts` providing `recordTurnHistory`, `RoundSummary`, `PlayerTurnSummary`, and `TurnActionItem` to structure player actions by round and turn count.
+  - Automatically records and aggregates key actions in each round:
+    - 🎲 **Dice rolls**: roll values, dice pair Breakdown, and 7-robber activation.
+    - 🌾 **Production**: consolidated resource yields per turn (e.g., `+2 Wheat, +1 Wood`).
+    - 🏠/🏰/🛣️ **Buildings**: initial settlement/road draft placements, settlements, cities, and roads.
+    - 🥷/⚔️ **Robber & Knights**: robber hex movement, knight card plays, and stolen cards from victims.
+    - 🃏 **Development cards**: card purchases and plays (Knight, Road Building, Year of Plenty, Monopoly).
+    - 🤝/🏦 **Trading**: player-to-player trades with partners, and 4:1/port bank trades.
+    - 🗑️ **Discards**: cards discarded when a 7 is rolled.
+    - 🏆 **Achievements & Victory**: Longest Road, Largest Army, DLC events, and victory claims.
+  - Wired `recordTurnHistory` into `runAction` in `src/server/game.ts` and initialized `room.turnHistory = []` on `startGame`.
+  - Added `turnHistory` and `round` to room state broadcast in `src/server/view.ts`.
+- **Turn History UI within Log Section (`public/index.html`, `src/client/render/sidebar.ts`, `src/client/store.ts`, `src/client/main.ts`, `src/client/types.ts`, `src/client/styles.css`)**:
+  - Embedded tab toggles inside `#logSection`: `[Live Log]` and `[Turn History]`, allowing seamless switching between the real-time continuous event feed and the structured round-by-round turn history.
+  - Rendered interactive round cards grouped in reverse chronological order (current/newest round at top with `Current` tag) showing player avatar face, color border, player name, bot tag, turn number, and categorized action rows with icons and badges.
+  - Added collapsible/expandable round accordions with one-click toggles (`toggleRoundCollapse`).
+  - Added an informative empty state when in the lobby or before rounds start.
+  - Added comprehensive CSS styling for `.log-head-tabs`, `.log-tab-btn`, `.turn-history-feed`, `.th-round-group`, `.th-turn-card`, and color-coded action category badges (`cat-roll`, `cat-build`, `cat-rob`, `cat-dev`, `cat-award`).
+- **Tests & Verification (`tests/turnhistory.test.ts`)**:
+  - Added comprehensive unit tests in `tests/turnhistory.test.ts` covering setup phase draft placement tracking, dice rolls, production consolidation, road/settlement/city builds, dev card plays, bank/player trading, and multi-round advancement.
+  - All 66 tests across 6 test suites passed including `tests/golden.test.ts` baselines; `compile_applet` passed cleanly.
+
 ## 2026-10-27 22:38:00 ICT (UTC+7) (Pass 39: Fix second Knight playability on next turn, restore map-size scaling of resources/dev cards/build limits, stack counter-trades down & pace bot trading, and randomize player turn order preserving colors)
 ### Fixed & Added
 - **Second Knight playability after obtaining two Knights in the same turn** (`src/shared/state.ts`, `src/server/bots/brain.ts`, `src/client/main.ts`, `src/server/socket.ts`):

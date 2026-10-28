@@ -2,7 +2,8 @@
 import { RESOURCES } from '../constants';
 import { getMiniSvg, uiIcon } from '../icons';
 import { socket } from '../socket';
-import { state, inFlightPlayerResCount, inFlightPlayerDevCount } from '../store';
+import { state, inFlightPlayerResCount, inFlightPlayerDevCount, logTab } from '../store';
+import type { RoundSummary } from '../types';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 
@@ -10,6 +11,15 @@ import { avatarFace } from '../avatars';
 // would wipe the selection, so each feed only re-renders when its content actually changed.
 let lastLogSig = '';
 let lastChatSig = '';
+let lastHistorySig = '';
+const collapsedRounds = new Set<number>();
+
+export function toggleRoundCollapse(roundNum: number): void {
+  if (collapsedRounds.has(roundNum)) collapsedRounds.delete(roundNum);
+  else collapsedRounds.add(roundNum);
+  lastHistorySig = '';
+  renderSidebar();
+}
 
 function hasSelectionIn(el: HTMLElement): boolean {
   const sel = window.getSelection();
@@ -115,14 +125,111 @@ export function visibleRect(el: HTMLElement): { left: number; top: number; width
   return { left: r.left, top, width: r.width, height: r.height };
 }
 
+function renderTurnHistory(el: HTMLElement): void {
+  const history: RoundSummary[] = state.turnHistory || [];
+  const currentRoundNum = state.status === 'PLAYING' ? (state.round || 1) : -1;
+  const sig = `${state.round || 0}|${history.length}|${Array.from(collapsedRounds).sort().join(',')}|${history.map(r => `${r.round}:${r.turns.length}:${r.turns.reduce((s, t) => s + t.actions.length, 0)}`).join(';')}`;
+
+  if (sig === lastHistorySig && el.innerHTML.trim().length > 0) return;
+  lastHistorySig = sig;
+
+  if (state.status === 'LOBBY' || history.length === 0) {
+    el.innerHTML = `
+      <div class="turn-history-empty">
+        <div class="th-empty-icon">⏳</div>
+        <div class="th-empty-title">Turn History</div>
+        <div class="th-empty-desc">Key player actions (dice rolls, productions, buildings, trades, dev cards) will be summarized round-by-round here once the game begins.</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Display newest round first for instant visibility of recent play
+  const reversedRounds = [...history].reverse();
+
+  const html = reversedRounds.map(rnd => {
+    const isCurrent = rnd.round === currentRoundNum && rnd.round > 0;
+    const isCollapsed = collapsedRounds.has(rnd.round);
+    const totalActions = rnd.turns.reduce((s, t) => s + t.actions.length, 0);
+
+    const turnsHtml = rnd.turns.map(turn => {
+      const actionsHtml = turn.actions.length > 0
+        ? turn.actions.map(act => `
+            <div class="th-action-row cat-${esc(act.category)}">
+              <span class="th-act-icon">${act.icon}</span>
+              <span class="th-act-text">${esc(act.text)}</span>
+              ${act.badge ? `<span class="th-act-badge">${esc(act.badge)}</span>` : ''}
+            </div>
+          `).join('')
+        : `<div class="th-action-row th-act-empty"><span>⏭️</span><span>Passed turn</span></div>`;
+
+      return `
+        <div class="th-turn-card" style="border-left-color: ${esc(turn.playerColor)}">
+          <div class="th-turn-head">
+            <span class="avatar th-avatar" style="background:${esc(turn.playerColor)}">${avatarFace(turn.playerAvatar, turn.playerName)}</span>
+            <span class="th-player-name" style="color:${esc(turn.playerColor)}">${esc(turn.playerName)}</span>
+            ${turn.isBot ? `<span class="tag">Bot</span>` : ''}
+            ${turn.turnCount > 0 ? `<span class="th-turn-num">Turn #${turn.turnCount}</span>` : ''}
+          </div>
+          <div class="th-turn-actions">
+            ${actionsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="th-round-group ${isCurrent ? 'is-current-round' : ''} ${isCollapsed ? 'is-collapsed' : ''}">
+        <div class="th-round-header" onclick="toggleRoundCollapse(${rnd.round})" title="Click to collapse/expand">
+          <div class="th-round-title-wrap">
+            <span class="th-round-badge">${rnd.round === 0 ? 'Draft' : `R${rnd.round}`}</span>
+            <span class="th-round-title">${esc(rnd.title)}</span>
+            ${isCurrent ? `<span class="tag accent">Current</span>` : ''}
+          </div>
+          <div class="th-round-right">
+            <span class="th-round-summary-count">${rnd.turns.length} turn${rnd.turns.length !== 1 ? 's' : ''} · ${totalActions} act</span>
+            <span class="th-chevron">${isCollapsed ? '▸' : '▾'}</span>
+          </div>
+        </div>
+        ${!isCollapsed ? `<div class="th-round-turns">${turnsHtml}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = html;
+}
+
 export function renderSidebar(): void {
-  const logEl = document.getElementById('logSection')!;
+  const logSectionEl = document.getElementById('logSection')!;
+  const feedEl = document.getElementById('logFeed') || logSectionEl;
+  const historyEl = document.getElementById('turnHistoryFeed');
+  const btnLive = document.getElementById('tabBtnLogLive');
+  const btnHist = document.getElementById('tabBtnLogHistory');
+
+  if (btnLive && btnHist) {
+    if (logTab === 'history') {
+      btnLive.classList.remove('active');
+      btnHist.classList.add('active');
+      if (feedEl && feedEl !== logSectionEl) feedEl.style.display = 'none';
+      if (historyEl) historyEl.style.display = 'flex';
+    } else {
+      btnLive.classList.add('active');
+      btnHist.classList.remove('active');
+      if (feedEl && feedEl !== logSectionEl) feedEl.style.display = 'block';
+      if (historyEl) historyEl.style.display = 'none';
+    }
+  }
+
   const logs: any[] = state.logs || [];
   const logSig = `${logs.length}|${logs.length ? logs[logs.length - 1].text : ''}`;
-  if (renderFeed(logEl, logSig, lastLogSig, () => logs.map(l => `
+  if (renderFeed(feedEl, logSig, lastLogSig, () => logs.map(l => `
     <div class="log-line" ${l.color ? `style="color:${esc(l.color)}"` : ''}>${l.text}</div>
   `).join(''))) {
     lastLogSig = logSig;
+  }
+
+  if (historyEl) {
+    renderTurnHistory(historyEl);
   }
 
   const chatEl = document.getElementById('chatFeed')!;
