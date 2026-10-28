@@ -387,7 +387,8 @@ export function pushSettings(): void {
       maxSettlements: val('setMaxSettle'),
       maxCities: val('setMaxCity'),
       eventsOn: chk('setEventsOn'),
-      fateTokens: val('setFateTokens')
+      fateTokens: val('setFateTokens'),
+      techTreeOn: chk('setTechTreeOn')
     }
   });
 }

@@ -1,8 +1,9 @@
 // MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, totalCards } from '../shared';
+import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, techPanelFor, totalCards } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
+import { techActionsFor } from '../packs/base/techEffects';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -306,6 +307,10 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
       isSpectator,
       recentTransfers,
       tradeRatios: g && !isSpectator ? tradeRatios(g, gameRegistry(g.rules), viewerId) : defaultRatios,
+      // The viewer's own tech panel. Null when the tree is off or the viewer only watches, so games without it send nothing new.
+      techTree: g && g.rules?.techTreeOn && !isSpectator ? techPanelFor(g, gameRegistry(g.rules), viewerId) : null,
+      // What the owned root techs can act on (harbor cities, Ground work tiles). Null on the same terms as `techTree`.
+      techActions: g && g.rules?.techTreeOn && !isSpectator ? techActionsFor(g, gameRegistry(g.rules), viewerId) : null,
       players: g
         ? g.players.map(p => enginePlayerView(g, p, viewerId, over, isSpectator))
         : room.lobbyPlayers.map(p => lobbyPlayerView(room, p))

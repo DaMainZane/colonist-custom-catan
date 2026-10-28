@@ -269,7 +269,8 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     dlc,
     addons,
     eventsOn: typeof s.eventsOn === 'boolean' ? s.eventsOn : !!old.eventsOn,
-    fateTokens: clamp(s.fateTokens, 0, 10, old.fateTokens ?? 2)
+    fateTokens: clamp(s.fateTokens, 0, 10, old.fateTokens ?? 2),
+    techTreeOn: typeof s.techTreeOn === 'boolean' ? s.techTreeOn : !!old.techTreeOn
   };
   return { settings, dropped };
 }

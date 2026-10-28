@@ -46,7 +46,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `coreServices.ts` | S0.9 Marker system (`addMarker`, `tickMarkers`), Ledger (`addLedgerEntry`, `settleLedgerEntry`), Strength & defense (`vertexDefense`, `playerTotalStrength`), Relations matrix (`getRelation`, `addOpinion`, `breakTreaty`) |
 | `history.ts` | S0.10 Public history ring buffer (`appendPublicHistory`, `getPublicHistory`, `detectStreaks`) and stats registry (`STAT_HANDLERS`, `runStatHandlers`) |
 | `eventDeck.ts` | S0.11 Seeded event deck (`EVENT_CARDS`, `ensureEventDeck`, `peekNextEvent`, `vetoPreviewEvent`, `upholdPreviewEvent`, `drawAndApplyRoundEvent`) |
-| `stage1.ts` | Stage 1 core systems & proving-ground content: S1.1 Taxes & Catch-up levers, S1.2 Public Contract Board & rarity tiers, S1.3 Spies & intel ladder, S1.4 Tech tree & Local Nemesis & Round recap, S1.5 Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
+| `stage1.ts` | Stage 1 core systems & proving-ground content: S1.1 Taxes & Catch-up levers, S1.2 Public Contract Board & rarity tiers, S1.3 Spies & intel ladder, S1.4 Tech tree (`techResearchCheck`, `researchTech`, `techPanelFor`, cost formula) & Local Nemesis & Round recap, S1.5 Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `botGoals.ts` | S0.14 Bot goal registry (`BOT_GOALS`, tier-gated `evaluateBotGoals`, `botGoalVertexDelta`, `botGoalEdgeDelta`, `botGoalActionScore`, `botGoalThreatDelta`) |
 | `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
 | `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
@@ -64,7 +64,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapterrain.ts` | Terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) |
 | `mapmix.ts` | `island_mix` fix-up: every landmass of 4+ tiles gets at least two resource types |
 | `mapcheck.ts` | Board checks: landmasses, lakes, usable spots, fairness, `MapReport` |
-| `numbers.ts` | Number tokens: real-game pool scaled to any board, red numbers never touch |
+| `numbers.ts` | Number tokens: real-game pool scaled to any board, red numbers never touch (random swaps, then a deterministic sweep for any red pair left) |
 
 ## `src/packs/` (game content registered as packs; load order: base, gold, fog)
 
@@ -84,7 +84,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/awards.ts` | Longest Road and Largest Army |
 | `base/longestRoad.ts` | Longest road metric (DFS, blocked by opponent pieces) |
 | `base/devcards.ts` | Knight, victory point, road building, year of plenty, monopoly |
-| `base/robbing.ts` | Robber victims on a hex, seeded random steal |
+| `base/robbing.ts` | Robber victims on a hex, seeded random steal, steal-count modifiers (`STEAL_COUNT_MODS`, `stealCount`) and the knight/7 steal source |
 | `base/trading.ts` | Bank ratios from ports, resource parsing, multi-offer stack, trade execution |
 | `base/ports.ts` | Ports and the old map presets (standard, blank, archipelago) |
 | `base/actions/index.ts` | Registers every base action |
@@ -96,6 +96,10 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/actions/owed.ts` | `discard`, `pick` |
 | `base/actions/robber.ts` | `move_robber`, `steal` |
 | `base/actions/endTurn.ts` | `end_turn` |
+| `base/actions/research.ts` | `research_tech` (rules in `shared/stage1.ts`; no legal actions while `rules.techTreeOn` is off) |
+| `base/techRoots.ts` | The 5 root techs (one per DLC branch) and `registerTechRoots` |
+| `base/techEffects.ts` | Effects of the 5 root techs: Stockpiling, Road levy, Harbor charters, Plunder modifiers; Ground work helpers; `techActionsFor` for the panel |
+| `base/actions/techActions.ts` | `upgrade_port` (Harbor charters) and `convert_tile` (Ground work) |
 | `base/map/index.ts` | Hexagon shape, random terrain, standard numbers, Standard and Blank quick starts |
 | `base/map/shapes.ts` | Continent, ring, islands, archipelago, continents; lake, river, satellites, ragged |
 | `base/map/terrain.ts` | Spread, clustered, realistic terrain styles |
@@ -175,6 +179,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles, active summary strip, player/spectator strip |
 | `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
+| `render/techpanel.ts` | Tech panel: hub-and-spoke view of the tech tree (one spoke per branch, built from the server's `techTree` rows), Tech button, Research buttons; draws its own DOM and styles |
 
 ## `tests/` (node:test / tsx)
 
@@ -208,5 +213,6 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × bot tiers, invariant checks, `botTested` badge flag |
 | `clankerton_s0.test.ts` | S0.5–S0.11 shared engine services: trade ratios, production pipeline, tile state/durability/wild tokens, Seven Resolver, markers/ledger/strength/relations, history/stats, seeded event deck |
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
+| `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, and the tree-off no-effect check |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
 

@@ -8,6 +8,7 @@ import { renderSidebar } from './sidebar';
 import { renderSetupPage } from './setup';
 import { renderBoard } from './board';
 import { renderTimerPopups } from './overlay';
+import { renderTechPanel } from './techpanel';
 import { renderPresetRow } from '../presets';
 import { renderMapMenu, renderQuickStarts } from '../mapmenu';
 import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
@@ -58,6 +59,8 @@ export function renderAll(): void {
       if (document.getElementById('setBotChat')) setVal('setBotChat', s.botChat ?? 'normal');
       const eventsCb = document.getElementById('setEventsOn') as HTMLInputElement | null;
       if (eventsCb) eventsCb.checked = !!s.eventsOn;
+      const techTreeCb = document.getElementById('setTechTreeOn') as HTMLInputElement | null;
+      if (techTreeCb) techTreeCb.checked = !!s.techTreeOn;
       if (document.getElementById('setFateTokens')) setVal('setFateTokens', s.fateTokens ?? 2);
       setVal('setGold', s.goldTiles);
       setVal('setDesert', s.desertTiles);
@@ -146,6 +149,7 @@ export function renderAll(): void {
   renderSidebar();
   renderSetupPage();
   renderTimerPopups();
+  renderTechPanel(isMyTurn);
 
   const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
   if (state.status !== 'GAMEOVER') {

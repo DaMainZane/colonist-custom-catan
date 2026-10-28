@@ -9,6 +9,7 @@ import { registerMapContent } from './map';
 import { registerPhases } from './phases';
 import { registerPieces } from './pieces';
 import { registerPortsAndPresets } from './ports';
+import { registerTechRoots } from './techRoots';
 
 export const basePack: Pack = {
   id: 'base',
@@ -34,6 +35,7 @@ export const basePack: Pack = {
     registerMapContent(api);
     registerPhases(api);
     registerActions(api);
+    registerTechRoots(api);
     registerHooks(api);
   }
 };

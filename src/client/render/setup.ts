@@ -140,10 +140,11 @@ function drawScenariosAndDlcs(): void {
   const addonFlags: Record<string, boolean> = s.addons && typeof s.addons === 'object' ? s.addons : {};
   const eventsOn = !!s.eventsOn;
   const fateTokens = s.fateTokens ?? 2;
+  const techTreeOn = !!s.techTreeOn;
   const scenarios: ScenarioPresetView[] = mapOptions?.scenarios || [];
   const { dlcs, addons } = effectiveDlcsAndAddons();
 
-  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
+  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, techTreeOn, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
   if (sig === lastDlcSig) return;
   lastDlcSig = sig;
 
@@ -196,6 +197,7 @@ function drawScenariosAndDlcs(): void {
         ? `<span class="summary-pill on">Events ON · ${esc(fateTokens)} Fate token${fateTokens === 1 ? '' : 's'}</span>`
         : `<span class="summary-pill">Events off</span>`
     );
+    pills.push(techTreeOn ? `<span class="summary-pill on">Tech tree ON</span>` : `<span class="summary-pill">Tech tree off</span>`);
 
     const blockedHtml = blockedAddons
       .map(b => {

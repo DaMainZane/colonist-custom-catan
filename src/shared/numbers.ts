@@ -117,6 +117,34 @@ export function settleNumbers(cells: { q: number; r: number }[], nums: number[],
     if (after > before) [nums[i], nums[j]] = [nums[j], nums[i]];
     else total += 2 * (after - before);
   }
+
+  // The random swaps are best effort and can stall with one red pair left (a rare 1 in a few hundred boards).
+  // A last sweep without the RNG scans every allowed tile for a spot where the red token touches no other red.
+  // It draws nothing, so boards that were already clean (and the golden test) come out the same.
+  if (forbidHot) {
+    const redTouches = (i: number): number => {
+      if (!HOT.has(nums[i])) return 0;
+      let c = 0;
+      for (const j of near[i]) if (HOT.has(nums[j])) c++;
+      return c;
+    };
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (let i = 0; i < size; i++) {
+        if (redTouches(i) === 0) continue;
+        const spots = grp ? members.get(grp[i])! : null;
+        const count = spots ? spots.length : size;
+        for (let k = 0; k < count; k++) {
+          const j = spots ? spots[k] : k;
+          if (j === i || HOT.has(nums[j])) continue;
+          [nums[i], nums[j]] = [nums[j], nums[i]];
+          if (redTouches(j) === 0) { moved = true; break; }
+          [nums[i], nums[j]] = [nums[j], nums[i]];
+        }
+      }
+      if (!moved) break;
+    }
+  }
   return nums;
 }
 

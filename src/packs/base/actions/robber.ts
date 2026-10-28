@@ -1,7 +1,7 @@
 // MODULE: actions "move_robber" and "steal" (victim choice when 2+ players are on the hex) | USED BY: packs/base/actions/index
 import { getPlayer, popPhase, publicVP, setPhase } from '../../../shared';
 import type { ActionDef } from '../../../shared';
-import { stealOne, victimsOnHex } from '../robbing';
+import { clearStealSource, stealOne, victimsOnHex } from '../robbing';
 
 export const moveRobberAction: ActionDef = {
   type: 'move_robber',
@@ -28,6 +28,7 @@ export const moveRobberAction: ActionDef = {
       return;
     }
     if (victims.length === 1) stealOne(ctx, pid, victims[0]);
+    clearStealSource(g);
     popPhase(ctx);
   },
   legal(ctx) {
@@ -43,6 +44,7 @@ export const stealAction: ActionDef = {
   },
   apply(ctx, pid, payload) {
     stealOne(ctx, pid, payload.victimId);
+    clearStealSource(ctx.g);
     popPhase(ctx);
   },
   /** Players with cards first, then by visible VP (highest first), so a simple bot can take the first entry. */

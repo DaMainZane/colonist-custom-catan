@@ -1,6 +1,7 @@
 // MODULE: base development cards (knight, victory point, road building, year of plenty, monopoly) | USED BY: packs/base/index
 import { getPlayer, pushPhase } from '../../shared';
 import type { PackApi } from '../../shared';
+import { setStealSource } from './robbing';
 
 export function registerDevCards(api: PackApi): void {
   api.devcard({
@@ -11,6 +12,7 @@ export function registerDevCards(api: PackApi): void {
       const p = getPlayer(ctx.g, pid)!;
       p.stats.knightsPlayed = (p.stats.knightsPlayed || 0) + 1;
       ctx.log(`${p.avatar} ${p.name} played a Knight`, p.color);
+      setStealSource(ctx.g, 'knight');
       pushPhase(ctx, 'robber');
     }
   });

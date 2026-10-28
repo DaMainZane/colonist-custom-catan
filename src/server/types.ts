@@ -45,6 +45,8 @@ export interface Settings {
   eventsOn?: boolean;
   /** Starting Fate tokens per player when events are on (default 2). */
   fateTokens?: number;
+  /** Tech tree toggle (default off). Off means nobody can research. Turning DLCs off does not change it. */
+  techTreeOn?: boolean;
 }
 
 /** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */

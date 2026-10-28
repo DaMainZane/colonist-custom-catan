@@ -1,5 +1,62 @@
 # Change Log
 
+## 2026-10-28 (Pass 51: Tech tree step 6, effects of all 5 root techs; untested)
+### Added
+- **`techEffects.ts`** (`src/packs/base/techEffects.ts`, registered by `registerTechRoots`): one modifier or helper per root, each asking `hasTech` first, so a game where nobody researched it is unchanged.
+  - **Bulwark Stockpiling**: `stockpilingModifier` on `DISCARD_LIMIT_MODS`, +2, stacks with Catch-up.
+  - **Guildhall Road levy**: `roadLevyModifier` on `COST_MODS`. Only past the road cap (2x price): 1 less brick or wood, taken from whichever the player holds fewer of (wood on a tie).
+  - **Tidebound Harbor charters**: `harborCharterModifier` on `RATIO_MODS`. An upgraded 3:1 port trades one chosen resource 2:1 for the city's owner. State in `g.ext.core.portUpgrades[vertexId]`.
+  - **Warlords Plunder**: `plunderModifier` on the new `STEAL_COUNT_MODS`. A played Knight steals 1 extra card; a rolled 7 is unchanged.
+  - **Wild Earth Ground work**: helpers `groundWorkSourceError`, `basicTileIds`, `rollTileNumber`. State in `g.ext.core.groundWork[pid]`.
+  - `techActionsFor(g, reg, pid)`: read-only lists for the panel (harbor cities, Ground work tiles). Never touches the RNG.
+- **Actions** (`actions/techActions.ts`, in the `main` phase): `upgrade_port` (city on a 3:1 port, 2 wood + 1 brick + 1 ore, one resource of choice) and `convert_tile` (once per player; land tile touching your settlement or city; basic target only; number kept; a desert gets a rolled number, never 7). Both return no legal actions without the tech.
+- **Robbing refactor** (`robbing.ts`): `STEAL_COUNT_MODS`, `stealCount`, `setStealSource` / `stealSourceOf` / `clearStealSource`. `stealOne` asks the registry for the count (1 with no modifier, so one draw exactly as before). The Knight sets the source in `devcards.ts`; `robber.ts` clears it when the steal ends.
+- **Server and client**: socket events `upgradePort` and `convertTile` (`socket.ts`); `techActions` per viewer in the state (`view.ts`, null on the same terms as `techTree`); `TechActionsView` in `client/types.ts`; `techpanel.ts` shows the harbor upgrade buttons under Tidebound and the Ground work tile + resource picker under Wild Earth.
+### Tests (`tests/techroots.test.ts`, new)
+- Stockpiling 7 to 9, stacking with Catch-up; Road levy below and above the cap and the adaptive pick; Harbor charters (upgrade, refusals, only the chosen resource and owner); Plunder (Knight 2, 7 steals 1, small hand, marker cleared); Ground work (once, number kept, desert roll, sea and hidden refused, RNG untouched); tree off adds no actions and no state.
+### Not done
+- Bots never research or use these techs. Tile click on the board for Ground work (the panel list is used instead). Sim matrix is step 7. Not run: needs `npm run typecheck` and `npm test`.
+
+## 2026-10-28 (Pass 50: Tech tree step 5, research action and tech panel; red-number flake fixed; untested)
+### Added
+- **`research_tech` action** (`src/packs/base/actions/research.ts`, listed in the `main` phase in `phases.ts`): validates and applies through the shared `techResearchCheck` / `researchTech`. `legal` returns nothing while `rules.techTreeOn` is off, so games without the tree gain no legal actions and no state.
+- **`techResearchCheck(g, reg, pid, techId, payment?)`** (`src/shared/stage1.ts`): every research rule in one side-effect-free function (same messages and order as before). `researchTech` now calls it, so the action and the panel cannot disagree.
+- **`techPanelFor(g, reg, pid)`** (`stage1.ts`): one row per tech the game offers (disabled-DLC techs left out) with this player's price, the wheat + ore payment, `owned`, `canResearch` and the reason. Generated from `allTechDefs`, so a DLC branch needs no panel edit.
+- **The 5 root techs** (`src/packs/base/techRoots.ts`, registered by the base pack through `api.define(TECH_DEFS, ...)`): Tidebound Harbor charters, Bulwark Stockpiling, Warlords Plunder (+1), Wild Earth Ground work (+2), Guildhall Road levy. No `dlc`, no `prereq`, tier 1. **Data only:** until step 6 wires each effect, researching one just spends the cards and records it. The tree is off by default.
+- **Server and client**: socket event `researchTech` (`socket.ts`); per-viewer `techTree` rows in the state (`view.ts`, null when the tree is off or the viewer spectates); `TechRowView` in `client/types.ts`; new `client/render/techpanel.ts` (Tech button on the left edge, hub-and-spoke modal with one spoke per branch, Research button enabled on your own turn in the main phase). Draws its own DOM and styles, so `index.html` and `styles.css` are unchanged.
+### Fixed
+- **Two red numbers touching on a standard board** (`numbers.ts`, `numbers.test.ts` failure "standard r4: expected 1 to be greater than 1"): the random swap loop is best effort and rarely stalls with one 6/8 pair left, and a board with only that warning still passes the generator. `settleNumbers` now ends with a deterministic sweep (no RNG draws) that moves a touching red token to any allowed tile where it touches no other red. Boards that were already clean come out the same.
+### Tests (`tests/stage1.test.ts`)
+- The "no built-in techs" test now expects exactly the 5 roots in build order; new tech audit (unique ids, prereqs exist, tier 1 to 3, roots have no `dlc`, every `dlc` is a known pack); new research action + panel test (prices at V = 2, payment, refusals, per-player); new "tree off adds no legal actions and no state" test.
+### Not done
+- No bot research logic (bots never research). Roots have no effect yet (step 6). Sim matrix with the tree on and off is step 7. Not run: needs `npm run typecheck` and `npm test`.
+
+## 2026-10-28 (Pass 49: Tech tree step 4, rules.techTreeOn toggle)
+### Added
+- **`techTreeOn` setting (default off)**: `Settings.techTreeOn` (`src/server/types.ts`), default `false` in `defaultSettings`, validated in `mergeSettingsDetailed` (`src/server/lobby.ts`: a non-boolean keeps the old value), and mapped by `rulesFromSettings` (`src/server/runtime.ts`) to `rules.techTreeOn = true` only when on. Off adds nothing to the rules, so existing games and the golden test are unchanged.
+- **Lobby UI**: a "Tech tree" checkbox (`#setTechTreeOn`) in the world setup page under Map and rules (`public/index.html`), sent by `pushSettings` (`src/client/actions.ts`), kept in sync in `src/client/render/index.ts`, and shown as a "Tech tree ON / off" pill in the Active summary (`src/client/render/setup.ts`).
+### Changed
+- **`researchTech` (`src/shared/stage1.ts`)** refuses with "The tech tree is off in this game" when `rules.techTreeOn` is not set, before it touches resources or state. Turning DLCs off does not turn the tree off.
+- **Tests (`tests/stage1.test.ts`)**: the research test now runs with `techTreeOn: true`; new tests for the off refusal (nothing spent, nothing stored) and for the setting (default off, merge rules, only reaches the rules when on).
+
+## 2026-10-28 (Pass 48: Tech tree step 3, remove the 4 old base techs)
+### Removed
+- **Old base techs (`src/shared/stage1.ts`)**: `base.road_engineering`, `base.harbor_charters`, `base.literacy` and `base.fortified_towns`. `BASE_TECH_DEFS` is now an empty list; every tech is added with `api.define(TECH_DEFS, ...)`.
+- **Their modifiers**: `techRoadCostModifier` and `techHarborCharterRatioModifier`, and their two `api.define` lines in `registerStage1Definitions`. Unused imports went with them (`addGarrison`, `COST_MODS`, `CostModifier`, `PieceDef`, `RATIO_MOD_ORDER`, `RATIO_MODS`, `RatioModifier`).
+### Changed
+- **Tests (`tests/stage1.test.ts`)**: the combined old-tech test is replaced by two tests: no built-in techs, and a research test with three test-only techs (single prereq, list prereq, `costOffset`, `onUnlock`, cost, already-researched). `makeStage1Game` takes an optional third argument to register extra defs.
+
+## 2026-10-28 (Pass 47: Tech tree step 2, per-player cost formula)
+### Changed
+- **Tech cost formula (`src/shared/stage1.ts`)**:
+  - `techCostCards(g, reg, pid, tier, offset = 0)` now returns `max(floor, tier + offset + ceil(V / divisor))`, where V = settlements x1 + cities x2 + castles x3 (`techBuildingValue`).
+  - New `TECH_COST` constants object (`settlement 1, city 2, castle 3, divisor 3, floor 2`), the single place to tune prices in the sim matrix.
+  - Removed the Literacy clause. The Catch-up discount stays (0 techs and eligible pays 1 less, never below the floor).
+  - `TechDef` gained `costOffset?: number`; `researchTech` passes it to the formula.
+  - `TechDef.prereq` is now `string | string[]` (new helper `techPrereqs`); `researchTech` checks every listed prereq.
+- **Tests (`tests/stage1.test.ts`)**: the old combined tech test now expects Literacy to give no discount (cost stays 3). Added a formula test over V = 0 / 2 / 5 / 9 / 14 with offsets 0 to 2, and a Catch-up discount test.
+- Old base techs and their modifiers are still in place (removed in step 3).
+
 ## 2026-10-28 00:18:00 ICT (UTC+7) (Pass 46: Restore rich player avatars and game theme colors in trading modal)
 ### Fixed & Improved
 - **Avatar Background & Contrast Restoration (`src/client/render/trade.ts`, `src/client/styles.css`, `src/client/avatars.ts`)**:

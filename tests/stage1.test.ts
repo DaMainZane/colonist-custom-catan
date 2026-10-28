@@ -1,10 +1,13 @@
 // MODULE: unit tests for Stage 1 core systems & proving-ground content (S1.1-S1.5)
 import { describe, expect, it } from 'vitest';
 import { allPacks } from '../src/packs';
-import { pieceCost } from '../src/packs/base/building';
+import { mergeSettings } from '../src/server/lobby';
+import { defaultSettings, rulesFromSettings } from '../src/server/runtime';
 import {
+  allTechDefs,
   appendPublicHistory,
   awardHatOfShame,
+  BASE_TECH_DEFS,
   buildRoundRecap,
   canViewerPeekHand,
   catchUpDiscardBonus,
@@ -12,6 +15,7 @@ import {
   computeVP,
   createGame,
   createRegistry,
+  defsOf,
   drawAndApplyRoundEvent,
   effectiveDiscardLimit,
   ensureContractBoard,
@@ -21,7 +25,9 @@ import {
   getFateTokens,
   getLedgerEntries,
   getLocalNemesis,
+  getPlayerTechs,
   getPublicHistory,
+  hasTech,
   isCatchUpEligible,
   makeCtx,
   playSpyAction,
@@ -32,18 +38,20 @@ import {
   runBotDrinkingGameCheck,
   runRoundStartTaxesAndCatchUp,
   techCostCards,
-  tradeRatiosFor,
-  vertexDefense
+  techPanelFor,
+  techPrereqs,
+  TECH_DEFS
 } from '../src/shared';
-import type { Pack } from '../src/shared';
+import type { Pack, PackApi } from '../src/shared';
 
-function makeStage1Game(seed = 777, rules: Record<string, any> = {}) {
+function makeStage1Game(seed = 777, rules: Record<string, any> = {}, extraRegister?: (api: PackApi) => void) {
   const stage1Pack: Pack = {
     id: 'stage1_test',
     name: 'Stage 1 Test Pack',
     deps: ['base'],
     register(api) {
       registerStage1Definitions(api);
+      extraRegister?.(api);
     }
   };
   const reg = createRegistry([...allPacks, stage1Pack], rules, 'all');
@@ -161,39 +169,164 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
   });
 
   describe('S1.4 Tech Tree with Empire-Size Pricing, Local Nemesis & Round Recap', () => {
-    it('scales tech cost by empire size, applies Road Engineering, Harbor Charters, Literacy discount, and Fortified Towns', () => {
-      const { g, reg, ctx } = makeStage1Game(404);
-      g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
-      g.board.vertices[0].port = '3:1';
-      g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' };
+    it('has no built-in techs; the base pack registers exactly the 5 roots, in build order', () => {
+      const { g, reg } = makeStage1Game(403);
+      expect(BASE_TECH_DEFS).toEqual([]);
+      expect([...allTechDefs(g, reg).keys()]).toEqual([
+        'tidebound.harbor_charters',
+        'bulwark.stockpiling',
+        'warlords.plunder',
+        'wildearth.ground_work',
+        'guildhall.road_levy'
+      ]);
+    });
 
-      expect(techCostCards(g, reg, 'p1', 1)).toBe(2);
+    it('audits every registered tech: unique ids, prereqs exist, tier 1 to 3, roots have no dlc, every dlc is a known pack', () => {
+      const { reg } = makeStage1Game(410);
+      const defs = [...defsOf<any>(reg, TECH_DEFS).values()];
+      const ids = defs.map(d => d.id);
+      const packIds = new Set(allPacks.map(p => p.id));
+      expect(new Set(ids).size).toBe(ids.length);
+      for (const d of defs) {
+        expect([1, 2, 3]).toContain(d.tier);
+        for (const pre of techPrereqs(d)) expect(ids).toContain(pre);
+        if (d.tier === 1) {
+          expect(d.dlc).toBeUndefined();
+          expect(techPrereqs(d)).toEqual([]);
+        }
+        if (d.dlc) expect(packIds.has(d.dlc) || reg.dlcs.has(d.dlc)).toBe(true);
+      }
+      expect(defs.filter(d => d.tier === 1)).toHaveLength(5);
+    });
+
+    it('research_tech: the panel shows each root with this player\'s price, the action spends wheat + ore and records the tech', () => {
+      const { g, reg, ctx } = makeStage1Game(411, { techTreeOn: true });
+      g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
+      g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' }; // V = 2
+      g.players[0].resources = { wood: 0, brick: 0, sheep: 0, wheat: 2, ore: 1 };
+      const action = reg.actions.get('research_tech')!;
+      expect(reg.phases.get('main')!.actions).toContain('research_tech');
+
+      const rows = techPanelFor(g, reg, 'p1');
+      const byId = (id: string) => rows.find(r => r.id === id)!;
+      expect(rows).toHaveLength(5);
+      expect(byId('bulwark.stockpiling')).toMatchObject({ cost: 2, payment: { wheat: 1, ore: 1 }, owned: false, canResearch: true, reason: null });
+      expect(byId('warlords.plunder')).toMatchObject({ cost: 3, canResearch: true }); // offset +1
+      expect(byId('wildearth.ground_work')).toMatchObject({ cost: 4, canResearch: false }); // offset +2, needs 2 ore
+      expect(byId('wildearth.ground_work').reason).toMatch(/not enough/i);
+
+      expect(action.validate(ctx, 'p1', { techId: 'bulwark.stockpiling' })).toBeNull();
+      expect(action.validate(ctx, 'p1', { techId: 'wildearth.ground_work' })).toMatch(/not enough/i);
+      expect(action.validate(ctx, 'p1', { techId: 'nope' })).toMatch(/unknown/i);
+      expect(action.validate(ctx, 'p1', {})).toMatch(/unknown/i);
+
+      action.apply(ctx, 'p1', { techId: 'bulwark.stockpiling' });
+      expect(getPlayerTechs(g, 'p1')).toEqual(['bulwark.stockpiling']);
+      expect(g.players[0].resources.wheat).toBe(1);
+      expect(g.players[0].resources.ore).toBe(0);
+      expect(techPanelFor(g, reg, 'p1').find(r => r.id === 'bulwark.stockpiling')).toMatchObject({ owned: true, canResearch: false, reason: null });
+      expect(action.validate(ctx, 'p1', { techId: 'bulwark.stockpiling' })).toMatch(/already/i);
+      expect(getPlayerTechs(g, 'p2')).toEqual([]); // techs are per player
+    });
+
+    it('research_tech adds no legal actions and no state when the tree is off', () => {
+      const off = makeStage1Game(412);
+      const action = off.reg.actions.get('research_tech')!;
+      expect(action.legal!(off.ctx, 'p1')).toEqual([]);
+      expect(action.validate(off.ctx, 'p1', { techId: 'bulwark.stockpiling' })).toMatch(/tech tree is off/i);
+      expect(off.g.ext?.core?.techs).toBeUndefined();
+
+      const on = makeStage1Game(413, { techTreeOn: true });
+      expect(on.reg.actions.get('research_tech')!.legal!(on.ctx, 'p1')).toHaveLength(5);
+    });
+
+    it('researches a tech: pays the formula cost, stores it, runs onUnlock, and checks single and list prereqs', () => {
+      let unlocked = 0;
+      const { g, reg, ctx } = makeStage1Game(404, { techTreeOn: true }, api => {
+        api.define(TECH_DEFS, {
+          id: 'test.a', name: 'Test A', branch: 'test', tier: 1, description: 'root',
+          onUnlock() { unlocked++; }
+        });
+        api.define(TECH_DEFS, { id: 'test.b', name: 'Test B', branch: 'test', tier: 2, prereq: 'test.a', description: 'one prereq' });
+        api.define(TECH_DEFS, {
+          id: 'test.c', name: 'Test C', branch: 'test', tier: 2, prereq: ['test.a', 'test.b'], costOffset: 1, description: 'list prereq'
+        });
+      });
+      g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
+      g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' };
       g.players[0].resources = { wood: 10, brick: 10, sheep: 10, wheat: 10, ore: 10 };
 
-      const r1 = researchTech(ctx, 'p1', 'base.road_engineering');
-      expect(r1.ok).toBe(true);
+      expect(techCostCards(g, reg, 'p1', 1)).toBe(2);
+      expect(researchTech(ctx, 'p1', 'test.b').ok).toBe(false); // needs test.a
+      expect(researchTech(ctx, 'p1', 'test.c').ok).toBe(false); // needs test.a and test.b
 
-      for (let i = 0; i < 15; i++) {
-        g.board.edges[i].piece = { type: 'road', owner: 'p1' };
-      }
-      const roadDef = reg.pieces.get('road')!;
-      const overLimitRoadCost = pieceCost(g, g.players[0], roadDef, reg);
-      expect(overLimitRoadCost).toEqual({ wood: 1, brick: 2 });
+      expect(researchTech(ctx, 'p1', 'test.a')).toEqual({ ok: true, costCards: 2 });
+      expect(unlocked).toBe(1);
+      expect(hasTech(g, 'p1', 'test.a')).toBe(true);
+      expect(g.players[0].resources.wheat + g.players[0].resources.ore).toBe(18);
 
-      expect(techCostCards(g, reg, 'p1', 2)).toBe(3);
-      const r2 = researchTech(ctx, 'p1', 'base.literacy');
-      expect(r2.ok).toBe(true);
+      expect(researchTech(ctx, 'p1', 'test.c').ok).toBe(false); // still needs test.b
+      expect(researchTech(ctx, 'p1', 'test.b').costCards).toBe(3); // tier 2 + ceil(2 / 3)
+      const c = researchTech(ctx, 'p1', 'test.c');
+      expect(c.ok).toBe(true);
+      expect(c.costCards).toBe(4); // tier 2 + offset 1 + ceil(2 / 3)
+      expect(getPlayerTechs(g, 'p1')).toEqual(['test.a', 'test.b', 'test.c']);
+      expect(researchTech(ctx, 'p1', 'test.a').ok).toBe(false); // already researched
+    });
 
-      expect(techCostCards(g, reg, 'p1', 2)).toBe(2);
-      const r3 = researchTech(ctx, 'p1', 'base.harbor_charters');
-      expect(r3.ok).toBe(true);
+    it('refuses research when rules.techTreeOn is off, and changes nothing', () => {
+      const { g, ctx } = makeStage1Game(409, {}, api => {
+        api.define(TECH_DEFS, { id: 'test.a', name: 'Test A', branch: 'test', tier: 1, description: 'root' });
+      });
+      g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
+      g.players[0].resources = { wood: 10, brick: 10, sheep: 10, wheat: 10, ore: 10 };
 
-      const ratios = tradeRatiosFor(g, reg, 'p1');
-      expect(ratios.brick).toBe(2);
+      expect(g.rules.techTreeOn).toBeUndefined();
+      const res = researchTech(ctx, 'p1', 'test.a');
+      expect(res.ok).toBe(false);
+      expect(res.error).toMatch(/tech tree is off/i);
+      expect(g.players[0].resources).toEqual({ wood: 10, brick: 10, sheep: 10, wheat: 10, ore: 10 });
+      expect(getPlayerTechs(g, 'p1')).toEqual([]);
+    });
 
-      const r4 = researchTech(ctx, 'p1', 'base.fortified_towns');
-      expect(r4.ok).toBe(true);
-      expect(vertexDefense(g, reg, 0).garrison).toBe(1);
+    it('prices techs per player by building value: max(floor, tier + offset + ceil(V / 3))', () => {
+      const { g, reg } = makeStage1Game(407);
+      const setBoard = (settlements: number, cities: number, castles: number) => {
+        for (let i = 0; i < 12; i++) delete g.board.vertices[i].piece;
+        let slot = 0;
+        for (let i = 0; i < settlements; i++) g.board.vertices[slot++].piece = { type: 'settlement', owner: 'p1' };
+        for (let i = 0; i < cities; i++) g.board.vertices[slot++].piece = { type: 'city', owner: 'p1' };
+        for (let i = 0; i < castles; i++) g.board.vertices[slot++].piece = { type: 'castle', owner: 'p1' };
+      };
+      const costs = () => [0, 1, 2].map(offset => techCostCards(g, reg, 'p1', 1, offset));
+
+      setBoard(0, 0, 0); // V = 0: ceil(0 / 3) = 0, so offsets 0 and 1 both sit on the floor
+      expect(costs()).toEqual([2, 2, 3]);
+      setBoard(2, 0, 0); // V = 2
+      expect(costs()).toEqual([2, 3, 4]);
+      setBoard(3, 1, 0); // V = 5
+      expect(costs()).toEqual([3, 4, 5]);
+      setBoard(3, 3, 0); // V = 9
+      expect(costs()).toEqual([4, 5, 6]);
+      setBoard(2, 3, 2); // V = 14
+      expect(costs()).toEqual([6, 7, 8]);
+    });
+
+    it('keeps the Catch-up discount: 1 less for a player with 0 techs, never below the floor', () => {
+      const { g, reg } = makeStage1Game(408, { catchUpMode: 'light' });
+      g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
+      g.board.vertices[1].piece = { type: 'city', owner: 'p1' };
+      g.board.vertices[2].piece = { type: 'settlement', owner: 'p1' };
+      g.board.vertices[3].piece = { type: 'settlement', owner: 'p2' };
+      g.board.vertices[4].piece = { type: 'settlement', owner: 'p3' };
+      g.board.vertices[5].piece = { type: 'settlement', owner: 'p3' };
+
+      expect(isCatchUpEligible(g, reg, 'p2')).toBe(true);
+      expect(isCatchUpEligible(g, reg, 'p1')).toBe(false);
+      expect(techCostCards(g, reg, 'p2', 1)).toBe(2); // 2 before the discount, already at the floor
+      expect(techCostCards(g, reg, 'p2', 2)).toBe(2); // 3 before the discount
+      expect(techCostCards(g, reg, 'p2', 3)).toBe(3); // 4 before the discount
+      expect(techCostCards(g, reg, 'p1', 2)).toBe(4); // V = 5, no discount
     });
 
     it('tracks Local Nemesis hits and builds a Round-End Recap', () => {
@@ -282,6 +415,22 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
       expect(win?.id).toBe('p2');
       expect(win?.vp).toBe(24);
       expect(g.phase).toBe('gameover');
+    });
+  });
+
+  describe('rules.techTreeOn lobby setting', () => {
+    it('is off by default, merges from the lobby, and only reaches the rules when on', () => {
+      const def = defaultSettings();
+      expect(def.techTreeOn).toBe(false);
+      expect(rulesFromSettings(def).techTreeOn).toBeUndefined();
+
+      const on = mergeSettings({ techTreeOn: true }, def);
+      expect(on.techTreeOn).toBe(true);
+      expect(rulesFromSettings(on).techTreeOn).toBe(true);
+
+      expect(mergeSettings({}, on).techTreeOn).toBe(true); // missing keeps the old value
+      expect(mergeSettings({ techTreeOn: 'yes' }, on).techTreeOn).toBe(true); // not a boolean: ignored
+      expect(mergeSettings({ techTreeOn: false }, on).techTreeOn).toBe(false);
     });
   });
 });

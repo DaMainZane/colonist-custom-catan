@@ -1,20 +1,17 @@
 // MODULE: Stage 1 General features (Taxes & Catch-up levers, Public Contract Board & Rarity Tiers, Spies & Intel Ladder, Tech Tree with Empire-Size Pricing, Local Nemesis & Round Recap, Proving-Ground Content & Sandbox Economy) | USED BY: packs, server, bots, tests
-import { addGarrison, addLedgerEntry, getMarkers, getRelation } from './coreServices';
+import { addLedgerEntry, getMarkers, getRelation } from './coreServices';
 import type { Ctx } from './ctx';
 import { addFateTokens, EVENT_CARDS } from './eventDeck';
 import type { EventCardDef } from './eventDeck';
 import { appendPublicHistory, detectStreaks, getPublicHistory } from './history';
-import { COST_MODS, placedCount } from './pricing';
-import type { CostModifier } from './pricing';
+import { placedCount } from './pricing';
 import { defsOf } from './registry';
-import type { PackApi, PieceDef, Registry } from './registry';
+import type { PackApi, Registry } from './registry';
 import { createRng, rngInt, rngShuffle } from './rng';
 import type { RngState } from './rng';
 import { DISCARD_LIMIT_MODS, effectiveDiscardLimit, SEVEN_STEP_ORDER, SEVEN_STEPS } from './sevenResolver';
 import type { DiscardLimitModifier, SevenStepDef } from './sevenResolver';
 import { bankGive, canAfford, getPlayer, payToBank, publicVP, score } from './state';
-import { RATIO_MOD_ORDER, RATIO_MODS } from './tradeRatio';
-import type { RatioModifier } from './tradeRatio';
 import type { GameState, Id, PlayerState, Resources } from './types';
 
 function sumCards(r: Resources): number {
@@ -436,51 +433,21 @@ export interface TechDef {
   name: string;
   branch: string;
   tier: 1 | 2 | 3;
-  prereq?: string;
+  /** One tech id, or several (all required), so later techs can need nodes from two branches. */
+  prereq?: string | string[];
+  /** Added to the tier in the cost formula (see `techCostCards`). Default 0. */
+  costOffset?: number;
   dlc?: string;
   description: string;
   onUnlock?(ctx: Ctx, pid: Id): void;
   replace?: boolean;
 }
 
-export const BASE_TECH_DEFS: TechDef[] = [
-  {
-    id: 'base.road_engineering',
-    name: 'Road Engineering',
-    branch: 'base',
-    tier: 1,
-    description: 'Roads built above the base limit cost 1 less wood.'
-  },
-  {
-    id: 'base.harbor_charters',
-    name: 'Harbor Charters',
-    branch: 'base',
-    tier: 2,
-    prereq: 'base.road_engineering',
-    description: 'Your 3:1 ports trade at 2:1.'
-  },
-  {
-    id: 'base.literacy',
-    name: 'Philosophy & Literacy',
-    branch: 'base',
-    tier: 2,
-    prereq: 'base.road_engineering',
-    description: 'Cuts the card cost of all future technologies by a third.'
-  },
-  {
-    id: 'base.fortified_towns',
-    name: 'Fortified Towns',
-    branch: 'base',
-    tier: 3,
-    prereq: 'base.harbor_charters',
-    description: 'Grants +1 garrison strength on each of your settlements and cities.',
-    onUnlock(ctx, pid) {
-      for (const v of ctx.g.board.vertices) {
-        if (v.piece?.owner === pid) addGarrison(ctx.g, pid, 'vertex', v.id, 1);
-      }
-    }
-  }
-];
+/**
+ * Techs that exist in every game. Empty on purpose: the 5 root techs and every later node are added with
+ * `api.define(TECH_DEFS, def)` (Tech Tree Design.md), so tech content never lives in engine code.
+ */
+export const BASE_TECH_DEFS: TechDef[] = [];
 
 export function allTechDefs(g: GameState, reg: Registry): Map<string, TechDef> {
   const map = new Map<string, TechDef>();
@@ -500,21 +467,34 @@ export function hasTech(g: GameState, pid: Id, techId: string): boolean {
   return getPlayerTechs(g, pid).includes(techId);
 }
 
+/** Tech cost constants, all in one place. Tune them in the sim matrix (Tech Tree Design.md, section 2). */
+export const TECH_COST = { settlement: 1, city: 2, castle: 3, divisor: 3, floor: 2 };
+
+/** The prerequisite ids of a tech as a list (empty for a root). */
+export function techPrereqs(def: TechDef): string[] {
+  if (!def.prereq) return [];
+  return Array.isArray(def.prereq) ? def.prereq : [def.prereq];
+}
+
+/** This player's building value V: settlements x1, cities x2, castles x3 (weights from `TECH_COST`). */
+export function techBuildingValue(g: GameState, pid: Id): number {
+  return (
+    placedCount(g, pid, 'settlement') * TECH_COST.settlement +
+    placedCount(g, pid, 'city') * TECH_COST.city +
+    placedCount(g, pid, 'castle') * TECH_COST.castle
+  );
+}
+
 /**
- * Polytopia-inspired tech cost by empire size:
- *  - Base cards needed = `tier + Math.ceil(buildingCount / 2)`.
- *  - If the player owns `base.literacy`, cost is reduced by ~1/3 (`Math.max(1, Math.floor(cost * 2 / 3))`).
- *  - If the player has 0 techs and qualifies for Catch-up (`isCatchUpEligible`), cost is reduced by 1 (min 1).
+ * Per-player tech cost in cards (Tech Tree Design.md, section 2):
+ *  - `cost = max(floor, tier + offset + ceil(V / divisor))`, where V is `techBuildingValue`.
+ *  - If the player has 0 techs and qualifies for Catch-up (`isCatchUpEligible`), cost is reduced by 1 (never below the floor).
  */
-export function techCostCards(g: GameState, reg: Registry, pid: Id, tier: 1 | 2 | 3): number {
-  const buildings =
-    placedCount(g, pid, 'settlement') + placedCount(g, pid, 'city') + placedCount(g, pid, 'castle');
-  let cost = tier + Math.ceil(buildings / 2);
-  if (hasTech(g, pid, 'base.literacy')) {
-    cost = Math.max(1, Math.floor((cost * 2) / 3));
-  }
+export function techCostCards(g: GameState, reg: Registry, pid: Id, tier: 1 | 2 | 3, offset = 0): number {
+  const v = techBuildingValue(g, pid);
+  let cost = Math.max(TECH_COST.floor, tier + offset + Math.ceil(v / TECH_COST.divisor));
   if (getPlayerTechs(g, pid).length === 0 && isCatchUpEligible(g, reg, pid)) {
-    cost = Math.max(1, cost - 1);
+    cost = Math.max(TECH_COST.floor, cost - 1);
   }
   return cost;
 }
@@ -529,6 +509,38 @@ export function defaultTechPayment(totalCards: number): Resources {
   return out;
 }
 
+/** Result of `techResearchCheck`: `error` is null when the player may research the tech now (then `def`, `needed` and `pay` are set). */
+export interface TechCheck {
+  error: string | null;
+  def?: TechDef;
+  needed?: number;
+  pay?: Resources;
+}
+
+/**
+ * Every rule for researching `techId` now, with no side effects (state, RNG and log are untouched):
+ * the tree is on, the tech exists (a tech of a disabled DLC does not), it is not owned, its prereqs are owned,
+ * the payment matches the price, and the player can afford it. The `research_tech` action and `researchTech` both use it.
+ */
+export function techResearchCheck(g: GameState, reg: Registry, pid: Id, techId: string, payment?: Resources): TechCheck {
+  const p = getPlayer(g, pid);
+  if (!p) return { error: 'Unknown player' };
+  if (!g.rules?.techTreeOn) return { error: 'The tech tree is off in this game' };
+  const defs = allTechDefs(g, reg);
+  const def = defs.get(techId);
+  if (!def) return { error: 'Unknown technology' };
+  const owned = getPlayerTechs(g, pid);
+  if (owned.includes(techId)) return { error: 'Technology already researched' };
+  const missingPrereq = techPrereqs(def).find(id => !owned.includes(id));
+  if (missingPrereq) return { error: `Requires ${defs.get(missingPrereq)?.name ?? missingPrereq} first` };
+
+  const needed = techCostCards(g, reg, pid, def.tier, def.costOffset ?? 0);
+  const pay = payment ?? defaultTechPayment(needed);
+  if (sumCards(pay) !== needed) return { error: `Tech requires ${needed} resource card(s)` };
+  if (!canAfford(p, pay)) return { error: 'Not enough resources to research this technology' };
+  return { error: null, def, needed, pay };
+}
+
 export function researchTech(
   ctx: Ctx,
   pid: Id,
@@ -536,27 +548,14 @@ export function researchTech(
   payment?: Resources
 ): { ok: boolean; costCards?: number; error?: string } {
   const { g, reg } = ctx;
-  const p = getPlayer(g, pid);
-  if (!p) return { ok: false, error: 'Unknown player' };
-  const defs = allTechDefs(g, reg);
-  const def = defs.get(techId);
-  if (!def) return { ok: false, error: 'Unknown technology' };
+  const check = techResearchCheck(g, reg, pid, techId, payment);
+  if (check.error) return { ok: false, error: check.error };
+  const p = getPlayer(g, pid)!;
+  const def = check.def!;
+  const needed = check.needed!;
   const owned = getPlayerTechs(g, pid);
-  if (owned.includes(techId)) return { ok: false, error: 'Technology already researched' };
-  if (def.prereq && !owned.includes(def.prereq)) {
-    return { ok: false, error: `Requires ${ defs.get(def.prereq)?.name ?? def.prereq } first` };
-  }
 
-  const needed = techCostCards(g, reg, pid, def.tier);
-  const pay = payment ?? defaultTechPayment(needed);
-  if (sumCards(pay) !== needed) {
-    return { ok: false, error: `Tech requires ${needed} resource card(s)` };
-  }
-  if (!canAfford(p, pay)) {
-    return { ok: false, error: 'Not enough resources to research this technology' };
-  }
-
-  payToBank(ctx, p, pay);
+  payToBank(ctx, p, check.pay!);
   g.ext = g.ext || {};
   g.ext.core = g.ext.core || {};
   g.ext.core.techs = g.ext.core.techs || {};
@@ -569,26 +568,52 @@ export function researchTech(
   return { ok: true, costCards: needed };
 }
 
-export const techRoadCostModifier: CostModifier = {
-  id: 'stage1.techRoadEngineering',
-  apply(g, p, def: PieceDef, cost) {
-    if (def.id !== 'road' || !hasTech(g, p.id, 'base.road_engineering')) return cost;
-    if ((cost.wood || 0) <= 1) return cost;
-    return { ...cost, wood: cost.wood - 1 };
-  }
-};
+/** One tech as the tech panel shows it to one player. */
+export interface TechRow {
+  id: string;
+  name: string;
+  branch: string;
+  tier: 1 | 2 | 3;
+  description: string;
+  prereqs: string[];
+  /** This player's price in cards, at their current building value. */
+  cost: number;
+  /** What the default payment takes (wheat + ore). */
+  payment: Resources;
+  owned: boolean;
+  /** True when `researchTech` would succeed right now (turn and phase are the action's business). */
+  canResearch: boolean;
+  /** Why not, in plain words (null when owned or researchable). */
+  reason: string | null;
+}
 
-export const techHarborCharterRatioModifier: RatioModifier = {
-  id: 'stage1.techHarborCharters',
-  order: RATIO_MOD_ORDER.tech,
-  apply(g, reg, pid, _resource, current) {
-    if (!hasTech(g, pid, 'base.harbor_charters')) return current;
-    const ownsThreeToOne = g.board.vertices.some(
-      v => v.piece?.owner === pid && v.port && reg.ports.get(v.port)?.ratio === 3
-    );
-    return ownsThreeToOne ? Math.min(current, 2) : current;
+/**
+ * The tech panel for one player: every tech the game offers (techs of a disabled DLC are left out), in registration order.
+ * Generated from `allTechDefs`, so a DLC that adds nodes needs no panel edit. Read-only, never touches the RNG.
+ */
+export function techPanelFor(g: GameState, reg: Registry, pid: Id): TechRow[] {
+  const owned = getPlayerTechs(g, pid);
+  const rows: TechRow[] = [];
+  for (const def of allTechDefs(g, reg).values()) {
+    const isOwned = owned.includes(def.id);
+    const check = isOwned ? null : techResearchCheck(g, reg, pid, def.id);
+    const cost = techCostCards(g, reg, pid, def.tier, def.costOffset ?? 0);
+    rows.push({
+      id: def.id,
+      name: def.name,
+      branch: def.branch,
+      tier: def.tier,
+      description: def.description,
+      prereqs: techPrereqs(def),
+      cost,
+      payment: defaultTechPayment(cost),
+      owned: isOwned,
+      canResearch: !!check && check.error === null,
+      reason: check ? check.error : null
+    });
   }
-};
+  return rows;
+}
 
 // ---- Local Nemesis Ledger & Round-End Recap -----------------------------
 
@@ -829,8 +854,6 @@ export function checkSandboxTurnLimitWinner(
 /** Registers Stage 1 general modifiers/cards into a pack API when requested. */
 export function registerStage1Definitions(api: PackApi): void {
   api.define(DISCARD_LIMIT_MODS, catchUpDiscardModifier);
-  api.define(COST_MODS, techRoadCostModifier);
-  api.define(RATIO_MODS, techHarborCharterRatioModifier);
   api.define(EVENT_CARDS, hatDayEventCard);
   api.define(SEVEN_STEPS, karaokeSevenStep);
 }

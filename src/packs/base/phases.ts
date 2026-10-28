@@ -15,7 +15,8 @@ export function registerPhases(api: PackApi): void {
     label: 'Your turn',
     actions: [
       'build', 'buy_dev', 'play_dev', 'bank_trade',
-      'propose_trade', 'respond_trade', 'counter_trade', 'confirm_trade', 'cancel_trade', 'end_turn'
+      'propose_trade', 'respond_trade', 'counter_trade', 'confirm_trade', 'cancel_trade', 'research_tech',
+      'upgrade_port', 'convert_tile', 'end_turn'
     ]
   });
 

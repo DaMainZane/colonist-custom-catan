@@ -157,6 +157,42 @@ export interface GameState {
   players: PlayerView[];
   /** How the lobby map was made (lobby only; null for blank, snapshot and legacy boards). */
   mapMeta?: MapMetaView | null;
+  /** Your tech panel: one row per tech the game offers. Null when the tech tree is off or you are spectating. */
+  techTree?: TechRowView[] | null;
+  /** What your root techs can act on (harbor cities, Ground work tiles). Null on the same terms as `techTree`. */
+  techActions?: TechActionsView | null;
+}
+
+export interface TechActionsView {
+  /** Null until you have Harbor charters. */
+  harbor: {
+    cost: Resources;
+    affordable: boolean;
+    resources: string[];
+    ports: { vertexId: number; resource: string | null }[];
+  } | null;
+  /** Null until you have Ground work. `hexes` is empty once it is used. */
+  groundWork: {
+    used: boolean;
+    choices: string[];
+    hexes: { hexId: number; type: string; number: number | null }[];
+  } | null;
+}
+
+export interface TechRowView {
+  id: string;
+  name: string;
+  branch: string;
+  tier: 1 | 2 | 3;
+  description: string;
+  prereqs: string[];
+  /** Your price in cards. */
+  cost: number;
+  /** What research takes (wheat + ore). */
+  payment: Resources;
+  owned: boolean;
+  canResearch: boolean;
+  reason: string | null;
 }
 
 export interface TurnActionItem {
