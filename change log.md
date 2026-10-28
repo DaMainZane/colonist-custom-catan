@@ -12,6 +12,18 @@
 - **In-Place Trade Counter-Offer Editing Without Flicker (`src/client/render/trade.ts`)**:
   - Removed the `.trade-card-enter` slide-in animation from `.trade-counter` and updated `refreshCounterView()` to patch `[data-counter-get]`, `[data-counter-give]`, and `[data-counter-send]` in place when editing a trade, preventing the trade window from disappearing and re-animating on every card click.
 
+## 2026-10-28 (Pass 53: Tech tree UI rework, radial tree and Tech button in the action bar; untested)
+### Changed
+- **Tech button** (`render/techpanel.ts`): moved from the left edge into the action bar, left of Trade (`.act-btn` with a new `tech` icon in `icons.ts`). Shown only while the tree is on; lit (`active-mode`) while the panel is open.
+- **Tech panel** (`render/techpanel.ts`): now a radial tree (hub in the middle, one spoke per branch, one ring per tier), flat circles with a pictogram, tinted by branch with muted tile tokens. Only ring 1 exists today (the 5 roots). Later tiers fill the rings from `TechRowView.tier` and `prereqs` (lines run to the first prereq, or to the hub), so a DLC branch needs no panel edit.
+  - **Description hidden**: shown only on hover or keyboard focus, in the same dark tooltip style as the road price tooltip. The tooltip opens toward the hub so it never leaves the panel.
+  - **Costs as cards**: each tech shows its price as mini resource cards (the build recipe style, dimmed for what the hand cannot cover) instead of text. The Harbor upgrade price uses the same card strip.
+  - **States** (never color alone): owned = green ring and check badge; researchable now = accent ring, click to research; otherwise dimmed.
+  - The Harbor charters and Ground work controls moved to a row under the tree.
+  - The panel is redrawn only when its content changed, so a hovered description does not flicker on each broadcast.
+### Not done
+- Not run: needs `npm run typecheck`, `npm test` and a look in the browser. Later rings (tier 2 and 3) are untested because no such techs exist yet.
+
 ## 2026-10-28 (Pass 51: Tech tree step 6, effects of all 5 root techs; untested)
 ### Added
 - **`techEffects.ts`** (`src/packs/base/techEffects.ts`, registered by `registerTechRoots`): one modifier or helper per root, each asking `hasTech` first, so a game where nobody researched it is unchanged.

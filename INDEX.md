@@ -181,7 +181,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles, active summary strip, player/spectator strip |
 | `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
-| `render/techpanel.ts` | Tech panel: hub-and-spoke view of the tech tree (one spoke per branch, built from the server's `techTree` rows), Tech button, Research buttons; draws its own DOM and styles |
+| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards, description on hover, Harbor charters and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
 
 ## `tests/` (node:test / tsx)
 

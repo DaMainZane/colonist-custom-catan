@@ -33,7 +33,7 @@ Anything under `src/packs/`, `src/shared/`, `src/client/`, and `src/server/` oth
 3. **Check the tree-off rows are unchanged.** Tree-off games must produce the same results as before. The golden test (`tests/golden.test.ts`) must stay green.
 4. **Make sure the tree-on rows run the invariant checks** the other rows run.
 5. **Run** `npm run typecheck` and `npm test`. Ask the user to run them (you may not have a shell) and paste only failure lines.
-6. **Docs.** Add `## 2026-10-28 (Pass 52: Tech tree step 7, sim matrix with the tree on and off)` at the top of `change log.md` (just under `# Change Log`), update the `sim.ts` and `simmatrix.test.ts` rows in `INDEX.md` if what they cover changed, and add one line to `Ideas.md`: "Bots that research and use the root techs (needed before the tree can be balanced)".
+6. **Docs.** Add `## 2026-10-28 (Pass 54: Tech tree step 7, sim matrix with the tree on and off)` at the top of `change log.md` (just under `# Change Log`). Read the top of the file first and use the next free pass number, because other agents add passes too. Update the `sim.ts` and `simmatrix.test.ts` rows in `INDEX.md` if what they cover changed, and add one line to `Ideas.md`: "Bots that research and use the root techs (needed before the tree can be balanced)".
 
 ## Rules
 - A disabled feature has zero effect: no `g.rng` draws, no state, no new legal actions. Do not break this.

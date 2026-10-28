@@ -244,6 +244,8 @@ export interface AddonInfoView {
   description?: string;
   pack: string;
   deps: string[];
+  /** The addon may depend on an addon from another DLC (set by the setup page catalog). */
+  allowCrossDlcDep?: boolean;
   links: { target: string; kind: string }[];
 }
 
