@@ -6,6 +6,7 @@ import { techActionsFor } from '../src/packs/base/techEffects';
 import {
   createGame,
   createRegistry,
+  dispatch,
   effectiveDiscardLimit,
   getPlayerTechs,
   isCatchUpEligible,
@@ -16,6 +17,7 @@ import {
   registerStage1Definitions
 } from '../src/shared';
 import type { GameState, Pack } from '../src/shared';
+import { chooseBotAction } from '../src/server/bots/brain';
 
 function makeGame(seed = 900, rules: Record<string, any> = { techTreeOn: true }) {
   const stage1Pack: Pack = {
@@ -289,3 +291,48 @@ describe('root tech effects with the tree off', () => {
     expect(harbor.resources).toEqual(expect.arrayContaining(['wood', 'brick', 'sheep', 'wheat', 'ore']));
   });
 });
+
+describe('bot tech tree usage when techTreeOn is enabled', () => {
+  it('bots research techs and use convert_tile and upgrade_port when techTreeOn is true', () => {
+    const { g, reg } = makeGame(920, { techTreeOn: true });
+    const p1 = g.players[0];
+    p1.isBot = true;
+    p1.difficulty = 'Overload';
+    p1.pieces.city = 0;
+    p1.pieces.settlement = 0;
+    p1.resources = { wood: 3, brick: 3, sheep: 3, wheat: 3, ore: 3 };
+
+    const move1 = chooseBotAction(g, reg, 'p1', () => 0.5);
+    expect(move1?.type).toBe('research_tech');
+    expect(dispatch(g, reg, { type: move1!.type, playerId: 'p1', payload: move1!.payload }).ok).toBe(true);
+    expect(getPlayerTechs(g, 'p1').length).toBe(1);
+
+    // Grant Ground Work and place a settlement on a desert hex: bot converts the desert tile immediately
+    grant(g, 'p1', 'wildearth.ground_work');
+    const desert = g.board.hexes.find(h => h.type === 'desert') ?? g.board.hexes.find(h => reg.tiles.get(h.type)?.land)!;
+    desert.type = 'desert';
+    desert.number = null;
+    g.board.vertices[desert.vertexIds[0]].piece = { type: 'settlement', owner: 'p1' };
+    const move2 = chooseBotAction(g, reg, 'p1', () => 0.5);
+    expect(move2?.type).toBe('convert_tile');
+    expect(move2?.payload.hexId).toBe(desert.id);
+    expect(dispatch(g, reg, { type: move2!.type, playerId: 'p1', payload: move2!.payload }).ok).toBe(true);
+    expect(desert.type).not.toBe('desert');
+
+    // Grant Harbor Charters, place a city on a 3:1 port, and give high wood production + upgrade resources
+    grant(g, 'p1', 'tidebound.harbor_charters');
+    const portVertex = g.board.vertices.find(v => v.port && reg.ports.get(v.port)?.resource === null) ?? g.board.vertices[0];
+    portVertex.port = '3:1';
+    portVertex.piece = { type: 'city', owner: 'p1' };
+    const adjHex = g.board.hexes[portVertex.hexIds.find(id => reg.tiles.get(g.board.hexes[id]?.type)?.land) ?? 0];
+    adjHex.type = 'wood';
+    adjHex.number = 6;
+    p1.resources = { wood: 4, brick: 1, sheep: 1, wheat: 1, ore: 1 };
+    const move3 = chooseBotAction(g, reg, 'p1', () => 0.5);
+    expect(move3?.type).toBe('upgrade_port');
+    expect(move3?.payload.vertexId).toBe(portVertex.id);
+    expect(dispatch(g, reg, { type: move3!.type, playerId: 'p1', payload: move3!.payload }).ok).toBe(true);
+    expect(ratioFor(g, reg, 'p1', move3!.payload.resource)).toBe(2);
+  });
+});
+

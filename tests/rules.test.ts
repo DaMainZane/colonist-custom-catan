@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { computeVP, createGame, dispatch, getPlayer, makeCtx } from '../src/shared';
+import { computeVP, createGame, dispatch, getPlayer, legalActions, makeCtx } from '../src/shared';
 import type { Board, GameState } from '../src/shared';
 import { longestRoadFor } from '../src/packs/base/longestRoad';
 import { canPlaceSettlement } from '../src/packs/base/placement';
 import { victimsOnHex } from '../src/packs/base/robbing';
 import { tradeRatios } from '../src/packs/base/trading';
-import { defaultSettings, registry, scaledSupply, settingsForPlayers } from '../src/server/runtime';
+import { defaultSettings, registry, rulesFromSettings, scaledSupply, settingsForPlayers } from '../src/server/runtime';
+import { createRoom, rooms } from '../src/server/rooms';
+import { tryReclaimSeat } from '../src/server/socket';
+import { startGame as startServerGame } from '../src/server/game';
 
 /** A fresh game with fixed seat order: p1, p2, ... */
 function newGame(n = 2): GameState {
@@ -335,6 +338,132 @@ describe('rules', () => {
     expect(p1.resources.brick).toBe(0);
     expect(p1.pieces.road).toBe(14);
   });
+
+  it('allows only Knight development cards to be played before rolling the dice', () => {
+    const g = newGame(2);
+    g.phase = 'roll';
+    g.turnCount = 1;
+    const p1 = getPlayer(g, 'p1')!;
+    p1.devCards = ['knight', 'monopoly', 'yearOfPlenty', 'roadBuilding'];
+
+    const legal = legalActions(g, registry, 'p1').filter(a => a.type === 'play_dev');
+    expect(legal.every(a => a.payload.card === 'knight')).toBe(true);
+    expect(legal.length).toBe(1);
+
+    const monoRes = dispatch(g, registry, { type: 'play_dev', playerId: 'p1', payload: { card: 'monopoly', resource: 'wood' } });
+    expect(monoRes.ok).toBe(false);
+    if (!monoRes.ok) expect(monoRes.error).toMatch(/Only a Knight card can be played before rolling the dice/);
+
+    const yopRes = dispatch(g, registry, { type: 'play_dev', playerId: 'p1', payload: { card: 'yearOfPlenty', r1: 'wood', r2: 'brick' } });
+    expect(yopRes.ok).toBe(false);
+
+    const rbRes = dispatch(g, registry, { type: 'play_dev', playerId: 'p1', payload: { card: 'roadBuilding' } });
+    expect(rbRes.ok).toBe(false);
+
+    const knightRes = dispatch(g, registry, { type: 'play_dev', playerId: 'p1', payload: { card: 'knight' } });
+    expect(knightRes.ok).toBe(true);
+    expect(g.phase).toBe('robber');
+  });
+
+  it('guides 2d6 rolls along the bell curve when fairDice is enabled', () => {
+    const s = { ...defaultSettings(), fairDice: true };
+    expect(rulesFromSettings(s).fairDice).toBe(true);
+
+    const g = createGame(registry, {
+      players: [{ id: 'p1', name: 'P1' }, { id: 'p2', name: 'P2' }],
+      rules: { fairDice: true },
+      seed: 42,
+      shuffleSeats: false
+    });
+    for (let i = 0; i < 30; i++) {
+      g.phase = 'roll';
+      g.phaseStack = [];
+      const res = dispatch(g, registry, { type: 'roll', playerId: 'p1', payload: {} });
+      expect(res.ok).toBe(true);
+    }
+    // Over 30 rolls from a 36-card 2d6 shoe (with 6-card cut), 6/7/8 each appear multiple times and 2/12 at most once
+    expect(g.diceStats[7] || 0).toBeGreaterThanOrEqual(3);
+    expect(g.diceStats[6] || 0).toBeGreaterThanOrEqual(2);
+    expect(g.diceStats[8] || 0).toBeGreaterThanOrEqual(2);
+    expect(g.diceStats[2] || 0).toBeLessThanOrEqual(1);
+    expect(g.diceStats[12] || 0).toBeLessThanOrEqual(1);
+  });
+
+  it('auto-denies incoming trade offers for human players who do not have the requested resources', () => {
+    const g = newGame(3);
+    g.phase = 'main';
+    g.turnCount = 1;
+    const p1 = getPlayer(g, 'p1')!;
+    const p2 = getPlayer(g, 'p2')!;
+    const p3 = getPlayer(g, 'p3')!;
+    p1.isBot = false;
+    p2.isBot = false;
+    p3.isBot = false;
+    p1.resources = { wood: 1, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    p2.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }; // cannot afford brick
+    p3.resources = { wood: 0, brick: 1, sheep: 0, wheat: 0, ore: 0 }; // holds brick
+
+    const res = dispatch(g, registry, {
+      type: 'propose_trade',
+      playerId: 'p1',
+      payload: { offer: { wood: 1 }, request: { brick: 1 } }
+    });
+    expect(res.ok).toBe(true);
+    expect(g.trade?.responses.p2).toBe('declined');
+    expect(g.trade?.responses.p3).toBe('pending');
+  });
+
+  it('reconnects a disconnected player back to their bot replacement seat and preserves core state', () => {
+    const room = createRoom('sock_old', 'Alice');
+    room.clientTokens = { tok_alice: 'sock_old' };
+    room.lobbyPlayers.push({
+      id: 'bot_1',
+      name: 'Breeze',
+      avatar: '🤖',
+      color: '#2980b9',
+      isBot: true,
+      difficulty: 'Main'
+    });
+    startServerGame(room);
+    const g = room.game!;
+    const aliceSeat = g.players.find(p => p.id === 'sock_old')!;
+    expect(aliceSeat).toBeDefined();
+
+    // Grant tech state to sock_old, then simulate mid-game disconnect where a bot replacement takes over
+    g.ext.core = { techs: { sock_old: ['bulwark.stockpiling'] } };
+    room.disconnectedSeats = {
+      sock_old: {
+        playerId: 'sock_old',
+        clientId: 'tok_alice',
+        originalName: 'Alice',
+        originalAvatar: aliceSeat.avatar,
+        wasHost: true,
+        disconnectedAt: Date.now()
+      }
+    };
+    aliceSeat.isBot = true;
+    aliceSeat.difficulty = 'Secondary';
+    aliceSeat.name = 'Alice (Bot)';
+
+    const fakeSocket = {
+      id: 'sock_new',
+      join: () => {},
+      emit: () => {}
+    };
+    const reclaimed = tryReclaimSeat(room, fakeSocket, 'tok_alice', 'Alice');
+    expect(reclaimed).toBe(true);
+
+    const restored = g.players.find(p => p.id === 'sock_new')!;
+    expect(restored).toBeDefined();
+    expect(restored.isBot).toBe(false);
+    expect(restored.difficulty).toBeNull();
+    expect(restored.name).toBe('Alice');
+    expect(g.ext.core.techs.sock_new).toEqual(['bulwark.stockpiling']);
+    expect(room.hostId).toBe('sock_new');
+
+    delete rooms[room.code];
+  });
 });
+
 
 

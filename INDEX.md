@@ -91,8 +91,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/ports.ts` | Ports and the old map presets (standard, blank, archipelago) |
 | `base/actions/index.ts` | Registers every base action |
 | `base/actions/build.ts` | `build` |
-| `base/actions/roll.ts` | `roll` (dice, production, seven leads to discard and robber) |
-| `base/actions/devCards.ts` | `buy_dev`, `play_dev` |
+| `base/actions/roll.ts` | `roll` (seeded or fair-dice curve-guided 2d6 rolls, production, seven leads to discard and robber) |
+| `base/actions/devCards.ts` | `buy_dev`, `play_dev` (only Knight playable before rolling in `roll` phase) |
 | `base/actions/bankTrade.ts` | `bank_trade` |
 | `base/actions/tradeOffers.ts` | `propose_trade`, `respond_trade`, `counter_trade`, `confirm_trade`, `cancel_trade` |
 | `base/actions/owed.ts` | `discard`, `pick` |
@@ -132,7 +132,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 
 | File | What it does |
 |---|---|
-| `brain.ts` | Pure bot decision: game state to one action; reads tier, map profile, grudges, and `BOT_GOALS` |
+| `brain.ts` | Pure bot decision: game state to one action; reads tier, map profile, grudges, `BOT_GOALS`, and tech tree research/actions when `techTreeOn` is on |
 | `tiers.ts` | Tier profiles (Main, Secondary, Overload), personalities, hash helper |
 | `mapProfile.ts` | Landmasses, fog and gold share, average pips, port count, resource scarcity |
 | `scheduler.ts` | Waits a game-speed delay, then lets one bot act after each broadcast |
@@ -215,6 +215,6 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × tech tree on/off × bot tiers, invariant checks, `botTested` badge flag |
 | `clankerton_s0.test.ts` | S0.5–S0.11 shared engine services: trade ratios, production pipeline, tile state/durability/wild tokens, Seven Resolver, markers/ledger/strength/relations, history/stats, seeded event deck |
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
-| `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, and the tree-off no-effect check |
+| `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, bot tech tree research/action decisions, and the tree-off no-effect check |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
 

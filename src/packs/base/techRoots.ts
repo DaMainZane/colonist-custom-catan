@@ -16,6 +16,7 @@ export const TECH_ROOTS: TechDef[] = [
     branch: 'tidebound',
     tier: 1,
     costOffset: 0,
+    costResources: ['wood', 'sheep', 'ore'],
     description: 'Upgrade a city on a 3:1 port so one resource of your choice trades 2:1 there (2 wood, 1 brick, 1 ore).'
   },
   {
@@ -24,6 +25,7 @@ export const TECH_ROOTS: TechDef[] = [
     branch: 'bulwark',
     tier: 1,
     costOffset: 0,
+    costResources: ['brick', 'ore', 'wood'],
     description: 'Your discard limit is 2 higher.'
   },
   {
@@ -32,6 +34,7 @@ export const TECH_ROOTS: TechDef[] = [
     branch: 'warlords',
     tier: 1,
     costOffset: 1,
+    costResources: ['ore', 'wheat', 'sheep'],
     description: 'When you play a knight, the steal takes 1 extra card.'
   },
   {
@@ -39,7 +42,8 @@ export const TECH_ROOTS: TechDef[] = [
     name: 'Ground work',
     branch: 'wildearth',
     tier: 1,
-    costOffset: 2,
+    costOffset: 1,
+    costResources: ['wood', 'brick', 'wheat'],
     description: 'Once: turn a land tile next to your settlement or city into a basic resource tile of your choice.'
   },
   {
@@ -48,6 +52,7 @@ export const TECH_ROOTS: TechDef[] = [
     branch: 'guildhall',
     tier: 1,
     costOffset: 0,
+    costResources: ['sheep', 'wheat', 'brick'],
     description: 'Roads past the road cap (2x price) cost 1 less brick or wood.'
   }
 ];

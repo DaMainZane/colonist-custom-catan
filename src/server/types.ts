@@ -47,6 +47,8 @@ export interface Settings {
   fateTokens?: number;
   /** Tech tree toggle (default off). Off means nobody can research. Turning DLCs off does not change it. */
   techTreeOn?: boolean;
+  /** Fair dice toggle (default off). Rolls 2d6 guided by the 36-combination bell curve. */
+  fairDice?: boolean;
 }
 
 /** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */

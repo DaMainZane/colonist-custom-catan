@@ -199,20 +199,20 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
       expect(defs.filter(d => d.tier === 1)).toHaveLength(5);
     });
 
-    it('research_tech: the panel shows each root with this player\'s price, the action spends wheat + ore and records the tech', () => {
+    it('research_tech: the panel shows each root with this player\'s branch-varied price, the action spends the branch resources and records the tech', () => {
       const { g, reg, ctx } = makeStage1Game(411, { techTreeOn: true });
       g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
       g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' }; // V = 2
-      g.players[0].resources = { wood: 0, brick: 0, sheep: 0, wheat: 2, ore: 1 };
+      g.players[0].resources = { wood: 0, brick: 1, sheep: 1, wheat: 1, ore: 1 };
       const action = reg.actions.get('research_tech')!;
       expect(reg.phases.get('main')!.actions).toContain('research_tech');
 
       const rows = techPanelFor(g, reg, 'p1');
       const byId = (id: string) => rows.find(r => r.id === id)!;
       expect(rows).toHaveLength(5);
-      expect(byId('bulwark.stockpiling')).toMatchObject({ cost: 2, payment: { wheat: 1, ore: 1 }, owned: false, canResearch: true, reason: null });
-      expect(byId('warlords.plunder')).toMatchObject({ cost: 3, canResearch: true }); // offset +1
-      expect(byId('wildearth.ground_work')).toMatchObject({ cost: 4, canResearch: false }); // offset +2, needs 2 ore
+      expect(byId('bulwark.stockpiling')).toMatchObject({ cost: 2, payment: { brick: 1, ore: 1 }, owned: false, canResearch: true, reason: null });
+      expect(byId('warlords.plunder')).toMatchObject({ cost: 3, payment: { ore: 1, wheat: 1, sheep: 1 }, canResearch: true }); // offset +1
+      expect(byId('wildearth.ground_work')).toMatchObject({ cost: 3, payment: { wood: 1, brick: 1, wheat: 1 }, canResearch: false }); // offset +1, needs wood
       expect(byId('wildearth.ground_work').reason).toMatch(/not enough/i);
 
       expect(action.validate(ctx, 'p1', { techId: 'bulwark.stockpiling' })).toBeNull();
@@ -222,7 +222,7 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
 
       action.apply(ctx, 'p1', { techId: 'bulwark.stockpiling' });
       expect(getPlayerTechs(g, 'p1')).toEqual(['bulwark.stockpiling']);
-      expect(g.players[0].resources.wheat).toBe(1);
+      expect(g.players[0].resources.brick).toBe(0);
       expect(g.players[0].resources.ore).toBe(0);
       expect(techPanelFor(g, reg, 'p1').find(r => r.id === 'bulwark.stockpiling')).toMatchObject({ owned: true, canResearch: false, reason: null });
       expect(action.validate(ctx, 'p1', { techId: 'bulwark.stockpiling' })).toMatch(/already/i);
@@ -310,6 +310,11 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
       expect(costs()).toEqual([4, 5, 6]);
       setBoard(2, 3, 2); // V = 14
       expect(costs()).toEqual([6, 7, 8]);
+
+      // At vpToWin = 25, divisor scales to max(3, round(0.3 * 25)) = 8 so late-game builds stay affordable
+      g.rules.vpToWin = 25;
+      setBoard(2, 3, 2); // V = 14 -> ceil(14 / 8) = 2
+      expect(costs()).toEqual([3, 4, 5]);
     });
 
     it('keeps the Catch-up discount: 1 less for a player with 0 techs, never below the floor', () => {

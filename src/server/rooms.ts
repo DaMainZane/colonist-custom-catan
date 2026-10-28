@@ -170,6 +170,26 @@ export function rebindPlayerId(
         g.winner.id = newId;
         if (restoreName) g.winner.name = restoreName;
       }
+      const core = g.ext?.core;
+      if (core && typeof core === 'object') {
+        if (core.techs && oldId in core.techs) {
+          core.techs[newId] = core.techs[oldId];
+          delete core.techs[oldId];
+        }
+        if (core.groundWork && oldId in core.groundWork) {
+          core.groundWork[newId] = core.groundWork[oldId];
+          delete core.groundWork[oldId];
+        }
+        if (core.portUpgrades && typeof core.portUpgrades === 'object') {
+          for (const upg of Object.values(core.portUpgrades) as any[]) {
+            if (upg && upg.by === oldId) upg.by = newId;
+          }
+        }
+        if (core.eventDeck?.fateTokens && oldId in core.eventDeck.fateTokens) {
+          core.eventDeck.fateTokens[newId] = core.eventDeck.fateTokens[oldId];
+          delete core.eventDeck.fateTokens[oldId];
+        }
+      }
       rebindTrainingLogPlayerId(room.code, oldId, newId);
     }
   }

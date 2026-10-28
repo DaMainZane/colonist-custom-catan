@@ -1,21 +1,38 @@
 // MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | USED BY: bots/scheduler, bots/sim, server/game
 import {
+  allTechDefs,
   botGoalActionScore,
   botGoalEdgeDelta,
   botGoalThreatDelta,
   botGoalVertexDelta,
   checkAction,
+  defaultTechPayment,
+  effectiveDiscardLimit,
   evaluateBotGoals,
   getPlayer,
   hasBotGoals,
+  hasTech,
   legalActions,
   makeCtx,
+  ratioFor,
   score,
+  techCostCards,
+  techPrereqs,
+  techResearchCheck,
   totalCards
 } from '../../shared';
 import type { Ctx, GameEvent, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 import { pieceCost } from '../../packs/base/building';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
+import {
+  HARBOR_UPGRADE_COST,
+  portUpgrades,
+  TECH_GROUND_WORK,
+  TECH_HARBOR_CHARTERS,
+  TECH_PLUNDER,
+  TECH_ROAD_LEVY,
+  TECH_STOCKPILING
+} from '../../packs/base/techEffects';
 import { openTrades, tradeRatios } from '../../packs/base/trading';
 import { getPips } from '../util';
 import { getMapProfile } from './mapProfile';
@@ -172,7 +189,9 @@ function pipsOfPlayer(g: GameState, reg: Registry, pid: Id): Record<string, numb
 function makeDc(g: GameState, reg: Registry, p: PlayerState, legal: Legal[], rand: Rand): Dc {
   const tier = tierProfile(tierFromDifficulty(p.difficulty));
   const win = g.rules.vpToWin;
-  const limit = g.rules.discardLimit;
+  const limit = g.rules?.techTreeOn || (g.rules?.catchUpMode && g.rules.catchUpMode !== 'off')
+    ? effectiveDiscardLimit(g, reg, p)
+    : g.rules.discardLimit;
 
   const vps = new Map<Id, number>();
   // A bot sees its own hidden VP and only the public score of everyone else.
@@ -855,6 +874,54 @@ function planList(dc: Dc): Plan[] {
     const missing = missingFor(p.resources, cost(ROAD));
     out.push({ type: 'road', priority: 65 - missing.length * 16 + (chase.road ? 25 : 0) + (pers === 'roadHog' ? 10 : 0), cost: cost(ROAD), missing });
   }
+  if (g.rules?.techTreeOn) {
+    let bestTech: { id: string; val: number; cost: Resources; missing: string[] } | null = null;
+    for (const def of allTechDefs(g, reg).values()) {
+      if (hasTech(g, p.id, def.id)) continue;
+      if (techPrereqs(def).some(req => !hasTech(g, p.id, req))) continue;
+      const val = techValue(dc, def.id);
+      if (val <= 0) continue;
+      const total = techCostCards(g, reg, p.id, def.tier, def.costOffset ?? 0);
+      const payment = defaultTechPayment(total, def.costResources ?? def.branch);
+      const missing = missingFor(p.resources, payment);
+      if (!bestTech || val - missing.length * 6 > bestTech.val - bestTech.missing.length * 6) {
+        bestTech = { id: def.id, val, cost: payment, missing };
+      }
+    }
+    if (bestTech) {
+      out.push({
+        type: 'goal',
+        id: `tech:${bestTech.id}`,
+        priority: 68 + Math.min(18, bestTech.val) - bestTech.missing.length * 15,
+        cost: bestTech.cost,
+        missing: bestTech.missing,
+        action: { type: 'research_tech', payload: { techId: bestTech.id } }
+      });
+    }
+    if (dc.tier.id !== 'main' && hasTech(g, p.id, TECH_HARBOR_CHARTERS)) {
+      const upgrades = portUpgrades(g);
+      const portCity = g.board.vertices.find(
+        v => v.piece?.owner === p.id && v.piece.type === CITY && v.port && reg.ports.get(v.port)?.resource === null && !upgrades[v.id]
+      );
+      if (portCity) {
+        const bestRes = pickBest(
+          resIds(reg).filter(r => ratioFor(g, reg, p.id, r) > 2),
+          r => (dc.prod[r] || 0) * 2 + (p.resources[r] || 0)
+        );
+        if (bestRes && ((dc.prod[bestRes] || 0) >= 3 || (p.resources[bestRes] || 0) >= 3)) {
+          const missing = missingFor(p.resources, HARBOR_UPGRADE_COST);
+          out.push({
+            type: 'goal',
+            id: `upgrade_port:${portCity.id}`,
+            priority: 76 - missing.length * 16,
+            cost: HARBOR_UPGRADE_COST,
+            missing,
+            action: { type: 'upgrade_port', payload: { vertexId: portCity.id, resource: bestRes } }
+          });
+        }
+      }
+    }
+  }
   if (hasBotGoals(reg)) {
     for (const gItem of evaluateBotGoals(dc.ctx, p.id, dc.tier.id)) {
       const missing = missingFor(p.resources, gItem.cost || {});
@@ -1060,6 +1127,9 @@ function knightBeforeRoll(dc: Dc): boolean {
   if (robberOnMe(dc)) return true;
   if (dc.tier.devTiming === 0) return false;
   if (awardChase(dc).armyWin) return true;
+  if (dc.g.rules?.techTreeOn && dc.tier.id !== 'main' && hasTech(dc.g, dc.p.id, TECH_PLUNDER)) {
+    if (leaderPressing(dc, 0.45) || dc.g.players.some(o => o.id !== dc.p.id && totalCards(o) >= 2)) return true;
+  }
   return dc.tier.devTiming === 2 && leaderPressing(dc, 0.6);
 }
 
@@ -1068,6 +1138,9 @@ function shouldPlayKnight(dc: Dc): boolean {
   if (dc.tier.devTiming === 0) return true;
   if (robberOnMe(dc) || awardChase(dc).armyWin) return true;
   if (dc.p.devCards.filter(c => c === 'knight').length >= 2) return true;
+  if (dc.g.rules?.techTreeOn && dc.tier.id !== 'main' && hasTech(dc.g, dc.p.id, TECH_PLUNDER)) {
+    if (dc.g.players.some(o => o.id !== dc.p.id && totalCards(o) >= 1)) return true;
+  }
   return leaderPressing(dc, dc.tier.devTiming === 2 ? 0.6 : 0.7);
 }
 
@@ -1157,6 +1230,112 @@ function pickVictim(dc: Dc, victims: Legal[]): Legal | null {
     if (missing.some(r => (o.resources[r] || 0) > 0)) s += 15;
     return s;
   });
+}
+
+// ---- Tech tree decisions (only active when g.rules?.techTreeOn is true) --------------------------------
+
+function techValue(dc: Dc, techId: string): number {
+  const { g, reg, p, tier } = dc;
+  switch (techId) {
+    case TECH_STOCKPILING:
+      return 14 + (totalCards(p) >= 5 ? 6 : 0) + (dc.landlocked ? 4 : 0);
+    case TECH_ROAD_LEVY:
+      return 13 + Math.min(8, (p.stats.longestRoad || 0) * 1.5) + (dc.personality === 'roadHog' ? 5 : 0);
+    case TECH_PLUNDER:
+      return 15 + (p.devCards.includes('knight') ? 8 : 0) + (dc.personality === 'devRusher' ? 5 : 0) + (tier.id === 'overload' ? 4 : 0);
+    case TECH_HARBOR_CHARTERS: {
+      if (tier.id === 'main') return 0;
+      const hasGenericPort = g.board.vertices.some(
+        v => v.piece?.owner === p.id && v.port && reg.ports.get(v.port)?.resource === null
+      );
+      return (hasGenericPort ? 18 : 8) + (dc.personality === 'portTrader' ? 6 : 0);
+    }
+    case TECH_GROUND_WORK: {
+      let touchesDesert = false;
+      let touchesWeakLand = false;
+      for (const v of g.board.vertices) {
+        if (v.piece?.owner !== p.id) continue;
+        for (const hId of v.hexIds) {
+          const h = g.board.hexes[hId];
+          if (!h) continue;
+          if (h.type === 'desert') touchesDesert = true;
+          else if (getPips(h.number) <= 2) touchesWeakLand = true;
+        }
+      }
+      if (touchesDesert) return 19;
+      if (touchesWeakLand) return 12;
+      return 6;
+    }
+    default:
+      return 10;
+  }
+}
+
+function pickGroundWorkMove(dc: Dc, options: Legal[]): BotMove | null {
+  if (options.length === 0) return null;
+  const { g, reg, p } = dc;
+  let best: Legal | null = null;
+  let bestScore = 1;
+  for (const a of options) {
+    const h = g.board.hexes[a.payload.hexId];
+    const newTile = reg.tiles.get(a.payload.resource);
+    const newRes = newTile?.produces;
+    if (!h || !newRes) continue;
+    const oldRes = reg.tiles.get(h.type)?.produces;
+    let myMult = 0;
+    let oppMult = 0;
+    for (const vId of h.vertexIds) {
+      const piece = g.board.vertices[vId]?.piece;
+      if (!piece) continue;
+      const mult = reg.pieces.get(piece.type)?.produces || 1;
+      if (piece.owner === p.id) myMult += mult;
+      else oppMult += mult;
+    }
+    if (myMult === 0) continue;
+    let s = 0;
+    const newNeed = (dc.prod[newRes] || 0) === 0 ? 5 : Math.max(0, 6 - (dc.prod[newRes] || 0));
+    if (h.type === 'desert') {
+      s = myMult * (4 + newNeed) - oppMult * 2;
+    } else if (oldRes && oldRes !== newRes) {
+      const pips = getPips(h.number);
+      const oldProd = dc.prod[oldRes] || 0;
+      const newProd = dc.prod[newRes] || 0;
+      if (oldProd - myMult * pips >= 3 && newProd === 0) {
+        s = myMult * pips * 2 + newNeed - oppMult * pips;
+      }
+    }
+    if (s > bestScore) {
+      bestScore = s;
+      best = a;
+    }
+  }
+  return best ? { type: 'convert_tile', payload: best.payload } : null;
+}
+
+function pickUpgradePortMove(dc: Dc, options: Legal[]): BotMove | null {
+  if (options.length === 0 || dc.tier.id === 'main') return null;
+  const { g, reg, p } = dc;
+  const candidates = options.filter(a => ratioFor(g, reg, p.id, a.payload.resource) > 2);
+  const best = pickBest(
+    candidates,
+    a => (dc.prod[a.payload.resource] || 0) * 2.5 + (p.resources[a.payload.resource] || 0)
+  );
+  if (!best) return null;
+  const r = best.payload.resource;
+  if ((dc.prod[r] || 0) < 2 && (p.resources[r] || 0) < 3) return null;
+  return { type: 'upgrade_port', payload: best.payload };
+}
+
+function pickResearchTechMove(dc: Dc, options: Legal[]): BotMove | null {
+  if (options.length === 0) return null;
+  const best = pickBest(options, a => {
+    const val = techValue(dc, a.payload.techId);
+    if (val <= 0) return -Infinity;
+    const paid = techResearchCheck(dc.g, dc.reg, dc.p.id, a.payload.techId).needed ?? 0;
+    return val - paid * 1.5;
+  });
+  if (!best || techValue(dc, best.payload.techId) <= 0) return null;
+  return { type: 'research_tech', payload: best.payload };
 }
 
 // ---- The decision ---------------------------------------------------------------------------------------------
@@ -1289,6 +1468,12 @@ function mainPhase(dc: Dc): BotMove | null {
     if (road) return road;
   }
 
+  // 2b. Free Ground Work tile conversion when tech tree is active.
+  if (g.rules?.techTreeOn) {
+    const convert = pickGroundWorkMove(dc, of('convert_tile'));
+    if (convert) return convert;
+  }
+
   // 3. City, 4. Settlement.
   const city = build(pickCity(dc, builds(CITY)));
   if (city) return city;
@@ -1297,6 +1482,17 @@ function mainPhase(dc: Dc): BotMove | null {
 
   const { plans, topPlan, surplus } = analyze(dc);
   const overHand = totalCards(p) > dc.threshold;
+
+  // 4a. Tech tree port upgrades and tech research when tech tree is active.
+  if (g.rules?.techTreeOn) {
+    const upgradePort = pickUpgradePortMove(dc, of('upgrade_port'));
+    if (upgradePort) return upgradePort;
+    const closeBuild = plans.some(pl => (pl.type === 'city' || pl.type === 'settlement') && pl.missing.length <= 1);
+    if (overHand || !closeBuild) {
+      const research = pickResearchTechMove(dc, of('research_tech'));
+      if (research) return research;
+    }
+  }
 
   // 4b. Addon / DLC goal actions (when ready) or highest-scored custom legal action.
   if (hasBotGoals(reg)) {

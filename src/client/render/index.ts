@@ -61,6 +61,8 @@ export function renderAll(): void {
       if (eventsCb) eventsCb.checked = !!s.eventsOn;
       const techTreeCb = document.getElementById('setTechTreeOn') as HTMLInputElement | null;
       if (techTreeCb) techTreeCb.checked = !!s.techTreeOn;
+      const fairDiceCb = document.getElementById('setFairDice') as HTMLInputElement | null;
+      if (fairDiceCb) fairDiceCb.checked = !!s.fairDice;
       if (document.getElementById('setFateTokens')) setVal('setFateTokens', s.fateTokens ?? 2);
       setVal('setGold', s.goldTiles);
       setVal('setDesert', s.desertTiles);

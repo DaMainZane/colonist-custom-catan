@@ -437,11 +437,25 @@ export interface TechDef {
   prereq?: string | string[];
   /** Added to the tier in the cost formula (see `techCostCards`). Default 0. */
   costOffset?: number;
+  /** Optional resource rotation override for this tech's research cost; defaults to its branch's thematic resources. */
+  costResources?: string[];
   dlc?: string;
   description: string;
   onUnlock?(ctx: Ctx, pid: Id): void;
   replace?: boolean;
 }
+
+/**
+ * Thematic resource rotations per branch so tech research spreads demand across all 5 resources
+ * instead of competing solely for wheat and ore. Unknown/test branches fall back to wheat + ore.
+ */
+export const BRANCH_TECH_RESOURCES: Record<string, string[]> = {
+  tidebound: ['wood', 'sheep', 'ore'],
+  bulwark: ['brick', 'ore', 'wood'],
+  warlords: ['ore', 'wheat', 'sheep'],
+  wildearth: ['wood', 'brick', 'wheat'],
+  guildhall: ['sheep', 'wheat', 'brick']
+};
 
 /**
  * Techs that exist in every game. Empty on purpose: the 5 root techs and every later node are added with
@@ -486,21 +500,41 @@ export function techBuildingValue(g: GameState, pid: Id): number {
 }
 
 /**
- * Per-player tech cost in cards (Tech Tree Design.md, section 2):
- *  - `cost = max(floor, tier + offset + ceil(V / divisor))`, where V is `techBuildingValue`.
+ * Per-player tech cost in cards (Tech Tree Design.md, sections 2 & 9):
+ *  - `cost = max(floor, tier + offset + ceil(V / divisor))`, where V is `techBuildingValue`
+ *    and `divisor = max(TECH_COST.divisor, round(0.3 * vpToWin))` (3 at 10 VP, 8 at 25 VP).
  *  - If the player has 0 techs and qualifies for Catch-up (`isCatchUpEligible`), cost is reduced by 1 (never below the floor).
  */
 export function techCostCards(g: GameState, reg: Registry, pid: Id, tier: 1 | 2 | 3, offset = 0): number {
   const v = techBuildingValue(g, pid);
-  let cost = Math.max(TECH_COST.floor, tier + offset + Math.ceil(v / TECH_COST.divisor));
+  const vpToWin = Number(g.rules?.vpToWin) || 10;
+  const divisor = Math.max(TECH_COST.divisor, Math.round(0.3 * vpToWin));
+  let cost = Math.max(TECH_COST.floor, tier + offset + Math.ceil(v / divisor));
   if (getPlayerTechs(g, pid).length === 0 && isCatchUpEligible(g, reg, pid)) {
     cost = Math.max(TECH_COST.floor, cost - 1);
   }
   return cost;
 }
 
-/** Default resource breakdown (wheat + ore) for a tech of `tier` costing `totalCards` cards. */
-export function defaultTechPayment(totalCards: number): Resources {
+/**
+ * Default resource breakdown for a tech costing `totalCards` cards.
+ * Uses the branch's thematic resource rotation (or an explicit resource list) when available,
+ * falling back to wheat + ore for generic/test branches.
+ */
+export function defaultTechPayment(totalCards: number, branchOrResources?: string | string[]): Resources {
+  const customList = Array.isArray(branchOrResources)
+    ? branchOrResources
+    : typeof branchOrResources === 'string'
+      ? BRANCH_TECH_RESOURCES[branchOrResources]
+      : undefined;
+  if (customList && customList.length > 0) {
+    const out: Resources = {};
+    for (let i = 0; i < totalCards; i++) {
+      const r = customList[i % customList.length];
+      out[r] = (out[r] || 0) + 1;
+    }
+    return out;
+  }
   const ore = Math.floor(totalCards / 2);
   const wheat = totalCards - ore;
   const out: Resources = {};
@@ -535,7 +569,7 @@ export function techResearchCheck(g: GameState, reg: Registry, pid: Id, techId: 
   if (missingPrereq) return { error: `Requires ${defs.get(missingPrereq)?.name ?? missingPrereq} first` };
 
   const needed = techCostCards(g, reg, pid, def.tier, def.costOffset ?? 0);
-  const pay = payment ?? defaultTechPayment(needed);
+  const pay = payment ?? defaultTechPayment(needed, def.costResources ?? def.branch);
   if (sumCards(pay) !== needed) return { error: `Tech requires ${needed} resource card(s)` };
   if (!canAfford(p, pay)) return { error: 'Not enough resources to research this technology' };
   return { error: null, def, needed, pay };
@@ -606,7 +640,7 @@ export function techPanelFor(g: GameState, reg: Registry, pid: Id): TechRow[] {
       description: def.description,
       prereqs: techPrereqs(def),
       cost,
-      payment: defaultTechPayment(cost),
+      payment: defaultTechPayment(cost, def.costResources ?? def.branch),
       owned: isOwned,
       canResearch: !!check && check.error === null,
       reason: check ? check.error : null

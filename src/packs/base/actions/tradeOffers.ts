@@ -59,7 +59,10 @@ export const proposeTradeAction: ActionDef = {
     const offer = parseResources(reg, payload.offer)!;
     const request = parseResources(reg, payload.request)!;
     const responses: Record<Id, 'pending' | 'accepted' | 'declined'> = {};
-    for (const other of g.players) if (other.id !== pid) responses[other.id] = 'pending';
+    for (const other of g.players) {
+      if (other.id === pid) continue;
+      responses[other.id] = !other.isBot && !holds(other, request) ? 'declined' : 'pending';
+    }
 
     g.ext.base.tradeSeq++;
     const trade: TradeState = { id: g.ext.base.tradeSeq, fromId: pid, offer, request, responses };
@@ -67,6 +70,10 @@ export const proposeTradeAction: ActionDef = {
     p.flags.proposedTrade = true;
     ctx.emit('tradeProposed', { tradeId: trade.id, playerId: pid, offer, request });
     ctx.log(`${p.avatar} ${p.name} wants to give [${describe(offer)}] for [${describe(request)}]`, p.color);
+    if (p.isBot && Object.values(trade.responses).every(r => r === 'declined')) {
+      removeTrade(g, trade.id);
+      ctx.emit('tradeCancelled', { tradeId: trade.id });
+    }
   }
 };
 
@@ -154,7 +161,7 @@ export const counterTradeAction: ActionDef = {
       fromId: pid,
       offer,
       request,
-      responses: { [original.id]: 'pending' }
+      responses: { [original.id]: !original.isBot && !holds(original, request) ? 'declined' : 'pending' }
     };
     pushTrade(g, counter);
     ctx.emit('tradeCountered', { tradeId: counter.id, replacedTradeId: previous.id, playerId: pid, toId: original.id, offer, request });

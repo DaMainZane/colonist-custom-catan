@@ -388,7 +388,8 @@ export function pushSettings(): void {
       maxCities: val('setMaxCity'),
       eventsOn: chk('setEventsOn'),
       fateTokens: val('setFateTokens'),
-      techTreeOn: chk('setTechTreeOn')
+      techTreeOn: chk('setTechTreeOn'),
+      fairDice: chk('setFairDice')
     }
   });
 }

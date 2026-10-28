@@ -16,6 +16,7 @@ import { renderHand } from './hand';
 // Local arrival timestamps keyed by trade id so client countdown bars run smoothly regardless of clock skew.
 const tradeTiming = new Map<number, { startMs: number; durationMs: number }>();
 const seenTradeIds = new Set<number>();
+const autoDeclinedTradeIds = new Set<number>();
 let timerRaf = 0;
 
 function renderTradeCards(counts: Record<string, number>, side?: 'get' | 'give', isEditor?: boolean): string {
@@ -56,6 +57,9 @@ function syncClientTradeTimings(trades: TradeView[]): void {
   }
   for (const id of seenTradeIds) {
     if (!activeIds.has(id)) seenTradeIds.delete(id);
+  }
+  for (const id of autoDeclinedTradeIds) {
+    if (!activeIds.has(id)) autoDeclinedTradeIds.delete(id);
   }
   for (const t of trades) {
     if (tradeTiming.has(t.id)) continue;
@@ -258,8 +262,22 @@ export function renderActiveTradeModal(me: any): void {
     setTradesCollapsed(false);
     tradeTiming.clear();
     seenTradeIds.clear();
+    autoDeclinedTradeIds.clear();
     box.style.display = 'none';
     return;
+  }
+
+  if (me && !state.isSpectator) {
+    for (const t of trades) {
+      if (t.fromId === socket.id) continue;
+      const myResp = (t.responses && t.responses[socket.id]) || 'pending';
+      const canAfford = RESOURCES.every(r => (t.request[r] || 0) <= (me.resources?.[r] || 0));
+      if (myResp === 'pending' && !canAfford && !autoDeclinedTradeIds.has(t.id)) {
+        autoDeclinedTradeIds.add(t.id);
+        if (t.responses) t.responses[socket.id] = 'declined';
+        socket.emit('respondTrade', { code: state.code, decision: 'declined', tradeId: t.id });
+      }
+    }
   }
 
   syncClientTradeTimings(trades);

@@ -61,7 +61,7 @@ function addSpectator(room: Room, socket: any, cleanName: string, cleanClientId:
   broadcastRoom(room);
 }
 
-function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: string): boolean {
+export function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: string): boolean {
   room.clientTokens = room.clientTokens || {};
   room.disconnectedSeats = room.disconnectedSeats || {};
   room.spectators = room.spectators || [];
@@ -69,17 +69,50 @@ function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: strin
   const cleanName = typeof name === 'string' ? name.trim().substring(0, 16) : '';
   const lowerName = cleanName.toLowerCase();
   const disconnectedList = Object.values(room.disconnectedSeats);
+  const playerSeats = disconnectedList.filter(s => !s.isSpectator);
+  const specSeats = disconnectedList.filter(s => s.isSpectator);
 
-  let seatInfo =
+  const matchFrom = (list: typeof disconnectedList) =>
     (cleanClientId && lowerName
-      ? disconnectedList.find(s => s.clientId === cleanClientId && s.originalName.toLowerCase() === lowerName)
-      : undefined) ||
-    (lowerName
-      ? disconnectedList.find(s => s.originalName.toLowerCase() === lowerName)
+      ? list.find(s => s.clientId === cleanClientId && s.originalName.toLowerCase() === lowerName)
       : undefined) ||
     (cleanClientId
-      ? disconnectedList.find(s => s.clientId === cleanClientId)
+      ? list.find(s => s.clientId === cleanClientId)
+      : undefined) ||
+    (lowerName
+      ? list.find(s => s.originalName.toLowerCase() === lowerName)
       : undefined);
+
+  let seatInfo = matchFrom(playerSeats);
+
+  // Fallback: if a bot replacement seat exists in the active game for this clientId or nickname, reclaim it directly.
+  if (!seatInfo && room.game) {
+    const tokenPid = cleanClientId ? room.clientTokens[cleanClientId] : undefined;
+    const botReplacement =
+      (tokenPid ? room.game.players.find(p => p.id === tokenPid && p.isBot) : undefined) ||
+      (lowerName
+        ? room.game.players.find(
+            p =>
+              p.isBot &&
+              (/\(Bot\)$/i.test(p.name) || p.id.startsWith('bot_spec_') || !BOT_NAMES.includes(p.name)) &&
+              p.name.replace(/\s*\(Bot\)$/i, '').toLowerCase() === lowerName
+          )
+        : undefined);
+    if (botReplacement) {
+      seatInfo = {
+        playerId: botReplacement.id,
+        clientId: cleanClientId || undefined,
+        originalName: botReplacement.name.replace(/\s*\(Bot\)$/i, ''),
+        originalAvatar: botReplacement.avatar,
+        wasHost: room.hostId === botReplacement.id,
+        disconnectedAt: Date.now()
+      };
+    }
+  }
+
+  if (!seatInfo) {
+    seatInfo = matchFrom(specSeats);
+  }
 
   if (!seatInfo) return false;
 
@@ -118,7 +151,18 @@ function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: strin
     return false;
   }
 
+  // If the reconnecting player had been placed in spectators first, remove their spectator entry now that they reclaimed their player seat.
+  room.spectators = room.spectators.filter(s => s.id !== socket.id && s.id !== targetOldId);
+
   delete room.disconnectedSeats[targetOldId];
+  for (const [k, v] of Object.entries(room.disconnectedSeats)) {
+    if (
+      (cleanClientId && v.clientId === cleanClientId) ||
+      (lowerName && v.originalName.toLowerCase() === lowerName)
+    ) {
+      delete room.disconnectedSeats[k];
+    }
+  }
   if (cleanClientId) {
     room.clientTokens[cleanClientId] = socket.id;
   }
@@ -128,6 +172,10 @@ function tryReclaimSeat(room: Room, socket: any, clientId?: string, name?: strin
   if (room.cleanupTimer) {
     clearTimeout(room.cleanupTimer);
     room.cleanupTimer = undefined;
+  }
+  if (room.botTimer) {
+    clearTimeout(room.botTimer);
+    room.botTimer = undefined;
   }
 
   socket.join(room.code);
@@ -227,13 +275,27 @@ export function registerSocketHandlers(io: Server): void {
         return addSpectator(targetRoom, socket, cleanName, cleanClientId);
       }
 
+      const lowerName = cleanName.toLowerCase();
       const candidateRoom = cleanCode
         ? rooms[cleanCode]
-        : (Object.values(rooms).reverse().find(r => !r.game && !r.setup && r.lobbyPlayers.length < r.settings.maxPlayers)
-           ?? Object.values(rooms).reverse().find(r => !!r.game || (!r.setup && r.lobbyPlayers.length >= r.settings.maxPlayers)));
+        : (Object.values(rooms).reverse().find(r =>
+            Object.values(r.disconnectedSeats || {}).some(s =>
+              !s.isSpectator &&
+              ((cleanClientId && s.clientId === cleanClientId) || (lowerName && s.originalName.toLowerCase() === lowerName))
+            ) ||
+            r.game?.players.some(
+              p => p.isBot && /\(Bot\)$/i.test(p.name) && p.name.replace(/\s*\(Bot\)$/i, '').toLowerCase() === lowerName
+            )
+          ) ??
+          Object.values(rooms).reverse().find(r => !r.game && !r.setup && r.lobbyPlayers.length < r.settings.maxPlayers) ??
+          Object.values(rooms).reverse().find(r => !!r.game || (!r.setup && r.lobbyPlayers.length >= r.settings.maxPlayers)));
 
       if (!candidateRoom) {
         return socket.emit('errorMsg', cleanCode ? 'Room not found!' : 'No open game to join. Ask the host to create one.');
+      }
+
+      if (tryReclaimSeat(candidateRoom, socket, cleanClientId, cleanName)) {
+        return;
       }
 
       if (candidateRoom.game) {
@@ -316,13 +378,35 @@ export function registerSocketHandlers(io: Server): void {
         return;
       }
 
-      // Mid-game: a seated human player can switch to spectating, handing their seat to a bot.
+      // Mid-game: a spectator who previously had a seat can reclaim their bot replacement seat,
+      // and a seated human player can switch to spectating, handing their seat to a bot.
       const g = room.game;
+      const spec = room.spectators.find(s => s.id === socket.id);
+      if (spec) {
+        const tokenEntry = Object.entries(room.clientTokens || {}).find(([, pid]) => pid === socket.id);
+        if (tryReclaimSeat(room, socket, tokenEntry?.[0], spec.name)) {
+          return;
+        }
+        return socket.emit('errorMsg', 'No open seat to join while the game is in progress.');
+      }
+
       const p = g.players.find(pl => pl.id === socket.id && !pl.isBot);
       if (!p) return;
       const cleanOriginalName = p.name.replace(/\s*\(Bot\)$/i, '');
+      const tokenEntry = Object.entries(room.clientTokens || {}).find(([, pid]) => pid === socket.id);
+      const wasHost = room.hostId === socket.id;
       const botId = `bot_spec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       rebindPlayerId(room, socket.id, botId);
+      room.disconnectedSeats = room.disconnectedSeats || {};
+      room.disconnectedSeats[botId] = {
+        playerId: botId,
+        clientId: tokenEntry?.[0],
+        originalName: cleanOriginalName,
+        originalAvatar: p.avatar,
+        wasHost,
+        disconnectedAt: Date.now()
+      };
+      if (wasHost) room.hostId = socket.id;
       const botPlayer = g.players.find(pl => pl.id === botId);
       if (botPlayer) {
         botPlayer.isBot = true;
@@ -352,6 +436,9 @@ export function registerSocketHandlers(io: Server): void {
             Object.values(r.disconnectedSeats || {}).some(s =>
               (cleanClientId && s.clientId === cleanClientId) ||
               (lowerName && s.originalName.toLowerCase() === lowerName)
+            ) ||
+            r.game?.players.some(
+              p => p.isBot && /\(Bot\)$/i.test(p.name) && p.name.replace(/\s*\(Bot\)$/i, '').toLowerCase() === lowerName
             )
           );
 

@@ -45,7 +45,8 @@ export function defaultSettings(): Settings {
     addons: {},
     eventsOn: false,
     fateTokens: 2,
-    techTreeOn: false
+    techTreeOn: false,
+    fairDice: false
   };
 }
 
@@ -141,8 +142,9 @@ export function rulesFromSettings(s: Settings): Record<string, any> {
   if (s.addons && Object.keys(s.addons).length > 0) out.addons = { ...s.addons };
   if (s.eventsOn) out.eventsOn = true;
   if (s.fateTokens !== undefined && (s.eventsOn || s.fateTokens !== 2)) out.fateTokens = s.fateTokens;
-  // Off is the absence of the rule, so games without the tech tree carry no new state.
+  // Off is the absence of the rule, so games without the tech tree or fair dice carry no new state.
   if (s.techTreeOn) out.techTreeOn = true;
+  if (s.fairDice) out.fairDice = true;
   return out;
 }
 

@@ -52,7 +52,7 @@ export function removeTrade(g: GameState, tradeId?: number): TradeState | null {
   return removed ?? null;
 }
 
-/** Drops any open trade offers whose proposer no longer holds the offered cards. */
+/** Drops any open trade offers whose proposer no longer holds the offered cards, and auto-declines pending human responders who lack the requested cards. */
 export function pruneInvalidTrades(g: GameState): void {
   if (!Array.isArray(g.trades)) {
     if (g.trade) {
@@ -60,12 +60,21 @@ export function pruneInvalidTrades(g: GameState): void {
       if (!proposer || !holds(proposer, g.trade.offer)) g.trade = null;
     }
     g.trades = g.trade ? [g.trade] : [];
-    return;
+  } else {
+    g.trades = g.trades.filter(t => {
+      const proposer = getPlayer(g, t.fromId);
+      return !!proposer && holds(proposer, t.offer);
+    });
   }
-  g.trades = g.trades.filter(t => {
-    const proposer = getPlayer(g, t.fromId);
-    return !!proposer && holds(proposer, t.offer);
-  });
+  for (const t of g.trades) {
+    for (const [pid, resp] of Object.entries(t.responses)) {
+      if (resp !== 'pending') continue;
+      const rp = getPlayer(g, pid);
+      if (rp && !rp.isBot && !holds(rp, t.request)) {
+        t.responses[pid] = 'declined';
+      }
+    }
+  }
   syncPrimaryTrade(g);
 }
 

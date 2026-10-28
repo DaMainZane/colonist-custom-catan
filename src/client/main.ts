@@ -110,15 +110,25 @@ socket.on('reconnectFailed', () => {
   }
 });
 
+let shouldAutoReconnect = false;
+
+socket.on('connect', () => {
+  if (shouldAutoReconnect) {
+    shouldAutoReconnect = false;
+    rejoinSavedRoom();
+  }
+});
+
 socket.on('disconnect', () => {
   if (state?.code) {
+    shouldAutoReconnect = true;
     const me = state.players?.find((p: any) => p.id === socket.id) || state.spectators?.find((s: any) => s.id === socket.id);
     saveSessionInfo(state.code, me?.name?.replace(/\s*\(Bot\)$/i, ''));
     setState(null);
     document.getElementById('gameViewport')!.style.display = 'none';
     document.getElementById('authScreen')!.style.display = 'flex';
     syncRejoinButton();
-    showToast('Disconnected from server. Press Reconnect to rejoin.');
+    showToast('Disconnected from server. Reconnecting...');
   }
 });
 

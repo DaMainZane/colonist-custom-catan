@@ -187,7 +187,8 @@ export function renderHand(me: any, isMyTurn: boolean): void {
   const devTypes = Array.from(new Set([...oldDevs, ...newDevs]));
 
   const devHtml = devTypes.map(c => {
-    const canPlay = isMyTurn && !me.playedDevCardThisTurn && (oldCounts[c] || 0) > 0 && c !== 'vp';
+    const phaseAllowsCard = state.phase === 'MAIN' || (state.phase === 'ROLL' && c === 'knight');
+    const canPlay = isMyTurn && phaseAllowsCard && !me.playedDevCardThisTurn && (oldCounts[c] || 0) > 0 && c !== 'vp';
     return devCardHtml(c, oldCounts[c] || 0, newCounts[c] || 0, canPlay);
   }).join('');
 
@@ -241,6 +242,9 @@ export function onClickHandResource(r: string): void {
 }
 
 export function onClickDevCard(cardType: string): void {
+  if (!state) return;
+  const phaseAllowsCard = state.phase === 'MAIN' || (state.phase === 'ROLL' && cardType === 'knight');
+  if (!phaseAllowsCard) return;
   if (cardType === 'monopoly') {
     setDrawerMode('monopoly');
     renderInlineDrawer(state.players.find(p => p.id === socket.id), true);

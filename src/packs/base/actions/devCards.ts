@@ -30,6 +30,7 @@ export const playDevAction: ActionDef = {
     const p = getPlayer(ctx.g, pid)!;
     const def = ctx.reg.devcards.get(payload?.card);
     if (!def || !def.playable) return 'That card cannot be played';
+    if (ctx.g.phase === 'roll' && payload.card !== 'knight') return 'Only a Knight card can be played before rolling the dice';
     if (p.flags.playedDev) return 'You already played a development card this turn';
     if (!p.devCards.includes(payload.card)) return 'You do not have that card (cards bought this turn must wait)';
     return def.validate ? def.validate(ctx, pid, payload) : null;
@@ -46,6 +47,7 @@ export const playDevAction: ActionDef = {
     const p = getPlayer(ctx.g, pid)!;
     const out: any[] = [];
     for (const card of new Set(p.devCards)) {
+      if (ctx.g.phase === 'roll' && card !== 'knight') continue;
       const def = ctx.reg.devcards.get(card);
       if (!def || !def.playable) continue;
       for (const extra of def.legal ? def.legal(ctx, pid) : [{}]) out.push({ card, ...extra });

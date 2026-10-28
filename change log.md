@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-10-28 (Pass 56: Bot tech tree support, pre-roll dev card restriction, fair dice option, tech tree cost & resource variety rebalancing, client trade auto-deny, and bot-replacement seat reconnect)
+### Added & Changed
+- **Bot Tech Tree Research & Root Tech Usage (`src/server/bots/brain.ts`, `tests/techroots.test.ts`)**:
+  - Enabled bots to evaluate, save for, and research techs (`research_tech`) and use tech actions (`convert_tile` for Wild Earth Ground work, `upgrade_port` for Tidebound Harbor charters) as well as respect `bulwark.stockpiling` (+2 discard limit) and `warlords.plunder` (higher knight play valuation) whenever `g.rules?.techTreeOn` is enabled.
+  - Gated all bot tech tree logic behind `g.rules?.techTreeOn` so tree-off games and `tests/golden.test.ts` remain 100% unchanged.
+- **Pre-Roll Development Card Restriction (`src/packs/base/actions/devCards.ts`, `src/client/render/hand.ts`, `tests/rules.test.ts`)**:
+  - Updated `playDevAction.validate` and `playDevAction.legal` in `src/packs/base/actions/devCards.ts` and client hand UI (`renderHand`, `onClickDevCard` in `src/client/render/hand.ts`) so only `knight` can be played during the `roll` phase before rolling the dice; `monopoly`, `yearOfPlenty`, and `roadBuilding` require the `main` phase.
+- **Fair Dice Option (`src/packs/base/actions/roll.ts`, `src/server/types.ts`, `src/server/runtime.ts`, `src/server/lobby.ts`, `public/index.html`, `src/client/actions.ts`, `src/client/render/index.ts`, `src/client/render/setup.ts`, `tests/rules.test.ts`)**:
+  - Added a `fairDice` lobby/game rule toggle (`#setFairDice` in World Setup) that draws 2d6 rolls from a seeded 36-combination 2d6 shoe (`g.ext.base.fairDiceDeck`, reshuffled with a 6-card cut) so dice rolls follow the 2d6 bell curve (`1,2,3,4,5,6,5,4,3,2,1`) and prevent extreme streaks while leaving default `fairDice: false` games untouched.
+- **Tech Tree Cost & Resource Variety Rebalancing (`src/shared/stage1.ts`, `src/packs/base/techRoots.ts`, `tests/stage1.test.ts`)**:
+  - Added branch-specific resource rotations (`BRANCH_TECH_RESOURCES` and `TechDef.costResources`) across all 5 resources (`tidebound`: wood/sheep/ore, `bulwark`: brick/ore/wood, `warlords`: ore/wheat/sheep, `wildearth`: wood/brick/wheat, `guildhall`: sheep/wheat/brick) instead of charging only wheat and ore.
+  - Scaled the building-value divisor in `techCostCards` with `vpToWin` (`max(3, round(0.3 * vpToWin))`, e.g., `3` at 10 VP and `8` at 25 VP) and lowered `wildearth.ground_work` `costOffset` from `2` to `1`.
+- **Auto-Deny Trade When Client Lacks Requested Resources (`src/packs/base/actions/tradeOffers.ts`, `src/packs/base/trading.ts`, `src/client/render/trade.ts`, `tests/rules.test.ts`)**:
+  - Automatically sets human responder status to `'declined'` on `propose_trade`, `counter_trade`, and `pruneInvalidTrades` when the human player does not hold the requested resources, and auto-emits `respondTrade: 'declined'` on the client in `renderActiveTradeModal`.
+- **Reconnect Player Back to Bot Replacement Seat (`src/server/rooms.ts`, `src/server/socket.ts`, `src/client/main.ts`, `tests/rules.test.ts`)**:
+  - Updated `rebindPlayerId` in `src/server/rooms.ts` to rebind `g.ext.core` per-player state (`techs`, `groundWork`, `portUpgrades`, `eventDeck.fateTokens`).
+  - Updated `tryReclaimSeat`, `joinRoom`, `toggleSpectate`, and `reconnectRoom` in `src/server/socket.ts` (plus automatic socket reconnect in `src/client/main.ts`) so a disconnected player reconnecting via Reconnect, Join Game, auto-reconnect, or spectator toggle reclaims their bot replacement seat instead of being routed to spectator mode.
+
 ## 2026-10-28 (Pass 55: Tech tree tiers, the two-lane split and the Tidebound tree; docs only, no code)
 ### Added
 - **`Tech Tree Design.md`**: section 6 (the 4 tiers: base, lock-in, boost, defining, each with an offset band and a price at V = 2), section 7 (every DLC branch forks into two lanes after its root; the lock is economic, not a rule; tech panel needs fork layout), section 8 (the full Tidebound tree: root Raise the Port, Expansion lane with Rickety bridges, Salvage crew, Pirate hunter and Grand Causeway, Industrial lane with Fishing nets, Net works, Harbor master and Harbor empire; port ladder; lane identity; code impact list), section 9 (5 open questions), section 10 (later).
