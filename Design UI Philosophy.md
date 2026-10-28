@@ -96,6 +96,34 @@ One typeface family, two or three sizes, two weights. Numbers (dice, VP, card co
 - **Trade, discard, pick:** same panel style, anchored consistently (bottom sheet on phones, side or corner panel on desktop).
 - **Pieces:** see the Pieces section above.
 
+## Extended references (added 2026-10-28)
+
+More inspiration from John's favorite games. The base direction above does not change (Lichess shell, Mini Metro pictograms, Dorfromantik palette). Every idea below has a role:
+
+- **Accentuate:** pushes the current style further in the same direction. Can be used anywhere.
+- **Contrast:** a deliberate departure that makes a moment stand out. Allowed only in short moments or opt-in themes, never in the base chrome (panels, buttons, hand), so the board stays the hero.
+
+| Reference | What we take | Role | Where it applies |
+|---|---|---|---|
+| **Bad North** | Minimal low poly islands, calm cool sea, tiny but readable pieces, one hot color (red) kept for threats | Accentuate (flat, muted, board first); contrast for the red threat color | Island and archipelago maps, water tiles, robber and raiders, Tidebound, Crimson |
+| **Monument Valley** | Geometric calm, soft pastel pairings, slow deliberate motion, shapes that turn and shift into place. Flat pastel pairs only, no gradients | Accentuate (palette, quiet motion) | Fog reveal, bridges and ships appearing, victory reveal |
+| **Mini Motorway** | Flat line-based graphics, color-coded routes, simple flow animation, pressure and capacity meters | Accentuate | Roads drawn as clean lines, cards travelling along roads on a roll, trade and contract routes, timer bars |
+| **Low poly** | Flat-shaded facets: every face one solid tone, a light and a dark facet per shape, no gradients | Accentuate (still flat) | Optional "depth" look: slightly raised hex tiles with a facet side, faceted DLC pieces (walls, bridges) |
+| **Into the Breach** | Information clarity: show what will happen before it happens, strong silhouettes, grid overlays | Accentuate | Overlay kit (S0.13: pattern, icon and label), robber and 7 previews, event card preview, threatened tiles |
+| **Replaced** | Cinematic framing: limited palette, strong light and shadow, glow against dark, crisp pixel-sharp edges | Contrast | Event title cards, round recap, game start, victory screen. Not during normal play |
+| **Signalis** | Muted retro-futurist look: desaturated grays, one stark red, thin technical line UI, light grain, cold tension | Contrast | Whispers and Crimson themes, dark theme variant only, opt-in |
+| **Railbound** (suggested) | Clean flat track pieces, snap-to-grid clarity, charming tiny characters | Accentuate | How roads, bridges and ships show where a piece can connect; bot avatars and personality |
+| **Unrailed** (suggested) | Chunky voxel and low poly props, playful chaos, readable at small size | Contrast (playful) | Wildlands and Wayfarers pieces, outposts, bot chat humor. Never the base board |
+
+### Guardrails
+
+1. **Flat stays flat.** Low poly means flat-shaded facets, never gradients. Monument Valley's gradients are not used.
+2. **Contrast only in moments or themes.** A contrast treatment lasts a few seconds (a card, a recap) or lives in an opt-in DLC theme. Base panels, buttons and the hand do not change.
+3. **Red is a signal.** Keep red for threats, the robber and danger, plus player red. Never use it as decoration. Keep the threat red clearly different in hue and shape from the player red.
+4. **Never color alone.** Overlays use pattern plus icon plus label (colorblind rule, same as S0.13).
+5. **Performance.** Pass 22 removed SVG blur filters and keeps persistent layers for phones. Glow, grain and scanline effects must be CSS only or prebuilt, off by default on phones, and respect `prefers-reduced-motion`.
+6. **DLC themes.** A DLC may ship a theme block: a set of token overrides on top of the base tokens. Proposed mapping (tune by eye): Tidebound = Bad North and Monument Valley; Whispers and Crimson = Signalis and Replaced; Wildlands and Wayfarers = Unrailed and low poly; Ledger and Heartland = Mini Motorway and Dorfromantik; Bulwark = Into the Breach and low poly.
+
 ## Implementation plan
 
 1. **Design tokens.** Move every color, radius, spacing and font value into CSS variables (`:root` plus a dark theme block). Replace hardcoded hex in `styles.css`, `constants.ts` (`RES_META`), `icons.ts` and `render/board.ts` with tokens.
@@ -112,6 +140,9 @@ One typeface family, two or three sizes, two weights. Numbers (dice, VP, card co
 - Whether player colors should follow the same muted palette or stay brighter than the tiles. Current lean: brighter.
 - Piece rim color: the light rim works on the tested tiles, but John may switch it to black or gray. Try a dark rim and a gray rim in the next preview and compare, including in dark mode.
 - Whether the sheep's cream wool and the fog cloud are too similar at small sizes.
+- Whether the optional low poly "depth" look ships as a theme the player can switch, or only appears in DLC themes.
+- Whether DLC themes are opt-in per player or follow the host's DLC choice.
+- How to do Replaced-style glow and Signalis-style grain without SVG blur filters (CSS only, or prebuilt images).
 
 ## Sample
 ![[../../_attachments/file-20261024175027506.png]]
