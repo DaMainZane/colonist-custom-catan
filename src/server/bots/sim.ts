@@ -219,6 +219,9 @@ export interface SimMatrixDlcComboSpec {
   dlc?: Record<string, boolean>;
   addons?: Record<string, boolean>;
   eventsOn?: boolean;
+  techTreeOn?: boolean;
+  /** Optional scenario subset for this combo (e.g. reduced set for tree-on rows); defaults to all scenarios. */
+  scenarioIds?: string[];
 }
 
 export interface SimMatrixOptions {
@@ -233,6 +236,7 @@ export interface SimMatrixOptions {
 export interface SimMatrixCellResult {
   scenarioId: string;
   dlcComboId: string;
+  techTreeOn: boolean;
   lineupLabel: string;
   games: number;
   finished: number;
@@ -258,7 +262,8 @@ const DEFAULT_MATRIX_SCENARIOS: SimMatrixScenarioSpec[] = [
 ];
 
 const DEFAULT_MATRIX_COMBOS: SimMatrixDlcComboSpec[] = [
-  { id: 'base', dlc: {}, addons: {}, eventsOn: false }
+  { id: 'base', dlc: {}, addons: {}, eventsOn: false, techTreeOn: false },
+  { id: 'tech_base', dlc: {}, addons: {}, eventsOn: false, techTreeOn: true, scenarioIds: ['standard'] }
 ];
 
 const DEFAULT_MATRIX_LINEUPS: TierId[][] = [
@@ -286,6 +291,7 @@ export function runSimMatrix(opts: SimMatrixOptions): SimMatrixResult {
 
   for (const sc of scenarios) {
     for (const combo of dlcCombos) {
+      if (combo.scenarioIds && combo.scenarioIds.length > 0 && !combo.scenarioIds.includes(sc.id)) continue;
       for (const lineup of lineups) {
         const winsByTier: Record<TierId, number> = { main: 0, secondary: 0, overload: 0 };
         const cellErrors: string[] = [];
@@ -299,6 +305,7 @@ export function runSimMatrix(opts: SimMatrixOptions): SimMatrixResult {
           if (combo.dlc && Object.keys(combo.dlc).length > 0) rules.dlc = { ...combo.dlc };
           if (combo.addons && Object.keys(combo.addons).length > 0) rules.addons = { ...combo.addons };
           if (combo.eventsOn) rules.eventsOn = true;
+          if (combo.techTreeOn) rules.techTreeOn = true;
 
           const res = simulateGame({
             seed,
@@ -333,6 +340,7 @@ export function runSimMatrix(opts: SimMatrixOptions): SimMatrixResult {
         cells.push({
           scenarioId: sc.id,
           dlcComboId: combo.id,
+          techTreeOn: Boolean(combo.techTreeOn),
           lineupLabel: lineup.join(' vs '),
           games,
           finished,

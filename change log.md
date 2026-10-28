@@ -1,5 +1,11 @@
 # Change Log
 
+## 2026-10-28 (Pass 54: Tech tree step 7, sim matrix with the tree on and off)
+### Changed
+- **Sim matrix (`src/server/bots/sim.ts`)**: added `techTreeOn` and optional `scenarioIds` filtering to `SimMatrixDlcComboSpec` and `techTreeOn` to `SimMatrixCellResult`. `runSimMatrix` only sets `rules.techTreeOn = true` when a combo enables it, leaving tree-off rows and their rules untouched.
+- **Matrix tests (`tests/simmatrix.test.ts`)**: kept the 4 existing tree-off cells (`standard` and `islands` × `base` and `events_on`, 8 games) unchanged and added 2 tree-on cells on the `standard` map (`tech_base` and `tech_events_on`, 4 extra games, 12 total), running full invariant and completion checks on all rows.
+- **Docs (`INDEX.md`, `Ideas.md`)**: updated `sim.ts` and `simmatrix.test.ts` descriptions in `INDEX.md`, and noted bot research/use of root techs in `Ideas.md`.
+
 ## 2026-10-28 (Pass 53: Tech tree UI rework, radial tree and Tech button in the action bar; untested)
 ### Changed
 - **Tech button** (`render/techpanel.ts`): moved from the left edge into the action bar, left of Trade (`.act-btn` with a new `tech` icon in `icons.ts`). Shown only while the tree is on; lit (`active-mode`) while the panel is open.
