@@ -21,8 +21,10 @@
   - **States** (never color alone): owned = green ring and check badge; researchable now = accent ring, click to research; otherwise dimmed.
   - The Harbor charters and Ground work controls moved to a row under the tree.
   - The panel is redrawn only when its content changed, so a hovered description does not flicker on each broadcast.
+### Fixed
+- **Typecheck error** (`src/client/types.ts`): `AddonInfoView` gained an optional `allowCrossDlcDep` field, which the placeholder DLC catalog in `render/setup.ts` already used (TS2353).
 ### Not done
-- Not run: needs `npm run typecheck`, `npm test` and a look in the browser. Later rings (tier 2 and 3) are untested because no such techs exist yet.
+- Not looked at in the browser yet. Later rings (tier 2 and 3) are untested because no such techs exist yet.
 
 ## 2026-10-28 (Pass 51: Tech tree step 6, effects of all 5 root techs; untested)
 ### Added
