@@ -10,7 +10,7 @@ The user is Cat. Windows and PowerShell. Casual, wants direct answers, gets over
 
 ## State right now
 - Stage 0 (shared services) is done and green. `main` was `4ef7311` plus local commits when this was written.
-- **No DLC addon has gameplay code.** `src/packs/index.ts` has only `base`, `gold`, `fog` in `allPacks`. The DLC cards in `src/client/render/setup.ts` come from a placeholder catalog of 8 made-up packs. The real DLC list is 5 (Tidebound, Bulwark, Warlords, Wild Earth, Guildhall; Rowdy Tavern is cosmetic). Do not trust "Stage 1 is written" in old notes; it means infrastructure only.
+- **No DLC addon has gameplay code.** `src/packs/index.ts` has only `base`, `gold`, `fog` in `allPacks`. The DLC cards in `src/client/render/setup.ts` and scenarios in `src/server/mapmenu.ts` now list the 6 official packs from `Ideas.md` (5 gameplay: Tidebound, Bulwark, Warlords, Wild Earth, Guildhall; plus Rowdy Tavern which is cosmetic/social). Do not trust "Stage 1 is written" in old notes; it means infrastructure only.
 - `src/shared/stage1.ts` has tech logic only: `TECH_DEFS`, `TechDef`, `BASE_TECH_DEFS`, `allTechDefs`, `getPlayerTechs`, `hasTech`, `techCostCards`, `defaultTechPayment`, `researchTech`, plus `techRoadCostModifier` and `techHarborCharterRatioModifier`, registered in `registerStage1Definitions`. Techs are stored in `g.ext.core.techs[pid]`.
 - **Not verified:** whether a research action, a tech panel or bot research logic exists. Check this first.
 
