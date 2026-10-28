@@ -42,6 +42,8 @@ The build order, in short:
 
 ## Tidebound DLC
 
+On map generation: Sea bound increases the width of sea and river drastically (4-5 tiles larger)
+
 On skill tree: split into 2 variant - expansion: bridge maxing, playing for massive bridge movement, encourage expansion and shipwreck hunting, offshore play, and movement; industrial - harbor and fishing maxing: less mobile, but more production and efficiency 
 
 - Tidebound DLC - Add bridges, basically water road, but require one more stone to build. Base number (if game mode has the setting toggle on) of bridge: 10 (all bridges after 10 due to board size expansion cost double to build) [+brainstorm: the "double cost above base" rule already exists for roads/settlements/cities (scale with VP setting), so reuse that limit logic; decide if bridges count toward longest road]  
