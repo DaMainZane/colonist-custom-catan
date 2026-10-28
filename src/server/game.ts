@@ -108,14 +108,24 @@ export function startGame(room: Room): string | null {
   if (room.board.vertices.length < need) return 'Map needs more land tiles for this player count!';
 
   room.setup = false;
-  const rules = rulesFromSettings(settingsForPlayers(room.settings, room.lobbyPlayers.length, room.board.hexes.filter(h => h.type !== 'water').length));
+  const landCount = room.board.hexes.filter(h => h.type !== 'water').length;
+  room.settings = settingsForPlayers(room.settings, room.lobbyPlayers.length, landCount);
+  const rules = rulesFromSettings(room.settings);
   const reg = gameRegistry(rules);
   room.game = createGame(reg, {
-    players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, isBot: p.isBot, difficulty: p.difficulty })),
+    players: room.lobbyPlayers.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, isBot: p.isBot, difficulty: p.difficulty })),
     rules,
     board: structuredClone(room.board),
     shuffleSeats: true
   });
+  room.lobbyPlayers = room.game.players.map<LobbyPlayer>(p => ({
+    id: p.id,
+    name: p.name,
+    avatar: p.avatar,
+    color: p.color,
+    isBot: p.isBot,
+    difficulty: p.difficulty
+  }));
   room.fx = { lastRollHexIds: [], recentProductions: [], recentTransfers: [], animDelayMs: 0 };
   room.animatingUntil = 0;
   room.startedAt = Date.now();
@@ -131,7 +141,7 @@ export function rematch(room: Room): void {
   if (g) {
     // Keep the roster (including bots that replaced disconnected players), in the shuffled seat order.
     room.lobbyPlayers = g.players.map<LobbyPlayer>((p, i) => ({
-      id: p.id, name: p.name, avatar: p.avatar, color: PLAYER_COLORS[i % PLAYER_COLORS.length], isBot: p.isBot, difficulty: p.difficulty
+      id: p.id, name: p.name, avatar: p.avatar, color: p.color || PLAYER_COLORS[i % PLAYER_COLORS.length], isBot: p.isBot, difficulty: p.difficulty
     }));
   }
   room.game = null;

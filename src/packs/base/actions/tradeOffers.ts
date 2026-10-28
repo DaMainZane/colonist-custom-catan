@@ -147,6 +147,7 @@ export const counterTradeAction: ActionDef = {
     const offer = parseResources(reg, payload.offer)!;
     const request = parseResources(reg, payload.request)!;
 
+    previous.responses[pid] = 'declined';
     g.ext.base.tradeSeq++;
     const counter: TradeState = {
       id: g.ext.base.tradeSeq,
@@ -155,8 +156,7 @@ export const counterTradeAction: ActionDef = {
       request,
       responses: { [original.id]: 'pending' }
     };
-    g.trades = [counter, ...openTrades(g).filter(t => t.id !== previous.id)];
-    syncPrimaryTrade(g);
+    pushTrade(g, counter);
     ctx.emit('tradeCountered', { tradeId: counter.id, replacedTradeId: previous.id, playerId: pid, toId: original.id, offer, request });
     ctx.log(`${p.avatar} ${p.name} counters ${original.name}: [${describe(offer)}] for [${describe(request)}]`, p.color);
   }

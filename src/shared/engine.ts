@@ -13,6 +13,7 @@ export interface PlayerInit {
   id: Id;
   name: string;
   avatar?: string;
+  color?: string;
   isBot?: boolean;
   difficulty?: string | null;
 }
@@ -64,7 +65,7 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
     id: pi.id,
     name: pi.name,
     avatar: pi.avatar ?? (pi.isBot ? '🤖' : AVATARS[idx % AVATARS.length]),
-    color: PLAYER_COLORS[idx % PLAYER_COLORS.length],
+    color: pi.color ?? PLAYER_COLORS[idx % PLAYER_COLORS.length],
     isBot: !!pi.isBot,
     difficulty: pi.difficulty ?? (pi.isBot ? 'ADVANCED HARD' : null),
     resources: zero(),

@@ -119,12 +119,13 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
     ? `<span class="avatar trade-who-avatar" style="background:${esc(me.color)}" title="You (${esc(me.name)})">${avatarFace(me.avatar, me.name)}</span>`
     : `<span class="trade-who-group">${uiIcon('users', 18)}</span>`;
 
+  let counterCardHtml = '';
   if (editing) {
     const mine = me || myPlayerView();
     const canSend = sum(counterGive) > 0 && sum(counterGet) > 0 &&
       !!mine && RESOURCES.every(r => (counterGive[r] || 0) <= (mine.resources?.[r] || 0));
-    return `
-      <div class="trade-offer-body trade-counter ${animCls}" data-trade-id="${t.id}">
+    counterCardHtml = `
+      <div class="trade-offer-body trade-counter trade-card-enter" data-trade-id="${t.id}">
         <div class="trade-timer-track" title="Time left"><div class="trade-timer-fill" data-trade-timer="${t.id}"></div></div>
         <div class="trade-rows">
           <div class="counter-picker" title="Click a resource to ask for it">
@@ -148,7 +149,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
         <div class="trade-actions">
           <button class="trade-act-btn accept ${canSend ? '' : 'off'}" ${canSend ? `onclick="sendCounter(${t.id})"` : 'disabled'}
             title="${canSend ? 'Send counter offer' : 'Pick cards you give (that you hold) and cards you get'}">${uiIcon('check', 18)}</button>
-          <button class="trade-act-btn cancel" onclick="cancelCounter()" title="Back to the offer">${uiIcon('close', 18)}</button>
+          <button class="trade-act-btn cancel" onclick="cancelCounter()" title="Cancel counter offer">${uiIcon('close', 18)}</button>
         </div>
       </div>`;
   }
@@ -194,7 +195,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
     actionsHtml = `
       <button class="trade-act-btn accept ${canAfford ? '' : 'off'} ${myResp === 'accepted' ? 'chosen' : ''}" ${canAfford ? `onclick="respondToTrade('accepted', ${t.id})"` : 'disabled'}
         title="${canAfford ? 'Accept trade' : 'Not enough cards'}">${uiIcon('check', 18)}</button>
-      <button class="trade-act-btn edit" onclick="startCounter(${t.id})" title="Edit and counter offer">${uiIcon('swap', 18)}</button>
+      <button class="trade-act-btn edit ${editing ? 'chosen' : ''}" onclick="${editing ? 'cancelCounter()' : `startCounter(${t.id})`}" title="Edit and counter offer">${uiIcon('swap', 18)}</button>
       <button class="trade-act-btn decline ${myResp === 'declined' ? 'off' : ''}" onclick="respondToTrade('declined', ${t.id})" title="Decline trade">${uiIcon('close', 18)}</button>
     `;
   }
@@ -220,6 +221,7 @@ function renderOneTradeCard(t: TradeView, me: any, headerPlayers: any[], isNew: 
       </div>
       <div class="trade-actions">${actionsHtml}</div>
     </div>
+    ${counterCardHtml}
   `;
 }
 

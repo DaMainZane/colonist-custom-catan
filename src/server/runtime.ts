@@ -49,15 +49,18 @@ export function defaultSettings(): Settings {
 }
 
 /** Bank and dev deck sizes of the standard 3-4 player game, the ones the lobby starts with. */
-const STANDARD_SUPPLY = { bankResourcePerType: 19, devKnights: 14, devVp: 5, devRoadBuilding: 2, devYearOfPlenty: 2, devMonopoly: 2 };
-const STANDARD_PIECES = { maxRoads: 15, maxSettlements: 5, maxCities: 4 };
+export const STANDARD_SUPPLY = { bankResourcePerType: 19, devKnights: 14, devVp: 5, devRoadBuilding: 2, devYearOfPlenty: 2, devMonopoly: 2 };
+export const STANDARD_PIECES = { maxRoads: 15, maxSettlements: 5, maxCities: 4 };
 
 /**
- * Piece limits (roads, settlements, cities) scaled to `vpToWin` when above the standard 10 VP.
- * Base limits at 10 VP are 15 roads, 5 settlements, 4 cities. Pieces built above the base limits cost double.
+ * Piece limits (roads, settlements, cities) scaled to `vpToWin` (above standard 10 VP) and map size (`landHexes` above standard 19).
+ * Base limits at 10 VP / 19 land hexes are 15 roads, 5 settlements, 4 cities. Pieces built above the base limits cost double.
  */
-export function scaledPieces(vpToWin: number): typeof STANDARD_PIECES {
-  const mult = Math.max(1, (Number(vpToWin) || 10) / 10);
+export function scaledPieces(vpToWin: number, landHexes = 19): typeof STANDARD_PIECES {
+  const vpMult = Math.max(1, (Number(vpToWin) || 10) / 10);
+  const h = Math.max(1, Number(landHexes) || 19);
+  const mapMult = h <= 19 ? 1 : Math.sqrt(h / 19);
+  const mult = vpMult * mapMult;
   return {
     maxRoads: Math.min(100, Math.ceil(STANDARD_PIECES.maxRoads * mult)),
     maxSettlements: Math.min(50, Math.ceil(STANDARD_PIECES.maxSettlements * mult)),
@@ -79,9 +82,11 @@ function supplyFor(players: number): typeof STANDARD_SUPPLY {
  */
 export function scaledSupply(players: number, landHexes: number): typeof STANDARD_SUPPLY {
   const byTable = supplyFor(players);
-  const bank = Math.min(999, Math.max(byTable.bankResourcePerType, Math.round(landHexes * 0.8)));
+  const h = Math.max(1, Number(landHexes) || 19);
+  const mapMult = h <= 19 ? 1 : Math.sqrt(h / 19);
+  const bank = Math.min(999, Math.max(byTable.bankResourcePerType, Math.round(byTable.bankResourcePerType * mapMult), Math.round(h * 0.8)));
   const tableTotal = byTable.devKnights + byTable.devVp + byTable.devRoadBuilding + byTable.devYearOfPlenty + byTable.devMonopoly;
-  const wantTotal = Math.round(landHexes * 1.2);
+  const wantTotal = Math.max(Math.round(tableTotal * mapMult), Math.round(h * 1.2));
   if (wantTotal <= tableTotal) return { ...byTable, bankResourcePerType: bank };
   const each = Math.min(50, Math.max(byTable.devRoadBuilding, Math.round(wantTotal * 0.08)));
   const vp = Math.min(50, Math.max(5, Math.round(wantTotal * 0.14)));
@@ -104,8 +109,8 @@ export function settingsForPlayers(s: Settings, players: number, landHexes = 0):
     const sameSup = (Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[]).every(k => sup[k] === s[k]);
     if (!sameSup) next = { ...next, ...sup };
   }
-  if (untouchedPieces && s.vpToWin > 10) {
-    const pcs = scaledPieces(s.vpToWin);
+  if (untouchedPieces && (s.vpToWin > 10 || (untouchedSupply && landHexes > 19))) {
+    const pcs = scaledPieces(s.vpToWin, landHexes);
     const samePcs = (Object.keys(STANDARD_PIECES) as (keyof typeof STANDARD_PIECES)[]).every(k => pcs[k] === s[k]);
     if (!samePcs) next = { ...next, ...pcs };
   }

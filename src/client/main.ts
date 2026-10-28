@@ -125,12 +125,13 @@ socket.on('gameState', (newState: any) => {
   const prevMe = state?.players?.find((p: any) => p.id === socket.id);
   const wasDiscarding = (prevMe?.discardPending || 0) > 0;
 
+  const prevTurnCount = state?.turnCount ?? -1;
   setState(newState);
   const meInNewState = newState?.players?.find((p: any) => p.id === socket.id) || newState?.spectators?.find((s: any) => s.id === socket.id);
   if (newState?.code && meInNewState) {
     saveSessionInfo(newState.code, meInNewState.name?.replace(/\s*\(Bot\)$/i, ''));
   }
-  if (state.status === 'LOBBY') {
+  if (state.status === 'LOBBY' || (prevTurnCount !== -1 && state.turnCount !== prevTurnCount)) {
     clearAllInFlight();
   }
   // Back in the lobby after a game: fold the menus away so nothing overlaps; the settings button reopens the dock.
@@ -359,10 +360,13 @@ function init(): void {
     if (svg) svg.classList.remove('is-panning');
   });
   stage.addEventListener('click', (e: MouseEvent) => {
+    const target = e.target as Element | null;
     if (hasDraggedMap) {
-      e.stopPropagation();
-      e.preventDefault();
       setHasDraggedMap(false);
+      if (!target?.closest('#myHandPanel, #activeTradeModal, #inlineDrawerWrap, #gameSettingsMenu')) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
     }
   }, true);
   stage.addEventListener('contextmenu', e => e.preventDefault());

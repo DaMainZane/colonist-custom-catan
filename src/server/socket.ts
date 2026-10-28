@@ -4,7 +4,7 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rebindPlayerId, rooms } from './rooms';
-import { applyMapStart, applyRecipeStyle, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap } from './lobby';
+import { applyMapStart, applyRecipeStyle, countLandHexes, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap, syncSettingsToBoard } from './lobby';
 import { mapOptionsView } from './mapmenu';
 import { applyLoadedPreset, loadPreset, presetStyle, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
@@ -402,12 +402,14 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('addBot', safe(({ code, tier }) => {
       const room = hostLobbyRoom(code);
       if (!room || room.lobbyPlayers.length >= room.settings.maxPlayers) return;
+      const prevPlayers = room.lobbyPlayers.length;
       const tierId = normalizeTier(tier) ?? DEFAULT_TIER;
       const used = new Set(room.lobbyPlayers.map(p => p.name));
       const botName = BOT_NAMES.find(n => !used.has(n)) || `Bot ${room.lobbyPlayers.length}`;
       const bot = createLobbyPlayer(`bot_${Date.now()}_${Math.random()}`, botName, room.lobbyPlayers.length, true, tierId);
       bot.avatar = freeAvatar(room);
       room.lobbyPlayers.push(bot);
+      syncSettingsToBoard(room, undefined, undefined, prevPlayers);
       addLobbyLog(room, `🤖 ${bot.name} [${tierLabel(tierId)}] added`, bot.color);
       noteCrowding(room);
       broadcastRoom(room);
@@ -427,9 +429,11 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('removeBot', safe(({ code }) => {
       const room = hostLobbyRoom(code);
       if (!room) return;
+      const prevPlayers = room.lobbyPlayers.length;
       const idx = room.lobbyPlayers.findLastIndex(p => p.isBot);
       if (idx !== -1) {
         room.lobbyPlayers.splice(idx, 1);
+        syncSettingsToBoard(room, undefined, undefined, prevPlayers);
         broadcastRoom(room);
       }
     }));
@@ -438,11 +442,16 @@ export function registerSocketHandlers(io: Server): void {
       const room = hostLobbyRoom(code);
       if (!room || !newSettings) return;
       const old = room.settings;
+      const prevLand = countLandHexes(room.board);
+      const prevVp = old.vpToWin;
       const { settings: next, dropped } = mergeSettingsDetailed(newSettings, old);
       room.settings = next;
 
       // The map follows its recipe (seed, radius, picks, params, tile counts). Other settings leave painted edits alone.
-      if (recipeKey(old) !== recipeKey(next)) refreshMap(room);
+      if (recipeKey(old) !== recipeKey(next)) {
+        refreshMap(room);
+      }
+      syncSettingsToBoard(room, prevLand, prevVp);
       if (dropped.length > 0) addLobbyLog(room, `Map code: ignored ${dropped.join(', ')} (not available here).`, null);
       broadcastRoom(room);
     }));
@@ -557,8 +566,10 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('paintHex', safe(({ code, hexId, paintType, paintValue }) => {
       const room = hostLobbyRoom(code);
       if (!room) return;
+      const prevLand = countLandHexes(room.board);
       room.board = paintHex(room.board, hexId, paintType, paintValue);
       if (room.mapMeta) room.mapMeta.edited = true;
+      syncSettingsToBoard(room, prevLand);
       broadcastRoom(room);
     }));
 
@@ -615,7 +626,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('discardCards', safe(({ code, discards }) => act(code, 'discard', { cards: discards })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {
-      act(code, 'play_dev', { card: cardType, resource: monopolyResource });
+      act(code, 'play_dev', { card: cardType, resource: monopolyResource }, true);
     }));
 
     socket.on('bankTrade', safe(({ code, give, get }) => act(code, 'bank_trade', { give, get }, true)));

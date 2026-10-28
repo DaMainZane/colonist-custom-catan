@@ -160,7 +160,14 @@ export function startTurn(ctx: Ctx): void {
     for (const hook of ctx.reg.hooks.onRoundStart) hook(ctx);
     ctx.emit('roundStarted', { round: ctx.g.round });
   }
-  for (const p of ctx.g.players) p.flags = {};
+  for (const p of ctx.g.players) {
+    if (p.newDevCards.length > 0) {
+      p.devCards.push(...p.newDevCards);
+      p.newDevCards = [];
+    }
+    p.flags = {};
+  }
+  ctx.g.phaseStack = [];
   for (const hook of ctx.reg.hooks.onTurnStart) hook(ctx);
   setPhase(ctx, 'roll');
   ctx.emit('turnStarted', { playerId: currentPlayer(ctx.g).id, turnCount: ctx.g.turnCount });

@@ -1,5 +1,28 @@
 # Change Log
 
+## 2026-10-27 22:38:00 ICT (UTC+7) (Pass 39: Fix second Knight playability on next turn, restore map-size scaling of resources/dev cards/build limits, stack counter-trades down & pace bot trading, and randomize player turn order preserving colors)
+### Fixed & Added
+- **Second Knight playability after obtaining two Knights in the same turn** (`src/shared/state.ts`, `src/server/bots/brain.ts`, `src/client/main.ts`, `src/server/socket.ts`):
+  - `startTurn` in `src/shared/state.ts` now promotes any remaining `p.newDevCards` into `p.devCards` for all players and resets `ctx.g.phaseStack = []` alongside `p.flags = {}`.
+  - Updated `knightBeforeRoll` and `shouldPlayKnight` in `src/server/bots/brain.ts` so Secondary and Overload bots also play their second Knight on the turn after playing their first Knight (`chase.army` or `knightsPlayed >= 1`).
+  - Cleared in-flight card counters on turn transitions and excluded UI overlays (`#myHandPanel`, `#activeTradeModal`, `#inlineDrawerWrap`, `#gameSettingsMenu`) from map-drag click suppression in `src/client/main.ts`; enabled error toast reporting on `playDevCard` in `src/server/socket.ts`.
+- **Map-size scaling of resources, dev cards, and build limits** (`src/server/runtime.ts`, `src/server/lobby.ts`, `src/server/socket.ts`, `src/server/game.ts`):
+  - Updated `scaledPieces(vpToWin, landHexes)` and `scaledSupply(players, landHexes)` in `src/server/runtime.ts` so build limits (`maxRoads`, `maxSettlements`, `maxCities`), bank resources (`bankResourcePerType`), and dev card counts (`devKnights`, `devVp`, `devRoadBuilding`, `devYearOfPlenty`, `devMonopoly`) scale with map land hex count (`landHexes > 19`) as well as player count and `vpToWin`.
+  - Added `countLandHexes` and `syncSettingsToBoard` in `src/server/lobby.ts` and wired them into `refreshMap`, `applyMapStart`, `applyRecipeStyle`, `updateSettings`, `addBot`, `removeBot`, and `paintHex` so lobby settings and inputs automatically scale whenever the map size changes.
+- **Counter-trade vertical stacking & bot trade pacing** (`src/packs/base/actions/tradeOffers.ts`, `src/client/render/trade.ts`, `src/server/bots/scheduler.ts`):
+  - `counterTradeAction` in `src/packs/base/actions/tradeOffers.ts` now marks `previous.responses[pid] = 'declined'` and pushes the counter offer onto the trade stack (`pushTrade(g, counter)`) instead of deleting the original offer card.
+  - `renderOneTradeCard` in `src/client/render/trade.ts` renders the counter-offer composer card stacked down underneath the original trade offer card rather than replacing it in place.
+  - Increased bot trade response and proposal delays (`respond_trade: 1250ms`, minimum settle lead-in `900ms–1800ms`, `BOT_TRADE_WAIT: 12000ms` with 6s minimum) in `src/server/bots/scheduler.ts` so bot trades are readable and give human players ample time to react.
+- **Randomize player turn order at game start** (`src/shared/engine.ts`, `src/server/game.ts`):
+  - `PlayerInit` and `createGame` in `src/shared/engine.ts` preserve each player's chosen `color` across seat shuffling (`shuffleSeats: true`), and `startGame` in `src/server/game.ts` syncs `room.lobbyPlayers` to the randomized turn order.
+
+## 2026-10-27 21:55:00 ICT (UTC+7) (Pass 38: Clankerton's Stage 0 S0.5–S0.11 & Stage 1 Foundation)
+### Added & Changed
+- **S0.5–S0.11 Core Services (`src/shared/tradeRatio.ts`, `src/shared/production.ts`, `src/shared/tileState.ts`, `src/shared/sevenResolver.ts`, `src/shared/coreServices.ts`, `src/shared/history.ts`, `src/shared/eventDeck.ts`, `tests/clankerton_s0.test.ts`)**:
+  - Verified and completed Stage 0 services: Trade Ratio (`bestTradeRatio`), Production Pipeline (`PROD_MODS`, `PROD_TRIGGERS`), Tile State (`wild` token, durability, `setTileState`), Seven Resolver (`SEVEN_HOOKS`, `resolveSeven`), Markers/Ledger/Strength/Relations (`coreServices.ts`), History Buffer & Stats Registry (`history.ts`), and Seeded Event Deck (`eventDeck.ts`).
+- **Stage 1 Addons (`src/shared/stage1.ts`, `tests/stage1.test.ts`, `INDEX.md`, `Development Plan.md`)**:
+  - Implemented 9 Stage 1 addons across 6 DLC packs (`heartland.estates`, `heartland.harvest_festival`, `tidebound.ships`, `tidebound.bridges`, `bulwark.walls`, `ledger.coins`, `wayfarers.outposts`, `crimson.raiders`, `whispers.pacts`, `wildlands.seasons`).
+
 ## 2026-10-27 16:12:00 ICT (UTC+7) (Pass 37: Fix map radius to 5 for non-standard presets and scenarios & sync Map radius (1-50) input)
 ### Changed
 - **Map presets & quick starts radius (`src/server/lobby.ts`)**: `applyMapStart(room, id)` now sets `room.settings.boardRadius = 5` for every preset apart from `'standard'` (which sets `room.settings.boardRadius = 2`).

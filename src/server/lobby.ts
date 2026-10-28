@@ -5,13 +5,58 @@ import {
 } from '../shared';
 import type { Board, HexInit } from '../shared';
 import { normalizeBotChat } from './bots/dialogue/events';
-import { fullRules, registry, scaledPieces } from './runtime';
+import { STANDARD_PIECES, STANDARD_SUPPLY, fullRules, registry, scaledPieces, scaledSupply } from './runtime';
 import type { MapMeta, Room, Settings } from './types';
 import { clamp } from './util';
 
 const NUMBERS = REAL_NUMBER_POOL;
 
 const isLand = (type: string): boolean => !!registry.tiles.get(type)?.land;
+
+export function countLandHexes(board?: Board | null): number {
+  if (!board?.hexes) return 19;
+  return Math.max(1, board.hexes.filter(h => isLand(h.type)).length);
+}
+
+/**
+ * Keeps bank resources, dev card counts, and build limits (roads, settlements, cities) scaled to the board's
+ * land hex count, player count, and `vpToWin` whenever the host has not manually overridden a given field.
+ */
+export function syncSettingsToBoard(
+  room: Pick<Room, 'settings' | 'board'> & Partial<Pick<Room, 'lobbyPlayers'>>,
+  prevLandHexes?: number,
+  prevVp?: number,
+  prevPlayers?: number
+): void {
+  const s = room.settings;
+  const curLand = countLandHexes(room.board);
+  const oldLand = prevLandHexes ?? curLand;
+  const curPlayers = Math.max(2, room.lobbyPlayers?.length || 4);
+  const oldPlayers = prevPlayers ?? curPlayers;
+  const oldVp = prevVp ?? s.vpToWin;
+
+  const prevSup = scaledSupply(oldPlayers, oldLand);
+  const prevSup4 = scaledSupply(4, oldLand);
+  const nextSup = scaledSupply(curPlayers, curLand);
+
+  const supplyKeys = Object.keys(STANDARD_SUPPLY) as (keyof typeof STANDARD_SUPPLY)[];
+  for (const k of supplyKeys) {
+    if (s[k] === STANDARD_SUPPLY[k] || s[k] === prevSup[k] || s[k] === prevSup4[k]) {
+      s[k] = nextSup[k];
+    }
+  }
+
+  const prevPcs = scaledPieces(oldVp, oldLand);
+  const prevPcs19 = scaledPieces(oldVp, 19);
+  const nextPcs = scaledPieces(s.vpToWin, curLand);
+
+  const pieceKeys = Object.keys(STANDARD_PIECES) as (keyof typeof STANDARD_PIECES)[];
+  for (const k of pieceKeys) {
+    if (s[k] === STANDARD_PIECES[k] || s[k] === prevPcs[k] || s[k] === prevPcs19[k]) {
+      s[k] = nextPcs[k];
+    }
+  }
+}
 
 // ---- Map from a recipe --------------------------------------------------------------------------------------
 
@@ -47,18 +92,21 @@ export function newBoard(settings: Settings, preset?: string): Board {
 }
 
 /** Rebuilds the room's lobby board from its settings and stores the seed that was used (so a rolled seed is never lost). */
-export function refreshMap(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>): void {
+export function refreshMap(room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & Partial<Pick<Room, 'lobbyPlayers'>>): void {
+  const prevLand = countLandHexes(room.board);
   const { board, meta } = generateLobbyMap(room.settings);
   room.settings.mapSeed = meta.recipe.seed;
   room.board = board;
   room.mapMeta = meta;
+  syncSettingsToBoard(room, prevLand);
 }
 
 /**
  * A preset chip. Quick starts set the picks and params and roll a new seed; Blank is the special all-water canvas;
  * a legacy preset (Archipelago, until the M3 shape replaces it) draws a one-off board and clears the picks.
  */
-export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>, id: string): void {
+export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & Partial<Pick<Room, 'lobbyPlayers'>>, id: string): void {
+  const prevLand = countLandHexes(room.board);
   const quick = registry.quickStarts.get(id);
   room.settings.boardRadius = id === 'standard' ? 2 : 5;
   if (quick) {
@@ -71,12 +119,14 @@ export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>
       return;
     }
     refreshMap(room);
+    syncSettingsToBoard(room, prevLand);
     return;
   }
   room.settings.mapPicks = [];
   room.settings.mapParams = {};
   room.board = generateBoard(registry, fullRules(room.settings), createRng(randomSeed()), id);
   room.mapMeta = undefined;
+  syncSettingsToBoard(room, prevLand);
 }
 
 /**
@@ -84,11 +134,13 @@ export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'>
  * again. Picks and params go through the same validation as every other client message.
  */
 export function applyRecipeStyle(
-  room: Pick<Room, 'settings' | 'board' | 'mapMeta'>,
+  room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & Partial<Pick<Room, 'lobbyPlayers'>>,
   style: { radius: number; picks: string[]; params: Record<string, number> }
 ): void {
+  const prevLand = countLandHexes(room.board);
   room.settings = mergeSettings({ boardRadius: style.radius, mapPicks: style.picks, mapParams: style.params, mapSeed: '' }, room.settings);
   refreshMap(room);
+  syncSettingsToBoard(room, prevLand);
 }
 
 /** Everything that decides the lobby map. When this changes the board is rebuilt; other settings leave painted edits alone. */
