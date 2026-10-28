@@ -1,17 +1,5 @@
 # Change Log
 
-## 2026-10-28 02:20:00 ICT (UTC+7) (Pass 52: Fix trade offer button alignment, restore clean card stack numbers, and eliminate trade editor reload flicker)
-### Fixed
-- **Trade Proposal Button & Header Alignment (`src/client/render/trade.ts`, `src/client/styles.css`, `src/client/icons.ts`)**:
-  - Restored the two-column `.trade-offer-main` layout (`badge + cards rows on the left, buttons on the right`, vertically centered) so the trade proposal action buttons (`[✓]`, `[✏️]`, `[✕]`) sit cleanly aligned on the right side of the offer card instead of hanging offset in the bottom row.
-  - Centered the `pencil` SVG icon path (`UI_ICONS.pencil` in `src/client/icons.ts`) inside the `0 0 24 24` viewBox so it is no longer shifted to the top-right corner of the edit button.
-  - Positioned `.trade-collapse-btn` with `position: absolute; right: 10px` inside `.trade-top-avatars` so the opponent avatars in the top header strip stay dead-center.
-- **Trade Card Number Display (`src/client/render/trade.ts`, `src/client/styles.css`)**:
-  - Replaced the overlapping top-right `.trade-card-count` badge (which covered and blocked the resource pictogram icon) with `buildOverlappingStackHtml` from `src/client/icons.ts`, matching `Design UI Philosophy.md` and the player hand / trade drawer (resource glyph on top, count cleanly below the glyph, and overlapping card slices when count > 1).
-  - Restored `.mini-res-card` in `.counter-picker`.
-- **In-Place Trade Counter-Offer Editing Without Flicker (`src/client/render/trade.ts`)**:
-  - Removed the `.trade-card-enter` slide-in animation from `.trade-counter` and updated `refreshCounterView()` to patch `[data-counter-get]`, `[data-counter-give]`, and `[data-counter-send]` in place when editing a trade, preventing the trade window from disappearing and re-animating on every card click.
-
 ## 2026-10-28 (Pass 53: Tech tree UI rework, radial tree and Tech button in the action bar; untested)
 ### Changed
 - **Tech button** (`render/techpanel.ts`): moved from the left edge into the action bar, left of Trade (`.act-btn` with a new `tech` icon in `icons.ts`). Shown only while the tree is on; lit (`active-mode`) while the panel is open.
@@ -25,6 +13,19 @@
 - **Typecheck error** (`src/client/types.ts`): `AddonInfoView` gained an optional `allowCrossDlcDep` field, which the placeholder DLC catalog in `render/setup.ts` already used (TS2353).
 ### Not done
 - Not looked at in the browser yet. Later rings (tier 2 and 3) are untested because no such techs exist yet.
+
+## 2026-10-28 02:20:00 ICT (UTC+7) (Pass 52: Fix trade offer button alignment, restore clean card stack numbers, and eliminate trade editor reload flicker)
+### Fixed
+- **Trade Proposal Button & Header Alignment (`src/client/render/trade.ts`, `src/client/styles.css`, `src/client/icons.ts`)**:
+  - Restored the two-column `.trade-offer-main` layout (`badge + cards rows on the left, buttons on the right`, vertically centered) so the trade proposal action buttons (`[✓]`, `[✏️]`, `[✕]`) sit cleanly aligned on the right side of the offer card instead of hanging offset in the bottom row.
+  - Centered the `pencil` SVG icon path (`UI_ICONS.pencil` in `src/client/icons.ts`) inside the `0 0 24 24` viewBox so it is no longer shifted to the top-right corner of the edit button.
+  - Positioned `.trade-collapse-btn` with `position: absolute; right: 10px` inside `.trade-top-avatars` so the opponent avatars in the top header strip stay dead-center.
+- **Trade Card Number Display (`src/client/render/trade.ts`, `src/client/styles.css`)**:
+  - Replaced the overlapping top-right `.trade-card-count` badge (which covered and blocked the resource pictogram icon) with `buildOverlappingStackHtml` from `src/client/icons.ts`, matching `Design UI Philosophy.md` and the player hand / trade drawer (resource glyph on top, count cleanly below the glyph, and overlapping card slices when count > 1).
+  - Restored `.mini-res-card` in `.counter-picker`.
+- **In-Place Trade Counter-Offer Editing Without Flicker (`src/client/render/trade.ts`)**:
+  - Removed the `.trade-card-enter` slide-in animation from `.trade-counter` and updated `refreshCounterView()` to patch `[data-counter-get]`, `[data-counter-give]`, and `[data-counter-send]` in place when editing a trade, preventing the trade window from disappearing and re-animating on every card click.
+
 
 ## 2026-10-28 (Pass 51: Tech tree step 6, effects of all 5 root techs; untested)
 ### Added
