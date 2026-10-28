@@ -21,6 +21,7 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 5. One chunk = one commit. Claude can't run code, so each chunk ends with the exact commands. Next chunk starts after they pass.
 6. Every addon needs 2+ links incl. one General service (`auditAddons`).
 7. Git: pull only on a clean tree; check for `<<<<<<<` before committing a merge.
+8. Any ideas in tidebound that is noted to be reserve for other dlc will not be included in tidebound development process, it will remain in `Ideas.md` as backlog for future work.
 
 ---
 
@@ -58,12 +59,12 @@ Each chunk adds minimal bot support (reads costs and ratios through services, no
 
 ## 4. Decisions needed
 
-| Before | Decision | Assumed |
-|---|---|---|
-| T5 | Robber on a tile that floods | Stays; tile produces nothing anyway |
-| T4 | Rickety collapse trigger | 7 only |
-| T8 | Harbor build cost; Ideas mentions "max 4 per turn" at 1:1 | Needs a number; plain 1:1 |
-| T11 | 4 tiers vs 5 levels; cost divisor at 25+ VP | `Tech Tree Design.md` §9 |
+| Before | Decision                                                  | Assumed                                                                               |
+| ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| T5     | Robber on a tile that floods                              | Stays; tile produces nothing anyway - Committed                                       |
+| T4     | Rickety collapse trigger                                  | 7 only - Committed                                                                    |
+| T8     | Harbor build cost; Ideas mentions "max 4 per turn" at 1:1 | Needs a number; plain 1:1 max cap of 4 1:1 trade per turn for each harbor - Committed |
+| T11    | 4 tiers vs 5 levels; cost divisor at 25+ VP               | `Tech Tree Design.md` §9 - Check author note in the same file - Committed             |
 
 Resolved: bridges count for Longest Road.
 

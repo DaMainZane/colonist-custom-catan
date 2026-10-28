@@ -201,7 +201,7 @@ T2   Rickety bridges           Fishing nets
 
 ## 9. Open questions
 
-1. **Five levels or four tiers.** The Tidebound drawing has a root plus four nodes per lane, which is five levels. There are four tiers, so tier 3 holds two nodes in a row (3a, 3b). Alternatives: merge 3a and 3b into one node, or allow five tiers.
+1. **Five levels or four tiers.** The Tidebound drawing has a root plus four nodes per lane, which is five levels. There are four tiers, so tier 3 holds two nodes in a row (3a, 3b). Alternatives: merge 3a and 3b into one node, or allow five tiers. - Author note: Both. The base counts as 1 tier/level, dlc tiers are added on top of the base. Think of it as a vent diagram, with base research both belonging to base game and dlc, while tier 2 to 5 is dlc unique only. 
 2. **Does the tree gate the DLC content?** Assumed yes: with the tree on, rickety bridges, fishing nets, feeding and the Harbor only exist after their tech. With the tree off they are available from the start as normal Tidebound addons.
 3. **Port ladder reading.** Assumed: each upgrade lowers a port one step, the Harbor works on any port, and the settlement-only rule covers only the 3:1 to 2:1 upgrade and sits on Fishing nets (move it to Net works if it is too strong early).
 4. **Soft lock.** Is rising price enough to keep a player in one lane, or add a surcharge (for example +2 cards at tiers 3 and 4 if you own a node in the other lane)?
