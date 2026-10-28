@@ -1268,9 +1268,13 @@ function mainPhase(dc: Dc): BotMove | null {
   const builds = (piece: string): Legal[] => of('build').filter(a => a.payload.piece === piece);
   const build = (a: Legal | null): BotMove | null => (a ? { type: 'build', payload: a.payload } : null);
 
-  // My own open offer: wait for answers, then take it down.
+  // My own open offer: wait for answers, then execute with accepting partner or take it down.
   const myTrade = openTrades(g).find(t => t.fromId === p.id);
   if (myTrade) {
+    const acceptedPartner = Object.keys(myTrade.responses).find(id => myTrade.responses[id] === 'accepted');
+    if (acceptedPartner) {
+      return { type: 'confirm_trade', payload: { tradeId: myTrade.id, partnerId: acceptedPartner } };
+    }
     const waiting = Object.values(myTrade.responses).some(r => r === 'pending');
     return waiting ? null : { type: 'cancel_trade', payload: { tradeId: myTrade.id } };
   }

@@ -1,5 +1,37 @@
 # Change Log
 
+## 2026-10-27 23:59:00 ICT (UTC+7) (Pass 44: Colonist-paced bot trading - snappy responses, natural seat stagger, and prompt trade resolution)
+### Changed & Fixed
+- **Bot Trade Response Speed (`src/server/bots/scheduler.ts`)**:
+  - Reduced `BASE_DELAY.respond_trade` from `1250ms` down to `320ms` so bot responses pop in swiftly like in Colonist.io.
+  - Replaced the previous 900ms–1800ms artificial settle delay with a subtle, natural seat stagger (`botIndex * 60ms`), ensuring all bots respond within ~0.5s–0.8s without simultaneously flashing on the exact same frame.
+- **Bot Trade Proposal Window & Resolution (`src/server/bots/scheduler.ts`, `src/server/bots/brain.ts`)**:
+  - Reduced `BOT_TRADE_WAIT` from `12000ms` (and 6s minimum) down to `3600ms` (3.6s, standard Colonist trade window).
+  - When all responses have arrived or when a player accepts the bot's trade, the bot now resolves immediately (~300ms) rather than idling for seconds.
+  - Updated bot `mainPhase` in `src/server/bots/brain.ts` so bots execute `confirm_trade` immediately when an offer is accepted by a partner instead of prematurely cancelling.
+
+## 2026-10-27 23:53:00 ICT (UTC+7) (Pass 43: Fix dice rolling trigger and immediate rolling animation feedback)
+### Fixed
+- **Dice Roll Emit Blockage (`src/client/actions.ts`, `src/client/render/index.ts`, `public/index.html`, `src/client/styles.css`)**:
+  - Fixed client-side `rollDice()` which was blocked from emitting `rollDice` because of references to non-existent properties (`state.myId`, `state.turnPlayerId`).
+  - Restored clean `socket.emit('rollDice', { code: state.code })` emit and added immediate tactile dice roll shake feedback upon click.
+  - Attached direct `onclick="rollDice()"` to `#die1` and `#die2` in addition to `#dicePair` container so clicks anywhere on the dice or faces register instantly.
+  - Fixed `isMyTurn` check in `src/client/render/index.ts` to check `(state.currentPlayerId === socket.id) || (current && current.id === socket.id)`.
+  - Added `cursor: pointer; pointer-events: auto;` to `.dice-pair` and `.die-box`.
+
+## 2026-10-27 23:45:00 ICT (UTC+7) (Pass 42: Interactive physical dice roll & decouple dice rolling from pass turn button)
+### Changed
+- **Decoupled Dice Rolling from Pass Turn Button (`public/index.html`, `src/client/render/index.ts`, `src/client/actions.ts`)**:
+  - Removed dice rolling trigger, dice icon, and "Roll" text from the pass turn button (`#btnMainTurnAction`).
+  - Pass button is now strictly dedicated to passing/ending turns (`mainBtnIcon` set to `uiIcon('pass')` and label "Pass").
+  - The pass button is enabled only during the active player's `MAIN` phase and disabled during `ROLL` (or non-turn) phases.
+  - Updated `mainTurnButton()` in `src/client/actions.ts` to only execute `endTurn()` during `MAIN` phase.
+- **Interactive Board Dice Trigger & Visual Affordances (`public/index.html`, `src/client/styles.css`, `src/client/actions.ts`, `src/client/render/index.ts`)**:
+  - The physical dice pair element (`#dicePair` / `.dice-pair`) is now the direct trigger for rolling.
+  - When in the active player's `ROLL` phase, `#dicePair` dynamically receives `.can-roll`, `title="Click dice to roll!"`, `role="button"`, and keyboard triggers (`Enter` / `Space`).
+  - Added CSS styling and animations: pulsing accent glow (`diceRollPulse`), hover lift and scale, active click compression, and a floating `"CLICK TO ROLL"` prompt badge above the dice.
+  - Guarded client-side `rollDice()` in `src/client/actions.ts` to verify active player turn and `ROLL` phase before emitting to server.
+
 ## 2026-10-27 23:35:00 ICT (UTC+7) (Pass 41: Fix darkened display and blocked clicks caused by unhidden round-recap mount overlay)
 ### Fixed
 - **Screen Darkening and Click Interception Bug (`public/index.html`, `src/client/styles.css`, `src/client/render/overlay.ts`)**:

@@ -11,10 +11,10 @@ import { chooseBotAction } from './brain';
 import { tierFromDifficulty, tierProfile } from './tiers';
 
 /** Base delay per action type in ms (before the game-speed setting divides it). */
-const BASE_DELAY: Record<string, number> = { respond_trade: 1250, discard: 550, pick: 500 };
+const BASE_DELAY: Record<string, number> = { respond_trade: 320, discard: 550, pick: 500 };
 const DEFAULT_DELAY = 700;
-/** How long a human gets to answer a bot's trade offer (before game-speed scaling). */
-const BOT_TRADE_WAIT = 12000;
+/** How long a human gets to answer a bot's trade offer (before game-speed scaling). Colonist-like 3.6s */
+const BOT_TRADE_WAIT = 3600;
 /** Default time limit for a human-proposed trade offer (ms). The lobby setting `tradeTimerSec` overrides it. */
 const HUMAN_TRADE_WAIT = 20000;
 
@@ -74,7 +74,7 @@ export function ensureTradeTimers(room: Room): void {
     if (map.has(trade.id)) continue;
     const isBotOffer = !!getPlayer(g, trade.fromId)?.isBot;
     const humanWaitMs = (Number(room.settings?.tradeTimerSec) || HUMAN_TRADE_WAIT / 1000) * 1000;
-    const durationMs = isBotOffer ? Math.max(6000, delay(room, BOT_TRADE_WAIT)) : humanWaitMs;
+    const durationMs = isBotOffer ? delay(room, BOT_TRADE_WAIT) : humanWaitMs;
     const createdAt = now;
     const expiresAt = now + durationMs;
     const timer = setTimeout(() => {
@@ -152,15 +152,11 @@ function peekNextBotDelay(room: Room): { botId: string; baseMs: number } | null 
     if (!p || !p.isBot) continue;
     const pendingTrade = trades.find(t => t.fromId !== p.id && t.responses[p.id] === 'pending');
     if (pendingTrade) {
-      const createdAt = room.tradeTimers?.get(pendingTrade.id)?.createdAt ?? now;
-      const ageMs = Math.max(0, now - createdAt);
-      const isBotOffer = !!getPlayer(g, pendingTrade.fromId)?.isBot;
-      const hasPendingHuman = g.players.some(
-        x => !x.isBot && x.id !== pendingTrade.fromId && pendingTrade.responses[x.id] === 'pending'
-      );
-      const minSettleMs = isBotOffer && hasPendingHuman ? 1800 : 900;
-      const extraLeadMs = Math.max(0, minSettleMs - ageMs);
-      return { botId: p.id, baseMs: BASE_DELAY.respond_trade + extraLeadMs };
+      // In Colonist, bots evaluate trade offers fast (~320ms) with a natural seat stagger (~60ms)
+      // so all bots answer within ~0.5s–0.8s without simultaneously flashing on the same frame.
+      const botIndex = g.players.findIndex(x => x.id === p.id);
+      const staggerMs = Math.max(0, botIndex) * 60;
+      return { botId: p.id, baseMs: BASE_DELAY.respond_trade + staggerMs };
     }
     if (g.phase === 'discard') {
       if ((p.pending.discard || 0) > 0) return { botId: p.id, baseMs: BASE_DELAY.discard };
@@ -172,8 +168,15 @@ function peekNextBotDelay(room: Room): { botId: string; baseMs: number } | null 
     }
     if (g.players[g.turn]?.id === p.id) {
       const myTrade = trades.find(t => t.fromId === p.id);
-      if (myTrade && Object.values(myTrade.responses).some(r => r === 'pending')) continue;
-      return { botId: p.id, baseMs: myTrade ? 1100 : DEFAULT_DELAY };
+      if (myTrade) {
+        const hasAccept = Object.values(myTrade.responses).some(r => r === 'accepted');
+        const hasPending = Object.values(myTrade.responses).some(r => r === 'pending');
+        // If someone accepted, or if all players have answered (no pending responses left),
+        // resolve immediately with a short natural pause (300ms) like Colonist.
+        if (!hasAccept && hasPending) continue;
+        return { botId: p.id, baseMs: 300 };
+      }
+      return { botId: p.id, baseMs: DEFAULT_DELAY };
     }
   }
   return null;

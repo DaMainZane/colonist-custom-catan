@@ -314,9 +314,9 @@
 
       <!-- Dice, turn pill and actions -->
       <div class="center-hud">
-        <div class="dice-pair" id="dicePair" onclick="rollDice()" title="Roll dice">
-          <div class="die-box" id="die1"></div>
-          <div class="die-box" id="die2"></div>
+        <div class="dice-pair" id="dicePair" onclick="rollDice()" onkeydown="if(event.key==='Enter'||event.key===' ')rollDice()" title="Click to roll dice" role="button" tabindex="0">
+          <div class="die-box" id="die1" onclick="rollDice()"></div>
+          <div class="die-box" id="die2" onclick="rollDice()"></div>
         </div>
         <div class="turn-pill" id="turnStatusPill">Waiting in lobby</div>
         <div class="action-bar">
@@ -344,8 +344,8 @@
             <span class="piece-badge" id="badgeCityCnt">4</span>
             <span data-icon="city" data-size="22"></span><span class="lbl">City</span>
           </button>
-          <button class="act-btn" id="btnMainTurnAction" onclick="mainTurnButton()" title="Roll or pass">
-            <span id="mainBtnIcon" data-icon="dice" data-size="22"></span><span class="lbl" id="mainBtnLbl">Roll</span>
+          <button class="act-btn" id="btnMainTurnAction" onclick="mainTurnButton()" title="Pass turn">
+            <span id="mainBtnIcon" data-icon="pass" data-size="22"></span><span class="lbl" id="mainBtnLbl">Pass</span>
           </button>
         </div>
       </div>

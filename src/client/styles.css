@@ -584,11 +584,66 @@ svg#boardSvg.is-panning * {
   gap: 8px; z-index: 30; pointer-events: none;
 }
 .center-hud > * { pointer-events: auto; }
-.dice-pair { display: flex; gap: 8px; cursor: pointer; border-radius: var(--r-lg); padding: 4px; }
-.dice-pair.can-roll { box-shadow: 0 0 0 3px var(--accent); }
+.dice-pair {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+  pointer-events: auto;
+  border-radius: var(--r-lg);
+  padding: 4px;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+.dice-pair:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.dice-pair.can-roll {
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 16px rgba(224, 114, 59, 0.45);
+  animation: diceRollPulse 1.5s ease-in-out infinite alternate;
+}
+.dice-pair.can-roll:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 0 0 3px var(--accent), 0 6px 20px rgba(224, 114, 59, 0.65);
+}
+.dice-pair.can-roll:active {
+  transform: translateY(1px) scale(0.97);
+}
+.dice-pair.can-roll::after {
+  content: 'CLICK TO ROLL';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: dicePromptBounce 1.5s ease-in-out infinite;
+}
+@keyframes diceRollPulse {
+  0% { box-shadow: 0 0 0 2px var(--accent), 0 0 6px rgba(224, 114, 59, 0.25); }
+  100% { box-shadow: 0 0 0 4px var(--accent), 0 0 20px rgba(224, 114, 59, 0.65); }
+}
+@keyframes dicePromptBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-3px); }
+}
 .die-box {
   width: 52px; height: 52px; border-radius: 10px; background: var(--surface); color: var(--ink);
   box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s ease;
+  cursor: pointer;
+  pointer-events: auto;
 }
 .die-box.rolling { animation: shakeDie 0.35s infinite; }
 @keyframes shakeDie {

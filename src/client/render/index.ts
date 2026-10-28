@@ -23,7 +23,7 @@ export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
   const isSpec = !!state.isSpectator || !me;
   const current = state.players[state.turnIndex];
-  const isMyTurn = !!current && current.id === socket.id;
+  const isMyTurn = Boolean(!isSpec && ((state.currentPlayerId === socket.id) || (current && current.id === socket.id)));
 
   const s = state.settings || {};
 
@@ -126,17 +126,18 @@ export function renderAll(): void {
   btn('btnBuildCity').classList.toggle('active-mode', buildMode === 'city');
 
   const mainBtn = btn('btnMainTurnAction');
-  if (state.phase === 'ROLL') {
-    mainBtn.disabled = !isMyTurn;
-    document.getElementById('mainBtnIcon')!.innerHTML = uiIcon('dice', 22);
-    document.getElementById('mainBtnLbl')!.textContent = 'Roll';
-  } else {
-    mainBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
-    document.getElementById('mainBtnIcon')!.innerHTML = uiIcon('pass', 22);
-    document.getElementById('mainBtnLbl')!.textContent = 'Pass';
-  }
-  mainBtn.classList.toggle('primary', !mainBtn.disabled);
-  document.getElementById('dicePair')!.classList.toggle('can-roll', isMyTurn && state.phase === 'ROLL');
+  const canPass = isMyTurn && state.phase === 'MAIN';
+  mainBtn.disabled = !canPass;
+  document.getElementById('mainBtnIcon')!.innerHTML = uiIcon('pass', 22);
+  document.getElementById('mainBtnLbl')!.textContent = 'Pass';
+  mainBtn.title = canPass ? 'Pass turn' : 'End turn';
+  mainBtn.classList.toggle('primary', canPass);
+
+  const canRoll = isMyTurn && state.phase === 'ROLL';
+  const dicePair = document.getElementById('dicePair')!;
+  dicePair.classList.toggle('can-roll', canRoll);
+  dicePair.title = canRoll ? 'Click dice to roll!' : 'Dice';
+  dicePair.setAttribute('aria-disabled', String(!canRoll));
 
   renderVictoryScreen();
   renderActiveTradeModal(me);

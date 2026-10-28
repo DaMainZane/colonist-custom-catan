@@ -440,11 +440,23 @@ export function setBuildMode(mode: string): void {
 }
 
 export function mainTurnButton(): void {
-  if (state.phase === 'ROLL') rollDice();
-  else endTurn();
+  if (state.phase === 'MAIN') endTurn();
 }
 
-export function rollDice(): void { socket.emit('rollDice', { code: state.code }); }
+export function rollDice(): void {
+  if (!state || !state.code) return;
+  const d1 = document.getElementById('die1');
+  const d2 = document.getElementById('die2');
+  if (d1 && d2) {
+    d1.classList.add('rolling');
+    d2.classList.add('rolling');
+    setTimeout(() => {
+      d1?.classList.remove('rolling');
+      d2?.classList.remove('rolling');
+    }, 380);
+  }
+  socket.emit('rollDice', { code: state.code });
+}
 
 export function buyDevCard(): void {
   socket.emit('buyDevCard', { code: state.code });
