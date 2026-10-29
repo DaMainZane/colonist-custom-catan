@@ -3,7 +3,8 @@
 // with no client change (design section 12, "What the server sends").
 import { allMapOptions } from '../shared';
 import type { AddonInfo, DlcInfo, MapOptionStage, ParamDef, Registry } from '../shared';
-import { registry } from './runtime';
+import { mapRegistryFor, mapRegistryKey, registry } from './runtime';
+import type { Settings } from './types';
 
 export interface MapOptionView {
   id: string;
@@ -138,6 +139,24 @@ export interface MapOptionsView {
   dlcs: DlcInfo[];
   addons: AddonInfo[];
   scenarios: ScenarioPresetView[];
+}
+
+const MAP_VIEW_CACHE_MAX = 32;
+const mapViews = new Map<string, MapOptionsView>();
+
+/**
+ * The map menu data for one room: the options of base plus the addons its DLC toggles turn on. The view is cached per addon set,
+ * so a lobby broadcast costs one key lookup. With no addon on it is the same data as `mapOptionsView()`.
+ */
+export function mapOptionsForSettings(s: Pick<Settings, 'dlc' | 'addons'>): MapOptionsView {
+  const key = mapRegistryKey(s);
+  let view = mapViews.get(key);
+  if (!view) {
+    if (mapViews.size >= MAP_VIEW_CACHE_MAX) mapViews.clear();
+    view = mapOptionsView(mapRegistryFor(s));
+    mapViews.set(key, view);
+  }
+  return view;
 }
 
 /** Every registered option (shapes first, then terrain, numbers, perks), quick start, DLC, addon and scenario, as plain data. */

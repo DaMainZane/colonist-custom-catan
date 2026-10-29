@@ -15,8 +15,8 @@ const cellsOf = (landmasses: number[]): CellInfo[] =>
   landmasses.map((landmass, i) => ({ q: i, r: 0, h: 0, m: 0, coastDist: 0, landmass }));
 
 describe('GEN_VERSION', () => {
-  it('is 5 (hexagon ports follow the real board layout, other shapes keep the general rule; the M3 shapes and add-ons came before)', () => {
-    expect(GEN_VERSION).toBe(5);
+  it('is 6 (Tidebound wide water grows the canvas; hexagon ports follow the real board layout, other shapes keep the general rule)', () => {
+    expect(GEN_VERSION).toBe(6);
   });
 });
 

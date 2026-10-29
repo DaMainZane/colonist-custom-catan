@@ -1,6 +1,6 @@
 // MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | USED BY: server/*, bots, sim
 import { allPacks } from '../packs';
-import { createRegistry, mergeRules, registryFor } from '../shared';
+import { createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';
 import type { Registry, Rules } from '../shared';
 import type { Settings } from './types';
 
@@ -13,6 +13,31 @@ export function gameRegistry(rules?: Record<string, any>): Registry {
     return registryFor(allPacks, rules);
   }
   return registry;
+}
+
+/** The addon set a room's DLC and addon toggles turn on, as a stable string ('' = none, the plain registry). */
+export function mapRegistryKey(s: Pick<Settings, 'dlc' | 'addons'>): string {
+  return [...resolveAddons(allPacks, { dlc: s.dlc, addons: s.addons }).enabled].sort().join(',');
+}
+
+const MAP_REGISTRY_CACHE_MAX = 32;
+const mapRegistries = new Map<string, Registry>();
+
+/**
+ * The registry the lobby builds its map and map menu from: the plain registry while no addon is on, otherwise base plus the
+ * enabled addons (so an addon's map perks, shapes and styles exist only while its DLC and addon are on). Cached per addon set;
+ * the cache is capped because a client can send any toggle combination.
+ */
+export function mapRegistryFor(s: Pick<Settings, 'dlc' | 'addons'>): Registry {
+  const key = mapRegistryKey(s);
+  if (!key) return registry;
+  let reg = mapRegistries.get(key);
+  if (!reg) {
+    if (mapRegistries.size >= MAP_REGISTRY_CACHE_MAX) mapRegistries.clear();
+    reg = registryFor(allPacks, { dlc: s.dlc, addons: s.addons });
+    mapRegistries.set(key, reg);
+  }
+  return reg;
 }
 
 export function defaultSettings(): Settings {

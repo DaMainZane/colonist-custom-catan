@@ -12,8 +12,11 @@ import type { RngState } from './rng';
  *    3 (R + 1) on a hexagon of radius R) instead of an even spread by coast length at a random phase.
  * 5: on the plain hexagon each harbor takes the edge of its sea tile the real board uses (away from the corner tile next to it), so the
  *    gaps run 2, 3, 2, 2, 3, 2, 2, 3, 2 and a corner harbor has a gap of 2 on both sides. Other shapes are unchanged.
+ * 6: Tidebound's wide water grows the canvas around the normal map (`canvasRadiusFor`) and keeps the normal land count, instead of cutting the
+ *    land on the same canvas. Counts that scale with the land (islands, river length, noise size, ring size) read `baseRadius`. Without the
+ *    wide-water pick nothing changes.
  */
-export const GEN_VERSION = 5;
+export const GEN_VERSION = 6;
 
 export const SHARE_PREFIX = 'hx1';
 export const MIN_RADIUS = 1;

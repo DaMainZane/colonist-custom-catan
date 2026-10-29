@@ -13,7 +13,7 @@ import { effectiveFlags, paramOf, resolveMapOptions, resolveParams } from './map
 import type { CellInfo, DropReason, MapCtx, NumbersDef, PerkDef, ShapeOpDef, TerrainDef } from './mapoptions';
 import { validateBoard } from './mapcheck';
 import type { MapIssue, MapReport } from './mapcheck';
-import { canvasCoords, runShape } from './mapshape';
+import { canvasCoords, canvasRadiusFor, runShape, seaExtraOf, seaGrow } from './mapshape';
 import { buildCellInfo } from './mapcells';
 import { mixIslands } from './mapmix';
 
@@ -182,18 +182,30 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     code: 'pick-ignored',
     message: `"${d.id}" ${DROP_TEXT[d.reason]} and was ignored.`
   }));
+  // A wide-water pick (Tidebound) grows the canvas around the normal map: the land count stays what the radius gives, and the extra room is sea,
+  // so wide gaps work at any radius. Only the radius cap can hold it back; say so instead of looking broken.
+  const seaExtra = seaExtraOf(paramOf(resolved.options, params, 'water.extra'));
+  const canvasRadius = canvasRadiusFor(recipe.radius, seaExtra);
+  if (seaExtra > 0 && canvasRadius < recipe.radius + seaGrow(seaExtra)) {
+    warnings.push({
+      code: 'wide-water-small',
+      message: `Wide water needs room: radius ${recipe.radius} is close to the size limit, so the seas stay narrower than asked.`
+    });
+  }
 
   // 2 canvas, 3 shape: shape ops decide which canvas cells are land (the plain hexagon is the whole canvas).
   // Terrain, numbers and extras then work on the land cells only; the rest of the canvas stays water.
-  const canvas = canvasCoords(recipe.radius);
+  // The canvas is the normal map's size, or bigger with a wide-water pick (`shape.radius` says which: a failed shape falls back to the normal size).
   const shapeOps = resolved.options.filter((o): o is ShapeOpDef => o.stage === 'shape');
   const shape = runShape({
-    radius: recipe.radius,
+    radius: canvasRadius,
+    landRadius: recipe.radius,
     ops: shapeOps,
     // Picks like `ragged` or `satellites` clash with the default hexagon; they sit on a continent instead.
     fallbackBase: reg.mapShapes.get('continent') ?? reg.mapShapes.get('hexagon'),
     make: attempt => ({ ...ctxFor('shape'), rng: stageRng(seed, 'shape', attempt), noise: createNoise(`${seed}:shape:${attempt}`) })
   });
+  const canvas = canvasCoords(shape.radius);
   if (shape.fallback) {
     const why = shape.why ? ` Most attempts failed on: ${shape.why}.` : '';
     warnings.push({ code: 'shape-fallback', message: `No shape attempt passed the checks, so the plain hexagon was used.${why} Try another seed or fewer options.` });
@@ -316,7 +328,7 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
   };
 
   // Board loop: keep the shape, redraw the tokens until the checks pass; keep the best attempt if none does. Never throws.
-  const limit = boardAttempts(recipe.radius);
+  const limit = boardAttempts(shape.radius);
   let terrainAttempt = 0;
   let best: { board: Board; report: MapReport; score: number } | null = null;
   let passed = false;

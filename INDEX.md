@@ -61,7 +61,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapgen.ts` | Board generator: shape, terrain, numbers, extras, ports (`generateMap`), plus the old `generateBoard` |
 | `maprecipe.ts` | Map recipe (seed, radius, picks, params), share code, per-stage RNG, `GEN_VERSION` |
 | `mapoptions.ts` | Map option types (shape ops, terrain and number styles, perks, quick starts), flags, pick resolution |
-| `mapshape.ts` | Shape stage: land field, cleanup, exact land count, blob growth, retry loop |
+| `mapshape.ts` | Shape stage: land field, cleanup, exact land count, blob growth, retry loop; wide-water helpers (`seaExtra`, `gapRoom`, `wideGap`, `centersTooClose`) that do nothing without the Tidebound perk |
 | `mapcells.ts` | Per-cell height, moisture, coast distance and landmass; neighbour lists |
 | `mapterrain.ts` | Terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) |
 | `mapmix.ts` | `island_mix` fix-up: every landmass of 4+ tiles gets at least two resource types |
@@ -109,7 +109,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
 | `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
 | `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order (skeleton only, `register()` is empty until T3) |
-| `tidebound/bridges.ts`, `ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T3 to T12) |
+| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a, param `water.extra`); the bridge piece arrives in T3 |
+| `tidebound/ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T4 to T12) |
 
 ## `src/server/` (thin adapter over the engine, plus bots)
 
@@ -119,13 +120,13 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `socket.ts` | Socket handlers for lobby editing, spectating, scenario presets and game actions (all game actions go through engine `dispatch`) |
 | `game.ts` | Game runner: start, rematch, run one action, turn engine events into client effects |
 | `rooms.ts` | Room registry, lobby roster, spectators, status, reconnect (`rebindPlayerId`) |
-| `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge (`dlc`, `addons`, `eventsOn`, `fateTokens`), painting terrain, numbers, robber, ports |
-| `runtime.ts` | Shared base registry, dynamic `gameRegistry(rules)`, settings to rules mapping, defaults |
-| `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots |
+| `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge (`dlc`, `addons`, `eventsOn`, `fateTokens`), painting terrain, numbers, robber, ports; map, picks and quick starts come from the room's DLC-aware registry (`mapRegistryFor`) |
+| `runtime.ts` | Shared base registry, dynamic `gameRegistry(rules)`, the room map registry (`mapRegistryKey`, `mapRegistryFor`: plain while no addon is on, cached per addon set), settings to rules mapping, defaults |
+| `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots; in the lobby sends a socket the room's map option list when its addon set changes |
 | `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal and per-player `pieceCosts`) |
 | `turnClock.ts` | Per-turn clock for humans (base time plus increment per action) |
 | `presets.ts` | Custom map presets as plain JSON: save, validate, rebuild |
-| `mapmenu.ts` | Map options, quick starts, scenario presets, DLCs and addons as JSON for the lobby and setup page |
+| `mapmenu.ts` | Map options, quick starts, scenario presets, DLCs and addons as JSON for the lobby and setup page; `mapOptionsForSettings` gives the list for one room's addon set (cached) |
 | `persistence.ts` | S0.15 Cross-game bot memory & player profile store (`data/bots/*.json`, caps, public-only event filter, schema migration, Render `CTMEM1.` export/import) |
 | `types.ts` | Server room types: settings, room, spectators, client-facing effects |
 | `util.ts` | `clamp`, `getPips` |
@@ -209,6 +210,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapbudget.test.ts` | Generation time budget |
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
 | `tidebound.test.ts` | Tidebound skeleton (T0): 8 addons and links, lobby card data from the manifest, client fallback catalog matches the server ids, DLC off changes nothing, DLC on registers no content yet |
+| `tideboundmap.test.ts` | T2a wide-water perk: registered only with the DLC, perk off = same map, land share, island and continent gaps, wider river, warnings, helpers |
+| `tideboundlobby.test.ts` | T2a2 lobby sees DLC map perks: room registry, per-room menu list, settings merge and share code follow the DLC toggles, lobby map, option list sent per socket |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
 | `score.test.ts` | `score()`, `publicVP()`, score modes, `checkWinner` |

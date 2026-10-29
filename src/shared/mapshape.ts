@@ -5,6 +5,7 @@ import { cellPoint } from './noise';
 import type { NoiseFn } from './noise';
 import { rngInt, rngNext } from './rng';
 import type { RngState } from './rng';
+import { MAX_RADIUS } from './maprecipe';
 import { hexDistance } from './topology';
 
 /** Neighbour directions in ring order (consecutive entries are neighbours of each other). */
@@ -27,13 +28,46 @@ export const SHAPE_ATTEMPTS = 40;
 export const SOFT_ATTEMPTS = 10;
 /** Smallest land count a shaped map may have. */
 export const MIN_LAND = 7;
+/** Most extra sea width a wide-water perk may ask for, in tiles. */
+export const SEA_EXTRA_MAX = 5;
+/** Rings of sea a wide-water pick adds around the normal map per extra tile of water width (rounded up: 4 extra = 6 rings). A starting guess: tune it with the gallery. */
+export const SEA_GROW_PER_EXTRA = 1.5;
+
+/** Cells within `radius` of the center (the size of a canvas). */
+export function cellsWithin(radius: number): number {
+  return 3 * radius * (radius + 1) + 1;
+}
+
+/** The `water.extra` param as a whole number from 0 (no wide-water pick) to SEA_EXTRA_MAX. */
+export function seaExtraOf(raw: unknown): number {
+  return Math.max(0, Math.min(SEA_EXTRA_MAX, Math.floor(Number(raw) || 0)));
+}
+
+/** Rings of sea a wide-water pick adds around the normal map. 0 without the pick. */
+export function seaGrow(extra: number): number {
+  return extra > 0 ? Math.ceil(extra * SEA_GROW_PER_EXTRA) : 0;
+}
+
+/**
+ * The canvas radius for a normal map of `radius` and a wide-water extra: the normal map plus the sea rings, never above MAX_RADIUS.
+ * Tidebound's map is bigger than the base one by design; the land count still comes from `radius`, so the extra room is all sea.
+ */
+export function canvasRadiusFor(radius: number, extra: number): number {
+  return Math.min(MAX_RADIUS, radius + seaGrow(extra));
+}
 
 /**
  * The canvas while the shape stage works on it. Cells are indexed in canvas order (the same order the
  * board uses), so index i here is index i of the canvas everywhere else.
  */
 export interface LandField {
+  /** Radius of the canvas. */
   radius: number;
+  /**
+   * Radius of the normal map the land is sized for. Equal to `radius`, except while a wide-water pick grows the canvas around it.
+   * Everything that scales with the amount of land (land share, island count, river length, noise size) reads this, not `radius`.
+   */
+  baseRadius: number;
   size: number;
   q: number[];
   r: number[];
@@ -73,6 +107,11 @@ export interface LandField {
   /** Smallest allowed size of a main landmass. */
   minSize: number;
   lakes: number;
+  /**
+   * Extra sea width, in tiles, that a wide-water perk asked for (0 = none, the normal map). `tryShape` reads it from the `water.extra` param
+   * before any op runs. Ops widen the water between landmasses and along a river with it, and the land share shrinks to make room.
+   */
+  seaExtra: number;
   /** Set by an op that cannot finish; the attempt is dropped. */
   failed: string | null;
   /**
@@ -82,7 +121,7 @@ export interface LandField {
   notes: string[];
 }
 
-export function createLandField(radius: number, noise: NoiseFn, rng: RngState): LandField {
+export function createLandField(radius: number, noise: NoiseFn, rng: RngState, baseRadius: number = radius): LandField {
   const cells = canvasCoords(radius);
   const size = cells.length;
   const side = 2 * radius + 1;
@@ -96,6 +135,7 @@ export function createLandField(radius: number, noise: NoiseFn, rng: RngState): 
   const nb = cells.map(c => HEX_DIRS.map(([dq, dr]) => at(c.q + dq, c.r + dr)));
   return {
     radius,
+    baseRadius,
     size,
     q: cells.map(c => c.q),
     r: cells.map(c => c.r),
@@ -119,6 +159,7 @@ export function createLandField(radius: number, noise: NoiseFn, rng: RngState): 
     ragged: 0,
     minSize: 1,
     lakes: 0,
+    seaExtra: 0,
     failed: null,
     notes: []
   };
@@ -212,6 +253,40 @@ export function cellDistance(f: LandField, a: number, b: number): number {
   return hexDistance({ q: f.q[a], r: f.r[a] }, { q: f.q[b], r: f.r[b] });
 }
 
+// ---- Wide water (the Tidebound perk). Every helper here does nothing while `f.seaExtra` is 0. -----------------------
+
+/**
+ * Rough hex-packing estimate of the widest water gap that `k` landmasses holding `land` tiles in all can keep on this canvas
+ * (round blobs, centres spread evenly, 20% safety margin). It only stops a wide-water pick from asking for what cannot fit.
+ */
+export function gapRoom(f: LandField, k: number, land: number): number {
+  if (k < 2) return f.radius;
+  const free = f.radius - 1 - Math.sqrt(land / 3);
+  return Math.max(0, Math.floor((1.6 * free) / Math.sqrt(k)));
+}
+
+/**
+ * The landmass count and water gap a base op should use: its own gap plus the wide-water extra, kept within what the canvas can hold.
+ * Landmasses are dropped one at a time (down to `minK`) before the gap gives way. Without a wide-water pick the input comes back unchanged.
+ */
+export function wideGap(f: LandField, baseGap: number, k: number, land: number, minK: number): { k: number; gap: number } {
+  if (f.seaExtra <= 0) return { k, gap: baseGap };
+  const want = baseGap + f.seaExtra;
+  let n = k;
+  while (n > minK && gapRoom(f, n, land) < want) n--;
+  return { k: n, gap: Math.max(baseGap, Math.min(want, gapRoom(f, n, land))) };
+}
+
+/** True when two of the centres are too close to keep `gap` tiles of water between the landmasses grown from them. */
+export function centersTooClose(f: LandField, centers: number[], gap: number): boolean {
+  for (let a = 0; a < centers.length; a++) {
+    for (let b = a + 1; b < centers.length; b++) {
+      if (cellDistance(f, centers[a], centers[b]) < gap + 2) return true;
+    }
+  }
+  return false;
+}
+
 // ---- Heightfield ------------------------------------------------------------------------------------------------
 
 export interface HeightOpts {
@@ -238,7 +313,7 @@ export function fillHeight(f: LandField, o: HeightOpts): void {
   for (let i = 0; i < f.size; i++) {
     const p = cellPoint(f.q[i], f.r[i]);
     const n = f.noise(p.x * freq + (o.ox ?? 0), p.y * freq + (o.oy ?? 0), o.octaves ?? 3);
-    const fall = 1 - f.dist[i] / f.radius;
+    const fall = 1 - f.dist[i] / f.baseRadius;
     let pen = 0;
     if (f.radius >= 3) {
       if (f.dist[i] === f.radius) pen = rim;
@@ -500,7 +575,10 @@ export function growBlobs(f: LandField, specs: BlobSpec[], gap: number): boolean
 // ---- The shape stage -----------------------------------------------------------------------------------------------
 
 export interface ShapeInput {
+  /** Radius of the canvas. */
   radius: number;
+  /** Radius of the normal map whose land count the shape keeps (see `LandField.baseRadius`). Defaults to `radius`. */
+  landRadius?: number;
   ops: ShapeOpDef[];
   /** Used when the picks leave no base op (for example `ragged` alone, because the default hexagon conflicts with it). */
   fallbackBase?: ShapeOpDef;
@@ -509,6 +587,8 @@ export interface ShapeInput {
 }
 
 export interface ShapeResult {
+  /** Radius of the canvas every array here is indexed by. The plain-hexagon fallback uses the land radius, not a grown canvas. */
+  radius: number;
   /** 1 = land, by canvas index. */
   land: Uint8Array;
   /** 1 = water carved as a river. */
@@ -545,6 +625,8 @@ function shapeProblem(f: LandField): string | null {
 
 /** Null when the attempt produced a usable shape, else the reason it did not. */
 function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDef[], carves: ShapeOpDef[], scatters: ShapeOpDef[]): string | null {
+  // A wide-water perk declares `water.extra`. With no such pick `ctx.param` gives 0 and nothing below changes.
+  f.seaExtra = seaExtraOf(ctx.param('water.extra'));
   for (const t of tweaks) t.run?.(f, ctx);
   if (!base.run) {
     // The hexagon: the whole canvas is land. Carve ops (a lake) may still cut into it; the count is whatever is left.
@@ -560,7 +642,9 @@ function tryShape(f: LandField, ctx: MapCtx, base: ShapeOpDef, tweaks: ShapeOpDe
 
   const landDefault = base.params?.find(p => p.id === 'land')?.default ?? 70;
   const density = ctx.param('land') || landDefault;
-  const L = Math.max(Math.min(MIN_LAND, f.size), Math.min(f.size, Math.round((f.size * density) / 100)));
+  // The land share comes from the normal map (`baseRadius`), so wide water adds sea around the same land. Without the pick that is `f.size`.
+  const landCells = Math.round((cellsWithin(f.baseRadius) * density) / 100);
+  const L = Math.max(Math.min(MIN_LAND, f.size), Math.min(f.size, landCells));
   // Budgets read f.L, so it is set first.
   f.L = L;
   const carveCells = carves.reduce((a, c) => a + (c.budget?.(f, ctx) ?? 0), 0);
@@ -594,12 +678,12 @@ export function runShape(input: ShapeInput): ShapeResult {
   const finish = (f: LandField, attempts: number): ShapeResult => {
     // A shape that never called fillHeight leaves the field all zero: that means "no height", not "flat".
     const drawn = f.h.some(v => v !== 0);
-    return { land: f.land, river: f.river, h: drawn ? f.h : null, attempts, fallback: false, why: null, notes: f.notes };
+    return { radius: input.radius, land: f.land, river: f.river, h: drawn ? f.h : null, attempts, fallback: false, why: null, notes: f.notes };
   };
   if (base) {
     for (let attempt = 0; attempt < SHAPE_ATTEMPTS; attempt++) {
       const ctx = input.make(attempt);
-      const f = createLandField(input.radius, ctx.noise, ctx.rng);
+      const f = createLandField(input.radius, ctx.noise, ctx.rng, input.landRadius ?? input.radius);
       const problem = tryShape(f, ctx, base, tweaks, carves, scatters);
       if (problem !== null) {
         why.set(problem, (why.get(problem) ?? 0) + 1);
@@ -612,11 +696,13 @@ export function runShape(input: ShapeInput): ShapeResult {
     }
     if (soft) return finish(soft.f, soft.attempt + 1);
   }
-  const size = canvasCoords(input.radius).length;
+  // A failed shape falls back to the plain hexagon of the normal map, not of the grown canvas.
+  const fallbackRadius = input.landRadius ?? input.radius;
+  const size = canvasCoords(fallbackRadius).length;
   const top = [...why.entries()]
     .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
     .slice(0, 2)
     .map(([reason, n]) => `${reason} (${n}x)`)
     .join(', ');
-  return { land: new Uint8Array(size).fill(1), river: new Uint8Array(size), h: null, attempts: SHAPE_ATTEMPTS, fallback: !!base, why: top || null, notes: [] };
+  return { radius: fallbackRadius, land: new Uint8Array(size).fill(1), river: new Uint8Array(size), h: null, attempts: SHAPE_ATTEMPTS, fallback: !!base, why: top || null, notes: [] };
 }

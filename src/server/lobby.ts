@@ -5,7 +5,7 @@ import {
 } from '../shared';
 import type { Board, HexInit } from '../shared';
 import { normalizeBotChat } from './bots/dialogue/events';
-import { STANDARD_PIECES, STANDARD_SUPPLY, fullRules, registry, scaledPieces, scaledSupply } from './runtime';
+import { STANDARD_PIECES, STANDARD_SUPPLY, fullRules, mapRegistryFor, registry, scaledPieces, scaledSupply } from './runtime';
 import type { MapMeta, Room, Settings } from './types';
 import { clamp } from './util';
 
@@ -60,9 +60,12 @@ export function syncSettingsToBoard(
 
 // ---- Map from a recipe --------------------------------------------------------------------------------------
 
-/** The lobby map for these settings: seed, radius, picks and params become a recipe. An empty seed rolls a fresh one (read it from `meta.recipe`). */
+/**
+ * The lobby map for these settings: seed, radius, picks and params become a recipe. An empty seed rolls a fresh one (read it from `meta.recipe`).
+ * It is built from the room's DLC-aware registry (`mapRegistryFor`), so an addon's map perk works only while its DLC and addon are on.
+ */
 export function generateLobbyMap(settings: Settings): { board: Board; meta: MapMeta } {
-  const res = generateMap(registry, fullRules(settings), {
+  const res = generateMap(mapRegistryFor(settings), fullRules(settings), {
     seed: settings.mapSeed ?? '',
     radius: settings.boardRadius,
     picks: settings.mapPicks ?? [],
@@ -82,10 +85,11 @@ function blankBoard(settings: Settings): Board {
  */
 export function newBoard(settings: Settings, preset?: string): Board {
   if (!preset) return generateLobbyMap(settings).board;
-  const quick = registry.quickStarts.get(preset);
+  const reg = mapRegistryFor(settings);
+  const quick = reg.quickStarts.get(preset);
   if (quick?.blank) return blankBoard(settings);
   if (quick) {
-    const picks = resolvePicks(registry, quick.picks).picks;
+    const picks = resolvePicks(reg, quick.picks).picks;
     return generateLobbyMap({ ...settings, mapSeed: '', mapPicks: picks, mapParams: quick.params ?? {} }).board;
   }
   return generateBoard(registry, fullRules(settings), createRng(randomSeed()), preset);
@@ -107,10 +111,11 @@ export function refreshMap(room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & 
  */
 export function applyMapStart(room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & Partial<Pick<Room, 'lobbyPlayers'>>, id: string): void {
   const prevLand = countLandHexes(room.board);
-  const quick = registry.quickStarts.get(id);
+  const reg = mapRegistryFor(room.settings);
+  const quick = reg.quickStarts.get(id);
   room.settings.boardRadius = id === 'standard' ? 2 : 5;
   if (quick) {
-    room.settings.mapPicks = resolvePicks(registry, quick.picks).picks;
+    room.settings.mapPicks = resolvePicks(reg, quick.picks).picks;
     room.settings.mapParams = { ...(quick.params ?? {}) };
     room.settings.mapSeed = '';
     if (quick.blank) {
@@ -158,8 +163,10 @@ export function recommendedRadius(players: number): number {
   return players <= 4 ? 2 : players <= 6 ? 3 : 4;
 }
 
-export function isPreset(id: any): boolean {
-  return typeof id === 'string' && (registry.quickStarts.has(id) || registry.presets.has(id));
+/** Is this a quick start or legacy preset id? Pass the room's settings to include quick starts an enabled addon registers. */
+export function isPreset(id: any, settings?: Pick<Settings, 'dlc' | 'addons'>): boolean {
+  const reg = settings ? mapRegistryFor(settings) : registry;
+  return typeof id === 'string' && (reg.quickStarts.has(id) || reg.presets.has(id));
 }
 
 // ---- Settings ---------------------------------------------------------------------------------------------------
@@ -174,12 +181,36 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
   const dropped: string[] = [];
   const gameSpeed = old.gameSpeed ?? 0.5;
 
+  // DLC and addon toggles come first: they decide which map picks and params exist (an addon's perk is known only while it is on).
+  const dlc: Record<string, boolean> = { ...(old.dlc ?? {}) };
+  if (s.dlc && typeof s.dlc === 'object' && !Array.isArray(s.dlc)) {
+    let n = 0;
+    for (const [k, v] of Object.entries(s.dlc)) {
+      if (++n > 32) break;
+      if (typeof k === 'string' && k.length > 0 && k.length <= 40 && typeof v === 'boolean') {
+        dlc[k] = v;
+      }
+    }
+  }
+
+  const addons: Record<string, boolean> = { ...(old.addons ?? {}) };
+  if (s.addons && typeof s.addons === 'object' && !Array.isArray(s.addons)) {
+    let n = 0;
+    for (const [k, v] of Object.entries(s.addons)) {
+      if (++n > 128) break;
+      if (typeof k === 'string' && k.length > 0 && k.length <= 64 && typeof v === 'boolean') {
+        addons[k] = v;
+      }
+    }
+  }
+  const reg = mapRegistryFor({ dlc, addons });
+
   let seedIn: any = s.mapSeed;
   let picksIn: any = s.mapPicks;
   let paramsIn: any = s.mapParams;
   let radiusIn: any = s.boardRadius;
   if (typeof seedIn === 'string' && seedIn.length <= 400 && seedIn.trim().startsWith(`${SHARE_PREFIX};`)) {
-    const decoded = decodeRecipe(seedIn, id => isKnownMapId(registry, id));
+    const decoded = decodeRecipe(seedIn, id => isKnownMapId(reg, id));
     if (decoded) {
       seedIn = decoded.recipe.seed;
       picksIn = decoded.recipe.picks;
@@ -190,8 +221,8 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
   }
 
   const mapSeed = seedIn === undefined || seedIn === null ? (old.mapSeed ?? '') : cleanSeed(seedIn);
-  const mapPicks = resolvePicks(registry, Array.isArray(picksIn) ? picksIn.slice(0, 32).map(String) : (old.mapPicks ?? [])).picks;
-  const options = resolveMapOptions(registry, mapPicks).options;
+  const mapPicks = resolvePicks(reg, Array.isArray(picksIn) ? picksIn.slice(0, 32).map(String) : (old.mapPicks ?? [])).picks;
+  const options = resolveMapOptions(reg, mapPicks).options;
   const mapParams = resolveParams(options, paramsIn && typeof paramsIn === 'object' && !Array.isArray(paramsIn) ? paramsIn : (old.mapParams ?? {}));
 
   const newVp = clamp(s.vpToWin, 3, 50, old.vpToWin);
@@ -216,28 +247,6 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     maxRoads = nextPieces.maxRoads;
     maxSettlements = nextPieces.maxSettlements;
     maxCities = nextPieces.maxCities;
-  }
-
-  const dlc: Record<string, boolean> = { ...(old.dlc ?? {}) };
-  if (s.dlc && typeof s.dlc === 'object' && !Array.isArray(s.dlc)) {
-    let n = 0;
-    for (const [k, v] of Object.entries(s.dlc)) {
-      if (++n > 32) break;
-      if (typeof k === 'string' && k.length > 0 && k.length <= 40 && typeof v === 'boolean') {
-        dlc[k] = v;
-      }
-    }
-  }
-
-  const addons: Record<string, boolean> = { ...(old.addons ?? {}) };
-  if (s.addons && typeof s.addons === 'object' && !Array.isArray(s.addons)) {
-    let n = 0;
-    for (const [k, v] of Object.entries(s.addons)) {
-      if (++n > 128) break;
-      if (typeof k === 'string' && k.length > 0 && k.length <= 64 && typeof v === 'boolean') {
-        addons[k] = v;
-      }
-    }
   }
 
   const settings: Settings = {

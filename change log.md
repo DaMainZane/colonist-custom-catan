@@ -1,6 +1,62 @@
 # Change Log
 
-## 2026-10-29 (Pass 60: Tidebound T1b to T1d, Raise the Port upgrades the whole port; harbor-only 1:1 floor; panel and tests; NOT RUN YET)
+## 2026-10-29 (Pass 63: Tidebound T2b1, wide water grows the canvas; NOT RUN YET)
+### Decision (Development Plan section 4)
+- **The canvas grows.** Tidebound's map is bigger than base Catan by default. The land count stays what the radius gives; the extra room is sea. Rivers and continents reuse the existing logic, only widened.
+### Changed
+- **`shared/mapshape.ts`**: `SEA_LAND_CUT` and `WIDE_WATER_MIN_RADIUS` removed. New `SEA_GROW_PER_EXTRA` (1.5), `cellsWithin`, `seaExtraOf`, `seaGrow` (4 extra = 6 rings) and `canvasRadiusFor(radius, extra)` (capped at `MAX_RADIUS`). `LandField.baseRadius` (the normal map's radius; equals `radius` without the pick). `createLandField` takes it as a 4th argument. `ShapeInput.landRadius`, `ShapeResult.radius` (a failed shape falls back to the hexagon of the normal size, not the grown canvas). The land share is now `cellsWithin(baseRadius) x density`, the same number as before without the pick. `fillHeight` pull reads `baseRadius`.
+- **`shared/mapgen.ts`**: canvas radius from `canvasRadiusFor`, canvas built from `shape.radius`, board attempts sized by the canvas. `wide-water-small` now only fires when the radius cap holds the sea back.
+- **`packs/base/map/shapes.ts`**: noise size, river length, island count, archipelago count and ring size read `baseRadius`, so the grown canvas does not add islands or lengthen rivers.
+- **`shared/maprecipe.ts`**: `GEN_VERSION` 6. **`tidebound/bridges.ts`**: perk text. **`tests/tideboundmap.test.ts`**: land-count and canvas-size tests rewritten, standard-size boards added, warning test narrowed.
+### Not changed
+- Without the pick every value is identical (`baseRadius === radius`), so the golden test and `mapshapes.test.ts` should pass untouched. No new RNG draws, no state shape change, no `g.version` bump.
+### Not done
+- `npm run typecheck; npm test` has not been run. Anything that pins `GEN_VERSION` to 5 or the old wide-water land counts (`tideboundlobby.test.ts`, `mapbudget.test.ts`, share-code fixtures) may need the new numbers.
+- Not checked: UI zoom and bot map reads with a board larger than `rules.boardRadius`; bridge cap scaling (T3) must pick land radius or canvas.
+- Starting guesses to tune with the gallery: 1.5 rings per extra tile, and sparse spacing of islands on a big canvas.
+
+## 2026-10-29 (Pass 62: Tidebound T2a2, the lobby sees DLC map perks; NOT RUN YET)
+T1 and T2a (Passes 60 and 61) ran clean: `npm run typecheck; npm test` passed before this pass.
+### Decision (Development Plan section 4)
+- **Option A**, with one change to its wording: the lobby uses the room's DLC-aware registry for the map, picks and menu, and the client needs **no change** (its `mapOptions` handler already redraws from whatever list arrives). Option B (perks in the static registry behind a capability) is dropped: it would put an addon perk in the base registry and break "DLC off = nothing registered".
+### Added
+- **`mapRegistryKey(settings)` and `mapRegistryFor(settings)` (`server/runtime.ts`)**: the key is the sorted list of addons the DLC and addon toggles turn on (`resolveAddons`); `mapRegistryFor` returns the plain `registry` itself while that list is empty, otherwise `registryFor(allPacks, ...)`, cached per addon set (cap 32, cleared when full, because a client can send any toggle combination).
+- **`mapOptionsForSettings(settings)` (`server/mapmenu.ts`)**: the menu data for one room, cached per addon set. `mapOptionsView(reg = registry)` is unchanged, so with no addon on both give the same data.
+- **Per-socket option list (`server/net.ts`)**: in the lobby, `broadcastRoom` sends a socket `mapOptions` before its `gameState` whenever the room's addon-set key differs from the one that socket last got (`socket.data.mapOptionsKey`, set to `''` on connect, where the plain list is sent as before). This covers a join, a reconnect, a DLC or addon toggle, a scenario and a loaded preset in one place. Nothing is sent during a game.
+- **`tests/tideboundlobby.test.ts`**: room registry (plain object with no addon, perk only with Tidebound and bridges, cache), menu data (same as plain without the DLC; with it only `wide_water` is added, dlcs, addons, quick starts and scenarios equal), settings merge (pick and param dropped with the DLC off, kept and clamped when the same patch turns it on, dropped again when the DLC or only the bridges addon goes off, share code with the perk dropped or applied), `isPreset` with settings, the lobby map (less land with the perk on, a stray pick ignored with the DLC off and the plain continent drawn, DLC off = same map as before) and the option list sent once per change and before the state, with a fake `io`.
+### Changed
+- **`server/lobby.ts`**: `generateLobbyMap`, `newBoard` and `applyMapStart` build and resolve quick starts from `mapRegistryFor(settings)`. `mergeSettingsDetailed` now reads the `dlc` and `addons` toggles **first** and resolves share-code ids, picks and params against that room's registry, so a DLC switched off drops its picks and params in the same merge. `isPreset(id, settings?)` takes the room settings (the old one-argument call still works). Blank and legacy presets (`generateBoard`) still use the plain registry.
+- **`server/socket.ts`**: `isPreset` calls pass `room.settings`; the connection handler sets `socket.data.mapOptionsKey`.
+- `tests/tideboundmap.test.ts`: header comment updated.
+### Not changed
+- `GEN_VERSION` stays 5, no state shape change, no `g.version` bump, no new RNG draws. With no addon on, every lobby call gets the same registry object as before.
+- `recipeKey` does not include the addon set, so switching a DLC on or off does not by itself rebuild the map (it would wipe painted edits). Nothing registered by an addon changes the map outside its picks yet. **T2c (fish icons) must revisit this** if icons are drawn without a pick.
+- `gameRegistry(rules)` still builds a fresh registry on every action (existing behaviour). `mapRegistryFor`'s cache could serve it too; left alone because games share nothing today.
+### Not done
+- `npm run typecheck; npm test` has not been run for this pass.
+- Not checked in a browser: tick Tidebound on the setup page, open the map menu, find "Wide water" under Perks with its "Extra water width" slider; switch Tidebound off and see it vanish and the pick clear.
+- A share code that carries `wide_water` pasted into a room where Tidebound is off drops the perk and logs it ("Map code: ignored wide_water"). Turn the DLC on first, then paste.
+
+## 2026-10-29 (Pass 61: Tidebound T2a, wide-water map perk; typecheck and tests passed)
+### Added
+- **`wide_water` perk (`src/packs/tidebound/bridges.ts`)**: registered by the `tidebound.bridges` addon, so it exists only while the DLC and that addon are on. Stage `extras`, conflicts with `hexagon` (no sea to widen, so with the pick the map sits on a continent, like the ragged coast), one param `water.extra` ("Extra water width (tiles)", 1 to 5, default 4). It has no game-time code: the shape stage reads the param.
+- **`LandField.seaExtra` (`src/shared/mapshape.ts`)**: set by `tryShape` from `ctx.param('water.extra')` (0 when no active option declares it, so nothing changes without the pick). New constants `SEA_EXTRA_MAX` (5), `SEA_LAND_CUT` (10) and `WIDE_WATER_MIN_RADIUS` (6), and three helpers: `gapRoom(f, k, land)` (rough hex-packing estimate of the widest gap `k` landmasses can keep), `wideGap(f, baseGap, k, land, minK)` (base gap plus the extra, kept within `gapRoom`; drops landmasses down to `minK` before it gives up gap) and `centersTooClose`.
+- **`tests/tideboundmap.test.ts`**: registration (exists only with the DLC and bridges addon on, param shape), perk off = same map and report as a registry without it (8 recipes, 2 radii), exact land counts (continent r8: 91 at the default, 76 at 5, 137 at 1 clamped from the recipe), determinism, island and continent gaps, no-fallback bound on big boards (loose, prints the reasons), river wider and still water and one landmass, hexagon conflict both ways, small-board warning, never throws, and unit tests for the three helpers.
+### Changed
+- **Land share (`tryShape`)**: with the pick on, land cells = canvas x density x (100 - 10 x extra) / 10000 (default extra 4: 60% of the normal land). The old formula is kept as its own branch, so the number is identical without the pick.
+- **Islands, archipelago, continents (`packs/base/map/shapes.ts`)**: after their own count and size checks they call `wideGap`; the result replaces the count `k` and the blob gap (`growBlobs`). Islands and archipelago also fail an attempt whose centres are too close for the new gap (continents already did). Without the pick `wideGap` returns its input, so the draws and the gap are unchanged.
+- **River (`shapes.ts`)**: `riverBudget` = length on a normal map; with the pick it is length x (1 + 2 per ring), never above a quarter of the land (rings = floor(extra / 2): 4 or 5 extra = 2 rings = 5 tiles across). After the centre line is carved, `widenRiver` adds the rings: a ring is the land next to the water so far, in cell order; a tile joins only if it touches no water but the river, is not on the canvas edge and keeps one arc of land (`widenOk`). So the sea and lakes stay out of reach (the mouth stays narrow), and the land never splits. A short ring adds a `shape-partial` note ("river: widened N of M rings").
+- **`src/shared/mapgen.ts`**: a `wide-water-small` warning when the pick is on and the radius is under 6 ("on radius N the seas stay narrow").
+### Not changed
+- `GEN_VERSION` stays 5: with the pick off the output is the same (the golden test and `mapshapes.test.ts` should pass untouched). T2b bumps it.
+- No new RNG draws without the pick; with it the stream names are the same, only `k`, gaps and the land count differ.
+- No state shape change, no `g.version` bump.
+### Not done
+- `npm run typecheck; npm test` ran clean (2026-10-29). The numbers (land cut 10 per tile, the 1.6 safety factor in `gapRoom`, rings = extra / 2) are starting guesses: look at a few generated maps (the gallery idea in `Map Generation Design.md` section 15) before trusting them.
+- **Not reachable from the lobby yet.** `server/lobby.ts` and `mapOptionsView()` use the process-wide registry, which has no addons, so the lobby drops `wide_water` as an unknown pick. Fixed in Pass 62 (T2a2). Tests call `generateMap` with `registryFor(allPacks, { dlc: { tidebound: true } })` directly.
+- Honest limit: the canvas does not grow. At radius 10 islands get a gap of about 3 and continents stay at their own gap; 4 to 5 tiles of extra water need radius 12 to 14 or more (see the T2b question in the plan).
+
+## 2026-10-29 (Pass 60: Tidebound T1b to T1d, Raise the Port upgrades the whole port; harbor-only 1:1 floor; panel and tests; typecheck and tests passed)
 ### Changed
 - **T1b, whole-port upgrade (`src/packs/base/techEffects.ts`, `actions/techActions.ts`)**: Harbor charters no longer asks for a resource. `upgrade_port` takes `{ vertexId }`, stores `{ level: 1, by }` and drops the whole 3:1 port to 2:1 for every resource (still 2 wood + 1 brick + 1 ore, city only). `harborCharterModifier` reads the level and lowers the ratio for all resources (`min(current, 2)`), so a better specialised 2:1 port is never made worse. `PortUpgrade.resource` is gone; an old entry that still has one is read as a plain level 1 (whole port). The `resource` checks ("choose a resource", "already trade X at 2:1") are removed; the event is now `portUpgraded { playerId, vertexId, level }`. `legal()` gives one `{ vertexId }` per port city. `techActionsFor().harbor` drops `resources`, and each port row is `{ vertexId, level }`.
 - **T1b, wiring**: `server/socket.ts` `upgradePort` forwards only `vertexId`. `base/techRoots.ts` description now says every resource trades 2:1. `server/bots/brain.ts`: the port goal and `pickUpgradePortMove` no longer pick a resource; they ask whether the bot makes (2+ pips) or holds (3+ cards) any resource it still trades above 2:1, and use the first legal port. Still Secondary and up only, still gated by `techTreeOn`.
@@ -12,7 +68,7 @@
 - The tech name stays "Harbor charters" (T11 renames it to Raise the Port).
 - No RNG draws added; golden snapshot should be unchanged.
 ### Not done
-- `npm run typecheck; npm test` has not been run for T1b to T1d (they are tested together). Settlement-only upgrade with Fishing nets is T11. The Harbor (level 2, 1:1) is T8.
+- `npm run typecheck; npm test` ran clean for T1b to T1d (2026-10-29). Settlement-only upgrade with Fishing nets is T11. The Harbor (level 2, 1:1) is T8.
 
 ## 2026-10-29 (Pass 59: Tidebound T1a, port upgrades get a level; state version 2)
 ### Changed

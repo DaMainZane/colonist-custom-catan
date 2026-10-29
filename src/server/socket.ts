@@ -206,6 +206,8 @@ function noteCrowding(room: Room): void {
 export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket) => {
     // The map menu is drawn from the registry's options, so the client gets the list once per connection and caches it.
+    // In the lobby the server sends the room's own list again whenever its DLC/addon set changes (net.ts syncMapOptions).
+    socket.data.mapOptionsKey = '';
     socket.emit('mapOptions', mapOptionsView());
 
     const safe = (fn: (data: any) => void) => (data: any = {}) => {
@@ -587,7 +589,7 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on('applyMapPreset', safe(({ code, preset }) => {
       const room = hostLobbyRoom(code);
-      if (!room || !isPreset(preset)) return;
+      if (!room || !isPreset(preset, room.settings)) return;
       applyMapStart(room, preset);
       broadcastRoom(room);
     }));
@@ -597,7 +599,7 @@ export function registerSocketHandlers(io: Server): void {
       if (!room) return;
       const sc = mapOptionsView().scenarios.find(s => s.id === scenarioId);
       if (!sc) return;
-      if (isPreset(sc.quickStart)) {
+      if (isPreset(sc.quickStart, room.settings)) {
         applyMapStart(room, sc.quickStart);
       }
       const resetDlc: Record<string, boolean> = {};
