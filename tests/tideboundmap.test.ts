@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { allPacks } from '../src/packs';
 import { createNoise, createRegistry, createRng, findLandmasses, generateMap, hexDistance, registryFor } from '../src/shared';
 import type { Board, GeneratedMap, Hex, Registry } from '../src/shared';
-import { canvasRadiusFor, centersTooClose, createLandField, gapRoom, seaGrow, wideGap } from '../src/shared/mapshape';
+import { canvasCoords, canvasRadiusFor, centersTooClose, createLandField, gapRoom, seaGrow, wideGap } from '../src/shared/mapshape';
+import type { HexInit } from '../src/shared/topology';
+import {
+  ELEVATION_2_FROM, ELEVATION_3_FROM, FISH_BOOSTS, FISH_SHARE_OPEN, FISH_SHARE_SHORE, applyElevation, elevationOf, placeFish
+} from '../src/packs/tidebound/seaData';
 
 // T2a/T2b: the Tidebound wide-water perk. Data only: the shape stage reads the `water.extra` param. Seas and rivers get wider, the canvas grows
 // around the normal map to make room (the land count stays what the radius gives), and a pick that is not ticked changes nothing. The perk lives
 // in the `tidebound.bridges` addon, so it exists only while the DLC is on. The lobby reaches it through the room's DLC-aware registry (T2a2,
-// `tests/tideboundlobby.test.ts`).
+// `tests/tideboundlobby.test.ts`). T2b2 and T2c (the `sea data` blocks at the end): the same perk writes `ext.elevation` on land and
+// `ext.fish` on sea tiles, with no RNG draws.
 
 const on = registryFor(allPacks, { dlc: { tidebound: true } });
 const off = createRegistry(allPacks);
@@ -266,5 +271,163 @@ describe('land field helpers for wide water', () => {
     expect(centersTooClose(f, [a, b], 1)).toBe(false);
     expect(centersTooClose(f, [a, b], 2)).toBe(true);
     expect(centersTooClose(f, [a], 5)).toBe(false);
+  });
+});
+
+// T2b2 and T2c: the same perk writes the sea data later chunks read. `ext.elevation` 1 to 3 on land (higher is rarer, by ranked height) and
+// `ext.fish` on seeded sea tiles. Data only, no RNG draws, and nothing at all without the pick.
+describe('sea data: elevation', () => {
+  it('elevationOf: 1 below 0.65, 2 from 0.65, 3 from 0.9', () => {
+    expect(ELEVATION_2_FROM).toBe(0.65);
+    expect(ELEVATION_3_FROM).toBe(0.9);
+    for (const [h, want] of [[0, 1], [0.3, 1], [0.649, 1], [0.65, 2], [0.8, 2], [0.899, 2], [0.9, 3], [1, 3]] as const) {
+      expect(elevationOf(h), `h=${h}`).toBe(want);
+    }
+  });
+
+  it('applyElevation matches cells by position (not order), skips water, and keeps other ext keys', () => {
+    const inits: HexInit[] = [
+      { q: 0, r: 0, type: 'wood', number: 6, ext: { keep: 1 } },
+      { q: 1, r: 0, type: 'water', number: null, ext: {} },
+      { q: 0, r: 1, type: 'ore', number: 8 },
+      { q: -1, r: 1, type: 'brick', number: 5, ext: {} }
+    ];
+    const cells = [
+      { q: -1, r: 1, h: 0.95, m: 0.5, coastDist: 0, landmass: 0 },
+      { q: 0, r: 1, h: 0.7, m: 0.5, coastDist: 0, landmass: 0 },
+      { q: 0, r: 0, h: 0.1, m: 0.5, coastDist: 0, landmass: 0 }
+    ];
+    applyElevation(inits, cells);
+    expect(inits[0].ext).toEqual({ keep: 1, elevation: 1 });
+    expect(inits[1].ext).toEqual({});
+    expect(inits[2].ext).toEqual({ elevation: 2 });
+    expect(inits[3].ext).toEqual({ elevation: 3 });
+  });
+
+  it('with the pick, every land hex has elevation 1 to 3 and nothing else does; higher is rarer', () => {
+    let checked = 0;
+    for (const seed of seeds(4)) {
+      const m = make(on, ['continent', 'wide_water'], 8, seed);
+      if (fellBack(m)) continue;
+      checked++;
+      const count = [0, 0, 0, 0];
+      for (const h of m.board.hexes) {
+        if (isLandHex(h)) {
+          expect([1, 2, 3], `${seed} ${h.q},${h.r}`).toContain(h.ext.elevation);
+          count[h.ext.elevation]++;
+        } else {
+          expect(h.ext.elevation, `${seed} water ${h.q},${h.r}`).toBeUndefined();
+        }
+      }
+      expect(count[3], seed).toBeGreaterThan(0);
+      expect(count[3], seed).toBeLessThan(count[2]);
+      expect(count[2], seed).toBeLessThan(count[1]);
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('works on every shape and gives the same data for the same recipe', () => {
+    for (const shape of ['continent', 'ring', 'islands', 'archipelago', 'continents']) {
+      const a = make(on, [shape, 'river', 'wide_water'], 8, 'ELEV1');
+      const b = make(on, [shape, 'river', 'wide_water'], 8, 'ELEV1');
+      const data = (m: GeneratedMap) => m.board.hexes.map(h => `${h.ext.elevation ?? '-'}${h.ext.fish ?? '-'}`).join('');
+      expect(data(a), shape).toBe(data(b));
+      for (const h of a.board.hexes) if (isLandHex(h)) expect([1, 2, 3], shape).toContain(h.ext.elevation);
+    }
+  });
+});
+
+describe('sea data: fish', () => {
+  const landId = [...on.tiles.values()].find(t => t.land)!.id;
+  /** A radius-4 canvas: land in rings 0 and 1, sea beyond (ring 2 touches land, rings 3 and 4 are open sea). */
+  const canvas = (): HexInit[] =>
+    canvasCoords(4).map(c => ({
+      q: c.q, r: c.r, number: null, ext: {},
+      type: hexDistance(c, { q: 0, r: 0 }) <= 1 ? landId : 'water'
+    }));
+  const ringOf = (h: HexInit) => hexDistance(h, { q: 0, r: 0 });
+  const ctx = () => ({ reg: on, noise: createNoise('FISH'), rng: createRng('R') }) as any;
+
+  it('shares are fixed counts: shore sea 25%, open sea 8%, fish only on sea, none on land or river', () => {
+    const inits = canvas();
+    // One ring-2 tile is a river channel: not sea for fish.
+    const river = inits.find(h => ringOf(h) === 2)!;
+    river.ext = { river: true };
+    placeFish(inits, ctx());
+    const fish = inits.filter(h => h.ext?.fish !== undefined);
+    for (const h of fish) {
+      expect(h.ext!.fish).toBe(FISH_BOOSTS);
+      expect(h.type).toBe('water');
+      expect(h.ext!.river).toBeUndefined();
+    }
+    const shoreN = inits.filter(h => ringOf(h) === 2 && !h.ext?.river).length;
+    const openN = inits.filter(h => ringOf(h) >= 3).length;
+    expect(shoreN).toBe(11);
+    expect(fish.filter(h => ringOf(h) === 2)).toHaveLength(Math.round(shoreN * FISH_SHARE_SHORE));
+    expect(fish.filter(h => ringOf(h) >= 3)).toHaveLength(Math.round(openN * FISH_SHARE_OPEN));
+    expect(fish.filter(h => ringOf(h) <= 1)).toHaveLength(0);
+    expect(river.ext!.fish).toBeUndefined();
+  });
+
+  it('draws no RNG (the stage stream is untouched), and the same noise gives the same tiles', () => {
+    const a = canvas();
+    const c = ctx();
+    const before = c.rng.s;
+    placeFish(a, c);
+    expect(c.rng.s).toBe(before);
+    const b = canvas();
+    placeFish(b, ctx());
+    expect(a.map(h => h.ext?.fish ?? 0)).toEqual(b.map(h => h.ext?.fish ?? 0));
+    // Another seed's noise picks other tiles (same counts).
+    const d = canvas();
+    placeFish(d, { ...ctx(), noise: createNoise('OTHER') });
+    expect(d.filter(h => h.ext?.fish).length).toBe(a.filter(h => h.ext?.fish).length);
+    expect(d.map(h => h.ext?.fish ?? 0)).not.toEqual(a.map(h => h.ext?.fish ?? 0));
+  });
+
+  it('with the pick, fish sit on sea tiles only, at a sensible density', () => {
+    let checked = 0;
+    for (const seed of seeds(4)) {
+      const m = make(on, ['continent', 'river', 'wide_water'], 8, seed);
+      if (fellBack(m)) continue;
+      checked++;
+      let sea = 0;
+      let fish = 0;
+      for (const h of m.board.hexes) {
+        if (h.ext.fish !== undefined) {
+          fish++;
+          expect(h.ext.fish, seed).toBe(FISH_BOOSTS);
+          expect(isLandHex(h), seed).toBe(false);
+          expect(h.ext.river, seed).toBeUndefined();
+        }
+        if (!isLandHex(h) && !h.ext.river) sea++;
+      }
+      expect(fish, seed).toBeGreaterThan(0);
+      expect(fish / sea, seed).toBeGreaterThan(0.05);
+      expect(fish / sea, seed).toBeLessThan(0.4);
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
+
+describe('sea data: nothing without the pick', () => {
+  it('no hex carries elevation or fish, with the DLC registered or not', () => {
+    for (const reg of [on, off]) {
+      for (const picks of [[], ['continent'], ['islands', 'river'], ['archipelago']]) {
+        const m = make(reg, picks, 6, 'NODATA');
+        for (const h of m.board.hexes) {
+          expect(h.ext.elevation, picks.join('+')).toBeUndefined();
+          expect(h.ext.fish, picks.join('+')).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it('the same recipe gives the same tiles, numbers and ports twice (the data adds no draws)', () => {
+    // The perk only adds ext keys and draws nothing, so a second build of the recipe is identical down to the ports.
+    const a = make(on, ['continent', 'wide_water'], 8, 'STRIP');
+    const b = make(on, ['continent', 'wide_water'], 8, 'STRIP');
+    expect(sig(a.board)).toBe(sig(b.board));
+    expect(a.board.edges.map(e => e.port ?? '-').join('')).toBe(b.board.edges.map(e => e.port ?? '-').join(''));
   });
 });

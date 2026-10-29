@@ -11,8 +11,10 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 - **No DLC has gameplay code.** `allPacks` = base, gold, fog, tidebound (T0a: skeleton only, 8 addon stubs, no content).
 - **T1 port ladder, done 2026-10-29 (T1a to T1d; typecheck and tests passed, Pass 60 in `change log.md`).** Port upgrade is a level per vertex; Raise the Port upgrades the whole port 3:1 to 2:1 (no resource choice); `HARBOR_RATIO_MODS` gives the harbor-only 1:1 floor (nothing registers into it until T8); panel and `techroots.test.ts` follow.
 - **T2a wide-water perk, done 2026-10-29 (typecheck and tests passed, Pass 61).** `wide_water` map perk (param `water.extra`, 1 to 5, default 4) registered by `tidebound.bridges`: less land on the same canvas, wider gaps between islands, archipelago islets and continents (fewer landmasses first, then a smaller gap, so it fits), wider rivers. Perk off = the generator draws exactly what it drew before, so `GEN_VERSION` stays 5. Tests: `tests/tideboundmap.test.ts`.
-- **T2a2 lobby sees DLC map perks, code written 2026-10-29, not yet run (Pass 62).** Decision A: the lobby builds its map, checks picks and draws the menu from `mapRegistryFor(settings)` (plain registry while no addon is on); each socket gets the room's `mapOptions` list when the room's addon set changes (`net.ts`). No client change. Tests: `tests/tideboundlobby.test.ts`. Done once `npm run typecheck; npm test` pass.
-- **T2b1 wide water grows the canvas, code written 2026-10-29, not yet run (Pass 63).** Decision: the canvas grows. Tidebound's map is bigger than base Catan by design; the land count stays what the radius gives, the extra room is sea (4 extra = 6 rings). Reuses the river and continent logic, only widened. `GEN_VERSION` is now 6. Done once `npm run typecheck; npm test` pass.
+- **T2a2 lobby sees DLC map perks, done 2026-10-29 (typecheck and tests passed, Pass 62).** Decision A: the lobby builds its map, checks picks and draws the menu from `mapRegistryFor(settings)` (plain registry while no addon is on); each socket gets the room's `mapOptions` list when the room's addon set changes (`net.ts`). No client change. Tests: `tests/tideboundlobby.test.ts`.
+- **T2b1 wide water grows the canvas, done 2026-10-29 (typecheck and tests passed, Pass 63).** Decision: the canvas grows. Tidebound's map is bigger than base Catan by design; the land count stays what the radius gives, the extra room is sea (4 extra = 6 rings). Reuses the river and continent logic, only widened. `GEN_VERSION` is now 6.
+- **T2b2 elevation 1 to 3, done 2026-10-29 (typecheck and tests passed, Pass 64).** `ext.elevation` on land hexes, written by the `wide_water` perk's `afterGenerated` from the ranked height `h` (1 below 0.65, 2 from 0.65, 3 from 0.9: about 65% / 25% / 10% of the land, higher is rarer). No RNG draws. `PerkDef.afterGenerated` now gets the land cells as a third argument. New file `packs/tidebound/seaData.ts`. Nothing reads it until T5d.
+- **T2c seeded fish icons, done 2026-10-29 (typecheck and tests passed, Pass 65).** `ext.fish` = 4 on sea tiles (not land, not river): 25% of the shore sea, 8% of the open sea, picked by ranked extras-stage noise, so no RNG draws. `recipeKey` checked and left alone (Pass 65). Nothing reads it until T7b. **T2 is closed.**
 
 ---
 
@@ -56,64 +58,61 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 | T14 | Balance gate    | Sim matrix: Tidebound on/off x tree on/off at 25+ VP. Check Grand Causeway swing and tier prices.                                                                                                                  | sim matrix                          |
 
 ### Split step
-| ID   | Step                                                                                                                              | Size |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| T2b1 | Wide water grows the canvas (sea rings around the normal map, same land count), bump GEN_VERSION to 6 | M |
-| T2b2 | Add elevation 1 to 3 on h (higher is rarer)                                                                     | L    |
-| T2c  | Add seeded fish icons on sea tiles, recheck the golden test                                                                       | M    |
-| T3a  | Bridge piece definition and placement rule (both edge ends in ocean)                                                              | M    |
-| T3b  | Cost (road + 1 ore), cap 10 scaled by radius, 2x past cap                                                                         | S    |
-| T3c  | Count bridges toward Longest Road                                                                                                 | M    |
-| T3d  | Build UI for bridges                                                                                                              | M    |
-| T3e  | Minimal bot support (bot builds a bridge without crashing)                                                                        | S    |
-| T4a  | Rickety piece, health 1, shared pool, 1 wood cost                                                                                 | M    |
-| T4b  | Upgrade action (1 brick + 1 ore)                                                                                                  | S    |
-| T4c  | Bridge type picker popup                                                                                                          | M    |
-| T4d  | Collapse on a 7 in the Seven Resolver                                                                                             | L    |
-| T4e  | Longest Road recalculation through the change log                                                                                 | L    |
-| T4f  | Collapse animation                                                                                                                | S    |
-| T5a  | flooded tile state and seeded per-cluster schedule                                                                                | L    |
-| T5b  | Spring tide (every 4th round, 2 rings)                                                                                            | M    |
-| T5c  | Settings: on/off, high/low slider                                                                                                 | S    |
-| T5d  | Elevation resistance                                                                                                              | M    |
-| T5e  | Ports idle while flooded, production stage skips flooded tiles                                                                    | M    |
-| T6a  | Warning one turn ahead: tint, wave pattern, fading flash                                                                          | M    |
-| T6b  | Rise title card                                                                                                                   | S    |
-| T6c  | Flooded tint for both themes                                                                                                      | S    |
-| T6d  | Elevation heat-map toggle                                                                                                         | S    |
-| T7a  | Fish wild token in hand (spend action, discard count, stealable, ignores bank cap)                                                | L    |
-| T7b  | Nets                                                                                                                              | M    |
-| T7c  | Fish icon boosts, max 4                                                                                                           | M    |
-| T7d  | Tide replenish                                                                                                                    | S    |
-| T7e  | Feed-the-sea action (1 wheat)                                                                                                     | S    |
-| T8a  | Harbor 1:1 upgrade, limit 1 per player, works while flooded                                                                       | M    |
-| T8b  | Max 4 trades per turn per harbor, invalid-ratio prompt explains harbors                                                           | S    |
-| T9a  | Storm event and wreck marker                                                                                                      | M    |
-| T9b  | Sea/shore 65/35 placement, fair spawn within 4 tiles of a player                                                                  | M    |
-| T9c  | First connecting road, bridge, or port claims the wreck                                                                           | M    |
-| T9d  | Loot with floor rule and slow scaling                                                                                             | M    |
-| T9e  | Two spawn animations                                                                                                              | S    |
-| T10a | Pirate marker, max 2, ocean only, random move                                                                                     | M    |
-| T10b | Strength grows slowly, knights needed to drive off                                                                                | M    |
-| T10c | Rob 2x                                                                                                                            | S    |
-| T10d | Flee mode, avoid stronger players                                                                                                 | M    |
-| T11a | path field, fork layout, cost divisor fix                                                                                         | M    |
-| T11b | techGate helper                                                                                                                   | S    |
-| T11c | Register nodes 1-3 and gate their features                                                                                        | M    |
-| T11d | Register nodes 4-6 and gate their features                                                                                        | M    |
-| T11e | Register nodes 7-9 and gate their features                                                                                        | M    |
-| T11f | Demolish-bridge action, Grand Causeway, Harbor empire                                                                             | L    |
-| T12a | Drown lowest elevation first                                                                                                      | M    |
-| T12b | Make it optional with Tides, add settings                                                                                         | S    |
-| T13a | Flood exposure in scoreVertex                                                                                                     | M    |
-| T13b | Salvage goal                                                                                                                      | M    |
-| T13c | Port and net placement                                                                                                            | M    |
-| T13d | Pirate avoidance                                                                                                                  | M    |
-| T13e | Tech research                                                                                                                     | M    |
-| T13f | Public-info-only dialogue lines                                                                                                   | S    |
-| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP                                                                       | M    |
-| T14b | Check Grand Causeway swing                                                                                                        | S    |
-| T14c | Tune tier prices                                                                                                                  | S    |
+| ID   | Step                                                                                                  | Size |
+| ---- | ----------------------------------------------------------------------------------------------------- | ---- |
+| T3a  | Bridge piece definition and placement rule (both edge ends in ocean)                                  | M    |
+| T3b  | Cost (road + 1 ore), cap 10 scaled by radius, 2x past cap                                             | S    |
+| T3c  | Count bridges toward Longest Road                                                                     | M    |
+| T3d  | Build UI for bridges                                                                                  | M    |
+| T3e  | Minimal bot support (bot builds a bridge without crashing)                                            | S    |
+| T4a  | Rickety piece, health 1, shared pool, 1 wood cost                                                     | M    |
+| T4b  | Upgrade action (1 brick + 1 ore)                                                                      | S    |
+| T4c  | Bridge type picker popup                                                                              | M    |
+| T4d  | Collapse on a 7 in the Seven Resolver                                                                 | L    |
+| T4e  | Longest Road recalculation through the change log                                                     | L    |
+| T4f  | Collapse animation                                                                                    | S    |
+| T5a  | flooded tile state and seeded per-cluster schedule                                                    | L    |
+| T5b  | Spring tide (every 4th round, 2 rings)                                                                | M    |
+| T5c  | Settings: on/off, high/low slider                                                                     | S    |
+| T5d  | Elevation resistance                                                                                  | M    |
+| T5e  | Ports idle while flooded, production stage skips flooded tiles                                        | M    |
+| T6a  | Warning one turn ahead: tint, wave pattern, fading flash                                              | M    |
+| T6b  | Rise title card                                                                                       | S    |
+| T6c  | Flooded tint for both themes                                                                          | S    |
+| T6d  | Elevation heat-map toggle                                                                             | S    |
+| T7a  | Fish wild token in hand (spend action, discard count, stealable, ignores bank cap)                    | L    |
+| T7b  | Nets                                                                                                  | M    |
+| T7c  | Fish icon boosts, max 4                                                                               | M    |
+| T7d  | Tide replenish                                                                                        | S    |
+| T7e  | Feed-the-sea action (1 wheat)                                                                         | S    |
+| T8a  | Harbor 1:1 upgrade, limit 1 per player, works while flooded                                           | M    |
+| T8b  | Max 4 trades per turn per harbor, invalid-ratio prompt explains harbors                               | S    |
+| T9a  | Storm event and wreck marker                                                                          | M    |
+| T9b  | Sea/shore 65/35 placement, fair spawn within 4 tiles of a player                                      | M    |
+| T9c  | First connecting road, bridge, or port claims the wreck                                               | M    |
+| T9d  | Loot with floor rule and slow scaling                                                                 | M    |
+| T9e  | Two spawn animations                                                                                  | S    |
+| T10a | Pirate marker, max 2, ocean only, random move                                                         | M    |
+| T10b | Strength grows slowly, knights needed to drive off                                                    | M    |
+| T10c | Rob 2x                                                                                                | S    |
+| T10d | Flee mode, avoid stronger players                                                                     | M    |
+| T11a | path field, fork layout, cost divisor fix                                                             | M    |
+| T11b | techGate helper                                                                                       | S    |
+| T11c | Register nodes 1-3 and gate their features                                                            | M    |
+| T11d | Register nodes 4-6 and gate their features                                                            | M    |
+| T11e | Register nodes 7-9 and gate their features                                                            | M    |
+| T11f | Demolish-bridge action, Grand Causeway, Harbor empire                                                 | L    |
+| T12a | Drown lowest elevation first                                                                          | M    |
+| T12b | Make it optional with Tides, add settings                                                             | S    |
+| T13a | Flood exposure in scoreVertex                                                                         | M    |
+| T13b | Salvage goal                                                                                          | M    |
+| T13c | Port and net placement                                                                                | M    |
+| T13d | Pirate avoidance                                                                                      | M    |
+| T13e | Tech research                                                                                         | M    |
+| T13f | Public-info-only dialogue lines                                                                       | S    |
+| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP                                           | M    |
+| T14b | Check Grand Causeway swing                                                                            | S    |
+| T14c | Tune tier prices                                                                                      | S    |
 Each chunk adds minimal bot support (reads costs and ratios through services, no crashes). T13 is the tuning pass.
 
 **Left for other DLCs (hooks only):** robber/knight blocks harbor (Warlords), wall +1 elevation (Bulwark), bog and silt (Wild Earth), Lighthouse sight (Wild Earth), sea caravans (Guildhall).

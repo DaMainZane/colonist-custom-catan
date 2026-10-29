@@ -14,7 +14,8 @@ import type { RngState } from './rng';
  *    gaps run 2, 3, 2, 2, 3, 2, 2, 3, 2 and a corner harbor has a gap of 2 on both sides. Other shapes are unchanged.
  * 6: Tidebound's wide water grows the canvas around the normal map (`canvasRadiusFor`) and keeps the normal land count, instead of cutting the
  *    land on the same canvas. Counts that scale with the land (islands, river length, noise size, ring size) read `baseRadius`. Without the
- *    wide-water pick nothing changes.
+ *    wide-water pick nothing changes. The same pick also writes `ext.elevation` (1 to 3) on land and `ext.fish` on seeded sea tiles (T2b2, T2c; no
+ *    RNG draws), still version 6 because version 6 had not shipped.
  */
 export const GEN_VERSION = 6;
 

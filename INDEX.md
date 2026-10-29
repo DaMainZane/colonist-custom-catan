@@ -60,8 +60,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `topology.ts` | Hex-grid topology: vertices, edges, ports (`buildTopology`, `hexDistance`, `portCap`) |
 | `mapgen.ts` | Board generator: shape, terrain, numbers, extras, ports (`generateMap`), plus the old `generateBoard` |
 | `maprecipe.ts` | Map recipe (seed, radius, picks, params), share code, per-stage RNG, `GEN_VERSION` |
-| `mapoptions.ts` | Map option types (shape ops, terrain and number styles, perks, quick starts), flags, pick resolution |
-| `mapshape.ts` | Shape stage: land field, cleanup, exact land count, blob growth, retry loop; wide-water helpers (`seaExtra`, `gapRoom`, `wideGap`, `centersTooClose`) that do nothing without the Tidebound perk |
+| `mapoptions.ts` | Map option types (shape ops, terrain and number styles, perks, quick starts), flags, pick resolution; `PerkDef.afterGenerated(inits, ctx, cells)` gets the land cells with their ranked height |
+| `mapshape.ts` | Shape stage: land field, cleanup, exact land count, blob growth, retry loop; wide-water helpers (`seaExtra`, `seaGrow`, `canvasRadiusFor`, `gapRoom`, `wideGap`, `centersTooClose`; `LandField.baseRadius`) that do nothing without the Tidebound perk |
 | `mapcells.ts` | Per-cell height, moisture, coast distance and landmass; neighbour lists |
 | `mapterrain.ts` | Terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) |
 | `mapmix.ts` | `island_mix` fix-up: every landmass of 4+ tiles gets at least two resource types |
@@ -109,7 +109,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
 | `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
 | `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order (skeleton only, `register()` is empty until T3) |
-| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a, param `water.extra`); the bridge piece arrives in T3 |
+| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a, param `water.extra`; it also writes the sea data below through `afterGenerated`); the bridge piece arrives in T3 |
+| `tidebound/seaData.ts` | T2b2 and T2c map data for the wide-water perk: `elevationOf`, `applyElevation` (`ext.elevation` 1 to 3 on land by ranked height), `placeFish` (`ext.fish` on seeded sea tiles, shore sea more than open sea). No RNG draws |
 | `tidebound/ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T4 to T12) |
 
 ## `src/server/` (thin adapter over the engine, plus bots)
@@ -210,7 +211,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapbudget.test.ts` | Generation time budget |
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
 | `tidebound.test.ts` | Tidebound skeleton (T0): 8 addons and links, lobby card data from the manifest, client fallback catalog matches the server ids, DLC off changes nothing, DLC on registers no content yet |
-| `tideboundmap.test.ts` | T2a wide-water perk: registered only with the DLC, perk off = same map, land share, island and continent gaps, wider river, warnings, helpers |
+| `tideboundmap.test.ts` | T2a to T2c wide-water perk: registered only with the DLC, perk off = same map, canvas grows and land stays, island and continent gaps, wider river, warnings, helpers; `ext.elevation` and `ext.fish` data (counts, rarity, no draws, nothing without the pick) |
 | `tideboundlobby.test.ts` | T2a2 lobby sees DLC map perks: room registry, per-room menu list, settings merge and share code follow the DLC toggles, lobby map, option list sent per socket |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |

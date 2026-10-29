@@ -1,6 +1,35 @@
 # Change Log
 
-## 2026-10-29 (Pass 63: Tidebound T2b1, wide water grows the canvas; NOT RUN YET)
+## 2026-10-29 (Pass 65: Tidebound T2c, seeded fish icons on sea tiles; typecheck and tests passed)
+Built in the same sitting as Pass 64 and shares its plumbing (the perk hook and `seaData.ts`). Closes T2.
+### Added
+- **`placeFish(inits, ctx)` (`packs/tidebound/seaData.ts`)**: writes `ext.fish = FISH_BOOSTS` (4) on some sea tiles. A sea tile is not land, has no `noPort` flag and is not a river channel (lakes count). Shore sea (next to land, where nets will sit) holds fish on 25% of its tiles (`FISH_SHARE_SHORE`), open sea on 8% (`FISH_SHARE_OPEN`). The counts are fixed by the share; which tiles is the extras-stage noise ranked, so fish gather a little into shoals. **No RNG draws** (the `extras` stream is untouched, so fog and other hooks after it draw what they drew before). Both shares are starting guesses for the gallery.
+- `wide_water.afterGenerated` calls it after `applyElevation`. Data only: nothing reads `ext.fish` until T7b and T7c.
+### Decisions
+- **`recipeKey` (`server/lobby.ts`) is left as it is.** The question from Pass 62 was whether the key must include the room's addon set. It does not: the only map change an addon makes in T2 is a pick (`wide_water`), picks are in the key, and `mergeSettingsDetailed` drops a pick when its DLC or addon goes off, so any toggle that changes the map changes the key. Adding the addon set would rebuild the board, and drop painted edits, whenever any DLC is toggled. Revisit when an addon changes the map without a pick (T12 Rising sea).
+- **Golden test**: not touched. No code path runs without the pick, and the golden games do not use Tidebound. A recheck means running it once, in the final command below.
+### Tests
+- `tests/tideboundmap.test.ts`, `sea data: fish`: exact counts on a built canvas (shore 3 of 11, open 3 of 42), none on land, river or in the first two rings of land, no RNG advance, same noise = same tiles, other noise = other tiles, and on real maps fish sit on sea only at 5% to 40% density. `sea data: nothing without the pick` covers the DLC-off and no-pick case.
+### Not done
+- `npm run typecheck; npm test` passed for Passes 62 to 65 (one run, 2026-10-29), golden included.
+- A host can repaint a tile in the lobby and the old `ext.fish` or `ext.elevation` stays on it. Readers (T5d, T7b) must check the tile type first.
+- Fish under fog: sea tiles are never hidden, so the icons are visible. Fine until a fog-and-Tidebound scenario is built.
+
+## 2026-10-29 (Pass 64: Tidebound T2b2, elevation 1 to 3 on land; typecheck and tests passed)
+### Added
+- **`src/packs/tidebound/seaData.ts`** (new): `elevationOf(h)` (1 below 0.65, 2 from 0.65, 3 from 0.9; `ELEVATION_2_FROM`, `ELEVATION_3_FROM`) and `applyElevation(inits, cells)`, which writes `ext.elevation` on every land hex. `h` is rank-normalized over the land cells, so about 10% of the land is elevation 3, 25% is 2 and 65% is 1 on any shape (higher is rarer). It uses the shape's own height field when the shape drew one, else the terrain noise, so the realistic terrain style and the elevation agree. Cells are matched to hexes by position, never by order. **No RNG draws.**
+- **`PerkDef.afterGenerated(inits, ctx, cells)`** (`shared/mapoptions.ts`): third argument, the land cells with their ranked `h`. Optional to read, so existing perks are unchanged. **`shared/mapgen.ts`** passes `cells0` (not the current terrain attempt's cells, so a terrain redraw never moves elevation).
+- **`tidebound/bridges.ts`**: `wide_water` now has `afterGenerated` (elevation, then fish). Menu text mentions both.
+- **`shared/maprecipe.ts`**: the `GEN_VERSION` 6 note lists the new `ext` keys. Still 6, because 6 has not shipped.
+### Where it is stored
+`hex.ext.elevation` (1 to 3) on land hexes only, only with the wide-water pick on. Nothing reads it yet: tides resist by it in T5d, the heat map shows it in T6d, Rising sea drowns lowest first in T12.
+### Tests
+- `tests/tideboundmap.test.ts`, `sea data: elevation`: thresholds, position matching, every land hex 1 to 3 and no water hex, higher is rarer (count 3 < count 2 < count 1 on a radius 8 continent), every shape, same recipe = same data. The header of the file now covers T2b2 and T2c.
+### Not done
+- `npm run typecheck; npm test` passed (see Pass 65).
+- The thresholds (0.65 and 0.9) are starting guesses. Tune with the gallery once T5 reads them: three tide levels should each drown a visibly different share of the land.
+
+## 2026-10-29 (Pass 63: Tidebound T2b1, wide water grows the canvas; typecheck and tests passed)
 ### Decision (Development Plan section 4)
 - **The canvas grows.** Tidebound's map is bigger than base Catan by default. The land count stays what the radius gives; the extra room is sea. Rivers and continents reuse the existing logic, only widened.
 ### Changed
@@ -11,11 +40,11 @@
 ### Not changed
 - Without the pick every value is identical (`baseRadius === radius`), so the golden test and `mapshapes.test.ts` should pass untouched. No new RNG draws, no state shape change, no `g.version` bump.
 ### Not done
-- `npm run typecheck; npm test` has not been run. Anything that pins `GEN_VERSION` to 5 or the old wide-water land counts (`tideboundlobby.test.ts`, `mapbudget.test.ts`, share-code fixtures) may need the new numbers.
+- `npm run typecheck; npm test` passed in the Pass 65 run. Before it, this was the open list: anything that pinned `GEN_VERSION` to 5 or the old wide-water land counts (`tideboundlobby.test.ts`, `mapbudget.test.ts`, share-code fixtures) may need the new numbers.
 - Not checked: UI zoom and bot map reads with a board larger than `rules.boardRadius`; bridge cap scaling (T3) must pick land radius or canvas.
 - Starting guesses to tune with the gallery: 1.5 rings per extra tile, and sparse spacing of islands on a big canvas.
 
-## 2026-10-29 (Pass 62: Tidebound T2a2, the lobby sees DLC map perks; NOT RUN YET)
+## 2026-10-29 (Pass 62: Tidebound T2a2, the lobby sees DLC map perks; typecheck and tests passed)
 T1 and T2a (Passes 60 and 61) ran clean: `npm run typecheck; npm test` passed before this pass.
 ### Decision (Development Plan section 4)
 - **Option A**, with one change to its wording: the lobby uses the room's DLC-aware registry for the map, picks and menu, and the client needs **no change** (its `mapOptions` handler already redraws from whatever list arrives). Option B (perks in the static registry behind a capability) is dropped: it would put an addon perk in the base registry and break "DLC off = nothing registered".

@@ -288,8 +288,10 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
     });
 
     // 6 extras: each active perk, then the hooks that need no menu entry (fog hides tiles here). Same stream every attempt.
+    // Perks also get the land cells with their ranked height (`cells0`, the shape's own height field when it drew one), so a perk can write data
+    // by height (Tidebound elevation). `cells0` and not this attempt's cells: a terrain redraw never moves it.
     const extrasCtx = ctxFor('extras');
-    for (const perk of perks) perk.afterGenerated?.(inits, extrasCtx);
+    for (const perk of perks) perk.afterGenerated?.(inits, extrasCtx, cells0);
     for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, extrasCtx.rng, extra);
 
     // 7 topology and ports, 8 check.

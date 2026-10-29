@@ -117,8 +117,12 @@ export interface PerkDef extends MapOptionBase {
   tileCounts?(rules: Rules, total: number, ctx: MapCtx): Record<string, number>;
   /** Handed to `afterMapGenerated` hooks (fog: `fogCount`). Applying "a typed count wins" is the perk's job here. */
   extra?(rules: Rules, total: number, ctx: MapCtx): Record<string, any>;
-  /** Same moment as `afterMapGenerated`, but only while the perk is active. */
-  afterGenerated?(inits: HexInit[], ctx: MapCtx): void;
+  /**
+   * Same moment as `afterMapGenerated`, but only while the perk is active.
+   * `cells` are the land cells in canvas order with their ranked height `h` (the same list the terrain stage got), for a perk that writes data by height.
+   * Match them to `inits` by position (`q`, `r`), not by index. A perk that ignores them can declare just `(inits, ctx)`.
+   */
+  afterGenerated?(inits: HexInit[], ctx: MapCtx, cells: readonly CellInfo[]): void;
 }
 
 export type MapOption = ShapeOpDef | TerrainDef | NumbersDef | PerkDef;
