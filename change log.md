@@ -1,5 +1,13 @@
 # Change Log
 
+## 2026-10-29 (Pass 57: Tidebound T0a, pack skeleton with 8 addon stubs)
+### Added
+- **`src/packs/tidebound/`**: `index.ts` (`tideboundPack`, `deps: ['base']`, empty `register()`) and one stub file per addon: `tidebound.bridges`, `tidebound.rickety_bridges` (deps bridges), `tidebound.tides`, `tidebound.rising_sea`, `tidebound.harbor`, `tidebound.fishing`, `tidebound.wrecks`, `tidebound.pirates`. Each has a description and 3 to 4 `links` (always at least one General service, so `auditAddons` passes). No `register()` on any addon: no tiles, pieces, actions, hooks or rules.
+### Changed
+- **`src/packs/index.ts`**: `allPacks` is now base, gold, fog, tidebound. The lobby DLC card and addon list come from the manifest, so they appear with no client change.
+### Not done (next: T0b)
+- No lobby card work, DLC-off test or placeholder id replacement yet. No `g.version` bump (no state shape change).
+
 ## 2026-10-28 (Pass 56: Bot tech tree support, pre-roll dev card restriction, fair dice option, tech tree cost & resource variety rebalancing, client trade auto-deny, and bot-replacement seat reconnect)
 ### Added & Changed
 - **Bot Tech Tree Research & Root Tech Usage (`src/server/bots/brain.ts`, `tests/techroots.test.ts`)**:

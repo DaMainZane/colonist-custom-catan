@@ -37,7 +37,7 @@ const on = { dlc: { fix: true } };
 describe('addon manifest and enabled sets', () => {
   it('lists every addon in the catalog but registers no addon content by default', () => {
     const reg = createRegistry(packs(fixtureDlc()));
-    expect([...reg.addons.keys()]).toEqual(['fix.bridges', 'fix.tides']);
+    expect([...reg.addons.keys()].filter(k => k.startsWith('fix.'))).toEqual(['fix.bridges', 'fix.tides']);
     expect(reg.dlcs.get('fix')).toEqual({ id: 'fix', name: 'Fixture DLC', addons: ['fix.bridges', 'fix.tides'] });
     expect(reg.addons.get('fix.tides')?.deps).toEqual(['fix.bridges']);
     expect(reg.enabled.size).toBe(0);
@@ -85,7 +85,9 @@ describe('addon manifest and enabled sets', () => {
   });
 
   it('"all" registers every addon', () => {
-    expect(createRegistry(packs(fixtureDlc()), {}, 'all').enabled.size).toBe(2);
+    const all = createRegistry(packs(fixtureDlc()), {}, 'all');
+    expect([...all.enabled].filter(k => k.startsWith('fix.')).length).toBe(2);
+    expect(all.enabled.size).toBe(all.addons.size);
   });
 });
 

@@ -68,7 +68,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapcheck.ts` | Board checks: landmasses, lakes, usable spots, fairness, `MapReport` |
 | `numbers.ts` | Number tokens: real-game pool scaled to any board, red numbers never touch (random swaps, then a deterministic sweep for any red pair left) |
 
-## `src/packs/` (game content registered as packs; load order: base, gold, fog)
+## `src/packs/` (game content registered as packs; load order: base, gold, fog, tidebound)
 
 | File | What it does |
 |---|---|
@@ -108,6 +108,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/map/numbers.ts` | Balanced number style |
 | `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
 | `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
+| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order (skeleton only, `register()` is empty until T3) |
+| `tidebound/bridges.ts`, `ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T3 to T12) |
 
 ## `src/server/` (thin adapter over the engine, plus bots)
 
