@@ -1,9 +1,10 @@
-// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; collapse arrives in T4d) | USED BY: packs/tidebound, tests
+// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc) | USED BY: packs/tidebound, tests
 import {
   aboveBaseLimit,
   BOT_GOALS,
   canAfford,
   COST_MODS,
+  damagePiece,
   doubledCost,
   DURABILITY_DEFS,
   getPlayer,
@@ -11,7 +12,10 @@ import {
   placedCount,
   priceOf,
   priceOfUpgrade,
-  totalCards
+  SEVEN_STEP_ORDER,
+  SEVEN_STEPS,
+  totalCards,
+  updateAwards
 } from '../../shared';
 import type {
   ActionDef,
@@ -26,13 +30,14 @@ import type {
   PieceDef,
   PlayerState,
   Registry,
-  Resources
+  Resources,
+  SevenStepDef
 } from '../../shared';
 import { BRIDGE, BRIDGE_BASE_LIMIT, bridgeBotGoal, bridgePiece, canPlaceBridge } from './bridges';
 
 export const RICKETY = 'rickety_bridge';
 export const RICKETY_COST: Resources = { wood: 1 };
-/** Health of a rickety bridge. One hit (a 7, in T4d) breaks it. */
+/** Health of a rickety bridge. One hit (rolling a 7, T4d) breaks it. */
 export const RICKETY_HEALTH = 1;
 /** Price of turning a rickety bridge into a full bridge. Together with the 1 wood it adds up to the full bridge price. */
 export const RICKETY_UPGRADE_COST: Resources = { brick: 1, ore: 1 };
@@ -40,6 +45,8 @@ export const RICKETY_UPGRADE_COST: Resources = { brick: 1, ore: 1 };
 export const RICKETY_UPGRADE_ID = 'upgrade_rickety_bridge';
 /** Action type of the upgrade. */
 export const UPGRADE_BRIDGE = 'upgrade_bridge';
+/** Seven Resolver step id for collapsing rickety bridges on a 7 (T4d). */
+export const RICKETY_SEVEN_STEP_ID = 'tidebound.rickety_collapse';
 
 // ---- Shared pool ---------------------------------------------------------------------------------------
 
@@ -190,6 +197,50 @@ export const ricketyBotGoal: BotGoalDef = {
   }
 };
 
+// ---- T4d: collapse on a 7 (Seven Resolver) & T4e: Longest Road recalculation ---------------------------
+
+/**
+ * On a 7, every rickety bridge on the board takes 1 damage (`RICKETY_HEALTH = 1`), breaks, and returns to the
+ * owner's shared bridge pool (`syncBridgePool`). Then `updateAwards(ctx)` recalculates Longest Road and emits
+ * `awardChanged` if the holder lost or handed off the award (recorded in the S0.10 public change log).
+ * Draws zero values from `g.rng`.
+ */
+export const ricketyCollapseStep: SevenStepDef = {
+  id: RICKETY_SEVEN_STEP_ID,
+  order: SEVEN_STEP_ORDER.decay,
+  isDlcSideEffect: true,
+  priority: 85,
+  canFire(ctx: Ctx): boolean {
+    return ctx.g.board.edges.some(e => e.piece?.type === RICKETY);
+  },
+  run(ctx: Ctx): void {
+    const { g } = ctx;
+    const owners = new Set<Id>();
+    const counts = new Map<Id, number>();
+    for (const e of g.board.edges) {
+      if (e.piece?.type !== RICKETY) continue;
+      const ownerId = e.piece.owner;
+      const res = damagePiece(ctx, 'edge', e.id, 1);
+      if (res.broken) {
+        owners.add(ownerId);
+        counts.set(ownerId, (counts.get(ownerId) || 0) + 1);
+      }
+    }
+    for (const ownerId of owners) {
+      syncBridgePool(g, ownerId);
+      const p = getPlayer(g, ownerId);
+      const n = counts.get(ownerId) || 0;
+      if (p && n > 0) {
+        p.stats.ricketyCollapsed = (p.stats.ricketyCollapsed || 0) + n;
+        ctx.log(`💥 ${p.avatar} ${p.name}'s ${n === 1 ? 'rickety bridge' : `${n} rickety bridges`} collapsed on a 7!`, p.color);
+      }
+    }
+    if (owners.size > 0) {
+      updateAwards(ctx);
+    }
+  }
+};
+
 export const ricketyBridgesAddon: AddonDef = {
   id: 'tidebound.rickety_bridges',
   name: 'Rickety bridges',
@@ -212,13 +263,12 @@ export const ricketyBridgesAddon: AddonDef = {
     api.define(DURABILITY_DEFS, ricketyDurability);
     api.define(COST_MODS, ricketyPoolCostMod);
     api.define(BOT_GOALS, ricketyBotGoal);
+    api.define(SEVEN_STEPS, ricketyCollapseStep);
     api.action(upgradeBridgeAction);
     api.phaseAction('main', UPGRADE_BRIDGE);
     // Shared pool: after either kind is built, put both supplies right.
     api.hook('onBuild', (ctx: Ctx, def: PieceDef, pid: Id) => {
       if (def.id === BRIDGE || def.id === RICKETY) syncBridgePool(ctx.g, pid);
     });
-    // T4c (client): type picker popup on ocean edges and the upgrade popup on your own rickety bridges (`client/render/bridgepicker.ts`).
-    // T4d: collapse on a 7 (Seven Resolver). T4e: Longest Road recalculation. T4f: collapse animation.
   }
 };

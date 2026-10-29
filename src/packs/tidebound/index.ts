@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4a/T4b rickety bridges, T4c view data) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -24,6 +24,7 @@ export {
   RICKETY,
   RICKETY_COST,
   RICKETY_HEALTH,
+  RICKETY_SEVEN_STEP_ID,
   RICKETY_UPGRADE_COST,
   RICKETY_UPGRADE_ID,
   UPGRADE_BRIDGE,
@@ -31,6 +32,7 @@ export {
   bridgesOnBoard,
   ricketyBotGoal,
   ricketyBridgesAddon,
+  ricketyCollapseStep,
   ricketyDurability,
   ricketyPiece,
   ricketyPoolCostMod,

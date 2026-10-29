@@ -1,5 +1,5 @@
-// MODULE: action "roll" (seeded dice, production, seven -> discard + robber) | USED BY: packs/base/actions/index
-import { getPlayer, produceFromHex, pushPhase, rngInt, setPhase, totalCards } from '../../../shared';
+// MODULE: action "roll" (seeded dice, production, seven -> Seven Resolver pipeline) | USED BY: packs/base/actions/index
+import { getPlayer, produceFromHex, resolveSeven, rngInt, setPhase } from '../../../shared';
 import type { ActionDef, Ctx, Hex } from '../../../shared';
 
 function matchingHexes(ctx: Ctx, sum: number): Hex[] {
@@ -22,20 +22,7 @@ function produce(ctx: Ctx, hexes: Hex[]): void {
 }
 
 function handleSeven(ctx: Ctx): void {
-  const { g } = ctx;
-  // After the robber (and any discards) the game returns to the main phase.
-  g.phaseStack.push('main');
-  setPhase(ctx, 'robber');
-
-  let anyDiscard = false;
-  for (const p of g.players) {
-    const total = totalCards(p);
-    if (total > g.rules.discardLimit) {
-      p.pending.discard = Math.floor(total / 2);
-      anyDiscard = true;
-    }
-  }
-  if (anyDiscard) pushPhase(ctx, 'discard');
+  resolveSeven(ctx);
 }
 
 function rollFairDice(g: Ctx['g']): [number, number] {

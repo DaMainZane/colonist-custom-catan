@@ -68,7 +68,7 @@ function optionHtml(piece: 'bridge' | 'rickety_bridge', me: any): string {
   const affordable = Object.entries(cost).every(([r, n]) => (me.resources?.[r] || 0) >= (Number(n) || 0));
   const why = left <= 0 ? 'No bridges left' : !affordable ? 'Not enough resources' : '';
   const name = piece === 'bridge' ? 'Bridge' : 'Rickety bridge';
-  const note = piece === 'bridge' ? 'Sturdy' : 'Cheap, 1 health';
+  const note = piece === 'bridge' ? 'Sturdy' : 'Cheap, breaks on a 7';
   return `
     <button class="bp-opt" type="button" ${why ? 'disabled' : ''} title="${esc(why || name)}" onclick="chooseBridgeType('${piece}')">
       <span class="bp-name">${uiIcon('bridge', 18)}${esc(name)}</span>

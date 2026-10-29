@@ -136,17 +136,24 @@ function toPublicEntry(g: GameState, seq: number, ev: GameEvent): PublicHistoryE
     case 'contractClaimed':
     case 'markerExpired':
     case 'pieceBroken':
-    case 'karaokeLost':
+    case 'karaokeLost': {
+      let defaultSummary: string = ev.type;
+      if (ev.type === 'pieceBroken' && d.piece) {
+        defaultSummary = `Collapsed ${d.piece}`;
+      } else if (ev.type === 'awardChanged' && d.award) {
+        defaultSummary = d.playerId ? `Claimed ${d.award} (${d.value ?? ''})` : `Lost ${d.award}`;
+      }
       return {
         seq,
         round,
         turnCount,
         type: ev.type,
-        actorId: d.playerId ?? d.breakerId ?? d.holderId ?? null,
+        actorId: d.playerId ?? d.breakerId ?? d.holderId ?? d.ownerId ?? null,
         targetId: d.victimId ?? d.previousHolderId ?? null,
-        summary: d.summary || ev.type,
+        summary: d.summary || defaultSummary,
         data
       };
+    }
     default:
       return null;
   }

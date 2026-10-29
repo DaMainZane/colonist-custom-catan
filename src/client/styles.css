@@ -1035,11 +1035,23 @@ svg#boardSvg.is-panning * {
 }
 .piece-drop-anim { transform-origin: 0 0; animation: pieceDrop 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
 .piece-impact-ring { transform-origin: 0 0; fill: none; stroke: var(--piece-rim); stroke-width: 3; pointer-events: none; animation: impactRing 0.4s ease-out both; }
+.bridge-collapse-anim { transform-origin: 0 0; pointer-events: none; animation: bridgeCollapse 0.6s cubic-bezier(0.36, 0, 0.66, -0.2) both; }
+.bridge-collapse-ring { transform-origin: 0 0; fill: none; stroke: var(--piece-rim); stroke-width: 2.8; stroke-dasharray: 5 4; pointer-events: none; animation: bridgeSplashRing 0.6s ease-out both; }
 .robber-drop-anim { transform-origin: 0 0; animation: pieceDrop 0.34s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
 .robber-impact-ring { transform-origin: 0 0; fill: none; stroke: var(--danger); stroke-width: 3; pointer-events: none; animation: impactRing 0.45s ease-out both; }
 .fog-reveal-anim { transform-origin: 0 0; animation: fogReveal 0.4s ease-out both; }
 @keyframes pieceDrop { from { transform: translateY(-16px) scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes impactRing { 0% { transform: scale(0.4); opacity: 0; } 30% { opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes bridgeCollapse {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  25% { transform: translateY(2px) scale(1.04, 0.92) rotate(-5deg); opacity: 0.95; }
+  100% { transform: translateY(14px) scale(0.45) rotate(14deg); opacity: 0; }
+}
+@keyframes bridgeSplashRing {
+  0% { transform: scale(0.35); opacity: 0.9; }
+  60% { opacity: 0.55; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
 @keyframes fogReveal { from { transform: scale(0.94); opacity: 0.4; } to { transform: scale(1); opacity: 1; } }
 
 /* ---------- Victory ---------- */

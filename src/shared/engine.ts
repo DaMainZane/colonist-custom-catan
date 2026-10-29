@@ -163,28 +163,74 @@ function finalize(ctx: Ctx, actionType: string): void {
   checkWinner(ctx);
 }
 
-export function updateAwards(ctx: Ctx, actionType: string): void {
+export function updateAwards(ctx: Ctx, actionType?: string): void {
   const { g } = ctx;
+  const hasBrokenPiece = ctx.events.some(ev => ev.type === 'pieceBroken');
   for (const a of ctx.reg.awards.values()) {
-    if (a.recomputeOn && !a.recomputeOn.includes(actionType)) continue;
-    let best = a.min - 1;
-    const holderId = g.awards[a.id];
-    if (holderId) {
-      const holder = getPlayer(g, holderId)!;
-      const len = a.metric(ctx, holder);
-      holder.stats[a.id] = len;
-      if (len >= a.min) best = len;
-      else g.awards[a.id] = null;
-    }
+    const recomputeOnBreak = hasBrokenPiece && !!a.recomputeOn?.includes('build');
+    if (actionType && a.recomputeOn && !a.recomputeOn.includes(actionType) && !recomputeOnBreak) continue;
+
+    const prevHolderId = g.awards[a.id] ?? null;
+    const lengths = new Map<Id, number>();
+    let maxLen = a.min - 1;
     for (const p of g.players) {
       const len = a.metric(ctx, p);
       p.stats[a.id] = len;
-      if (len > best) {
-        best = len;
-        g.awards[a.id] = p.id;
-        ctx.log(`${p.avatar} ${p.name} claimed ${a.name} (${best})!`, p.color);
-        ctx.emit('awardChanged', { award: a.id, playerId: p.id, value: best });
+      lengths.set(p.id, len);
+      if (len > maxLen) maxLen = len;
+    }
+
+    if (maxLen < a.min) {
+      if (prevHolderId !== null) {
+        const prev = getPlayer(g, prevHolderId);
+        const prevLen = lengths.get(prevHolderId) ?? 0;
+        g.awards[a.id] = null;
+        if (hasBrokenPiece && prev) {
+          ctx.log(`📉 ${prev.avatar} ${prev.name} lost ${a.name} (${prevLen})`, prev.color);
+        }
+        ctx.emit('awardChanged', {
+          award: a.id,
+          playerId: null,
+          previousHolderId: prevHolderId,
+          value: prevLen,
+          summary: `Lost ${a.name} (${prevLen})`
+        });
       }
+      continue;
+    }
+
+    const leaders = g.players.filter(p => lengths.get(p.id) === maxLen);
+    if (prevHolderId !== null && leaders.some(p => p.id === prevHolderId)) {
+      // Current holder is still tied for or outright in the lead >= min: retains the award.
+      continue;
+    }
+
+    if (leaders.length === 1) {
+      const winner = leaders[0];
+      g.awards[a.id] = winner.id;
+      ctx.log(`${winner.avatar} ${winner.name} claimed ${a.name} (${maxLen})!`, winner.color);
+      ctx.emit('awardChanged', {
+        award: a.id,
+        playerId: winner.id,
+        previousHolderId: prevHolderId,
+        value: maxLen,
+        summary: `Claimed ${a.name} (${maxLen})`
+      });
+    } else if (prevHolderId !== null) {
+      // Previous holder fell below maxLen and 2+ other players are tied for maxLen: award becomes unclaimed.
+      const prev = getPlayer(g, prevHolderId);
+      const prevLen = lengths.get(prevHolderId) ?? 0;
+      g.awards[a.id] = null;
+      if (hasBrokenPiece && prev) {
+        ctx.log(`📉 ${prev.avatar} ${prev.name} lost ${a.name} (tied at ${maxLen})`, prev.color);
+      }
+      ctx.emit('awardChanged', {
+        award: a.id,
+        playerId: null,
+        previousHolderId: prevHolderId,
+        value: prevLen,
+        summary: `Lost ${a.name} (tied at ${maxLen})`
+      });
     }
   }
 }

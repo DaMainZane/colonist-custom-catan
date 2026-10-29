@@ -118,6 +118,15 @@ export function playPlaceRoadSound(): void {
   playPitchSweep(580, 380, 0.06, 'sine', 0.08, 0.02);
 }
 
+// Splintering wood snap + water splash when a rickety bridge collapses on a 7 (T4f)
+export function playBridgeCollapseSound(): void {
+  if (!ensureAudio()) return;
+  playNoiseBurst(0.065, 1350, 2.8, 0.16, 0);
+  playPitchSweep(360, 110, 0.14, 'sawtooth', 0.12, 0.01);
+  playNoiseBurst(0.14, 620, 1.4, 0.15, 0.09);
+  playPitchSweep(190, 68, 0.22, 'triangle', 0.14, 0.08);
+}
+
 // Warm Colonist wooden pop + two-note build chime when placing a Settlement
 export function playPlaceSettlementSound(): void {
   if (!ensureAudio()) return;

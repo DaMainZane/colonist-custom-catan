@@ -281,13 +281,43 @@ export function recordTurnHistory(
         break;
       }
 
+      case 'bridgeUpgraded': {
+        turnSummary.actions.push({
+          category: 'build',
+          icon: '🌉',
+          badge: 'Bridge',
+          text: 'Upgraded Rickety Bridge to full Bridge',
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'pieceBroken': {
+        const pieceLabel = d.piece === 'rickety_bridge' ? 'Rickety Bridge' : (d.piece || 'Piece');
+        const owner = g.players.find(x => x.id === d.ownerId);
+        turnSummary.actions.push({
+          category: 'event',
+          icon: '💥',
+          badge: 'Collapsed',
+          text: owner ? `${owner.name}'s ${pieceLabel} collapsed!` : `${pieceLabel} collapsed!`,
+          timestamp: now
+        });
+        break;
+      }
+
       case 'awardChanged': {
         const name = d.award === 'longestRoad' ? 'Longest Road' : d.award === 'largestArmy' ? 'Largest Army' : d.award;
+        const val = d.value ?? d.count;
+        const winner = d.playerId ? g.players.find(x => x.id === d.playerId) : null;
+        const prev = d.previousHolderId ? g.players.find(x => x.id === d.previousHolderId) : null;
+        const text = d.playerId
+          ? `${winner && winner.id !== playerId ? `${winner.name} claimed` : 'Claimed'} ${name}${val !== undefined ? ` (${val})` : ''}`
+          : `${prev ? `${prev.name} lost` : 'Lost'} ${name}`;
         turnSummary.actions.push({
           category: 'award',
-          icon: '🏆',
+          icon: d.playerId ? '🏆' : '📉',
           badge: name,
-          text: `Claimed ${name} (${d.count})`,
+          text,
           timestamp: now
         });
         break;

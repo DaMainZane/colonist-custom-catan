@@ -6,6 +6,7 @@ import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityM
 import {
   playTone,
   playPlaceRoadSound,
+  playBridgeCollapseSound,
   playPlaceSettlementSound,
   playPlaceCitySound,
   playPlaceRobberSound,
@@ -28,6 +29,9 @@ import { esc } from '../util';
 import { openBridgePicker } from './bridgepicker';
 
 const knownRoads = new Set<number>();
+const knownRoadPieces = new Map<number, { owner: string; pieceType: string }>();
+const collapsingBridges = new Map<number, { owner: string; pieceType: string; start: number }>();
+const COLLAPSE_ANIM_MS = 620;
 const knownBuildings = new Map<number, string>();
 const knownFogHexes = new Set<number>();
 let knownRobberHexId: number | null = null;
@@ -324,6 +328,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   if (state.status === 'LOBBY') {
     knownRoads.clear();
+    knownRoadPieces.clear();
+    collapsingBridges.clear();
     knownBuildings.clear();
     knownFogHexes.clear();
     pieceAnimTimestamps.clear();
@@ -343,6 +349,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const showRollDim = rollElapsed < ROLL_DIM_MS;
   const rollDimStyle = `animation-delay: -${Math.max(0, Math.round(rollElapsed))}ms;`;
   let playedRoadSfx = false;
+  let playedCollapseSfx = false;
   let playedSettleSfx = false;
   let playedCitySfx = false;
 
@@ -374,15 +381,41 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   let hasActiveRoadAnim = false;
   for (const e of edges) {
-    if (e.road && !knownRoads.has(e.id)) {
-      knownRoads.add(e.id);
-      pieceAnimTimestamps.set(`road_${e.id}`, now);
-      if (state.status !== 'LOBBY' && !playedRoadSfx) {
-        playedRoadSfx = true;
-        playPlaceRoadSound();
+    const prevRoad = knownRoadPieces.get(e.id);
+    const curType = e.pieceType || 'road';
+    if (e.road) {
+      if (!knownRoads.has(e.id) || (prevRoad && prevRoad.pieceType !== curType)) {
+        knownRoads.add(e.id);
+        knownRoadPieces.set(e.id, { owner: e.road, pieceType: curType });
+        collapsingBridges.delete(e.id);
+        pieceAnimTimestamps.set(`road_${e.id}`, now);
+        if (state.status !== 'LOBBY' && !playedRoadSfx) {
+          playedRoadSfx = true;
+          playPlaceRoadSound();
+        }
+      } else if (!prevRoad) {
+        knownRoadPieces.set(e.id, { owner: e.road, pieceType: curType });
+      }
+    } else if (prevRoad || knownRoads.has(e.id)) {
+      knownRoads.delete(e.id);
+      knownRoadPieces.delete(e.id);
+      if (state.status !== 'LOBBY' && prevRoad) {
+        collapsingBridges.set(e.id, { owner: prevRoad.owner, pieceType: prevRoad.pieceType, start: now });
+        if (!playedCollapseSfx) {
+          playedCollapseSfx = true;
+          playBridgeCollapseSound();
+        }
+        setTimeout(() => syncInFlightUi(), COLLAPSE_ANIM_MS + 30);
       }
     }
     if (!hasActiveRoadAnim && e.road && getPieceAnimAttrs(`road_${e.id}`, now).isAnimating) {
+      hasActiveRoadAnim = true;
+    }
+  }
+  for (const [edgeId, c] of collapsingBridges) {
+    if (now - c.start >= COLLAPSE_ANIM_MS) {
+      collapsingBridges.delete(edgeId);
+    } else {
       hasActiveRoadAnim = true;
     }
   }
@@ -553,13 +586,16 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.portsLayer.innerHTML = portsHtml;
   }
 
-  // 4. Placed Roads Layers: rebuilds only when placed roads/bridges, blocking buildings, or road drop animations change.
+  // 4. Placed Roads Layers: rebuilds only when placed roads/bridges, blocking buildings, or road drop/collapse animations change.
   const placedRoadsSigParts: string[] = [
     cachedGeomBoardKey,
     hasActiveRoadAnim ? String(Math.floor(now / 32)) : '0'
   ];
   for (const e of edges) {
     if (e.road) placedRoadsSigParts.push(`r${e.id}:${e.road}:${e.pieceType || 'road'}`);
+  }
+  for (const [edgeId, c] of collapsingBridges) {
+    placedRoadsSigParts.push(`c${edgeId}:${c.owner}:${c.pieceType}:${Math.floor(c.start)}`);
   }
   for (const v of vertices) {
     if (v.building) placedRoadsSigParts.push(`b${v.id}:${v.building.owner}`);
@@ -572,6 +608,56 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     let roadRimsHtml = '';
     let roadBodiesHtml = '';
     let roadHitsHtml = '';
+
+    for (const [edgeId, c] of collapsingBridges) {
+      const e = edges[edgeId];
+      if (!e || e.road) continue;
+      const v1 = vertices[e.v1], v2 = vertices[e.v2];
+      if (!v1 || !v2) continue;
+      const owner = state.players.find(p => p.id === c.owner);
+      const col = owner?.color || '#888';
+      const isRickety = c.pieceType === 'rickety_bridge';
+      const isBridge = c.pieceType === 'bridge' || isRickety;
+      const x1 = v1.x + (v2.x - v1.x) * 0.08;
+      const y1 = v1.y + (v2.y - v1.y) * 0.08;
+      const x2 = v1.x + (v2.x - v1.x) * 0.92;
+      const y2 = v1.y + (v2.y - v1.y) * 0.92;
+      const mx = (v1.x + v2.x) / 2;
+      const my = (v1.y + v2.y) / 2;
+      const delayStyle = `animation-delay: -${Math.max(0, Math.round(now - c.start))}ms;`;
+
+      let bridgePlanksHtml = '';
+      if (isBridge) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const halfW = 7.5;
+        for (const f of (isRickety ? [0.3, 0.7] : [0.22, 0.5, 0.78])) {
+          const px = x1 + dx * f - mx;
+          const py = y1 + dy * f - my;
+          bridgePlanksHtml += `<line x1="${(px - nx * halfW).toFixed(1)}" y1="${(py - ny * halfW).toFixed(1)}" x2="${(px + nx * halfW).toFixed(1)}" y2="${(py + ny * halfW).toFixed(1)}" style="stroke:var(--piece-rim);stroke-width:2.8;stroke-linecap:round" />`;
+        }
+      }
+
+      roadRimsHtml += `
+        <g transform="translate(${mx}, ${my})">
+          <circle cx="0" cy="0" r="22" class="bridge-collapse-ring" style="${delayStyle}" />
+          <g class="bridge-collapse-anim" style="${delayStyle}">
+            <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
+          </g>
+        </g>`;
+
+      roadBodiesHtml += `
+        <g transform="translate(${mx}, ${my})">
+          <g class="bridge-collapse-anim" style="${delayStyle}">
+            <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
+              style="stroke:${col}${isRickety ? ';stroke-dasharray:9 5;stroke-linecap:butt' : ''}" />
+            ${bridgePlanksHtml}
+          </g>
+        </g>`;
+    }
 
     for (const e of edges) {
       if (!e.road) continue;

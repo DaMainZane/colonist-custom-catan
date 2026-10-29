@@ -18,6 +18,7 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 - **T4a rickety piece and T4b upgrade, done 2026-10-29 (typecheck and tests passed, Pass 67).** `rickety_bridge` (1 wood, health 1, shared pool and shared 2x threshold with bridges), `upgrade_bridge` (1 brick + 1 ore), `api.phaseAction`, bot goal. T4d must call `syncBridgePool` after a collapse.
 - **T4c bridge type picker and upgrade popup, done 2026-10-29 (typecheck and tests passed, Pass 68).** New `client/render/bridgepicker.ts`: type picker on an empty ocean edge (Bridge or Rickety bridge) and an upgrade popup on your own rickety bridge. Server side: `upgradeBridge` socket event, `bridgeUpgradeCost` in your player view (`bridgeUpgradeView`). Rickety bridges drawn dashed with two planks.
 - **T3 Bridges (T3a to T3e), done 2026-10-29 (typecheck and tests passed, Pass 66).** `bridge` piece (`tidebound.bridges`, `crossing` capability, water edge topology via `addWaterTopology`), ocean-only placement rule (`e.hexIds.length === 0`, connected to player's building or unblocked vertex with a road-like piece), cost `wood + brick + ore`, base limit 10 scaled by `rules.boardRadius` and `vpToWin` (`scaledPieceLimit`), 2x cost past 10 on board, counts toward Longest Road (`roadLike: true`), build UI (`#btnBuildBridge`, recipe popup, board cross-plank rendering and ocean edge spots), and minimal bot support (`bridgeBotGoal` + `hasReachableSpot`). **T3 is closed.**
+- **T4d collapse on a 7, T4e Longest Road recalculation, and T4f collapse animation, done 2026-10-29 (typecheck and tests passed, Pass 69).** `ricketyCollapseStep` (`SEVEN_STEPS`, `order: decay`) breaks all placed rickety bridges on a 7 via `damagePiece`, syncs the shared bridge pool (`syncBridgePool`), draws zero RNG values, and triggers `updateAwards(ctx)` so Longest Road shrinkage, handoffs, and tie-losses are recalculated and recorded with `pieceBroken` and `awardChanged` in the S0.10 public change log (`getPublicHistory`). Client renders the SVG bridge collapse + water splash animation and plays `playBridgeCollapseSound()`. **T4 is closed.**
 
 ---
 
@@ -63,9 +64,6 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 ### Split step
 | ID   | Step                                                                               | Size |
 | ---- | ---------------------------------------------------------------------------------- | ---- |
-| T4d  | Collapse on a 7 in the Seven Resolver                                              | L    |
-| T4e  | Longest Road recalculation through the change log                                  | L    |
-| T4f  | Collapse animation                                                                 | S    |
 | T5a  | flooded tile state and seeded per-cluster schedule                                 | L    |
 | T5b  | Spring tide (every 4th round, 2 rings)                                             | M    |
 | T5c  | Settings: on/off, high/low slider                                                  | S    |

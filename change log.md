@@ -1,5 +1,22 @@
 # Change Log
 
+## 2026-10-29 (Pass 69: Tidebound T4d collapse on a 7, T4e Longest Road recalculation, T4f collapse animation; typecheck and tests passed)
+### Added
+- **T4d, Collapse on a 7 in the Seven Resolver (`src/packs/tidebound/ricketyBridges.ts`, `src/packs/tidebound/index.ts`, `src/packs/base/actions/roll.ts`)**:
+  - `RICKETY_SEVEN_STEP_ID = 'tidebound.rickety_collapse'` and `ricketyCollapseStep: SevenStepDef` (`order: SEVEN_STEP_ORDER.decay`, `isDlcSideEffect: true`, `priority: 85`), registered in `ricketyBridgesAddon` via `api.define(SEVEN_STEPS, ricketyCollapseStep)`.
+  - `canFire(ctx)` returns `true` only when at least one `rickety_bridge` is on the board, so it does not consume a `maxSevenSideEffects` slot when none are placed.
+  - `run(ctx)` applies 1 damage (`damagePiece(ctx, 'edge', e.id, 1)`) to every rickety bridge on the board, calls `syncBridgePool(g, ownerId)` for each affected owner so both `p.pieces.bridge` and `p.pieces.rickety_bridge` stay mirrored, increments `p.stats.ricketyCollapsed`, logs the collapse, and calls `updateAwards(ctx)`. Draws zero values from `g.rng`.
+  - `handleSeven(ctx)` in `src/packs/base/actions/roll.ts` now delegates to `resolveSeven(ctx)` (with zero `SEVEN_STEPS` / `DISCARD_LIMIT_MODS` / `WILD_TOKENS` active in base games, `resolveSeven` runs the exact base robber + discard flow with zero RNG drift).
+  - Updated the Rickety bridge note in `src/client/render/bridgepicker.ts` from `"Cheap, 1 health"` to `"Cheap, breaks on a 7"`.
+- **T4e, Longest Road recalculation through the change log (`src/shared/engine.ts`, `src/shared/history.ts`, `src/server/turnHistory.ts`)**:
+  - `updateAwards(ctx, actionType?)` now recomputes `build` awards whenever `ctx.events` contains `pieceBroken` (or when `actionType` is omitted).
+  - Properly handles Longest Road shrinkage when a rickety bridge collapses: holder retains the award if still tied/ahead `>= 5`; sole new leader `>= 5` claims the award; award drops to `null` if nobody has `>= 5` or if 2+ other players are tied for the lead after the holder falls below them.
+  - Emits `awardChanged` (`{ award, playerId, previousHolderId, value, summary }`) on both award handoff and award loss (`playerId: null`), which is recorded alongside `pieceBroken` (`actorId: ownerId`) in the S0.10 public history ring buffer (`getPublicHistory(g)`) and in the server turn history (`src/server/turnHistory.ts`).
+- **T4f, Collapse animation (`src/client/render/board.ts`, `src/client/audio.ts`, `src/client/styles.css`)**:
+  - `renderBoard` tracks placed edge pieces in `knownRoadPieces` and records any edge piece removed during gameplay into `collapsingBridges` (`COLLAPSE_ANIM_MS = 620`), playing `playBridgeCollapseSound()` (wood snap + water splash) and rendering the splintering/sinking SVG bridge animation (`.bridge-collapse-anim`) and expanding water splash ring (`.bridge-collapse-ring`). Also plays the drop animation when a rickety bridge is upgraded to a full bridge in place.
+### Tests
+- `tests/tideboundrickety.test.ts`: added `T4d collapse on a 7 (Seven Resolver)` and `T4e Longest Road recalculation through the change log` covering collapse on `resolveSeven` and `roll` action (sum 7), full bridges/roads untouched, shared pool sync, zero RNG draws, `canFire` false when no rickety bridges are placed, chain splitting and Longest Road loss to `null`, Longest Road transfer to another player, holder retention on tie at 5, loss to `null` on multi-player tie after holder drops below 5, and `pieceBroken` + `awardChanged` entries in `getPublicHistory(g)`. **T4 is closed.**
+
 ## 2026-10-29 (Pass 68: Tidebound T4c bridge type picker and upgrade popup; typecheck and tests passed)
 ### Added
 - **`client/render/bridgepicker.ts` (new)**: one popup that sits over an ocean edge.
