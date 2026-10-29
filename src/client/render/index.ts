@@ -9,6 +9,7 @@ import { renderSetupPage } from './setup';
 import { renderBoard } from './board';
 import { renderTimerPopups } from './overlay';
 import { renderTechPanel } from './techpanel';
+import { renderBridgePicker } from './bridgepicker';
 import { renderPresetRow } from '../presets';
 import { renderMapMenu, renderQuickStarts } from '../mapmenu';
 import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
@@ -131,6 +132,9 @@ export function renderAll(): void {
     bridgeBtn.style.display = bridgesEnabled ? '' : 'none';
     bridgeBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
     bridgeBtn.classList.toggle('active-mode', buildMode === 'bridge');
+    bridgeBtn.title = badgeTarget?.pieceCosts?.rickety_bridge !== undefined
+      ? 'Build a bridge across the ocean (choose a full or a rickety one)'
+      : 'Build Bridge across ocean';
   }
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
   btn('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);
@@ -164,6 +168,7 @@ export function renderAll(): void {
   renderSetupPage();
   renderTimerPopups();
   renderTechPanel(isMyTurn);
+  renderBridgePicker(isMyTurn);
 
   const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
   if (state.status !== 'GAMEOVER') {

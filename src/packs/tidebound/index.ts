@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4a/T4b rickety bridges, T4c view data) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -19,6 +19,25 @@ export {
   canPlaceBridge,
   isOceanEdge
 } from './bridges';
+
+export {
+  RICKETY,
+  RICKETY_COST,
+  RICKETY_HEALTH,
+  RICKETY_UPGRADE_COST,
+  RICKETY_UPGRADE_ID,
+  UPGRADE_BRIDGE,
+  bridgeUpgradeView,
+  bridgesOnBoard,
+  ricketyBotGoal,
+  ricketyBridgesAddon,
+  ricketyDurability,
+  ricketyPiece,
+  ricketyPoolCostMod,
+  syncBridgePool,
+  upgradeBridgeAction,
+  upgradeBridgeCost
+} from './ricketyBridges';
 
 /**
  * Tidebound: sea, bridges, tides, harbors, fishing, wrecks and pirates.
@@ -41,4 +60,3 @@ export const tideboundPack: Pack = {
   ],
   register() {}
 };
-

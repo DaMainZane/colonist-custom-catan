@@ -1,5 +1,37 @@
 # Change Log
 
+## 2026-10-29 (Pass 68: Tidebound T4c bridge type picker and upgrade popup; typecheck and tests passed)
+### Added
+- **`client/render/bridgepicker.ts` (new)**: one popup that sits over an ocean edge.
+  - **Type picker**: clicking an empty ocean edge, with rickety bridges in the game, opens "Build on this edge" with two buttons, Bridge (sturdy) and Rickety bridge (cheap, 1 health), each with its price as mini cards. A button is disabled with the reason when the pool is empty or the hand cannot pay. Choosing sends `clickEdge { edgeId, piece }` (the server handler already took `piece`). With rickety bridges off (or Tidebound off) the click builds a bridge at once, as in T3.
+  - **Upgrade popup**: clicking one of your own rickety bridges (the bridge itself, or the accent marker that shows while you can pay) opens "Upgrade to a full bridge" with the price; confirming sends the new `upgradeBridge` socket event.
+  - Closes on a press elsewhere, wheel, Escape, or when a state arrives that no longer fits (not your turn, not the main phase, edge taken). Redraws only when its HTML changed.
+- **`server/socket.ts`**: `upgradeBridge { code, edgeId }` runs `upgrade_bridge` (errors go back to the player).
+- **`server/view.ts`**: `bridgeUpgradeCost` on your own player view, from the new `bridgeUpgradeView(g, reg, p)` in `tidebound/ricketyBridges.ts` (your upgrade price, doubled at the pool limit; `undefined` when rickety bridges are not in the game, so other games send nothing new).
+- **`client/render/board.ts`**: rickety bridges drawn with a dashed body and two planks (full bridges keep three); `isRicketyEnabled` and `canClientAffordBridgeUpgrade` helpers; a bridge spot now counts as buildable when either kind is affordable; `rickety_bridge` added to the client piece keys, base limit and base cost; the client 2x counter treats bridges and rickety bridges as one pool (like the server).
+- **`client/render/index.ts`, `main.ts`**: `renderBridgePicker` runs after each render; `clickPlacedBridge`, `chooseBridgeType`, `confirmBridgeUpgrade`, `closeBridgePicker` are on `window`; the Bridge button tooltip mentions the choice when rickety bridges are on.
+- **`client/render/techpanel.ts`**: `costStripHtml` is now exported (the picker reuses it).
+### Tests
+- `tests/tideboundrickety.test.ts`, `T4c view data`: `bridgeUpgradeView` gives the plain price, doubles with the pool, is `undefined` with the DLC or the addon off. The popup itself is client DOM and is not covered by a test.
+### Not done
+- `npm run typecheck; npm test` passed and John reported T4c done (2026-10-29). **T4c is closed.** Next is T4d.
+- The note under Rickety bridge says "Cheap, 1 health" on purpose: nothing breaks it until T4d. T4d should change it to say it breaks on a 7.
+- The popup is not tied to the camera: it closes on a wheel press or a pan, it does not follow the edge.
+- Bots are unchanged (they do not use the UI).
+
+## 2026-10-29 (Pass 67: Tidebound T4a rickety bridge and T4b upgrade; typecheck and tests passed)
+### Added
+- **T4a (`tidebound/ricketyBridges.ts`)**: `rickety_bridge` piece: 1 wood, health 1 (`DURABILITY_DEFS`), road-like, bridge placement rule, cap 10 scaled like bridges.
+- **Shared pool**: two mirrored supply counters kept equal by `syncBridgePool` (runs on every bridge or rickety build). **T4d must call it after `damagePiece` breaks one**, because `damagePiece` refunds only the rickety counter.
+- **Shared 2x cost**: `ricketyPoolCostMod` doubles the next bridge or rickety bridge once both kinds together reach 10.
+- **T4b**: `upgrade_bridge` `{ edgeId }`: rickety to full bridge in place for 1 brick + 1 ore, doubled at the pool limit.
+- **`api.phaseAction(phase, action)` (`shared/registry.ts`)**: lets an addon add an action to an existing phase. Used here for `main`; DLC off changes nothing.
+- **Bots**: `ricketyBotGoal` builds rickety when a full bridge is unaffordable and upgrades with 3+ spare cards. Tuning is T13.
+### Tests
+- `tests/tideboundrickety.test.ts` (new).
+### Not done
+- No UI until T4c (type picker, plus an upgrade button). Collapse on a 7 is T4d, Longest Road recalculation T4e, collapse animation T4f.
+
 ## 2026-10-29 (Pass 66: Tidebound T3, Bridges — T3a to T3e; typecheck and tests passed)
 ### Added
 - **T3a, Bridge piece & ocean-only placement rule (`src/packs/tidebound/bridges.ts`, `src/packs/tidebound/index.ts`)**: `BRIDGE = 'bridge'`, `BRIDGE_BASE_LIMIT = 10`, `BRIDGE_COST = { wood: 1, brick: 1, ore: 1 }`, `isOceanEdge(ctx, edgeId)` (`e.hexIds.length === 0`), `canPlaceBridge(ctx, pid, edgeId, mode)` (build phase only; both sides of the edge must touch ocean tiles; endpoint vertex must have player's building or be unblocked with at least one adjacent road-like edge piece), and `bridgePiece` (`target: 'edge'`, `vp: 0`, `produces: 0`, `baseLimit: 10`, `roadLike: true`, `scaleWithRadius: true`). `bridgesAddon` registers `api.capability('crossing')`, `api.piece(bridgePiece)`, `api.define(BOT_GOALS, bridgeBotGoal)`, `rules: { pieceLimits: { bridge: 10 } }`, and an `onGameStart` hook calling `addWaterTopology`.

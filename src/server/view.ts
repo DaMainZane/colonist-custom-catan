@@ -4,6 +4,7 @@ import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
+import { bridgeUpgradeView } from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -151,7 +152,9 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     vp: score(g, gameRegistry(g.rules), p, reveal),
     // What other players see. Differs from `vp` only for the viewer's own hidden VP cards.
     publicVp: over ? score(g, gameRegistry(g.rules), p, true) : publicVP(g, gameRegistry(g.rules), p),
-    pieceCosts: Object.fromEntries([...gameRegistry(g.rules).pieces.entries()].map(([id, def]) => [id, pieceCost(g, p, def, gameRegistry(g.rules))]))
+    pieceCosts: Object.fromEntries([...gameRegistry(g.rules).pieces.entries()].map(([id, def]) => [id, pieceCost(g, p, def, gameRegistry(g.rules))])),
+    // Your price to upgrade a rickety bridge (T4c). Undefined unless rickety bridges are in this game, and only sent to yourself.
+    bridgeUpgradeCost: self ? bridgeUpgradeView(g, gameRegistry(g.rules), p) : undefined
   };
 }
 

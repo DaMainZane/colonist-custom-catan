@@ -25,6 +25,7 @@ import { renderHand } from './hand';
 import { overlayPatternDefsMarkup, renderHexOverlaysMarkup } from './overlay';
 import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
+import { openBridgePicker } from './bridgepicker';
 
 const knownRoads = new Set<number>();
 const knownBuildings = new Map<number, string>();
@@ -579,7 +580,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const ownerId = e.road;
       const owner = state.players.find(p => p.id === ownerId);
       const col = owner?.color || '#888';
-      const isBridge = e.pieceType === 'bridge';
+      const isRickety = e.pieceType === 'rickety_bridge';
+      const isBridge = e.pieceType === 'bridge' || isRickety;
 
       // Extend endpoint to vertex if another road/bridge of the same player meets there (and no enemy building blocks it)
       const blocked1 = v1.building && v1.building.owner !== ownerId;
@@ -612,7 +614,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         const nx = -dy / len;
         const ny = dx / len;
         const halfW = 7.5;
-        for (const f of [0.22, 0.5, 0.78]) {
+        // A rickety bridge has fewer planks and a broken (dashed) body, so it reads as the weak one at a glance.
+        for (const f of (isRickety ? [0.3, 0.7] : [0.22, 0.5, 0.78])) {
           const px = x1 + dx * f - mx;
           const py = y1 + dy * f - my;
           bridgePlanksHtml += `<line x1="${(px - nx * halfW).toFixed(1)}" y1="${(py - ny * halfW).toFixed(1)}" x2="${(px + nx * halfW).toFixed(1)}" y2="${(py + ny * halfW).toFixed(1)}" style="stroke:var(--piece-rim);stroke-width:2.8;stroke-linecap:round" />`;
@@ -631,7 +634,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <g transform="translate(${mx}, ${my})">
           <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
             <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
-              style="stroke:${col}" />
+              style="stroke:${col}${isRickety ? ';stroke-dasharray:9 5;stroke-linecap:butt' : ''}" />
             ${bridgePlanksHtml}
           </g>
         </g>`;
@@ -640,7 +643,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <line class="road-hit" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
           onmouseenter="onRoadHover(${e.id}, event)"
           onmousemove="onRoadMove(event)"
-          onmouseleave="onRoadLeave()" />`;
+          onmouseleave="onRoadLeave()"${isRickety && ownerId === socket.id ? ` onclick="clickPlacedBridge(${e.id})" style="cursor:pointer"` : ''} />`;
     }
 
     layers.roadRimsLayer.innerHTML = roadRimsHtml;
@@ -662,6 +665,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <g onclick="clickEdge(${e.id})" style="cursor:pointer">
           <line class="road-spot-line" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
           <circle class="road-spot-dot" cx="${mx}" cy="${my}" r="8" />
+        </g>
+      `;
+    }
+  }
+  // Your rickety bridges you can pay to upgrade get a marker (click opens the upgrade popup; clicking the bridge itself does too).
+  if (isMyTurn && state.phase === 'MAIN' && me && canClientAffordBridgeUpgrade(me)) {
+    for (const e of edges) {
+      if (e.pieceType !== 'rickety_bridge' || e.road !== socket.id) continue;
+      const v1 = vertices[e.v1], v2 = vertices[e.v2];
+      if (!v1 || !v2) continue;
+      const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+      roadSpotsHtml += `
+        <g onclick="clickPlacedBridge(${e.id})" style="cursor:pointer">
+          <circle class="bridge-upgrade-dot" cx="${mx}" cy="${my}" r="10" />
         </g>
       `;
     }
@@ -932,23 +949,26 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
-export type ClientPieceKey = 'road' | 'bridge' | 'settlement' | 'city';
+export type ClientPieceKey = 'road' | 'bridge' | 'rickety_bridge' | 'settlement' | 'city';
 
 const CLIENT_BASE_PIECE_LIMITS: Record<ClientPieceKey, number> = {
   road: 15,
   bridge: 10,
+  rickety_bridge: 10,
   settlement: 5,
   city: 4
 };
 
 export function countClientActivePieces(ownerId: string, piece: ClientPieceKey): number {
   if (!state?.board) return 0;
-  if (piece === 'road' || piece === 'bridge') {
+  // Bridges and rickety bridges share one pool (and one 2x threshold), so each counts both kinds.
+  const pool = piece === 'bridge' || piece === 'rickety_bridge';
+  if (piece === 'road' || pool) {
     let n = 0;
     for (const e of state.board.edges) {
       if (e.road === ownerId) {
         const pt = e.pieceType || 'road';
-        if (pt === piece) n++;
+        if (pool ? (pt === 'bridge' || pt === 'rickety_bridge') : pt === piece) n++;
       }
     }
     return n;
@@ -968,6 +988,7 @@ export function isClientPieceDoubleCost(piece: ClientPieceKey, ownerId: string =
 const CLIENT_BASE_PIECE_COSTS: Record<ClientPieceKey, Record<string, number>> = {
   road: { wood: 1, brick: 1 },
   bridge: { wood: 1, brick: 1, ore: 1 },
+  rickety_bridge: { wood: 1 },
   settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
   city: { wheat: 2, ore: 3 }
 };
@@ -984,6 +1005,18 @@ export function getClientPieceCost(piece: ClientPieceKey, ownerId: string = sock
 export function canClientAffordPiece(me: any, piece: ClientPieceKey): boolean {
   if (!me || !me.resources) return false;
   const cost = getClientPieceCost(piece, me.id || socket.id || '');
+  return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
+}
+
+/** Rickety bridges are in this game (the server sends a price for the piece only then). */
+export function isRicketyEnabled(me: any): boolean {
+  return !!me?.pieceCosts?.rickety_bridge;
+}
+
+/** Can you pay the upgrade price from rickety to full bridge? (The server sends the price only when rickety bridges are in the game.) */
+export function canClientAffordBridgeUpgrade(me: any): boolean {
+  const cost = me?.bridgeUpgradeCost;
+  if (!me?.resources || !cost || typeof cost !== 'object') return false;
   return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
 }
 
@@ -1023,7 +1056,8 @@ export function canClientPlaceBridge(e: any, me: any): boolean {
   if (!me || (me.bridgesLeft ?? 0) <= 0) return false;
   if (!e.hexIds || e.hexIds.length !== 0) return false;
   if (state.phase !== 'MAIN') return false;
-  if (!canClientAffordPiece(me, 'bridge')) return false;
+  // Either kind will do: a full bridge, or a rickety one when those are in the game.
+  if (!canClientAffordPiece(me, 'bridge') && !(isRicketyEnabled(me) && canClientAffordPiece(me, 'rickety_bridge'))) return false;
 
   for (const vId of [e.v1, e.v2]) {
     const v = state.board.vertices[vId];
@@ -1041,6 +1075,13 @@ export function clickVertex(vertexId: number): void {
 }
 
 export function clickEdge(edgeId: number): void {
+  // An empty ocean edge with rickety bridges in the game: let the player pick the type first (the picker sends the build).
+  const edge = state?.board?.edges?.[edgeId];
+  const me = state?.players?.find(p => p.id === socket.id);
+  if (edge && edge.hexIds.length === 0 && !edge.road && state.phase === 'MAIN' && isRicketyEnabled(me)) {
+    openBridgePicker(edgeId);
+    return;
+  }
   setBuildModeValue(null);
   socket.emit('clickEdge', { code: state.code, edgeId });
 }

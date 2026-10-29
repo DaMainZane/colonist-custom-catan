@@ -198,6 +198,11 @@ export interface PackApi {
   mapNumbers(def: NumbersDef): void;
   mapPerk(def: PerkDef): void;
   quickStart(def: QuickStartDef): void;
+  /**
+   * Adds an action type to a phase that is already registered (a DLC action that must be playable in `main`, say), without replacing the phase.
+   * The action itself is registered with `api.action`. Throws if the phase does not exist yet, so call it from an addon (base phases are loaded first).
+   */
+  phaseAction(phaseId: string, actionType: string): void;
   /** Declares a capability. Several packs may declare the same one. */
   capability(id: string): void;
   /** Registers a definition in a keyed registry of the given kind. Duplicate ids throw unless `replace: true`. Kinds are separate namespaces. */
@@ -313,6 +318,11 @@ export function createRegistry(packs: Pack[], overrides: Record<string, any> = {
       mapNumbers: d => putOption(reg.mapNumberings, optionMaps, d, 'map numbers', id),
       mapPerk: d => putOption(reg.mapPerks, optionMaps, d, 'map perk', id),
       quickStart: d => put(reg.quickStarts, d.id, d, 'quick start', id),
+      phaseAction: (phaseId, actionType) => {
+        const ph = reg.phases.get(phaseId);
+        if (!ph) throw new Error(`Pack "${id}": phaseAction targets unknown phase "${phaseId}"`);
+        if (!ph.actions.includes(actionType)) reg.phases.set(phaseId, { ...ph, actions: [...ph.actions, actionType] });
+      },
       capability: c => { reg.capabilities.add(c); },
       define: (kind, d) => put(defsFor(kind), d.id, d, kind, id),
       productionStep: (order, fn, stepId) => {

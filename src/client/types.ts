@@ -28,6 +28,8 @@ export interface PlayerView {
   publicVp?: number;
   /** Effective cost of each piece type for this player, including 2x above-base scaling and active addon modifiers. */
   pieceCosts?: Record<string, Resources>;
+  /** Your price to upgrade a rickety bridge to a full bridge. Only sent to you, and only when rickety bridges are in the game. */
+  bridgeUpgradeCost?: Resources;
   stats?: {
     resourcesEarned: number;
     tradesMade: number;

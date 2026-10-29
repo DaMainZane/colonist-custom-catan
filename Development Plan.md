@@ -15,6 +15,8 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 - **T2b1 wide water grows the canvas, done 2026-10-29 (typecheck and tests passed, Pass 63).** Decision: the canvas grows. Tidebound's map is bigger than base Catan by design; the land count stays what the radius gives, the extra room is sea (4 extra = 6 rings). Reuses the river and continent logic, only widened. `GEN_VERSION` is now 6.
 - **T2b2 elevation 1 to 3, done 2026-10-29 (typecheck and tests passed, Pass 64).** `ext.elevation` on land hexes, written by the `wide_water` perk's `afterGenerated` from the ranked height `h` (1 below 0.65, 2 from 0.65, 3 from 0.9: about 65% / 25% / 10% of the land, higher is rarer). No RNG draws. `PerkDef.afterGenerated` now gets the land cells as a third argument. New file `packs/tidebound/seaData.ts`. Nothing reads it until T5d.
 - **T2c seeded fish icons, done 2026-10-29 (typecheck and tests passed, Pass 65).** `ext.fish` = 4 on sea tiles (not land, not river): 25% of the shore sea, 8% of the open sea, picked by ranked extras-stage noise, so no RNG draws. `recipeKey` checked and left alone (Pass 65). Nothing reads it until T7b. **T2 is closed.**
+- **T4a rickety piece and T4b upgrade, done 2026-10-29 (typecheck and tests passed, Pass 67).** `rickety_bridge` (1 wood, health 1, shared pool and shared 2x threshold with bridges), `upgrade_bridge` (1 brick + 1 ore), `api.phaseAction`, bot goal. T4d must call `syncBridgePool` after a collapse.
+- **T4c bridge type picker and upgrade popup, done 2026-10-29 (typecheck and tests passed, Pass 68).** New `client/render/bridgepicker.ts`: type picker on an empty ocean edge (Bridge or Rickety bridge) and an upgrade popup on your own rickety bridge. Server side: `upgradeBridge` socket event, `bridgeUpgradeCost` in your player view (`bridgeUpgradeView`). Rickety bridges drawn dashed with two planks.
 - **T3 Bridges (T3a to T3e), done 2026-10-29 (typecheck and tests passed, Pass 66).** `bridge` piece (`tidebound.bridges`, `crossing` capability, water edge topology via `addWaterTopology`), ocean-only placement rule (`e.hexIds.length === 0`, connected to player's building or unblocked vertex with a road-like piece), cost `wood + brick + ore`, base limit 10 scaled by `rules.boardRadius` and `vpToWin` (`scaledPieceLimit`), 2x cost past 10 on board, counts toward Longest Road (`roadLike: true`), build UI (`#btnBuildBridge`, recipe popup, board cross-plank rendering and ocean edge spots), and minimal bot support (`bridgeBotGoal` + `hasReachableSpot`). **T3 is closed.**
 
 ---
@@ -61,14 +63,6 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 ### Split step
 | ID   | Step                                                                               | Size |
 | ---- | ---------------------------------------------------------------------------------- | ---- |
-| T3a  | Bridge piece definition and placement rule (both edge ends in ocean)               | M    |
-| T3b  | Cost (road + 1 ore), cap 10 scaled by radius, 2x past cap                          | S    |
-| T3c  | Count bridges toward Longest Road                                                  | M    |
-| T3d  | Build UI for bridges                                                               | M    |
-| T3e  | Minimal bot support (bot builds a bridge without crashing)                         | S    |
-| T4a  | Rickety piece, health 1, shared pool, 1 wood cost                                  | M    |
-| T4b  | Upgrade action (1 brick + 1 ore)                                                   | S    |
-| T4c  | Bridge type picker popup                                                           | M    |
 | T4d  | Collapse on a 7 in the Seven Resolver                                              | L    |
 | T4e  | Longest Road recalculation through the change log                                  | L    |
 | T4f  | Collapse animation                                                                 | S    |

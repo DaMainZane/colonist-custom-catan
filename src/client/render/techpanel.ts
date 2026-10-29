@@ -134,7 +134,7 @@ function ensureDom(): void {
 }
 
 /** A cost as mini resource cards (one card per unit, dimmed when the hand cannot cover it), like the build recipes. */
-function costStripHtml(cost: Resources, hand: Resources | undefined): string {
+export function costStripHtml(cost: Resources, hand: Resources | undefined): string {
   const seen: Record<string, number> = {};
   const units: string[] = [];
   for (const [r, n] of Object.entries(cost)) for (let i = 0; i < Math.max(0, Number(n) || 0); i++) units.push(r);

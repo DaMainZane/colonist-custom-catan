@@ -38,7 +38,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 |---|---|
 | `index.ts` | Public entry that re-exports the engine |
 | `types.ts` | Core types: game state, board, players, rules |
-| `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
+| `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`), `api.phaseAction` (an addon adds its action to a phase that already exists) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
 | `pricing.ts` | Piece cost and limit service: `priceOf`, `priceOfUpgrade`, `placedCount`, `aboveBaseLimit`, `scaledPieceLimit`, cost modifiers (`COST_MODS`) |
 | `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `tradeRatiosFor`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption, harbor-only 1:1 pass (`HARBOR_RATIO_MODS`, `HARBOR_MIN_RATIO`) |
@@ -108,23 +108,24 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/map/numbers.ts` | Balanced number style |
 | `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
 | `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
-| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order and re-exports Bridge piece helpers |
+| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order and re-exports the Bridge and Rickety bridge helpers |
 | `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a–T2c), the `crossing` capability, the `bridge` piece (`BRIDGE`, `canPlaceBridge`, `isOceanEdge`, cost road + 1 ore, base limit 10 scaled by radius/VP, 2x cost past 10, counts toward Longest Road), and `bridgeBotGoal` (T3a–T3e) |
 | `tidebound/seaData.ts` | T2b2 and T2c map data for the wide-water perk: `elevationOf`, `applyElevation` (`ext.elevation` 1 to 3 on land by ranked height), `placeFish` (`ext.fish` on seeded sea tiles, shore sea more than open sea). No RNG draws |
-| `tidebound/ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T4 to T12) |
+| `tidebound/ricketyBridges.ts` | `tidebound.rickety_bridges` addon (T4a, T4b): `rickety_bridge` piece (`RICKETY`, 1 wood, health 1 through a `DURABILITY_DEFS` entry, road-like, same placement rule as a bridge), one shared pool with bridges (`syncBridgePool` keeps both supplies equal; `ricketyPoolCostMod` makes 10 bridges and rickety bridges together the 2x threshold), the `upgrade_bridge` action (`{ edgeId }`, 1 brick + 1 ore, doubled at the pool limit), and `ricketyBotGoal` (builds rickety when a full bridge is unaffordable, upgrades with spare cards), and `bridgeUpgradeView` (the player's upgrade price for the client, undefined when rickety bridges are not in the game). Collapse on a 7 is T4d |
+| `tidebound/tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T5 to T12) |
 
 ## `src/server/` (thin adapter over the engine, plus bots)
 
 | File | What it does |
 |---|---|
 | `main.ts` | Entry: Express and Socket.io, `/health`, bot training log endpoints, `/api/memory/export` and `/api/memory/import` |
-| `socket.ts` | Socket handlers for lobby editing, spectating, scenario presets and game actions (all game actions go through engine `dispatch`) |
+| `socket.ts` | Socket handlers for lobby editing, spectating, scenario presets and game actions (all game actions go through engine `dispatch`; `upgradeBridge` runs `upgrade_bridge`) |
 | `game.ts` | Game runner: start, rematch, run one action, turn engine events into client effects |
 | `rooms.ts` | Room registry, lobby roster, spectators, status, reconnect (`rebindPlayerId`) |
 | `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge (`dlc`, `addons`, `eventsOn`, `fateTokens`), painting terrain, numbers, robber, ports; map, picks and quick starts come from the room's DLC-aware registry (`mapRegistryFor`) |
 | `runtime.ts` | Shared base registry, dynamic `gameRegistry(rules)`, the room map registry (`mapRegistryKey`, `mapRegistryFor`: plain while no addon is on, cached per addon set), settings to rules mapping, defaults |
 | `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots; in the lobby sends a socket the room's map option list when its addon set changes |
-| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal and per-player `pieceCosts`) |
+| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal, per-player `pieceCosts`, and your own `bridgeUpgradeCost` when rickety bridges are in the game) |
 | `turnClock.ts` | Per-turn clock for humans (base time plus increment per action) |
 | `presets.ts` | Custom map presets as plain JSON: save, validate, rebuild |
 | `mapmenu.ts` | Map options, quick starts, scenario presets, DLCs and addons as JSON for the lobby and setup page; `mapOptionsForSettings` gives the list for one room's addon set (cached) |
@@ -177,7 +178,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `cursors.ts` | Lobby cursors and Shift laser trail |
 | `styles.css` | All styling and design tokens (copied to `dist/public/app.css`) |
 | `render/index.ts` | Render coordinator and the 6-tab post-game victory screen |
-| `render/board.ts` | Board SVG renderer, camera, board input and board animations |
+| `render/board.ts` | Board SVG renderer, camera, board input and board animations; rickety bridges drawn dashed with two planks, upgrade marker on your own rickety bridges you can pay for, `clickEdge` opens the bridge picker when rickety bridges are in the game |
 | `render/hand.ts` | Player hand (resources, dev cards, spectator hand inspector) and click handlers |
 | `render/drawer.ts` | Bottom-left sheet: bank trade, discard, gold, monopoly, robber victim picker |
 | `render/trade.ts` | Stacked trade offers, timers, responses, counter-offer editor |
@@ -185,7 +186,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles (server list first, built-in fallback catalog; the Tidebound ids in it must match the pack, see `tidebound.test.ts`), active summary strip, player/spectator strip |
 | `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
-| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards, description on hover, Harbor charters (one Raise to 2:1 button per port city) and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
+| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards (`costStripHtml`, also used by the bridge picker), description on hover, Harbor charters (one Raise to 2:1 button per port city) and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
+| `render/bridgepicker.ts` | Tidebound T4c: one popup that sits over an ocean edge. On an empty edge (rickety bridges in the game) it is the type picker (Bridge or Rickety bridge, prices as mini cards, disabled with a reason); on your own rickety bridge it is the upgrade button. Draws its own DOM and styles; `renderBridgePicker` keeps it in step with each state or closes it |
 
 ## `tests/` (node:test / tsx)
 
@@ -212,6 +214,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
 | `tidebound.test.ts` | Tidebound manifest (T0) and Bridges (T3a–T3e): 8 addons and links, lobby card data, DLC off changes nothing, bridge piece & ocean-only placement rule, cost & radius/VP scaling, 2x cost past 10, Longest Road across roads + bridges, `clientBoard` `pieceType`, and bot bridge building |
 | `tideboundmap.test.ts` | T2a to T2c wide-water perk: registered only with the DLC, perk off = same map, canvas grows and land stays, island and continent gaps, wider river, warnings, helpers; `ext.elevation` and `ext.fish` data (counts, rarity, no draws, nothing without the pick) |
+| `tideboundrickety.test.ts` | T4a to T4c rickety bridges: registration (on, off, rickety off), 1 wood cost and bridge placement rule, health 1, shared pool and supply mirror, pooled 2x cost, pool sync after a break, upgrade action (cost, refusals, double cost, legal list), bot build and bot upgrade, and the `bridgeUpgradeView` data the picker reads |
 | `tideboundlobby.test.ts` | T2a2 lobby sees DLC map perks: room registry, per-room menu list, settings merge and share code follow the DLC toggles, lobby map, option list sent per socket |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |

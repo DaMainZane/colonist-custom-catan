@@ -31,6 +31,7 @@ import {
 } from './render/drawer';
 import { sendChat, toggleRoundCollapse, renderSidebar } from './render/sidebar';
 import { toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick } from './render/techpanel';
+import { clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, closeBridgePicker } from './render/bridgepicker';
 import {
   setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
   showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
@@ -55,6 +56,7 @@ Object.assign(window as any, {
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   setLogTab: onSetLogTab, toggleRoundCollapse, toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick,
+  clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, closeBridgePicker,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
   startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier, setSetupOpen,
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset, applyPresetStyle,

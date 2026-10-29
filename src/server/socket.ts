@@ -718,6 +718,8 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('buyDevCard', safe(({ code }) => act(code, 'buy_dev')));
     socket.on('researchTech', safe(({ code, techId }) => act(code, 'research_tech', { techId }, true)));
     socket.on('upgradePort', safe(({ code, vertexId }) => act(code, 'upgrade_port', { vertexId }, true)));
+    // Tidebound T4c: turn one of your rickety bridges into a full bridge.
+    socket.on('upgradeBridge', safe(({ code, edgeId }) => act(code, 'upgrade_bridge', { edgeId }, true)));
     socket.on('convertTile', safe(({ code, hexId, resource }) => act(code, 'convert_tile', { hexId, resource }, true)));
     socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
     socket.on('discardCards', safe(({ code, discards }) => act(code, 'discard', { cards: discards })));
