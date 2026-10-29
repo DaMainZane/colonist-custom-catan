@@ -22,6 +22,7 @@ export interface PlayerView {
   settlementsLeft: number;
   citiesLeft: number;
   roadsLeft: number;
+  bridgesLeft?: number;
   vp: number;
   /** What other players see (differs from `vp` only for your own hidden VP cards). */
   publicVp?: number;

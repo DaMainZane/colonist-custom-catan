@@ -40,7 +40,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `types.ts` | Core types: game state, board, players, rules |
 | `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
-| `pricing.ts` | Piece cost and limit service: `priceOf`, `placedCount`, `aboveBaseLimit`, cost modifiers (`COST_MODS`) |
+| `pricing.ts` | Piece cost and limit service: `priceOf`, `priceOfUpgrade`, `placedCount`, `aboveBaseLimit`, `scaledPieceLimit`, cost modifiers (`COST_MODS`) |
 | `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `tradeRatiosFor`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption, harbor-only 1:1 pass (`HARBOR_RATIO_MODS`, `HARBOR_MIN_RATIO`) |
 | `production.ts` | S0.6 Production pipeline: ordered stages (`PRODUCTION_STEPS`), `effectiveHexNumber`, `matchingHexesForRoll`, `runProductionPipeline` |
 | `tileState.ts` | S0.7 Tile state (`TILE_STATES`, `getTileState`, `setTileState`, `tickTileStates`), durability & repair (`DURABILITY_DEFS`, `damagePiece`, `repairPiece`), wild tokens (`WILD_TOKENS`, `grantWildPick`, `spendWildToken`) |
@@ -57,7 +57,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `rng.ts` | Seeded RNG (mulberry32): `createRng`, `rngInt`, `rngPick`, `rngShuffle` |
 | `palette.ts` | Player colors and avatars |
 | `noise.ts` | Seeded value noise (`createNoise`, `cellPoint`) |
-| `topology.ts` | Hex-grid topology: vertices, edges, ports (`buildTopology`, `hexDistance`, `portCap`) |
+| `topology.ts` | Hex-grid topology: vertices, edges, ports, and optional water-edge topology for crossing packs (`buildTopology`, `addWaterTopology`, `hexDistance`, `portCap`) |
 | `mapgen.ts` | Board generator: shape, terrain, numbers, extras, ports (`generateMap`), plus the old `generateBoard` |
 | `maprecipe.ts` | Map recipe (seed, radius, picks, params), share code, per-stage RNG, `GEN_VERSION` |
 | `mapoptions.ts` | Map option types (shape ops, terrain and number styles, perks, quick starts), flags, pick resolution; `PerkDef.afterGenerated(inits, ctx, cells)` gets the land cells with their ranked height |
@@ -108,8 +108,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/map/numbers.ts` | Balanced number style |
 | `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
 | `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
-| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order (skeleton only, `register()` is empty until T3) |
-| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a, param `water.extra`; it also writes the sea data below through `afterGenerated`); the bridge piece arrives in T3 |
+| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order and re-exports Bridge piece helpers |
+| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a–T2c), the `crossing` capability, the `bridge` piece (`BRIDGE`, `canPlaceBridge`, `isOceanEdge`, cost road + 1 ore, base limit 10 scaled by radius/VP, 2x cost past 10, counts toward Longest Road), and `bridgeBotGoal` (T3a–T3e) |
 | `tidebound/seaData.ts` | T2b2 and T2c map data for the wide-water perk: `elevationOf`, `applyElevation` (`ext.elevation` 1 to 3 on land by ranked height), `placeFish` (`ext.fish` on seeded sea tiles, shore sea more than open sea). No RNG draws |
 | `tidebound/ricketyBridges.ts`, `tides.ts`, `risingSea.ts`, `harbor.ts`, `fishing.ts`, `wrecks.ts`, `pirates.ts` | One addon stub each (id, name, description, deps, `links`); the content of each is added by its own chunk (T4 to T12) |
 
@@ -210,7 +210,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapmenu.test.ts` | Map menu data and presets v2 |
 | `mapbudget.test.ts` | Generation time budget |
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
-| `tidebound.test.ts` | Tidebound skeleton (T0): 8 addons and links, lobby card data from the manifest, client fallback catalog matches the server ids, DLC off changes nothing, DLC on registers no content yet |
+| `tidebound.test.ts` | Tidebound manifest (T0) and Bridges (T3a–T3e): 8 addons and links, lobby card data, DLC off changes nothing, bridge piece & ocean-only placement rule, cost & radius/VP scaling, 2x cost past 10, Longest Road across roads + bridges, `clientBoard` `pieceType`, and bot bridge building |
 | `tideboundmap.test.ts` | T2a to T2c wide-water perk: registered only with the DLC, perk off = same map, canvas grows and land stays, island and continent gaps, wider river, warnings, helpers; `ext.elevation` and `ext.fish` data (counts, rarity, no draws, nothing without the pick) |
 | `tideboundlobby.test.ts` | T2a2 lobby sees DLC map perks: room registry, per-room menu list, settings merge and share code follow the DLC toggles, lobby map, option list sent per socket |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |

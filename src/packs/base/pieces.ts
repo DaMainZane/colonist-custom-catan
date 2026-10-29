@@ -12,6 +12,7 @@ export function registerPieces(api: PackApi): void {
     vp: 0,
     produces: 0,
     baseLimit: BASE_PIECE_LIMITS[ROAD],
+    roadLike: true,
     canPlace: canPlaceRoad
   });
 

@@ -32,6 +32,8 @@ export interface TopologyOptions {
    * (a swamp, an ice shelf, anything a mod adds that is not open sea) is not sea, so no port faces it. Default: none.
    */
   portBlocked?: (type: string) => boolean;
+  /** Build vertices and edges between adjacent water tiles so bridges can cross the sea (Tidebound). Default: false. */
+  waterEdges?: boolean;
 }
 
 export function hexDistance(a: { q: number; r: number }, b: { q: number; r: number }): number {
@@ -484,5 +486,103 @@ export function buildTopology(inits: HexInit[], opts: TopologyOptions = {}): Boa
     }
   });
 
-  return { hexes, vertices, edges, robberHexId };
+  const board: Board = { hexes, vertices, edges, robberHexId };
+  if (opts.waterEdges) {
+    addWaterTopology(board, isLand, opts.portBlocked ?? (() => false));
+  }
+  return board;
+}
+
+/**
+ * Adds vertices on water tiles and edges between pairs of adjacent water tiles so bridges can cross the sea (Tidebound).
+ * Safe to call on a board that already has water edges (idempotent). Never modifies `v.hexIds` or `e.hexIds` for land/coastal
+ * elements, so `v.hexIds.length > 0` still identifies land vertices and `e.hexIds.length === 0` identifies ocean edges
+ * whose two bordering tiles are both water.
+ */
+export function addWaterTopology(
+  board: Board,
+  isLand: (type: string) => boolean = t => t !== 'water',
+  blocked: (type: string) => boolean = () => false
+): Board {
+  const { hexes, vertices, edges } = board;
+  const hexSize = 58;
+  const isWater = (h: Hex | undefined): boolean => !!h && !isLand(h.type) && !blocked(h.type);
+
+  const vertexMap = new Map<string, Vertex>();
+  for (const v of vertices) {
+    vertexMap.set(`${v.x.toFixed(1)}_${v.y.toFixed(1)}`, v);
+  }
+  const edgeMap = new Map<string, Edge>();
+  for (const e of edges) {
+    edgeMap.set(`${Math.min(e.v1, e.v2)}_${Math.max(e.v1, e.v2)}`, e);
+  }
+
+  function getOrCreateVertex(x: number, y: number): Vertex {
+    const key = `${x.toFixed(1)}_${y.toFixed(1)}`;
+    let v = vertexMap.get(key);
+    if (!v) {
+      v = { id: vertices.length, x, y, hexIds: [], adjacentVertices: [], edgeIds: [], port: null, piece: null };
+      vertices.push(v);
+      vertexMap.set(key, v);
+    }
+    return v;
+  }
+
+  function getOrCreateWaterEdge(v1: Vertex, v2: Vertex): Edge {
+    const a = Math.min(v1.id, v2.id);
+    const b = Math.max(v1.id, v2.id);
+    const pairKey = `${a}_${b}`;
+    let e = edgeMap.get(pairKey);
+    if (!e) {
+      const mx = (v1.x + v2.x) / 2;
+      const my = (v1.y + v2.y) / 2;
+      e = {
+        id: edges.length,
+        v1: a,
+        v2: b,
+        key: `${mx.toFixed(1)}_${my.toFixed(1)}`,
+        hexIds: [],
+        port: null,
+        piece: null
+      };
+      edges.push(e);
+      edgeMap.set(pairKey, e);
+      if (!v1.adjacentVertices.includes(v2.id)) v1.adjacentVertices.push(v2.id);
+      if (!v2.adjacentVertices.includes(v1.id)) v2.adjacentVertices.push(v1.id);
+      if (!v1.edgeIds.includes(e.id)) v1.edgeIds.push(e.id);
+      if (!v2.edgeIds.includes(e.id)) v2.edgeIds.push(e.id);
+    }
+    return e;
+  }
+
+  const at = new Map<string, number>();
+  hexes.forEach((h, i) => at.set(`${h.q},${h.r}`, i));
+
+  for (const h of hexes) {
+    if (!isWater(h)) continue;
+    if (!h.corners || h.corners.length < 6) {
+      const cx = hexSize * Math.sqrt(3) * (h.q + h.r / 2);
+      const cy = hexSize * (3 / 2) * h.r;
+      h.x = Number(cx.toFixed(2));
+      h.y = Number(cy.toFixed(2));
+      h.corners = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        h.corners.push({
+          x: Number((cx + hexSize * Math.cos(angle)).toFixed(2)),
+          y: Number((cy + hexSize * Math.sin(angle)).toFixed(2))
+        });
+      }
+    }
+    const cornerVertices = h.corners.map(pt => getOrCreateVertex(pt.x, pt.y));
+    h.vertexIds = cornerVertices.map(v => v.id);
+    for (let i = 0; i < 6; i++) {
+      const j = at.get(`${h.q + EDGE_DIR[i][0]},${h.r + EDGE_DIR[i][1]}`);
+      if (j !== undefined && isWater(hexes[j])) {
+        getOrCreateWaterEdge(cornerVertices[i], cornerVertices[(i + 1) % 6]);
+      }
+    }
+  }
+
+  return board;
 }

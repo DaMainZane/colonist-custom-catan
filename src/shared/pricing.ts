@@ -55,3 +55,15 @@ export function priceOf(g: GameState, reg: Registry, p: PlayerState, def: PieceD
   for (const m of defsOf<CostModifier>(reg, COST_MODS).values()) cost = m.apply(g, p, def, cost);
   return cost;
 }
+
+/**
+ * Supply cap for a piece whose limit scales with both `vpToWin` (above 10) and `boardRadius` (above standard radius 2, 19 tiles),
+ * using the same `vpMult * sqrt(cells / 19)` curve as `scaledPieces`. Reads the land radius (`rules.boardRadius`), never a grown sea canvas.
+ */
+export function scaledPieceLimit(base: number, vpToWin = 10, boardRadius = 2): number {
+  const vpMult = Math.max(1, (Number(vpToWin) || 10) / 10);
+  const r = Math.max(1, Number(boardRadius) || 2);
+  const h = 3 * r * (r + 1) + 1;
+  const mapMult = h <= 19 ? 1 : Math.sqrt(h / 19);
+  return Math.ceil(base * vpMult * mapMult);
+}

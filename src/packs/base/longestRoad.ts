@@ -1,10 +1,10 @@
-// MODULE: longest road metric (DFS over a player's roads, blocked by opponent pieces) | USED BY: packs/base/awards
+// MODULE: longest road metric (DFS over a player's roads and road-like edge pieces, blocked by opponent pieces) | USED BY: packs/base/awards
 import type { Ctx, Edge, Id } from '../../shared';
-import { ROAD } from './constants';
+import { isRoadPiece } from './placement';
 
 export function longestRoadFor(ctx: Ctx, pid: Id): number {
   const { board } = ctx.g;
-  const mine = (e: Edge | undefined): boolean => !!e && !!e.piece && e.piece.owner === pid && e.piece.type === ROAD;
+  const mine = (e: Edge | undefined): boolean => !!e && !!e.piece && e.piece.owner === pid && isRoadPiece(ctx, e.piece.type);
 
   const roads = board.edges.filter(e => mine(e));
   if (roads.length === 0) return 0;

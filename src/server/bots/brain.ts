@@ -364,12 +364,14 @@ function isSpot(dc: Dc, vId: number): boolean {
   return ok;
 }
 
-/** Is there a settlement spot within a few roads of my network? False means the bot is boxed in (islands, walls). */
+/** Is there a settlement spot within a few roads/bridges of my network? False means the bot is boxed in (islands, walls). */
 function hasReachableSpot(dc: Dc): boolean {
   if (dc.net.size === 0) return true;
   const roads = dc.p.pieces[ROAD] || 0;
-  if (roads <= 0) return false;
-  const depth = clamp(roads, 1, 6);
+  const bridges = dc.p.pieces.bridge || 0;
+  const totalSteps = roads + bridges;
+  if (totalSteps <= 0) return false;
+  const depth = clamp(totalSteps, 1, 6);
   const { vertices, edges } = dc.g.board;
   let frontier = [...dc.net];
   const seen = new Set(frontier);
@@ -381,6 +383,11 @@ function hasReachableSpot(dc: Dc): boolean {
       for (const eId of vertices[vId].edgeIds) {
         const e = edges[eId];
         if (e.piece && e.piece.owner !== dc.p.id) continue;
+        if (!e.piece) {
+          const isOcean = e.hexIds.length === 0;
+          if (isOcean && bridges <= 0) continue;
+          if (!isOcean && roads <= 0) continue;
+        }
         const other = e.v1 === vId ? e.v2 : e.v1;
         if (!seen.has(other)) { seen.add(other); next.push(other); }
       }

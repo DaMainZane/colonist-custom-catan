@@ -4,7 +4,7 @@ import { createNoise } from './noise';
 import { assignNumbers, buildNumberPool } from './numbers';
 import { createRng, rngNext, rngShuffle } from './rng';
 import type { RngState } from './rng';
-import { buildTopology } from './topology';
+import { addWaterTopology, buildTopology } from './topology';
 import type { HexInit } from './topology';
 import type { Board, Rules } from './types';
 import { makeRecipe, stageRng } from './maprecipe';
@@ -96,7 +96,12 @@ export function generateBoard(reg: Registry, rules: Rules, rng: RngState, preset
   const extra = preset?.extra ? preset.extra(rules, total) : {};
   for (const hook of reg.hooks.afterMapGenerated) hook(inits, rules, rng, extra);
 
-  return buildTopology(inits, { isLand, autoPorts: rngShuffle(rng, portPool(reg)) });
+  return buildTopology(inits, {
+    isLand,
+    autoPorts: rngShuffle(rng, portPool(reg)),
+    portBlocked: t => !!reg.tiles.get(t)?.noPort,
+    waterEdges: reg.capabilities.has('crossing')
+  });
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -349,5 +354,8 @@ export function generateMap(reg: Registry, rules: Rules, input: Partial<MapRecip
   const chosen = best!;
   chosen.report.stats.boardAttempts = ran;
   if (!passed) chosen.report.degraded = true;
+  if (reg.capabilities.has('crossing')) {
+    addWaterTopology(chosen.board, isLand, t => !!reg.tiles.get(t)?.noPort);
+  }
   return { board: chosen.board, report: chosen.report, recipe };
 }

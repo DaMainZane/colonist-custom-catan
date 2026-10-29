@@ -131,6 +131,7 @@ const UI_ICONS: Record<string, string> = {
   devcard: `<rect x="6" y="3" width="12" height="18" rx="2.2" ${FILL}/>`,
   devbuy: `<rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M12 9.5v5M9.5 12h5"/>`,
   road: `<path d="M6 18L18 6" stroke-width="5" stroke="currentColor" stroke-linecap="round" fill="none"/>`,
+  bridge: `<path d="M3 16h18M5 16v4M19 16v4M5 16a7 6 0 0 1 14 0M9 12v4M12 10v6M15 12v4"/>`,
   house: `<path ${FILL} d="M12 3.5L3.5 11H6v8.5h12V11h2.5z"/>`,
   city: `<path ${FILL} d="M3.5 20V9.5l4-4 4 4V20zM12.5 20v-7h8v7z"/>`,
   sword: `<path d="M10 14L19 5M7.5 11.5l5 5M10 14l-5 5"/>`,

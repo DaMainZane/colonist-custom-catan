@@ -702,7 +702,12 @@ export function registerSocketHandlers(io: Server): void {
       if (!v.piece) act(code, 'build', { piece: SETTLEMENT, loc: vertexId }, true);
     }));
 
-    socket.on('clickEdge', safe(({ code, edgeId }) => act(code, 'build', { piece: ROAD, loc: edgeId }, true)));
+    socket.on('clickEdge', safe(({ code, edgeId, piece }) => {
+      const g = rooms[code]?.game;
+      const e = g?.board.edges[edgeId];
+      const chosen = piece || (e && e.hexIds.length === 0 ? 'bridge' : ROAD);
+      act(code, 'build', { piece: chosen, loc: edgeId }, true);
+    }));
     socket.on('clickHex', safe(({ code, hexId }) => act(code, 'move_robber', { hexId })));
     socket.on('stealFromPlayer', safe(({ code, victimId }) => act(code, 'steal', { victimId })));
 

@@ -3,6 +3,7 @@ import { makeCtx } from './ctx';
 import type { Ctx, GameEvent } from './ctx';
 import { generateBoard } from './mapgen';
 import { AVATARS, PLAYER_COLORS } from './palette';
+import { scaledPieceLimit } from './pricing';
 import { mergeRules } from './registry';
 import type { Registry } from './registry';
 import { createRng, randomSeed, rngShuffle } from './rng';
@@ -44,13 +45,17 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
   const seed = cfg.seed ?? randomSeed();
   const rng = createRng(seed);
   const rules: Rules = mergeRules(reg.rules, cfg.rules ?? {});
-  if (rules.vpToWin > 10 && rules.pieceLimits) {
-    const mult = rules.vpToWin / 10;
+  if ((rules.vpToWin > 10 || rules.boardRadius > 2) && rules.pieceLimits) {
+    const mult = Math.max(1, rules.vpToWin / 10);
     const explicit = cfg.rules?.pieceLimits ?? {};
     const scaled: Record<string, number> = { ...rules.pieceLimits };
     for (const [id, base] of Object.entries(reg.rules.pieceLimits ?? {})) {
       if (explicit[id] === undefined && scaled[id] === base) {
-        scaled[id] = Math.ceil((base as number) * mult);
+        if (reg.pieces.get(id)?.scaleWithRadius) {
+          scaled[id] = scaledPieceLimit(base as number, rules.vpToWin, rules.boardRadius);
+        } else if (rules.vpToWin > 10) {
+          scaled[id] = Math.ceil((base as number) * mult);
+        }
       }
     }
     rules.pieceLimits = scaled;

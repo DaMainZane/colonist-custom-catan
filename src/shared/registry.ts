@@ -52,6 +52,10 @@ export interface PieceDef {
   upgradeFrom?: string;
   /** Pieces on the board at which the next one costs double (standard 10 VP setting). See shared/pricing.ts. */
   baseLimit?: number;
+  /** True when this edge piece connects to the road network and counts toward Longest Road (e.g. road, bridge). */
+  roadLike?: boolean;
+  /** True when this piece's default supply cap scales with `rules.boardRadius` (above radius 2) in addition to `vpToWin`. */
+  scaleWithRadius?: boolean;
   /** Base defense strength of a vertex building (settlement 1, city 2, castle 3). See shared/coreServices.ts. */
   baseDefense?: number;
   icon?: string;

@@ -39,7 +39,7 @@ export function clientBoard(board: Board, revealAll: boolean): any {
     }),
     edges: board.edges.map(e => {
       const { piece, ...rest } = e;
-      return { ...rest, road: piece ? piece.owner : null };
+      return { ...rest, road: piece ? piece.owner : null, pieceType: piece ? piece.type : null };
     }),
     robberHexId: board.robberHexId
   };
@@ -94,6 +94,7 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     settlementsLeft: p.pieces.settlement ?? 0,
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
+    bridgesLeft: p.pieces.bridge ?? 0,
     stats: {
       resourcesEarned: p.stats.earned || 0,
       tradesMade: p.stats.trades || 0,
@@ -176,6 +177,7 @@ function lobbyPlayerView(room: Room, p: Room['lobbyPlayers'][number]): any {
     settlementsLeft: room.settings.maxSettlements,
     citiesLeft: room.settings.maxCities,
     roadsLeft: room.settings.maxRoads,
+    bridgesLeft: 10,
     stats: {
       resourcesEarned: 0,
       tradesMade: 0,

@@ -108,7 +108,7 @@ export function startGame(room: Room): string | null {
   }
   // Up to 4 players keep the old loose check. Bigger tables need real room: 2 settlements each, ~4 blocked spots per settlement.
   const need = room.lobbyPlayers.length > 4 ? room.lobbyPlayers.length * 8 : room.lobbyPlayers.length * 4;
-  if (room.board.vertices.length < need) return 'Map needs more land tiles for this player count!';
+  if (room.board.vertices.filter(v => v.hexIds.length > 0).length < need) return 'Map needs more land tiles for this player count!';
 
   room.setup = false;
   const landCount = room.board.hexes.filter(h => h.type !== 'water').length;

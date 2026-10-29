@@ -1,16 +1,20 @@
-// MODULE: piece placement rules (settlement, road, city geometry/ownership) | USED BY: packs/base/pieces
+// MODULE: piece placement rules (settlement, road, city geometry/ownership) | USED BY: packs/base/pieces, packs/base/longestRoad, tidebound/bridges
 import type { Ctx, Id } from '../../shared';
 import { ROAD, SETTLEMENT } from './constants';
 
-function ownsRoadAt(ctx: Ctx, pid: Id, edgeId: number): boolean {
+export function isRoadPiece(ctx: Ctx, type: string): boolean {
+  return type === ROAD || !!ctx.reg.pieces.get(type)?.roadLike;
+}
+
+export function ownsRoadAt(ctx: Ctx, pid: Id, edgeId: number): boolean {
   const pc = ctx.g.board.edges[edgeId]?.piece;
-  return !!pc && pc.owner === pid && pc.type === ROAD;
+  return !!pc && pc.owner === pid && isRoadPiece(ctx, pc.type);
 }
 
 export function canPlaceSettlement(ctx: Ctx, pid: Id, vertexId: number, mode: 'setup' | 'build'): boolean {
   const { board } = ctx.g;
   const v = board.vertices[vertexId];
-  if (!v || v.piece) return false;
+  if (!v || v.piece || v.hexIds.length === 0) return false;
   for (const adj of v.adjacentVertices) {
     if (board.vertices[adj]?.piece) return false;
   }
@@ -21,7 +25,7 @@ export function canPlaceSettlement(ctx: Ctx, pid: Id, vertexId: number, mode: 's
 export function canPlaceRoad(ctx: Ctx, pid: Id, edgeId: number, mode: 'setup' | 'build'): boolean {
   const { board, setup } = ctx.g;
   const e = board.edges[edgeId];
-  if (!e || e.piece) return false;
+  if (!e || e.piece || e.hexIds.length === 0) return false;
   if (mode === 'setup') {
     const last = setup.lastVertexId;
     return last !== null && (e.v1 === last || e.v2 === last);

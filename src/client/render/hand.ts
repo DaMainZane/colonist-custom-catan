@@ -10,14 +10,17 @@ import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import { isClientPieceDoubleCost } from './board';
 
-export const BUILD_RECIPES: Record<'dev' | 'road' | 'settlement' | 'city', string[]> = {
+export type RecipeKey = 'dev' | 'road' | 'bridge' | 'settlement' | 'city';
+
+export const BUILD_RECIPES: Record<RecipeKey, string[]> = {
   dev: ['sheep', 'wheat', 'ore'],
   road: ['wood', 'brick'],
+  bridge: ['wood', 'brick', 'ore'],
   settlement: ['wood', 'brick', 'sheep', 'wheat'],
   city: ['wheat', 'wheat', 'ore', 'ore', 'ore']
 };
 
-export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' | 'city', me: any): string {
+export function renderRecipeStripHtml(recipeKey: RecipeKey, me: any): string {
   const baseList = BUILD_RECIPES[recipeKey];
   const isDouble = recipeKey !== 'dev' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
   const customCost = recipeKey !== 'dev' ? me?.pieceCosts?.[recipeKey] : null;
@@ -44,9 +47,10 @@ export function renderRecipeStripHtml(recipeKey: 'dev' | 'road' | 'settlement' |
 }
 
 function updateActionRecipePopups(me: any): void {
-  const map: Array<[string, 'dev' | 'road' | 'settlement' | 'city']> = [
+  const map: Array<[string, RecipeKey]> = [
     ['recipePopupDev', 'dev'],
     ['recipePopupRoad', 'road'],
+    ['recipePopupBridge', 'bridge'],
     ['recipePopupSettle', 'settlement'],
     ['recipePopupCity', 'city']
   ];

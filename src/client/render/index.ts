@@ -93,6 +93,8 @@ export function renderAll(): void {
     document.getElementById('badgeRoadCnt')!.textContent = String(badgeTarget.roadsLeft);
     document.getElementById('badgeSettleCnt')!.textContent = String(badgeTarget.settlementsLeft);
     document.getElementById('badgeCityCnt')!.textContent = String(badgeTarget.citiesLeft);
+    const bridgeBadge = document.getElementById('badgeBridgeCnt');
+    if (bridgeBadge) bridgeBadge.textContent = String(badgeTarget.bridgesLeft ?? 10);
   }
 
   const pill = document.getElementById('turnStatusPill')!;
@@ -120,6 +122,16 @@ export function renderAll(): void {
   syncTurnClockDisplay();
 
   const btn = (id: string) => document.getElementById(id) as HTMLButtonElement;
+  const bridgesEnabled = Boolean(
+    badgeTarget?.pieceCosts?.bridge !== undefined ||
+    (s.dlc?.tidebound && s.addons?.['tidebound.bridges'] !== false)
+  );
+  const bridgeBtn = document.getElementById('btnBuildBridge') as HTMLButtonElement | null;
+  if (bridgeBtn) {
+    bridgeBtn.style.display = bridgesEnabled ? '' : 'none';
+    bridgeBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
+    bridgeBtn.classList.toggle('active-mode', buildMode === 'bridge');
+  }
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
   btn('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);
   btn('btnBuildRoad').disabled = !(isMyTurn && (state.phase === 'MAIN' || state.phase === 'SETUP_ROAD'));

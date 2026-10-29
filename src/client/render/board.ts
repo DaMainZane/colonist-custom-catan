@@ -18,7 +18,7 @@ import {
 import { socket } from '../socket';
 import {
   state, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
-  setBuildModeValue, setCamZoom, setCamPan, getClientSpeed,
+  buildMode, setBuildModeValue, setCamZoom, setCamPan, getClientSpeed,
   addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev
 } from '../store';
 import { renderHand } from './hand';
@@ -552,13 +552,13 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.portsLayer.innerHTML = portsHtml;
   }
 
-  // 4. Placed Roads Layers: rebuilds only when placed roads, blocking buildings, or road drop animations change.
+  // 4. Placed Roads Layers: rebuilds only when placed roads/bridges, blocking buildings, or road drop animations change.
   const placedRoadsSigParts: string[] = [
     cachedGeomBoardKey,
     hasActiveRoadAnim ? String(Math.floor(now / 32)) : '0'
   ];
   for (const e of edges) {
-    if (e.road) placedRoadsSigParts.push(`r${e.id}:${e.road}`);
+    if (e.road) placedRoadsSigParts.push(`r${e.id}:${e.road}:${e.pieceType || 'road'}`);
   }
   for (const v of vertices) {
     if (v.building) placedRoadsSigParts.push(`b${v.id}:${v.building.owner}`);
@@ -579,8 +579,9 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const ownerId = e.road;
       const owner = state.players.find(p => p.id === ownerId);
       const col = owner?.color || '#888';
+      const isBridge = e.pieceType === 'bridge';
 
-      // Extend endpoint to vertex if another road of the same player meets there (and no enemy building blocks it)
+      // Extend endpoint to vertex if another road/bridge of the same player meets there (and no enemy building blocks it)
       const blocked1 = v1.building && v1.building.owner !== ownerId;
       const blocked2 = v2.building && v2.building.owner !== ownerId;
       const conn1 = !blocked1 && (
@@ -603,6 +604,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const my = (v1.y + v2.y) / 2;
       const anim = getPieceAnimAttrs(`road_${e.id}`, now);
 
+      let bridgePlanksHtml = '';
+      if (isBridge) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const halfW = 7.5;
+        for (const f of [0.22, 0.5, 0.78]) {
+          const px = x1 + dx * f - mx;
+          const py = y1 + dy * f - my;
+          bridgePlanksHtml += `<line x1="${(px - nx * halfW).toFixed(1)}" y1="${(py - ny * halfW).toFixed(1)}" x2="${(px + nx * halfW).toFixed(1)}" y2="${(py + ny * halfW).toFixed(1)}" style="stroke:var(--piece-rim);stroke-width:2.8;stroke-linecap:round" />`;
+        }
+      }
+
       roadRimsHtml += `
         <g transform="translate(${mx}, ${my})">
           ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
@@ -616,6 +632,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
             <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
               style="stroke:${col}" />
+            ${bridgePlanksHtml}
           </g>
         </g>`;
 
@@ -631,13 +648,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.roadHitsLayer.innerHTML = roadHitsHtml;
   }
 
-  // 5. Road Spots Layer (buildable edges)
+  // 5. Road & Bridge Spots Layer (buildable edges)
   let roadSpotsHtml = '';
   for (const e of edges) {
     if (e.road) continue;
     const v1 = vertices[e.v1], v2 = vertices[e.v2];
     if (!v1 || !v2) continue;
-    if (isMyTurn && canClientPlaceRoad(e, me)) {
+    const allowRoad = !buildMode || buildMode === 'road';
+    const allowBridge = !buildMode || buildMode === 'bridge';
+    if (isMyTurn && ((allowRoad && canClientPlaceRoad(e, me)) || (allowBridge && canClientPlaceBridge(e, me)))) {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
       roadSpotsHtml += `
         <g onclick="clickEdge(${e.id})" style="cursor:pointer">
@@ -913,18 +932,24 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
-const CLIENT_BASE_PIECE_LIMITS: Record<'road' | 'settlement' | 'city', number> = {
+export type ClientPieceKey = 'road' | 'bridge' | 'settlement' | 'city';
+
+const CLIENT_BASE_PIECE_LIMITS: Record<ClientPieceKey, number> = {
   road: 15,
+  bridge: 10,
   settlement: 5,
   city: 4
 };
 
-export function countClientActivePieces(ownerId: string, piece: 'road' | 'settlement' | 'city'): number {
+export function countClientActivePieces(ownerId: string, piece: ClientPieceKey): number {
   if (!state?.board) return 0;
-  if (piece === 'road') {
+  if (piece === 'road' || piece === 'bridge') {
     let n = 0;
     for (const e of state.board.edges) {
-      if (e.road === ownerId) n++;
+      if (e.road === ownerId) {
+        const pt = e.pieceType || 'road';
+        if (pt === piece) n++;
+      }
     }
     return n;
   }
@@ -935,18 +960,19 @@ export function countClientActivePieces(ownerId: string, piece: 'road' | 'settle
   return n;
 }
 
-export function isClientPieceDoubleCost(piece: 'road' | 'settlement' | 'city', ownerId: string = socket.id || ''): boolean {
+export function isClientPieceDoubleCost(piece: ClientPieceKey, ownerId: string = socket.id || ''): boolean {
   if (!ownerId || !state?.board) return false;
   return countClientActivePieces(ownerId, piece) >= CLIENT_BASE_PIECE_LIMITS[piece];
 }
 
-const CLIENT_BASE_PIECE_COSTS: Record<'road' | 'settlement' | 'city', Record<string, number>> = {
+const CLIENT_BASE_PIECE_COSTS: Record<ClientPieceKey, Record<string, number>> = {
   road: { wood: 1, brick: 1 },
+  bridge: { wood: 1, brick: 1, ore: 1 },
   settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
   city: { wheat: 2, ore: 3 }
 };
 
-export function getClientPieceCost(piece: 'road' | 'settlement' | 'city', ownerId: string = socket.id || ''): Record<string, number> {
+export function getClientPieceCost(piece: ClientPieceKey, ownerId: string = socket.id || ''): Record<string, number> {
   const player = state?.players?.find(p => p.id === ownerId);
   const srvCost = player?.pieceCosts?.[piece];
   if (srvCost && typeof srvCost === 'object') return srvCost;
@@ -955,7 +981,7 @@ export function getClientPieceCost(piece: 'road' | 'settlement' | 'city', ownerI
   return Object.fromEntries(Object.entries(base).map(([r, n]) => [r, n * mult]));
 }
 
-export function canClientAffordPiece(me: any, piece: 'road' | 'settlement' | 'city'): boolean {
+export function canClientAffordPiece(me: any, piece: ClientPieceKey): boolean {
   if (!me || !me.resources) return false;
   const cost = getClientPieceCost(piece, me.id || socket.id || '');
   return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
@@ -963,6 +989,7 @@ export function canClientAffordPiece(me: any, piece: 'road' | 'settlement' | 'ci
 
 export function canClientPlaceSettlement(v: any, me: any): boolean {
   if (!me || me.settlementsLeft <= 0) return false;
+  if (!v.hexIds || v.hexIds.length === 0) return false;
   for (const adjId of v.adjacentVertices) {
     if (state.board.vertices[adjId]?.building) return false;
   }
@@ -974,12 +1001,29 @@ export function canClientPlaceSettlement(v: any, me: any): boolean {
 
 export function canClientPlaceRoad(e: any, me: any): boolean {
   if (!me || me.roadsLeft <= 0) return false;
+  if (!e.hexIds || e.hexIds.length === 0) return false;
   if (state.phase === 'SETUP_ROAD') {
     return e.v1 === state.lastSetupVertexId || e.v2 === state.lastSetupVertexId;
   }
   if (state.phase !== 'MAIN') return false;
   const canAfford = me.freeRoads > 0 || canClientAffordPiece(me, 'road');
   if (!canAfford) return false;
+
+  for (const vId of [e.v1, e.v2]) {
+    const v = state.board.vertices[vId];
+    if (!v) continue;
+    if (v.building && v.building.owner === socket.id) return true;
+    if (v.building && v.building.owner !== socket.id) continue;
+    if (v.edgeIds.some((oe: number) => state.board.edges[oe]?.road === socket.id)) return true;
+  }
+  return false;
+}
+
+export function canClientPlaceBridge(e: any, me: any): boolean {
+  if (!me || (me.bridgesLeft ?? 0) <= 0) return false;
+  if (!e.hexIds || e.hexIds.length !== 0) return false;
+  if (state.phase !== 'MAIN') return false;
+  if (!canClientAffordPiece(me, 'bridge')) return false;
 
   for (const vId of [e.v1, e.v2]) {
     const v = state.board.vertices[vId];
