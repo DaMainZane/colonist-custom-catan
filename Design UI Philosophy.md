@@ -86,7 +86,7 @@ Dark theme uses the same tile tokens, slightly desaturated, on a near-black warm
 
 ## Typography
 
-One typeface family, two or three sizes, two weights. Numbers (dice, VP, card counts) use tabular figures so they do not jump. No emoji in the UI chrome. Avatars become simple colored shapes or initials.
+One typeface family, two or three sizes, two weights. Numbers (dice, VP, card counts) use tabular figures so they do not jump. No emoji in the UI chrome. Avatars become simple colored shapes or initials. Layout follows a strict grid and a fixed type scale (Swiss-style discipline) so every panel lines up. Headlines on title cards and the victory screen use balanced wrapping (`text-wrap: balance`).
 
 ## Components
 
@@ -124,6 +124,24 @@ More inspiration from John's favorite games. The base direction above does not c
 5. **Performance.** Pass 22 removed SVG blur filters and keeps persistent layers for phones. Glow, grain and scanline effects must be CSS only or prebuilt, off by default on phones, and respect `prefers-reduced-motion`.
 6. **DLC themes.** A DLC may ship a theme block: a set of token overrides on top of the base tokens. Proposed mapping (tune by eye): Tidebound = Bad North and Monument Valley; Whispers and Crimson = Signalis and Replaced; Wildlands and Wayfarers = Unrailed and low poly; Ledger and Heartland = Mini Motorway and Dorfromantik; Bulwark = Into the Breach and low poly.
 
+## Interaction principles (added 2026-10-29)
+
+The sections above say how the game looks. These say how it behaves and feels. They apply to the base UI, not only to themes.
+
+1. **Small targets, big hit areas.** Vertices, road edges and ports stay visually small, but their tap area is at least 44px (invisible hit slop). Where areas overlap, the nearest target wins. Do not enlarge pieces to fix taps.
+2. **Respect the device.** Everything anchored to a screen edge (bottom sheets, action bar, top bar) honors safe-area insets. Bottom sheets swipe down to dismiss. The back gesture closes the top sheet or menu first and never exits the game by accident.
+3. **Motion never blocks.** Animations are interruptible: a new action or event takes any running animation straight to its end state, so nobody waits for a card transfer or robber move to finish. Prefer CSS transitions over fixed keyframe sequences.
+4. **Instant feedback, server decides.** The client shows the player's own action immediately in a pending state and rolls it back with a clear message if the server rejects it. Every action carries an id so a double tap or a reconnect cannot apply it twice. On reconnect, show the last known board dimmed while resyncing, not a blank spinner.
+5. **Guide the next move.**
+   - *Dim what does not matter.* For robber, discard and placement, legal targets stay at full strength and the rest steps back (same overlay kit as S0.13: pattern, icon and label).
+   - *Fewer options up front.* Build and trade lead with what the player can afford and place right now. The rest is one tap away.
+   - *Fill in what is already known.* A single legal robber target is pre-selected and the bank or port ratio is applied automatically.
+   - *Connect the steps.* Build and trade flows stay in one panel as one continuous flow, and selecting a road highlights the network it belongs to.
+6. **No undo, preview then confirm.** Catan moves are public and final, so there are no undo toasts. Irreversible actions show a preview of the result first (Into the Breach style), then commit on a deliberate tap.
+7. **Important prompts never look like ads.** Trade offers, "discard required" and "your turn" use the anchored panel style and the accent, in the same place every time. They never look like dismissable banners or toasts. Toasts are for low-importance info only.
+8. **Peek to show there is more.** When the hand or dev cards overflow, the next card is partly visible at the edge so scrolling is obvious.
+9. **Desktop extras.** Keyboard shortcuts for roll, end turn and build, with hints shown on the buttons. Desktop only, never required.
+
 ## Implementation plan
 
 1. **Design tokens.** Move every color, radius, spacing and font value into CSS variables (`:root` plus a dark theme block). Replace hardcoded hex in `styles.css`, `constants.ts` (`RES_META`), `icons.ts` and `render/board.ts` with tokens.
@@ -131,7 +149,8 @@ More inspiration from John's favorite games. The base direction above does not c
 3. **Shell.** Restyle panels, buttons, lobby bar and menus. Remove emoji and gradient styling.
 4. **Board and pieces.** Flat tiles, number tokens, ports and player pieces in the new style.
 5. **Layouts.** Adaptive phone, tablet and desktop layouts (Step 4).
-6. **Review on real devices.** Check contrast and colorblind readability, adjust the palette.
+6. **Interaction pass.** Hit areas, safe-area insets, swipe-to-dismiss sheets and back-gesture handling, interruptible animations, pending and rollback states (built with the layouts in Step 4).
+7. **Review on real devices.** Check contrast and colorblind readability, adjust the palette.
 
 ## Open questions
 
@@ -143,6 +162,9 @@ More inspiration from John's favorite games. The base direction above does not c
 - Whether the optional low poly "depth" look ships as a theme the player can switch, or only appears in DLC themes.
 - Whether DLC themes are opt-in per player or follow the host's DLC choice.
 - How to do Replaced-style glow and Signalis-style grain without SVG blur filters (CSS only, or prebuilt images).
+- Which actions get preview then confirm: robber placement and end turn yes, but probably not every build, or it gets annoying.
+- How trade offers and "discard required" are shown so they cannot be mistaken for dismissable toasts.
+- Whether overlapping hit areas on a small phone board need a zoom or magnify step.
 
 ## Sample
 ![[../../_attachments/file-20261024175027506.png]]
