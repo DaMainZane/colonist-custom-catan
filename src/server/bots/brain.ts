@@ -14,6 +14,7 @@ import {
   hasTech,
   legalActions,
   makeCtx,
+  priceOfUpgrade,
   ratioFor,
   score,
   techCostCards,
@@ -26,6 +27,7 @@ import { pieceCost } from '../../packs/base/building';
 import { CITY, ROAD, SETTLEMENT } from '../../packs/base/constants';
 import {
   HARBOR_UPGRADE_COST,
+  PORT_UPGRADE_ID,
   portUpgrades,
   TECH_GROUND_WORK,
   TECH_HARBOR_CHARTERS,
@@ -904,19 +906,20 @@ function planList(dc: Dc): Plan[] {
         v => v.piece?.owner === p.id && v.piece.type === CITY && v.port && reg.ports.get(v.port)?.resource === null && !upgrades[v.id]
       );
       if (portCity) {
-        const bestRes = pickBest(
-          resIds(reg).filter(r => ratioFor(g, reg, p.id, r) > 2),
-          r => (dc.prod[r] || 0) * 2 + (p.resources[r] || 0)
+        // The whole port drops to 2:1, so it pays off when the bot makes or holds a lot of any resource it still trades above 2:1.
+        const worthIt = resIds(reg).some(
+          r => ratioFor(g, reg, p.id, r) > 2 && ((dc.prod[r] || 0) >= 3 || (p.resources[r] || 0) >= 3)
         );
-        if (bestRes && ((dc.prod[bestRes] || 0) >= 3 || (p.resources[bestRes] || 0) >= 3)) {
-          const missing = missingFor(p.resources, HARBOR_UPGRADE_COST);
+        if (worthIt) {
+          const upgradeCost = priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST);
+          const missing = missingFor(p.resources, upgradeCost);
           out.push({
             type: 'goal',
             id: `upgrade_port:${portCity.id}`,
             priority: 76 - missing.length * 16,
-            cost: HARBOR_UPGRADE_COST,
+            cost: upgradeCost,
             missing,
-            action: { type: 'upgrade_port', payload: { vertexId: portCity.id, resource: bestRes } }
+            action: { type: 'upgrade_port', payload: { vertexId: portCity.id } }
           });
         }
       }
@@ -1315,15 +1318,12 @@ function pickGroundWorkMove(dc: Dc, options: Legal[]): BotMove | null {
 function pickUpgradePortMove(dc: Dc, options: Legal[]): BotMove | null {
   if (options.length === 0 || dc.tier.id === 'main') return null;
   const { g, reg, p } = dc;
-  const candidates = options.filter(a => ratioFor(g, reg, p.id, a.payload.resource) > 2);
-  const best = pickBest(
-    candidates,
-    a => (dc.prod[a.payload.resource] || 0) * 2.5 + (p.resources[a.payload.resource] || 0)
+  // Every raised port gets the same 3:1 -> 2:1 on all resources, so any legal port will do; the question is only whether it pays off.
+  const worthIt = resIds(reg).some(
+    r => ratioFor(g, reg, p.id, r) > 2 && ((dc.prod[r] || 0) >= 2 || (p.resources[r] || 0) >= 3)
   );
-  if (!best) return null;
-  const r = best.payload.resource;
-  if ((dc.prod[r] || 0) < 2 && (p.resources[r] || 0) < 3) return null;
-  return { type: 'upgrade_port', payload: best.payload };
+  if (!worthIt) return null;
+  return { type: 'upgrade_port', payload: options[0].payload };
 }
 
 function pickResearchTechMove(dc: Dc, options: Legal[]): BotMove | null {

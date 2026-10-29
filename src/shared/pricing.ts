@@ -37,6 +37,18 @@ export function doubledCost(cost: Resources): Resources {
   return out;
 }
 
+/**
+ * What this player pays for an upgrade that is not a piece (port upgrade, later harbors and the like): the base cost run through the same
+ * registered cost modifiers as a piece, so discounts and taxes apply to every resource price the same way.
+ * `upgradeId` is the id modifiers see as `def.id` (use a unique one such as 'upgrade_port'); there is no base limit, so no doubling.
+ */
+export function priceOfUpgrade(g: GameState, reg: Registry, p: PlayerState, upgradeId: string, baseCost: Resources): Resources {
+  const def: PieceDef = { id: upgradeId, name: upgradeId, target: 'vertex', cost: baseCost, vp: 0, produces: 0, canPlace: () => false };
+  let cost = baseCost;
+  for (const m of defsOf<CostModifier>(reg, COST_MODS).values()) cost = m.apply(g, p, def, cost);
+  return cost;
+}
+
 /** What this player pays for this piece right now: base cost, doubled above the base limit, then the registered modifiers. */
 export function priceOf(g: GameState, reg: Registry, p: PlayerState, def: PieceDef): Resources {
   let cost = aboveBaseLimit(g, p, def) ? doubledCost(def.cost) : def.cost;

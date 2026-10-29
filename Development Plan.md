@@ -9,6 +9,7 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 - **Stage 0 and Stage 1 infrastructure.** All shared services, DLC manifest, lobby cards. Gate passed 2026-10-28.
 - **Tech tree roots** (Passes 51 to 54): radial panel, 5 root techs, research action, sim rows. No deeper nodes.
 - **No DLC has gameplay code.** `allPacks` = base, gold, fog, tidebound (T0a: skeleton only, 8 addon stubs, no content).
+- **T1 port ladder, code written 2026-10-29 (T1a to T1d), not yet run.** Port upgrade is a level per vertex; Raise the Port upgrades the whole port 3:1 to 2:1 (no resource choice); `HARBOR_RATIO_MODS` gives the harbor-only 1:1 floor (nothing registers into it until T8); panel and `techroots.test.ts` follow. T1 counts as done once `npm run typecheck; npm test` pass (Pass 60 in `change log.md`).
 
 ---
 
@@ -54,10 +55,6 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 ### Split step
 | ID   | Step                                                                               | Size |
 | ---- | ---------------------------------------------------------------------------------- | ---- |
-| T1a  | Make portUpgrades a level per vertex (state shape, g.version bump)                 | M    |
-| T1b  | Make the root a whole-port 3:1 to 2:1 upgrade in tradeRatio.ts and pricing.ts      | M    |
-| T1c  | Add the 1:1 floor exception for harbors only                                       | S    |
-| T1d  | Fix the tech panel and techroots tests                                             | S    |
 | T2a  | Perk: sea and rivers 4-5 tiles wider                                               | M    |
 | T2b  | Add elevation 1 to 3 on h (higher is rarer), bump GEN_VERSION                      | L    |
 | T2c  | Add seeded fish icons on sea tiles, recheck the golden test                        | M    |

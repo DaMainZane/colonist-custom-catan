@@ -41,7 +41,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`) |
 | `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
 | `pricing.ts` | Piece cost and limit service: `priceOf`, `placedCount`, `aboveBaseLimit`, cost modifiers (`COST_MODS`) |
-| `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `tradeRatiosFor`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption |
+| `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `tradeRatiosFor`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption, harbor-only 1:1 pass (`HARBOR_RATIO_MODS`, `HARBOR_MIN_RATIO`) |
 | `production.ts` | S0.6 Production pipeline: ordered stages (`PRODUCTION_STEPS`), `effectiveHexNumber`, `matchingHexesForRoll`, `runProductionPipeline` |
 | `tileState.ts` | S0.7 Tile state (`TILE_STATES`, `getTileState`, `setTileState`, `tickTileStates`), durability & repair (`DURABILITY_DEFS`, `damagePiece`, `repairPiece`), wild tokens (`WILD_TOKENS`, `grantWildPick`, `spendWildToken`) |
 | `sevenResolver.ts` | S0.8 Seven Resolver: ordered step pipeline (`SEVEN_STEPS`), `DISCARD_LIMIT_MODS`, `effectiveDiscardLimit`, `resolveSeven` with side-effect cap |
@@ -100,8 +100,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `base/actions/endTurn.ts` | `end_turn` |
 | `base/actions/research.ts` | `research_tech` (rules in `shared/stage1.ts`; no legal actions while `rules.techTreeOn` is off) |
 | `base/techRoots.ts` | The 5 root techs (one per DLC branch) and `registerTechRoots` |
-| `base/techEffects.ts` | Effects of the 5 root techs: Stockpiling, Road levy, Harbor charters, Plunder modifiers; Ground work helpers; `techActionsFor` for the panel |
-| `base/actions/techActions.ts` | `upgrade_port` (Harbor charters) and `convert_tile` (Ground work) |
+| `base/techEffects.ts` | Effects of the 5 root techs: Stockpiling, Road levy, Harbor charters (raises a whole port 3:1 to 2:1, port level per vertex in `portUpgrades`), Plunder modifiers; Ground work helpers; `techActionsFor` for the panel |
+| `base/actions/techActions.ts` | `upgrade_port` (Harbor charters, payload `{ vertexId }`, no resource choice) and `convert_tile` (Ground work) |
 | `base/map/index.ts` | Hexagon shape, random terrain, standard numbers, Standard and Blank quick starts |
 | `base/map/shapes.ts` | Continent, ring, islands, archipelago, continents; lake, river, satellites, ragged |
 | `base/map/terrain.ts` | Spread, clustered, realistic terrain styles |
@@ -183,7 +183,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles (server list first, built-in fallback catalog; the Tidebound ids in it must match the pack, see `tidebound.test.ts`), active summary strip, player/spectator strip |
 | `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
-| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards, description on hover, Harbor charters and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
+| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards, description on hover, Harbor charters (one Raise to 2:1 button per port city) and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
 
 ## `tests/` (node:test / tsx)
 
@@ -218,6 +218,6 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `simmatrix.test.ts` | S0.16 Sim matrix: scenarios × DLC/addon combos × tech tree on/off × bot tiers, invariant checks, `botTested` badge flag |
 | `clankerton_s0.test.ts` | S0.5–S0.11 shared engine services: trade ratios, production pipeline, tile state/durability/wild tokens, Seven Resolver, markers/ledger/strength/relations, history/stats, seeded event deck |
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
-| `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, bot tech tree research/action decisions, and the tree-off no-effect check |
+| `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, the port level (T1a), the harbor-only 1:1 floor (T1c), bot tech tree research/action decisions, and the tree-off no-effect check |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
 

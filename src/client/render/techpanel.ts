@@ -1,4 +1,4 @@
-// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters and Ground work controls) and the Tech button in the action bar | USED BY: client/render/index, client/main
+// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | USED BY: client/render/index, client/main
 import { getMiniSvg, uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
@@ -208,20 +208,18 @@ function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): stri
     </div>`;
 }
 
-/** Harbor charters: your cities on a 3:1 port, with one button per resource to upgrade it to 2:1. */
+/** Harbor charters: your cities on a 3:1 port, each with one button that raises the whole port to 2:1 (no resource choice). */
 function harborHtml(h: NonNullable<TechActionsView['harbor']>, canAct: boolean, hand: Resources | undefined): string {
   const rows = h.ports.length === 0
-    ? '<div class="tp-why">Build a city on a 3:1 port to upgrade it.</div>'
+    ? '<div class="tp-why">Build a city on a 3:1 port to raise it.</div>'
     : h.ports.map(p => {
-        if (p.resource) {
-          return `<div class="tp-port">City #${p.vertexId} · <span class="tp-done">2:1 ${esc(cap(p.resource))}</span></div>`;
+        if (p.level >= 1) {
+          return `<div class="tp-port">City #${p.vertexId} · <span class="tp-done">2:1 any resource</span></div>`;
         }
-        const buttons = h.resources.map(r =>
-          `<button class="tp-mini" type="button" ${canAct && h.affordable ? '' : 'disabled'} onclick="upgradePortClick(${p.vertexId},'${esc(r)}')">${esc(cap(r))}</button>`
-        ).join('');
-        return `<div class="tp-port">City #${p.vertexId} · 3:1 port. Upgrade to 2:1 for:<div class="tp-chips">${buttons}</div></div>`;
+        const button = `<button class="tp-mini" type="button" ${canAct && h.affordable ? '' : 'disabled'} onclick="upgradePortClick(${p.vertexId})">Raise to 2:1</button>`;
+        return `<div class="tp-port">City #${p.vertexId} · 3:1 port<div class="tp-chips">${button}</div></div>`;
       }).join('');
-  return `<div class="tp-extra"><div class="tp-extra-title">Harbor upgrade ${costStripHtml(h.cost, hand)}</div>${rows}</div>`;
+  return `<div class="tp-extra"><div class="tp-extra-title">Raise the port ${costStripHtml(h.cost, hand)}</div>${rows}</div>`;
 }
 
 /** Ground work: pick one of your qualifying tiles, then the basic tile it becomes. One use per game. */
@@ -329,10 +327,10 @@ export function researchTechClick(techId: string): void {
   playTone(600, 0.08);
 }
 
-/** Harbor charters: upgrade the city on vertex `vertexId` so `resource` trades 2:1 there. */
-export function upgradePortClick(vertexId: number, resource: string): void {
+/** Harbor charters: raise the port under the city on vertex `vertexId` from 3:1 to 2:1 for every resource. */
+export function upgradePortClick(vertexId: number): void {
   if (!state?.code) return;
-  socket.emit('upgradePort', { code: state.code, vertexId, resource });
+  socket.emit('upgradePort', { code: state.code, vertexId });
   playTone(600, 0.08);
 }
 

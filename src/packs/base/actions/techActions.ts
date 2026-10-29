@@ -1,5 +1,5 @@
-// MODULE: actions "upgrade_port" (Tidebound Harbor charters) and "convert_tile" (Wild Earth Ground work) | USED BY: packs/base/actions/index
-import { canAfford, getPlayer, hasTech, payToBank, ratioFor } from '../../../shared';
+// MODULE: actions "upgrade_port" (Tidebound Harbor charters: raise a whole port 3:1 to 2:1) and "convert_tile" (Wild Earth Ground work) | USED BY: packs/base/actions/index
+import { canAfford, getPlayer, hasTech, payToBank, priceOfUpgrade } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { CITY, GENERIC_PORT } from '../constants';
 import {
@@ -7,6 +7,7 @@ import {
   groundWorkSourceError,
   groundWorkUsed,
   HARBOR_UPGRADE_COST,
+  PORT_UPGRADE_ID,
   portLevel,
   rollTileNumber,
   TECH_GROUND_WORK,
@@ -14,9 +15,10 @@ import {
 } from '../techEffects';
 
 /**
- * Harbor charters: a city on a 3:1 port becomes a 2:1 port for one resource of the player's choice.
+ * Harbor charters (Raise the Port): a city on a 3:1 port becomes a 2:1 port for every resource. It stays an 'any resource' port.
  * The port id on the vertex does not change; the upgrade is stored in `g.ext.core.portUpgrades[vertexId]`
- * as `{ level: 1, resource, by }` (level = step on the port ladder) and read by the trade ratio modifier in `techEffects.ts`.
+ * as `{ level: 1, by }` (level = step on the port ladder) and read by the trade ratio modifier in `techEffects.ts`.
+ * The payload is just `{ vertexId }`: there is no resource choice.
  */
 export const upgradePortAction: ActionDef = {
   type: 'upgrade_port',
@@ -30,33 +32,29 @@ export const upgradePortAction: ActionDef = {
     if (!v.piece || v.piece.owner !== pid || v.piece.type !== CITY) return 'A harbor upgrade needs your own city';
     if (v.port !== GENERIC_PORT) return 'Only a 3:1 port can be upgraded';
     if (portLevel(g, v.id) >= 1) return 'That port is already upgraded';
-    const resource = String(payload?.resource ?? '');
-    if (!reg.resources.has(resource)) return 'Choose a resource for the 2:1 port';
-    if (ratioFor(g, reg, pid, resource) <= 2) return `You already trade ${resource} at 2:1`;
-    if (!canAfford(p, HARBOR_UPGRADE_COST)) return 'Not enough resources for a harbor upgrade (2 wood, 1 brick, 1 ore)';
+    if (!canAfford(p, priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST))) return 'Not enough resources for a port upgrade';
     return null;
   },
   apply(ctx, pid, payload) {
-    const { g } = ctx;
+    const { g, reg } = ctx;
     const p = getPlayer(g, pid)!;
-    const resource = String(payload.resource);
-    payToBank(ctx, p, HARBOR_UPGRADE_COST);
+    payToBank(ctx, p, priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST));
     g.ext = g.ext || {};
     g.ext.core = g.ext.core || {};
     g.ext.core.portUpgrades = g.ext.core.portUpgrades || {};
-    g.ext.core.portUpgrades[payload.vertexId] = { level: 1, resource, by: pid };
+    g.ext.core.portUpgrades[payload.vertexId] = { level: 1, by: pid };
     p.stats.portsUpgraded = (p.stats.portsUpgraded || 0) + 1;
-    ctx.emit('portUpgraded', { playerId: pid, vertexId: payload.vertexId, resource });
-    ctx.log(`⚓ ${p.avatar} ${p.name} upgraded a harbor: ${resource} now trades 2:1`, p.color);
+    ctx.emit('portUpgraded', { playerId: pid, vertexId: payload.vertexId, level: 1 });
+    ctx.log(`⚓ ${p.avatar} ${p.name} raised a port: it now trades every resource 2:1`, p.color);
   },
   /** Nothing without the tech. The engine filters the rest through validate. */
   legal(ctx, pid) {
-    const { g, reg } = ctx;
+    const { g } = ctx;
     if (!hasTech(g, pid, TECH_HARBOR_CHARTERS)) return [];
-    const out: { vertexId: number; resource: string }[] = [];
+    const out: { vertexId: number }[] = [];
     for (const v of g.board.vertices) {
       if (v.piece?.owner !== pid || v.piece.type !== CITY || v.port !== GENERIC_PORT) continue;
-      for (const resource of reg.resources.keys()) out.push({ vertexId: v.id, resource });
+      out.push({ vertexId: v.id });
     }
     return out;
   }

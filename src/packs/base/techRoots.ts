@@ -17,7 +17,7 @@ export const TECH_ROOTS: TechDef[] = [
     tier: 1,
     costOffset: 0,
     costResources: ['wood', 'sheep', 'ore'],
-    description: 'Upgrade a city on a 3:1 port so one resource of your choice trades 2:1 there (2 wood, 1 brick, 1 ore).'
+    description: 'Raise a city on a 3:1 port so every resource trades 2:1 there (2 wood, 1 brick, 1 ore).'
   },
   {
     id: 'bulwark.stockpiling',

@@ -1,4 +1,4 @@
-// MODULE: effects of the 5 root techs (Stockpiling, Road levy, Harbor charters, Plunder, Ground work): modifiers, state helpers, and the lists the tech panel shows | USED BY: packs/base/techRoots, actions/techActions, server/view, tests
+// MODULE: effects of the 5 root techs (Stockpiling, Road levy, Harbor charters = raise a whole port 3:1 to 2:1, Plunder, Ground work): modifiers, state helpers, and the lists the tech panel shows | USED BY: packs/base/techRoots, actions/techActions, server/view, tests
 import {
   aboveBaseLimit,
   canAfford,
@@ -6,6 +6,7 @@ import {
   DISCARD_LIMIT_MODS,
   getPlayer,
   hasTech,
+  priceOfUpgrade,
   RATIO_MOD_ORDER,
   RATIO_MODS,
   rngInt
@@ -22,8 +23,10 @@ export const TECH_PLUNDER = 'warlords.plunder';
 export const TECH_GROUND_WORK = 'wildearth.ground_work';
 export const TECH_ROAD_LEVY = 'guildhall.road_levy';
 
-/** What one harbor upgrade costs (Tech Tree Design.md, section 4). */
+/** What one harbor upgrade costs before modifiers (Tech Tree Design.md, section 4). Read the real price with `priceOfUpgrade`. */
 export const HARBOR_UPGRADE_COST: Resources = { wood: 2, brick: 1, ore: 1 };
+/** The id cost modifiers see for the port upgrade (`def.id`). */
+export const PORT_UPGRADE_ID = 'upgrade_port';
 /** Bulwark Stockpiling: extra cards a player may hold through a 7. */
 export const STOCKPILING_BONUS = 2;
 
@@ -60,12 +63,12 @@ export const roadLevyModifier: CostModifier = {
 
 /**
  * One upgraded port vertex (`g.ext.core.portUpgrades[vertexId]`).
- * `level` is the step on the port ladder: 1 = Raise the Port (3:1 -> 2:1), 2 = Harbor (2:1 -> 1:1, arrives in T8).
- * `resource` is the one resource that trades 2:1 at a level 1 port. It goes away in T1b, when the root upgrades the whole port.
+ * `level` is the step on the port ladder: 1 = Raise the Port (3:1 -> 2:1 for every resource), 2 = Harbor (arrives in T8).
+ * The upgrade is a ratio change on the whole port, so there is no resource choice. An old entry that still carries a
+ * `resource` (state from before T1b) is read the same way: the whole port is raised.
  */
 export interface PortUpgrade {
   level: number;
-  resource?: string;
   by: Id;
 }
 
@@ -81,15 +84,15 @@ export function portLevel(g: GameState, vertexId: number): number {
 }
 
 /**
- * An upgraded 3:1 harbor trades its chosen resource at 2:1 for whoever holds the city there.
+ * A raised 3:1 port trades every resource at 2:1 for whoever holds the city there (it stays an 'any resource' port).
  * It only lowers the ratio (never raises it), and the 2:1 floor in `ratioFor` still applies.
  */
 export const harborCharterModifier: RatioModifier = {
   id: 'tech.harborCharters',
   order: RATIO_MOD_ORDER.harbor,
-  apply(g, _reg, pid, resource, current) {
-    for (const [vid, up] of Object.entries(portUpgrades(g))) {
-      if (up.resource !== resource) continue;
+  apply(g, _reg, pid, _resource, current) {
+    for (const vid of Object.keys(portUpgrades(g))) {
+      if (portLevel(g, Number(vid)) < 1) continue;
       const v = g.board.vertices[Number(vid)];
       if (v?.piece && v.piece.owner === pid && v.piece.type !== SETTLEMENT && v.port === GENERIC_PORT) {
         return Math.min(current, 2);
@@ -153,8 +156,8 @@ export interface TechActionsView {
   harbor: {
     cost: Resources;
     affordable: boolean;
-    resources: string[];
-    ports: { vertexId: number; resource: string | null; level: number }[];
+    /** Your cities on a 3:1 port; `level` 0 = not raised yet, 1 = raised to 2:1. */
+    ports: { vertexId: number; level: number }[];
   } | null;
   /** Null until the player has Ground work. `hexes` is empty once it is used. */
   groundWork: {
@@ -169,13 +172,13 @@ export function techActionsFor(g: GameState, reg: Registry, pid: Id): TechAction
   const p = getPlayer(g, pid);
   let harbor: TechActionsView['harbor'] = null;
   if (p && hasTech(g, pid, TECH_HARBOR_CHARTERS)) {
-    const ups = portUpgrades(g);
-    const ports: { vertexId: number; resource: string | null; level: number }[] = [];
+    const ports: { vertexId: number; level: number }[] = [];
     for (const v of g.board.vertices) {
       if (v.piece?.owner !== pid || v.piece.type !== CITY || v.port !== GENERIC_PORT) continue;
-      ports.push({ vertexId: v.id, resource: ups[v.id]?.resource ?? null, level: portLevel(g, v.id) });
+      ports.push({ vertexId: v.id, level: portLevel(g, v.id) });
     }
-    harbor = { cost: HARBOR_UPGRADE_COST, affordable: canAfford(p, HARBOR_UPGRADE_COST), resources: [...reg.resources.keys()], ports };
+    const cost = priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST);
+    harbor = { cost, affordable: canAfford(p, cost), ports };
   }
 
   let groundWork: TechActionsView['groundWork'] = null;

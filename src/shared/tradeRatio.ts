@@ -1,4 +1,4 @@
-// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, invalid-ratio advice) | USED BY: packs/base/trading, DLC packs, client, bots
+// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, invalid-ratio advice) | USED BY: packs/base/trading, DLC packs, client, bots
 import { defsOf } from './registry';
 import type { Registry } from './registry';
 import type { GameState, Id } from './types';
@@ -9,9 +9,16 @@ import type { GameState, Id } from './types';
  *  - Applies ports on vertices owned by the player (3:1 generic or 2:1 resource-specific; gem ports with `exemptFloor: true` can go down to 1:1).
  *  - Runs registered modifiers in `RATIO_MODS` in ascending `order` (ports = 10, harbor = 20, market = 30, tech = 40, war weariness = 80).
  *  - Enforces a hard `MIN_TRADE_RATIO` (2:1) floor unless `exemptFloor` is set (gem ports).
+ *  - Then runs the harbor pass (`HARBOR_RATIO_MODS`). A harbor is the only thing besides a gem port allowed under the 2:1 floor, down to
+ *    `HARBOR_MIN_RATIO` (1:1). It runs after the floor, so market, war weariness and every other modifier still stop at 2:1.
  */
 export const RATIO_MODS = 'tradeRatioMods';
 export const MIN_TRADE_RATIO = 2;
+
+/** Keyed registry for harbors (Tidebound, T8): the one source of a ratio under 2:1 that is not a gem port. */
+export const HARBOR_RATIO_MODS = 'harborRatioMods';
+/** The lowest ratio a harbor can give. */
+export const HARBOR_MIN_RATIO = 1;
 
 export const RATIO_MOD_ORDER = {
   ports: 10,
@@ -40,6 +47,16 @@ export interface RatioModifier {
     resource: string,
     current: number
   ): number | RatioModifierResult;
+  replace?: boolean;
+}
+
+/**
+ * A harbor's ratio for one resource, or null/undefined when the player has no harbor for it.
+ * It is applied after the 2:1 floor and can only lower the result (never raise it), but not below `HARBOR_MIN_RATIO`.
+ */
+export interface HarborRatioModifier {
+  id: string;
+  apply(g: GameState, reg: Registry, pid: Id, resource: string): number | null | undefined;
   replace?: boolean;
 }
 
@@ -75,7 +92,16 @@ export function ratioFor(g: GameState, reg: Registry, pid: Id, resource: string)
   }
 
   const floor = exemptFloor ? 1 : MIN_TRADE_RATIO;
-  return Math.max(floor, Math.round(ratio));
+  let result = Math.max(floor, Math.round(ratio));
+
+  // 3. Harbor pass: after the floor, so only a harbor can take the ratio below 2:1. Nothing registered = nothing changes.
+  if (result > HARBOR_MIN_RATIO) {
+    for (const mod of defsOf<HarborRatioModifier>(reg, HARBOR_RATIO_MODS).values()) {
+      const r = mod.apply(g, reg, pid, resource);
+      if (typeof r === 'number' && Number.isFinite(r)) result = Math.min(result, Math.max(HARBOR_MIN_RATIO, Math.round(r)));
+    }
+  }
+  return result;
 }
 
 /** Bank ratio per registered resource for a player. `tradeRatios` in base/trading wraps this. */

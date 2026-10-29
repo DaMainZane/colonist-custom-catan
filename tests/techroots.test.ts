@@ -1,4 +1,4 @@
-// MODULE: unit tests for the effects of the 5 root techs (Stockpiling, Road levy, Harbor charters, Plunder, Ground work)
+// MODULE: unit tests for the effects of the 5 root techs (Stockpiling, Road levy, Harbor charters = raise a whole port to 2:1, Plunder, Ground work) and the harbor-only 1:1 floor in the trade ratio service
 import { describe, expect, it } from 'vitest';
 import { allPacks } from '../src/packs';
 import { moveRobberAction } from '../src/packs/base/actions/robber';
@@ -8,11 +8,16 @@ import {
   createRegistry,
   dispatch,
   effectiveDiscardLimit,
+  COST_MODS,
+  explainInvalidBankRatio,
   getPlayerTechs,
+  HARBOR_RATIO_MODS,
   isCatchUpEligible,
   legalActions,
   makeCtx,
   priceOf,
+  RATIO_MOD_ORDER,
+  RATIO_MODS,
   ratioFor,
   registerStage1Definitions
 } from '../src/shared';
@@ -52,6 +57,7 @@ function grant(g: GameState, pid: string, techId: string): void {
 }
 
 const sum = (r: Record<string, number>): number => Object.values(r).reduce((a, b) => a + b, 0);
+const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
 describe('Bulwark: Stockpiling', () => {
   it('raises the discard limit by 2 for the owner only, and stacks with Catch-up', () => {
@@ -106,7 +112,7 @@ describe('Guildhall: Road levy', () => {
 });
 
 describe('Tidebound: Harbor charters', () => {
-  it('upgrades a city on a 3:1 port so one chosen resource trades 2:1, and spends 2 wood, 1 brick, 1 ore', () => {
+  it('raises a city on a 3:1 port to 2:1 for every resource, and spends 2 wood, 1 brick, 1 ore', () => {
     const { g, reg, ctx } = makeGame(912);
     const action = reg.actions.get('upgrade_port')!;
     expect(reg.phases.get('main')!.actions).toContain('upgrade_port');
@@ -115,22 +121,76 @@ describe('Tidebound: Harbor charters', () => {
     v.piece = { type: 'city', owner: 'p1' };
     g.players[0].resources = { wood: 2, brick: 1, sheep: 0, wheat: 0, ore: 1 };
 
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toMatch(/research harbor charters/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/research harbor charters/i);
     grant(g, 'p1', 'tidebound.harbor_charters');
-    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(3);
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toBeNull();
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(3);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toBeNull();
 
-    action.apply(ctx, 'p1', { vertexId: 0, resource: 'wheat' });
-    expect(g.ext.core.portUpgrades[0]).toEqual({ level: 1, resource: 'wheat', by: 'p1' });
+    action.apply(ctx, 'p1', { vertexId: 0 });
+    expect(g.ext.core.portUpgrades[0]).toEqual({ level: 1, by: 'p1' });
     expect(portLevel(g, 0)).toBe(1);
-    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2);
-    expect(ratioFor(g, reg, 'p1', 'sheep')).toBe(3); // only the chosen resource
-    expect(ratioFor(g, reg, 'p2', 'wheat')).toBe(4); // only the owner
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2); // the whole port, no resource choice
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p2', r)).toBe(4); // only the owner
     expect(g.players[0].resources).toEqual({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'sheep' })).toMatch(/already upgraded/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/already upgraded/i);
   });
 
-  it('refuses a settlement, a non-3:1 port, a resource already at 2:1, bad input and a player who cannot pay', () => {
+  it('the upgrade price goes through the cost service, so a cost modifier changes what is charged and shown', () => {
+    const taxPack: Pack = {
+      id: 'upgrade_tax_probe',
+      name: 'Upgrade tax probe',
+      deps: ['base'],
+      register(api) {
+        api.define(COST_MODS, {
+          id: 'probe.upgradeTax',
+          apply: (_g: GameState, _p: any, def: any, cost: Record<string, number>) => (def.id === 'upgrade_port' ? { ...cost, sheep: 1 } : cost)
+        });
+      }
+    };
+    const reg = createRegistry([...allPacks, taxPack], { techTreeOn: true }, 'all');
+    const g = createGame(reg, {
+      players: [
+        { id: 'p1', name: 'Alice', avatar: '1', color: '#e74c3c', isBot: false },
+        { id: 'p2', name: 'Bob', avatar: '2', color: '#3498db', isBot: false }
+      ],
+      seed: 924,
+      shuffleSeats: false,
+      rules: { techTreeOn: true }
+    });
+    g.phase = 'main';
+    const ctx = makeCtx(g, reg);
+    const action = reg.actions.get('upgrade_port')!;
+    grant(g, 'p1', 'tidebound.harbor_charters');
+    g.board.vertices[0].port = '3:1';
+    g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
+
+    g.players[0].resources = { wood: 2, brick: 1, sheep: 0, wheat: 0, ore: 1 };
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/not enough/i); // the tax needs 1 sheep too
+    expect(techActionsFor(g, reg, 'p1').harbor!.cost).toEqual({ wood: 2, brick: 1, ore: 1, sheep: 1 });
+    expect(techActionsFor(g, reg, 'p1').harbor!.affordable).toBe(false);
+
+    g.players[0].resources = { wood: 2, brick: 1, sheep: 1, wheat: 0, ore: 1 };
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toBeNull();
+    action.apply(ctx, 'p1', { vertexId: 0 });
+    expect(g.players[0].resources).toEqual({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
+  });
+
+  it('never raises a ratio: a better specialised 2:1 port keeps its own price, and the 2:1 floor holds', () => {
+    const { g, reg, ctx } = makeGame(923);
+    const action = reg.actions.get('upgrade_port')!;
+    grant(g, 'p1', 'tidebound.harbor_charters');
+    g.board.vertices[0].port = '3:1';
+    g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
+    g.board.vertices[1].port = 'wheat';
+    g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' };
+    g.players[0].resources = { wood: 2, brick: 1, sheep: 0, wheat: 0, ore: 1 };
+    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2);
+    expect(ratioFor(g, reg, 'p1', 'sheep')).toBe(3);
+    action.apply(ctx, 'p1', { vertexId: 0 });
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2); // wheat stays 2, never 1
+  });
+
+  it('refuses a settlement, another player\'s city, a non-3:1 port, bad input and a player who cannot pay', () => {
     const { g, reg, ctx } = makeGame(916);
     const action = reg.actions.get('upgrade_port')!;
     grant(g, 'p1', 'tidebound.harbor_charters');
@@ -138,29 +198,26 @@ describe('Tidebound: Harbor charters', () => {
 
     g.board.vertices[0].port = '3:1';
     g.board.vertices[0].piece = { type: 'settlement', owner: 'p1' };
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toMatch(/own city/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/own city/i);
 
     g.board.vertices[0].piece = { type: 'city', owner: 'p2' };
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toMatch(/own city/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/own city/i);
 
     g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
     g.board.vertices[0].port = 'wood';
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toMatch(/3:1/);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/3:1/);
 
     g.board.vertices[0].port = '3:1';
-    g.board.vertices[1].port = 'wheat';
-    g.board.vertices[1].piece = { type: 'settlement', owner: 'p1' };
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toMatch(/already trade wheat at 2:1/i);
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'gold' })).toMatch(/choose a resource/i);
-    expect(action.validate(ctx, 'p1', { vertexId: 'x', resource: 'sheep' })).toMatch(/choose a harbor city/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 'x' })).toMatch(/choose a harbor city/i);
+    expect(action.validate(ctx, 'p1', {})).toMatch(/choose a harbor city/i);
 
     g.players[0].resources = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'sheep' })).toMatch(/not enough/i);
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toMatch(/not enough/i);
 
     g.players[0].resources = { wood: 5, brick: 5, sheep: 5, wheat: 5, ore: 5 };
-    expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'sheep' })).toBeNull();
+    expect(action.validate(ctx, 'p1', { vertexId: 0 })).toBeNull();
     const legal = legalActions(g, reg, 'p1').filter(a => a.type === 'upgrade_port');
-    expect(legal.map(a => a.payload.resource).sort()).toEqual(['brick', 'ore', 'sheep', 'wood']); // wheat is already 2:1
+    expect(legal.map(a => a.payload)).toEqual([{ vertexId: 0 }]); // one entry per port city, no resource in the payload
   });
 });
 
@@ -172,7 +229,7 @@ describe('Tidebound: port upgrade level (T1a)', () => {
     expect(portLevel(g, 99999)).toBe(0);
   });
 
-  it('an entry from before the level existed counts as level 1 and still lowers the ratio', () => {
+  it('an entry from before the level existed counts as level 1, and an old chosen resource is ignored: the whole port is raised', () => {
     const { g, reg } = makeGame(921);
     const v = g.board.vertices[0];
     v.port = '3:1';
@@ -180,7 +237,7 @@ describe('Tidebound: port upgrade level (T1a)', () => {
     g.ext.core = g.ext.core ?? {};
     g.ext.core.portUpgrades = { 0: { resource: 'wheat', by: 'p1' } };
     expect(portLevel(g, 0)).toBe(1);
-    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2);
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
   });
 
   it('the panel list reports the level of an upgraded port', () => {
@@ -188,8 +245,97 @@ describe('Tidebound: port upgrade level (T1a)', () => {
     g.board.vertices[0].port = '3:1';
     g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
     grant(g, 'p1', 'tidebound.harbor_charters');
-    g.ext.core.portUpgrades = { 0: { level: 1, resource: 'ore', by: 'p1' } };
-    expect(techActionsFor(g, reg, 'p1').harbor!.ports).toEqual([{ vertexId: 0, resource: 'ore', level: 1 }]);
+    g.ext.core.portUpgrades = { 0: { level: 1, by: 'p1' } };
+    expect(techActionsFor(g, reg, 'p1').harbor!.ports).toEqual([{ vertexId: 0, level: 1 }]);
+  });
+});
+
+describe('Trade ratio: harbor-only 1:1 floor (T1c)', () => {
+  /**
+   * A registry with two probe modifiers. `probe.discount` stands in for Market or War weariness (a big cut in the normal
+   * chain, which must stop at 2:1). `probe.harbor` stands in for the Harbor that arrives in T8: it reads
+   * `g.ext.probe.harbor[pid][resource]` and may go to 1:1.
+   */
+  function makeProbeGame(seed: number) {
+    const probePack: Pack = {
+      id: 'ratio_probe',
+      name: 'Ratio probe',
+      deps: ['base'],
+      register(api) {
+        api.define(RATIO_MODS, {
+          id: 'probe.discount',
+          order: RATIO_MOD_ORDER.market,
+          apply: (g: GameState, _reg: any, _pid: string, _resource: string, current: number) => (g.ext?.probe?.discount ? current - 5 : current)
+        });
+        api.define(HARBOR_RATIO_MODS, {
+          id: 'probe.harbor',
+          apply: (g: GameState, _reg: any, pid: string, resource: string) => g.ext?.probe?.harbor?.[pid]?.[resource] ?? null
+        });
+      }
+    };
+    const reg = createRegistry([...allPacks, probePack], {}, 'all');
+    const g = createGame(reg, {
+      players: [
+        { id: 'p1', name: 'Alice', avatar: '1', color: '#e74c3c', isBot: false },
+        { id: 'p2', name: 'Bob', avatar: '2', color: '#3498db', isBot: false }
+      ],
+      seed,
+      shuffleSeats: false,
+      rules: {}
+    });
+    g.phase = 'main';
+    g.ext.probe = { discount: false, harbor: {} };
+    return { g, reg };
+  }
+
+  it('with no harbor answering, 4:1 stays 4:1, and a normal modifier cannot go under 2:1', () => {
+    const { g, reg } = makeProbeGame(930);
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(4);
+    g.ext.probe.discount = true; // 4 - 5 = -1 in the chain, held at the 2:1 floor
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
+  });
+
+  it('a harbor reaches 1:1 for its own resource only, and for its owner only', () => {
+    const { g, reg } = makeProbeGame(931);
+    g.ext.probe.harbor = { p1: { wheat: 1 } };
+    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(1);
+    for (const r of RESOURCES.filter(x => x !== 'wheat')) expect(ratioFor(g, reg, 'p1', r)).toBe(4);
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p2', r)).toBe(4);
+  });
+
+  it('other modifiers still stop at 2:1 even when a harbor makes one resource 1:1', () => {
+    const { g, reg } = makeProbeGame(932);
+    g.ext.probe.discount = true;
+    g.ext.probe.harbor = { p1: { wheat: 1 } };
+    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(1);
+    for (const r of RESOURCES.filter(x => x !== 'wheat')) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
+  });
+
+  it('a harbor can only lower a ratio, and never below 1:1', () => {
+    const { g, reg } = makeProbeGame(933);
+    g.ext.probe.discount = true;
+    g.ext.probe.harbor = { p1: { wheat: 3, ore: 0, wood: -4 } };
+    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2); // 3 would raise the 2:1, so it is ignored
+    expect(ratioFor(g, reg, 'p1', 'ore')).toBe(1); // 0 is held at the 1:1 floor
+    expect(ratioFor(g, reg, 'p1', 'wood')).toBe(1);
+  });
+
+  it('the bank trade check uses the 1:1 harbor ratio', () => {
+    const { g, reg } = makeProbeGame(934);
+    g.ext.probe.harbor = { p1: { wheat: 1 } };
+    expect(explainInvalidBankRatio(g, reg, 'p1', { wheat: 1 }, { ore: 1 })).toMatchObject({ ok: true, credits: 1, wanted: 1 });
+    expect(explainInvalidBankRatio(g, reg, 'p1', { sheep: 1 }, { ore: 1 }).ok).toBe(false); // sheep is still 4:1
+  });
+
+  it('a raised port (level 1) alone never goes under 2:1, even with another big cut on top', () => {
+    const { g, reg } = makeProbeGame(935);
+    g.board.vertices[0].port = '3:1';
+    g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
+    g.ext.core = g.ext.core ?? {};
+    g.ext.core.portUpgrades = { 0: { level: 1, by: 'p1' } };
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
+    g.ext.probe.discount = true; // even with a big cut on top, the raised port stops at 2:1
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
   });
 });
 
@@ -317,9 +463,9 @@ describe('root tech effects with the tree off', () => {
     g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
     grant(g, 'p1', 'tidebound.harbor_charters');
     const harbor = techActionsFor(g, reg, 'p1').harbor!;
-    expect(harbor.ports).toEqual([{ vertexId: 0, resource: null, level: 0 }]);
+    expect(harbor.ports).toEqual([{ vertexId: 0, level: 0 }]);
     expect(harbor.affordable).toBe(false);
-    expect(harbor.resources).toEqual(expect.arrayContaining(['wood', 'brick', 'sheep', 'wheat', 'ore']));
+    expect(harbor).not.toHaveProperty('resources'); // no resource choice any more
   });
 });
 
@@ -361,9 +507,9 @@ describe('bot tech tree usage when techTreeOn is enabled', () => {
     p1.resources = { wood: 4, brick: 1, sheep: 1, wheat: 1, ore: 1 };
     const move3 = chooseBotAction(g, reg, 'p1', () => 0.5);
     expect(move3?.type).toBe('upgrade_port');
-    expect(move3?.payload.vertexId).toBe(portVertex.id);
+    expect(move3?.payload).toEqual({ vertexId: portVertex.id });
     expect(dispatch(g, reg, { type: move3!.type, playerId: 'p1', payload: move3!.payload }).ok).toBe(true);
-    expect(ratioFor(g, reg, 'p1', move3!.payload.resource)).toBe(2);
+    for (const r of RESOURCES) expect(ratioFor(g, reg, 'p1', r)).toBe(2);
   });
 });
 

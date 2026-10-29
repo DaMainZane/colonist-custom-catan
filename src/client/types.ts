@@ -168,8 +168,8 @@ export interface TechActionsView {
   harbor: {
     cost: Resources;
     affordable: boolean;
-    resources: string[];
-    ports: { vertexId: number; resource: string | null }[];
+    /** Your cities on a 3:1 port; `level` 0 = not raised yet, 1 = raised to 2:1 for every resource. */
+    ports: { vertexId: number; level: number }[];
   } | null;
   /** Null until you have Ground work. `hexes` is empty once it is used. */
   groundWork: {
