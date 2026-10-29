@@ -84,7 +84,7 @@ export function createGame(reg: Registry, cfg: GameConfig): GameState {
 
   const order = makeSetupOrder(players.length);
   const g: GameState = {
-    version: 1,
+    version: 2,
     seed,
     rng,
     packs: [...reg.packs],

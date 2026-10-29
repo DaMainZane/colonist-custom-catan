@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { allPacks } from '../src/packs';
 import { moveRobberAction } from '../src/packs/base/actions/robber';
-import { techActionsFor } from '../src/packs/base/techEffects';
+import { portLevel, techActionsFor } from '../src/packs/base/techEffects';
 import {
   createGame,
   createRegistry,
@@ -121,6 +121,8 @@ describe('Tidebound: Harbor charters', () => {
     expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'wheat' })).toBeNull();
 
     action.apply(ctx, 'p1', { vertexId: 0, resource: 'wheat' });
+    expect(g.ext.core.portUpgrades[0]).toEqual({ level: 1, resource: 'wheat', by: 'p1' });
+    expect(portLevel(g, 0)).toBe(1);
     expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2);
     expect(ratioFor(g, reg, 'p1', 'sheep')).toBe(3); // only the chosen resource
     expect(ratioFor(g, reg, 'p2', 'wheat')).toBe(4); // only the owner
@@ -159,6 +161,35 @@ describe('Tidebound: Harbor charters', () => {
     expect(action.validate(ctx, 'p1', { vertexId: 0, resource: 'sheep' })).toBeNull();
     const legal = legalActions(g, reg, 'p1').filter(a => a.type === 'upgrade_port');
     expect(legal.map(a => a.payload.resource).sort()).toEqual(['brick', 'ore', 'sheep', 'wood']); // wheat is already 2:1
+  });
+});
+
+describe('Tidebound: port upgrade level (T1a)', () => {
+  it('a new game is state version 2, and a vertex with no upgrade is level 0', () => {
+    const { g } = makeGame(919);
+    expect(g.version).toBe(2);
+    expect(portLevel(g, 0)).toBe(0);
+    expect(portLevel(g, 99999)).toBe(0);
+  });
+
+  it('an entry from before the level existed counts as level 1 and still lowers the ratio', () => {
+    const { g, reg } = makeGame(921);
+    const v = g.board.vertices[0];
+    v.port = '3:1';
+    v.piece = { type: 'city', owner: 'p1' };
+    g.ext.core = g.ext.core ?? {};
+    g.ext.core.portUpgrades = { 0: { resource: 'wheat', by: 'p1' } };
+    expect(portLevel(g, 0)).toBe(1);
+    expect(ratioFor(g, reg, 'p1', 'wheat')).toBe(2);
+  });
+
+  it('the panel list reports the level of an upgraded port', () => {
+    const { g, reg } = makeGame(922);
+    g.board.vertices[0].port = '3:1';
+    g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
+    grant(g, 'p1', 'tidebound.harbor_charters');
+    g.ext.core.portUpgrades = { 0: { level: 1, resource: 'ore', by: 'p1' } };
+    expect(techActionsFor(g, reg, 'p1').harbor!.ports).toEqual([{ vertexId: 0, resource: 'ore', level: 1 }]);
   });
 });
 
@@ -286,7 +317,7 @@ describe('root tech effects with the tree off', () => {
     g.board.vertices[0].piece = { type: 'city', owner: 'p1' };
     grant(g, 'p1', 'tidebound.harbor_charters');
     const harbor = techActionsFor(g, reg, 'p1').harbor!;
-    expect(harbor.ports).toEqual([{ vertexId: 0, resource: null }]);
+    expect(harbor.ports).toEqual([{ vertexId: 0, resource: null, level: 0 }]);
     expect(harbor.affordable).toBe(false);
     expect(harbor.resources).toEqual(expect.arrayContaining(['wood', 'brick', 'sheep', 'wheat', 'ore']));
   });

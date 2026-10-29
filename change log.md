@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-10-29 (Pass 59: Tidebound T1a, port upgrades get a level; state version 2)
+### Changed
+- **Port upgrade state (`src/packs/base/techEffects.ts`, `actions/techActions.ts`)**: `g.ext.core.portUpgrades[vertexId]` is now `{ level, resource?, by }` (was `{ resource, by }`). `level` is the step on the port ladder: 1 = Raise the Port (3:1 -> 2:1), 2 = Harbor (T8). New `portLevel(g, vertexId)` returns 0 for no upgrade, and counts an entry with no `level` as 1. `upgrade_port` writes `level: 1` and uses `portLevel` for the "already upgraded" check. The tech panel's `harbor.ports` rows gain `level`.
+- **`src/shared/engine.ts`**: new games start at `version: 2`.
+- **`tests/golden.test.ts`**: `version` joins `packs` and `round` in the fields left out of the state hash (it is a schema marker). Snapshot re-recorded once: only the `state` hashes changed.
+- **`tests/techroots.test.ts`**: new stored shape, panel `level`, a legacy entry with no `level` still counts as level 1, and `g.version` is 2.
+### Not changed
+- Play is the same: the player still picks one resource that trades 2:1 (T1b makes it the whole port). `resource` stays on the entry until then. Games with no upgrade carry no `portUpgrades` at all.
+
+## 2026-10-29 (Pass 58: Tidebound T0b, lobby card data, DLC-off test, placeholder ids replaced)
+### Changed
+- **`src/client/render/setup.ts`**: the built-in fallback catalog listed 10 made-up Tidebound addons (`shipwreck`, `flood_warnings`, `lighthouse_sight` and others with old descriptions and links). It now lists the 8 real ids from the pack, with the same names, descriptions and links. The lobby card itself needs no new code: it is drawn from the server manifest (`mapOptionsView`), which has sent `tidebound` since T0a.
+### Added
+- **`tests/tidebound.test.ts`**: manifest (8 addons in order, audit, 2+ links, only rickety bridges has a dependency); lobby data (server DLC and addons, and the client fallback ids must equal the server ids, so placeholders cannot return); DLC off (same new game as a registry without the pack, master switch off by default, a lone addon flag cannot enable it); DLC on (8 addons enabled but no tiles, hooks or rules added, bridges off blocks rickety bridges).
+### Not changed
+- The tech id `tidebound.harbor_charters` in `techRoots.ts` is a tech, not an addon, so it stays until T1 and T11 rework the root.
+- No `g.version` bump (no state shape change).
+
 ## 2026-10-29 (Pass 57: Tidebound T0a, pack skeleton with 8 addon stubs)
 ### Added
 - **`src/packs/tidebound/`**: `index.ts` (`tideboundPack`, `deps: ['base']`, empty `register()`) and one stub file per addon: `tidebound.bridges`, `tidebound.rickety_bridges` (deps bridges), `tidebound.tides`, `tidebound.rising_sea`, `tidebound.harbor`, `tidebound.fishing`, `tidebound.wrecks`, `tidebound.pirates`. Each has a description and 3 to 4 `links` (always at least one General service, so `auditAddons` passes). No `register()` on any addon: no tiles, pieces, actions, hooks or rules.

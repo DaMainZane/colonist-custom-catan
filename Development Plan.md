@@ -54,8 +54,6 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 ### Split step
 | ID   | Step                                                                               | Size |
 | ---- | ---------------------------------------------------------------------------------- | ---- |
-| T0a  | Create src/packs/tidebound/ with 8 addon stubs and links, register in allPacks     | S    |
-| T0b  | Add lobby card, DLC-off test, replace placeholder tidebound.* ids                  | S    |
 | T1a  | Make portUpgrades a level per vertex (state shape, g.version bump)                 | M    |
 | T1b  | Make the root a whole-port 3:1 to 2:1 upgrade in tradeRatio.ts and pricing.ts      | M    |
 | T1c  | Add the 1:1 floor exception for harbors only                                       | S    |

@@ -5,7 +5,7 @@
     "winner": "bot1",
     "turns": 64,
     "steps": 482,
-    "state": "bd6a7beb8e8a8373",
+    "state": "b2947dd844289f30",
     "log": "4ce036d804469b5b"
   },
   "standard-2p-s12": {
@@ -14,7 +14,7 @@
     "winner": "bot2",
     "turns": 73,
     "steps": 343,
-    "state": "1d4f376105ce0210",
+    "state": "3e6a9b85ad2924eb",
     "log": "5d1ce9210eb3ea3c"
   },
   "goldRush-3p-s21": {
@@ -23,7 +23,7 @@
     "winner": "bot1",
     "turns": 79,
     "steps": 545,
-    "state": "83dc502df30b1cbc",
+    "state": "9e64b162619cd888",
     "log": "263bae394fb5fcf1"
   },
   "fogIsland-3p-s31": {
@@ -32,7 +32,7 @@
     "winner": "bot3",
     "turns": 72,
     "steps": 495,
-    "state": "897767ad366115ae",
+    "state": "fd608e1abe86356e",
     "log": "5969d338e7dcf8f1"
   },
   "big-6p-s41": {
@@ -41,7 +41,7 @@
     "winner": "bot3",
     "turns": 74,
     "steps": 796,
-    "state": "d09c0c6d1a99eef4",
+    "state": "5c5899823c8a6153",
     "log": "b6a04f54e1354f4a"
   }
 }

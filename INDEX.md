@@ -180,7 +180,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `render/drawer.ts` | Bottom-left sheet: bank trade, discard, gold, monopoly, robber victim picker |
 | `render/trade.ts` | Stacked trade offers, timers, responses, counter-offer editor |
 | `render/sidebar.ts` | Right sidebar: log, chat, bank, player rows, spectator strip |
-| `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles, active summary strip, player/spectator strip |
+| `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles (server list first, built-in fallback catalog; the Tidebound ids in it must match the pack, see `tidebound.test.ts`), active summary strip, player/spectator strip |
 | `render/overlay.ts` | S0.13 Overlay and popup kit: 6 colorblind-safe SVG hex overlays, timer-bar popup stack, event title cards, round-end recap card |
 | `render/turnclock.ts` | Turn clock readout and countdown bar |
 | `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree (one spoke per branch, one ring per tier, built from the server's `techTree` rows), costs as mini resource cards, description on hover, Harbor charters and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
@@ -208,6 +208,7 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `mapmenu.test.ts` | Map menu data and presets v2 |
 | `mapbudget.test.ts` | Generation time budget |
 | `addons.test.ts` | DLC and addon manifest, enabled sets, keyed registries, Rule of Two audit |
+| `tidebound.test.ts` | Tidebound skeleton (T0): 8 addons and links, lobby card data from the manifest, client fallback catalog matches the server ids, DLC off changes nothing, DLC on registers no content yet |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
 | `score.test.ts` | `score()`, `publicVP()`, score modes, `checkWinner` |

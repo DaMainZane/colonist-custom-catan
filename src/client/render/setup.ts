@@ -23,11 +23,9 @@ const CATALOG_DLCS: DlcInfoView[] = [
       'tidebound.tides',
       'tidebound.rising_sea',
       'tidebound.harbor',
-      'tidebound.shipwreck',
-      'tidebound.flood_warnings',
       'tidebound.fishing',
-      'tidebound.pirates',
-      'tidebound.lighthouse_sight'
+      'tidebound.wrecks',
+      'tidebound.pirates'
     ]
   },
   {
@@ -108,16 +106,14 @@ const CATALOG_DLCS: DlcInfoView[] = [
 
 const CATALOG_ADDONS: AddonInfoView[] = [
   // 3. Tidebound
-  { id: 'tidebound.bridges', name: 'Bridges', description: 'Water road requiring +1 ore to build (base limit 10, 2x cost above base).', pack: 'tidebound', deps: [], links: [{ target: 'piece-cost', kind: 'mechanic' }, { target: 'bot-goals', kind: 'bot' }] },
-  { id: 'tidebound.rickety_bridges', name: 'Rickety Bridges', description: 'Cheaper bridges that risk collapsing on a 7 or bad roll.', pack: 'tidebound', deps: ['tidebound.bridges'], links: [{ target: 'durability', kind: 'mechanic' }, { target: 'seven-resolver', kind: 'mechanic' }] },
-  { id: 'tidebound.tides', name: 'Tides', description: 'Coastal tiles flood periodically and produce nothing while flooded.', pack: 'tidebound', deps: [], links: [{ target: 'tile-state', kind: 'mechanic' }, { target: 'round-clock', kind: 'mechanic' }] },
-  { id: 'tidebound.rising_sea', name: 'Rising Sea', description: 'Tiles drown from the edges inward by lowest elevation; walls stop it and last land wins.', pack: 'tidebound', deps: ['tidebound.tides'], links: [{ target: 'tile-state', kind: 'mechanic' }, { target: 'round-clock', kind: 'mechanic' }] },
-  { id: 'tidebound.harbor', name: 'Harbor Upgrade', description: 'Upgrade a port next to a city for better trade ratios (3:1 to 2:1) and tide protection.', pack: 'tidebound', deps: [], links: [{ target: 'trade-ratio', kind: 'mechanic' }, { target: 'piece-cost', kind: 'mechanic' }] },
-  { id: 'tidebound.shipwreck', name: 'Shipwreck Salvage', description: 'Storm events spawn sea and shore wrecks; first bridge, port or road next to it claims the loot.', pack: 'tidebound', deps: [], links: [{ target: 'marker', kind: 'mechanic' }, { target: 'event-deck', kind: 'content' }] },
-  { id: 'tidebound.flood_warnings', name: 'Flood Warnings', description: 'Patterned blue tint previews coastal floods one round ahead.', pack: 'tidebound', deps: ['tidebound.tides'], links: [{ target: 'overlay', kind: 'ui' }, { target: 'bot-goals', kind: 'bot' }] },
-  { id: 'tidebound.fishing', name: 'Fishing', description: 'Coastal settlements and fish nets catch wild fish tokens (spendable as any 1 resource).', pack: 'tidebound', deps: [], links: [{ target: 'wild-token', kind: 'mechanic' }, { target: 'production', kind: 'mechanic' }] },
-  { id: 'tidebound.pirates', name: 'Pirates', description: 'Event spawns a pirate wreck requiring army strength to defeat and salvage.', pack: 'tidebound', deps: ['tidebound.shipwreck'], links: [{ target: 'strength', kind: 'mechanic' }, { target: 'marker', kind: 'mechanic' }] },
-  { id: 'tidebound.lighthouse_sight', name: 'Lighthouse Tide Sight', description: 'Owning a Lighthouse landmark reveals flood and storm previews an extra round ahead.', pack: 'tidebound', deps: ['tidebound.flood_warnings'], links: [{ target: 'overlay', kind: 'ui' }, { target: 'round-clock', kind: 'mechanic' }] },
+  { id: 'tidebound.bridges', name: 'Bridges', description: 'Roads across the sea. Both ends must touch ocean; they count toward Longest Road.', pack: 'tidebound', deps: [], links: [{ target: 'piece-cost', kind: 'mechanic' }, { target: 'history', kind: 'mechanic' }, { target: 'bot-goals', kind: 'bot' }] },
+  { id: 'tidebound.rickety_bridges', name: 'Rickety bridges', description: 'A cheap bridge with 1 health that collapses on a 7. Upgrade it to a full bridge later.', pack: 'tidebound', deps: ['tidebound.bridges'], links: [{ target: 'durability', kind: 'mechanic' }, { target: 'seven-resolver', kind: 'mechanic' }, { target: 'overlay', kind: 'ui' }, { target: 'tidebound.bridges', kind: 'content' }] },
+  { id: 'tidebound.tides', name: 'Tides', description: 'Coast tiles flood on a seeded schedule and produce nothing while flooded. Higher ground resists.', pack: 'tidebound', deps: [], links: [{ target: 'round-clock', kind: 'mechanic' }, { target: 'tile-state', kind: 'mechanic' }, { target: 'production', kind: 'mechanic' }, { target: 'overlay', kind: 'ui' }] },
+  { id: 'tidebound.rising_sea', name: 'Rising sea', description: 'Land drowns from the lowest ground up. Bridges become the only roads. Works alone or with Tides.', pack: 'tidebound', deps: [], links: [{ target: 'tile-state', kind: 'mechanic' }, { target: 'round-clock', kind: 'mechanic' }, { target: 'tidebound.tides', kind: 'content' }] },
+  { id: 'tidebound.harbor', name: 'Harbor', description: 'Upgrade a port to a harbor for 1:1 trades. One per player, and it keeps working while flooded.', pack: 'tidebound', deps: [], links: [{ target: 'trade-ratio', kind: 'mechanic' }, { target: 'piece-cost', kind: 'mechanic' }, { target: 'tidebound.tides', kind: 'mechanic' }] },
+  { id: 'tidebound.fishing', name: 'Fishing', description: 'Nets on the coast catch fish, a token that counts as any one resource. Fish icons on the sea boost the catch.', pack: 'tidebound', deps: [], links: [{ target: 'wild-token', kind: 'mechanic' }, { target: 'marker', kind: 'mechanic' }, { target: 'piece-cost', kind: 'mechanic' }, { target: 'tidebound.tides', kind: 'content' }] },
+  { id: 'tidebound.wrecks', name: 'Shipwreck salvage', description: 'A storm leaves a wreck at sea or on the shore. The first road, bridge or port to reach it claims the loot.', pack: 'tidebound', deps: [], links: [{ target: 'marker', kind: 'mechanic' }, { target: 'event-deck', kind: 'content' }, { target: 'overlay', kind: 'ui' }, { target: 'tidebound.bridges', kind: 'mechanic' }] },
+  { id: 'tidebound.pirates', name: 'Pirates', description: 'Up to 2 pirates roam the ocean and rob coastal settlements. Beating one takes knights, and it pays more than a wreck.', pack: 'tidebound', deps: [], links: [{ target: 'strength', kind: 'mechanic' }, { target: 'marker', kind: 'mechanic' }, { target: 'bot-goals', kind: 'bot' }, { target: 'tidebound.wrecks', kind: 'content' }] },
 
   // 4. Bulwark
   { id: 'bulwark.walls', name: 'Walls & Zone Control', description: 'Build wall rings on edges to enclose territory; controller taxes outside production (~30%).', pack: 'bulwark', deps: [], links: [{ target: 'tile-state', kind: 'mechanic' }, { target: 'production', kind: 'mechanic' }] },

@@ -24,8 +24,9 @@ const FILE = join(__dirname, 'golden.snapshot.json');
 const sha = (v: unknown): string => createHash('sha256').update(JSON.stringify(v)).digest('hex').slice(0, 16);
 
 /** Fields that later services add to the state. They are left out of the hash so a new service does not break the baseline; what they change in play still does.
- *  `packs` is the list of loaded pack ids: a new DLC pack (even with the DLC off) changes it, but not how the game plays (log, steps and turns stay hashed). */
-const ADDED_FIELDS = ['round', 'packs'];
+ *  `packs` is the list of loaded pack ids: a new DLC pack (even with the DLC off) changes it, but not how the game plays (log, steps and turns stay hashed).
+ *  `version` is the state schema marker (2 since T1a, when port upgrades got a `level`): a bump says the saved shape changed, not that play did. */
+const ADDED_FIELDS = ['round', 'packs', 'version'];
 function stateHash(g: any): string {
   const copy: any = { ...g };
   for (const k of ADDED_FIELDS) delete copy[k];

@@ -58,15 +58,26 @@ export const roadLevyModifier: CostModifier = {
 
 // ---- Tidebound: Harbor charters -------------------------------------------
 
-/** One upgraded harbor: the resource that now trades 2:1 there, and who upgraded it. */
+/**
+ * One upgraded port vertex (`g.ext.core.portUpgrades[vertexId]`).
+ * `level` is the step on the port ladder: 1 = Raise the Port (3:1 -> 2:1), 2 = Harbor (2:1 -> 1:1, arrives in T8).
+ * `resource` is the one resource that trades 2:1 at a level 1 port. It goes away in T1b, when the root upgrades the whole port.
+ */
 export interface PortUpgrade {
-  resource: string;
+  level: number;
+  resource?: string;
   by: Id;
 }
 
 /** Upgraded harbors by vertex id (`g.ext.core.portUpgrades`). Empty in every game where nobody upgraded. */
 export function portUpgrades(g: GameState): Record<number, PortUpgrade> {
   return g.ext?.core?.portUpgrades ?? {};
+}
+
+/** Ladder step of the upgrade on a vertex: 0 = not upgraded. An entry with no `level` (state from before T1a) counts as 1. */
+export function portLevel(g: GameState, vertexId: number): number {
+  const up = portUpgrades(g)[vertexId];
+  return up ? Math.max(1, Math.floor(Number(up.level)) || 1) : 0;
 }
 
 /**
@@ -143,7 +154,7 @@ export interface TechActionsView {
     cost: Resources;
     affordable: boolean;
     resources: string[];
-    ports: { vertexId: number; resource: string | null }[];
+    ports: { vertexId: number; resource: string | null; level: number }[];
   } | null;
   /** Null until the player has Ground work. `hexes` is empty once it is used. */
   groundWork: {
@@ -159,10 +170,10 @@ export function techActionsFor(g: GameState, reg: Registry, pid: Id): TechAction
   let harbor: TechActionsView['harbor'] = null;
   if (p && hasTech(g, pid, TECH_HARBOR_CHARTERS)) {
     const ups = portUpgrades(g);
-    const ports: { vertexId: number; resource: string | null }[] = [];
+    const ports: { vertexId: number; resource: string | null; level: number }[] = [];
     for (const v of g.board.vertices) {
       if (v.piece?.owner !== pid || v.piece.type !== CITY || v.port !== GENERIC_PORT) continue;
-      ports.push({ vertexId: v.id, resource: ups[v.id]?.resource ?? null });
+      ports.push({ vertexId: v.id, resource: ups[v.id]?.resource ?? null, level: portLevel(g, v.id) });
     }
     harbor = { cost: HARBOR_UPGRADE_COST, affordable: canAfford(p, HARBOR_UPGRADE_COST), resources: [...reg.resources.keys()], ports };
   }

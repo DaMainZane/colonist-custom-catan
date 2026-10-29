@@ -7,7 +7,7 @@ import {
   groundWorkSourceError,
   groundWorkUsed,
   HARBOR_UPGRADE_COST,
-  portUpgrades,
+  portLevel,
   rollTileNumber,
   TECH_GROUND_WORK,
   TECH_HARBOR_CHARTERS
@@ -16,7 +16,7 @@ import {
 /**
  * Harbor charters: a city on a 3:1 port becomes a 2:1 port for one resource of the player's choice.
  * The port id on the vertex does not change; the upgrade is stored in `g.ext.core.portUpgrades[vertexId]`
- * and read by the trade ratio modifier in `techEffects.ts`.
+ * as `{ level: 1, resource, by }` (level = step on the port ladder) and read by the trade ratio modifier in `techEffects.ts`.
  */
 export const upgradePortAction: ActionDef = {
   type: 'upgrade_port',
@@ -29,7 +29,7 @@ export const upgradePortAction: ActionDef = {
     if (!v) return 'Choose a harbor city';
     if (!v.piece || v.piece.owner !== pid || v.piece.type !== CITY) return 'A harbor upgrade needs your own city';
     if (v.port !== GENERIC_PORT) return 'Only a 3:1 port can be upgraded';
-    if (portUpgrades(g)[v.id]) return 'That port is already upgraded';
+    if (portLevel(g, v.id) >= 1) return 'That port is already upgraded';
     const resource = String(payload?.resource ?? '');
     if (!reg.resources.has(resource)) return 'Choose a resource for the 2:1 port';
     if (ratioFor(g, reg, pid, resource) <= 2) return `You already trade ${resource} at 2:1`;
@@ -44,7 +44,7 @@ export const upgradePortAction: ActionDef = {
     g.ext = g.ext || {};
     g.ext.core = g.ext.core || {};
     g.ext.core.portUpgrades = g.ext.core.portUpgrades || {};
-    g.ext.core.portUpgrades[payload.vertexId] = { resource, by: pid };
+    g.ext.core.portUpgrades[payload.vertexId] = { level: 1, resource, by: pid };
     p.stats.portsUpgraded = (p.stats.portsUpgraded || 0) + 1;
     ctx.emit('portUpgraded', { playerId: pid, vertexId: payload.vertexId, resource });
     ctx.log(`⚓ ${p.avatar} ${p.name} upgraded a harbor: ${resource} now trades 2:1`, p.color);
