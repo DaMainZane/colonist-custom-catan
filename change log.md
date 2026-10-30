@@ -1,6 +1,6 @@
 # Change Log
 
-## 2026-10-30 (Pass 79: Tidebound T10a pirate marker, T10b strength and drive off, T10c rob 2x, T10d flee mode and avoiding stronger players; typecheck and tests NOT run yet)
+## 2026-10-30 (Pass 79: Tidebound T10a pirate marker, T10b strength and drive off, T10c rob 2x, T10d flee mode and avoiding stronger players; typecheck and tests ran and yield no error)
 ### Added
 - **T10a Pirate marker, max 2, ocean only, random move (`src/packs/tidebound/pirates.ts`)**:
   - `tidebound.pirate_raid` event card in `EVENT_CARDS` (1 copy); when `rules.eventsOn` is off, `onRoundStart` spawns the first pirate on round `PIRATE_FIRST_ROUND = 4`, then every `PIRATE_CADENCE_ROUNDS = 4`.
