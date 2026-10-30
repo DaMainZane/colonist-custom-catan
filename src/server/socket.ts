@@ -735,6 +735,8 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('spendFish', safe(({ code, resource }) => act(code, 'spend_fish', { resource }, true)));
     // Tidebound T7e: pay 1 wheat to fill the fish icon of a sea tile next to one of your nets.
     socket.on('feedSea', safe(({ code, hexId }) => act(code, 'feed_sea', { hexId }, true)));
+    // Tidebound T10b: drive a pirate off its tile (needs played knights and a road, bridge or port touching it).
+    socket.on('drivePirate', safe(({ code, hexId }) => act(code, 'drive_off_pirate', { hexId }, true)));
     socket.on('discardCards', safe(({ code, discards, wild }) => act(code, 'discard', { cards: discards, wild })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {

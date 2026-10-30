@@ -107,7 +107,8 @@ describe('Tidebound on', () => {
     expect(reg.capabilities.has('crossing')).toBe(true);
     expect(reg.pieces.get(BRIDGE)).toBeDefined();
     expect(reg.rules.pieceLimits[BRIDGE]).toBe(BRIDGE_BASE_LIMIT);
-    expect(reg.hooks.onTurnStart.length).toBe(base.hooks.onTurnStart.length);
+    // Harbor (T8b) adds one onTurnStart hook (it resets the per-turn 1:1 trade count); nothing else in the pack does.
+    expect(reg.hooks.onTurnStart.length).toBe(base.hooks.onTurnStart.length + 1);
   });
 
   it('switching bridges off blocks rickety bridges, which the lobby prompts for', () => {

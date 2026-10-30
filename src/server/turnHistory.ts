@@ -305,6 +305,55 @@ export function recordTurnHistory(
         break;
       }
 
+      case 'pirateSpawned': {
+        turnSummary.actions.push({
+          category: 'event',
+          icon: '🏴‍☠️',
+          badge: `Strength ${d.strength}`,
+          text: `A pirate ship appeared on tile #${d.hexId}`,
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'pirateRobbed': {
+        const victim = g.players.find(x => x.id === d.victimId);
+        const n = Number(d.amount) || 0;
+        turnSummary.actions.push({
+          category: 'rob',
+          icon: '🏴‍☠️',
+          badge: n > 0 ? `-${n}` : 'Raid',
+          text: n > 0
+            ? `Pirates robbed ${victim?.name || 'a player'} of ${n} card${n === 1 ? '' : 's'}`
+            : `Pirates raided ${victim?.name || 'a player'}, but found no cards`,
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'pirateFleeing': {
+        turnSummary.actions.push({
+          category: 'event',
+          icon: '⛵',
+          badge: 'Fleeing',
+          text: 'A pirate ship ran for open water',
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'pirateDriven': {
+        const driver = g.players.find(x => x.id === d.playerId);
+        turnSummary.actions.push({
+          category: 'event',
+          icon: '⚔️',
+          badge: 'Pirate',
+          text: `${driver?.name || 'A player'} drove off a pirate ship (strength ${d.strength}) and took ${d.amount} ${d.resource}`,
+          timestamp: now
+        });
+        break;
+      }
+
       case 'awardChanged': {
         const name = d.award === 'longestRoad' ? 'Longest Road' : d.award === 'largestArmy' ? 'Largest Army' : d.award;
         const val = d.value ?? d.count;

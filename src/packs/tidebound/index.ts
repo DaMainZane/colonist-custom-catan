@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -137,6 +137,55 @@ export {
   tidesAddon
 } from './tides';
 export type { TideClientView, TideCluster, TideLevelDef, TideState, TideWarning } from './tides';
+
+export {
+  DRIVE_OFF_PIRATE,
+  PIRATE_AVOID_RADIUS,
+  PIRATE_BASE_STRENGTH,
+  PIRATE_CADENCE_ROUNDS,
+  PIRATE_CREW_KNIGHT_DISCOUNT,
+  PIRATE_CREW_LOOT_MULT,
+  PIRATE_EVENT_ID,
+  PIRATE_FIRST_ROUND,
+  PIRATE_FLEE_BASE,
+  PIRATE_FLEE_CLOSE_STEP,
+  PIRATE_FLEE_DISTANCE,
+  PIRATE_FLEE_MAX,
+  PIRATE_FLEE_ROB_STEP,
+  PIRATE_FLEE_STEPS,
+  PIRATE_GROWTH_ROUNDS,
+  PIRATE_LOOT_BASE,
+  PIRATE_MARKER_KIND,
+  PIRATE_MAX,
+  PIRATE_MAX_STRENGTH,
+  PIRATE_ROB_CARDS,
+  activePirates,
+  canDrivePirate,
+  derivePirateRng,
+  drivablePirateHexIds,
+  driveOffPirateAction,
+  ensurePirateRng,
+  guardedVertices,
+  hexVertexDistance,
+  isGuardedHex,
+  passivePirateSpawn,
+  pirateAt,
+  pirateBotGoal,
+  pirateClientView,
+  pirateContactVertices,
+  pirateDriveView,
+  pirateKnights,
+  pirateKnightsNeeded,
+  pirateLootCards,
+  pirateRaidCard,
+  pirateRoundStep,
+  pirateSpawnCandidates,
+  pirateStrengthAt,
+  piratesAddon,
+  seaNeighborIds,
+  spawnPirate
+} from './pirates';
+export type { PirateClientItem, PirateMode, PiratePayload } from './pirates';
 
 export {
   SALVAGE_CREW_LOOT_MULT,

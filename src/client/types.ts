@@ -41,6 +41,8 @@ export interface PlayerView {
   harborsLeft?: number;
   /** Remaining 1:1 trades across your harbors this turn (max 4 per harbor per turn, T8b). */
   harborTradesLeft?: number;
+  /** Tiles of the pirates you could drive off right now (Tidebound T10b). Only sent to you on your main-phase turn; `[]` when none, undefined unless pirates are in the game. */
+  pirateDrives?: number[];
   vp: number;
   /** What other players see (differs from `vp` only for your own hidden VP cards). */
   publicVp?: number;
@@ -109,7 +111,7 @@ export interface RecentTransfer {
   to: string;
   resource: string;
   amount: number;
-  kind: 'steal' | 'playerTrade' | 'bankTrade' | 'buyDev' | 'discard' | 'monopoly' | 'gold';
+  kind: 'steal' | 'playerTrade' | 'bankTrade' | 'buyDev' | 'discard' | 'monopoly' | 'gold' | 'pirate';
   secretForOthers?: boolean;
 }
 
@@ -190,8 +192,17 @@ export interface GameState {
   portLevels?: Record<number, number> | null;
   /** Tidebound shipwrecks (T9): active wreck markers on sea or shore tiles. Null when Wrecks is off or no wrecks are active. */
   wrecks?: WreckView[] | null;
+  /** Tidebound pirates (T10): ships on the ocean with their strength (played knights needed) and mode. Null when Pirates is off or none are out. */
+  pirates?: PirateView[] | null;
   /** Tidebound Tides (T6): tide facts for the title card, the warning and the heat map. Null when Tides is off. */
   tide?: TideView | null;
+}
+
+export interface PirateView {
+  id: string;
+  hexId: number;
+  strength: number;
+  mode: 'roam' | 'flee';
 }
 
 export interface WreckView {

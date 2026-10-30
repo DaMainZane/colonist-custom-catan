@@ -27,7 +27,8 @@ Rewritten 2026-10-28. Tidebound is the first full DLC and is split into chunks b
 - **T7b2 nets client, done 2026-10-30 (typecheck and tests passed, Pass 75).** `netSpotsView` (server list of legal vertices, sent as `netSpots` to the player on their main-phase turn), no net on a port vertex (`ratioFor` would give it a port), `netBotGoal` (side build, max 3 nets, price + 2 spare cards, prefers fish-icon sea), `clickVertex` with `piece: 'net'`, Net button with recipe popup and supply badge, net build mode with dashed diamond spots, net drawing, `net` icon. Tests: `tests/tideboundnetsclient.test.ts`. **T7b is closed.**
 - **T7c fish icon boosts, T7d tide replenish and T7e feed the sea, done 2026-10-30 (typecheck and tests passed, Pass 76). T7 is closed.** A sea tile at a net with boosts left (`ext.fish`, 0 to 4) doubles that net's catch chance (1 in 6 to 1 in 3) and each boosted catch uses up one boost of the richest such tile (the icon stays at 0). Tides refill icons that already exist, slowly (`FISH_REPLENISH_CHANCE`: 0.2 a round on a normal tide, 0.45 on a spring tide, hash draw, no `g.rng`). Feed the sea (`feed_sea`, 1 wheat) sets an open sea tile next to one of your nets to full (4), including one with no icon yet. Server: `fishIcons` public, `feedSpots` and `feedCost` yourself only, socket `feedSea`. Client: fish with pips drawn on the sea, Feed button and feed mode. Tests: `tests/tideboundfishgrounds.test.ts`.
 - **T8a Harbor 1:1 upgrade, limit 1, works while flooded, and T8b max 4 trades/turn + invalid-ratio prompt, done 2026-10-30 (typecheck and tests passed, Pass 77). T8 is closed.** `upgrade_harbor` (`tidebound.harbor`, cost 2 wood + 1 brick + 1 ore via `priceOfUpgrade`) upgrades a player's own `city` on a port (`3:1` generic or `2:1` resource) to `HARBOR_LEVEL = 2` (`1:1` via `HARBOR_RATIO_MODS`), limit 1 per player (`HARBOR_LIMIT = 1`, or 2 with `tidebound.harbor_empire`), exempt from flood idleness (`PORT_IDLE_CHECKS` `exempt` hook and `isPortFlooded`), capped at `HARBOR_MAX_TRADES = 4` `1:1` trades per turn per harbor before falling back to `2:1` for the rest of the turn (resetting on `onTurnStart`), with harbor explanations in `explainInvalidBankRatio` and client `bankTradeAdvice`, board `1:1`/`2:1` port badge updates, `#btnBuildHarbor` UI, and `harborBotGoal`. Tests: `tests/tideboundharbor.test.ts`.
-- **T9 Wrecks (T9a to T9e), done 2026-10-30 (typecheck and tests passed, Pass 78). T9 is closed.** `tidebound.wrecks` registers `tidebound.storm` in `EVENT_CARDS` (plus a passive storm cadence every 3 rounds from round 3 when `eventsOn` is off) using an independent derived RNG stream (`deriveWreckRng`, zero `g.rng` draws), spawns timed `wreck` markers (`countdown: 4`), rolls 65/35 sea vs shore (`WRECK_SEA_CHANCE = 0.65`) on fair equidistant tiles within `WRECK_MAX_PLAYER_DIST = 4` hexes of a player, claims immediately on the first connecting road, bridge, rickety bridge, or port (or on spawn if already connected), pays 3–5 cards (sea, plus fish/dev bonus drop chance) or 1–2 cards (shore) scaled up to +40% over 50 turns (`wreckTimeMultiplier`), +25% with `tidebound.salvage_crew`, and never less than `builtCostCards + 1` (the 2x-cost floor rule), with `wreckBotGoal`, `wreckClientView` (`shoreDir` toward the sea), and two distinct SVG/CSS spawn animations (`wreck-spawn-sea-anim` whirlpool vs `wreck-spawn-shore-anim` surf wash). Tests: `tests/tideboundwrecks.test.ts`. **T10 Pirates is next.**
+- **T9 Wrecks (T9a to T9e), done 2026-10-30 (typecheck and tests passed, Pass 78). T9 is closed.** `tidebound.wrecks` registers `tidebound.storm` in `EVENT_CARDS` (plus a passive storm cadence every 3 rounds from round 3 when `eventsOn` is off) using an independent derived RNG stream (`deriveWreckRng`, zero `g.rng` draws), spawns timed `wreck` markers (`countdown: 4`), rolls 65/35 sea vs shore (`WRECK_SEA_CHANCE = 0.65`) on fair equidistant tiles within `WRECK_MAX_PLAYER_DIST = 4` hexes of a player, claims immediately on the first connecting road, bridge, rickety bridge, or port (or on spawn if already connected), pays 3–5 cards (sea, plus fish/dev bonus drop chance) or 1–2 cards (shore) scaled up to +40% over 50 turns (`wreckTimeMultiplier`), +25% with `tidebound.salvage_crew`, and never less than `builtCostCards + 1` (the 2x-cost floor rule), with `wreckBotGoal`, `wreckClientView` (`shoreDir` toward the sea), and two distinct SVG/CSS spawn animations (`wreck-spawn-sea-anim` whirlpool vs `wreck-spawn-shore-anim` surf wash). Tests: `tests/tideboundwrecks.test.ts`.
+- **T10 Pirates (T10a to T10d), written 2026-10-30; typecheck and tests NOT run yet (Pass 79). T11 starts once they pass.** `tidebound.pirates`: `tidebound.pirate_raid` event card plus a passive spawn (round 4, then every 4th, when `eventsOn` is off), public `pirate` markers (max 2, ocean only, within 4 tiles of a player, derived RNG `derivePirateRng`, zero `g.rng` draws), one random step a round, strength 1 growing by 1 every 6 rounds after round 4 (cap 5), `drive_off_pirate` (played knights equal to the strength and a road, bridge or port touching the tile; loot `4 + strength` cards from the bank), rob 2 cards from every settlement and city in contact (`transferred` kind `pirate`), flee mode (chance 0.1, +0.3 after every rob, up to +0.3 more when the victim's knights are close; runs 2 tiles from the robbed city, no robbing on the way), and a 2-tile keep-clear rule around players with more knights than its strength. Client: `render/pirates.ts` ship with a strength badge, a ring and click on the ones you can drive off, `pirates` and `pirateDrives` in the `gameState`, socket `drivePirate`; turn history lines; `pirateBotGoal`. Salvage crew discounts read through `hasTech` (T11 registers the node). Tests: `tests/tideboundpirates.test.ts`.
 
 ---
 
@@ -71,29 +72,25 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 | T14 | Balance gate    | Sim matrix: Tidebound on/off x tree on/off at 25+ VP. Check Grand Causeway swing and tier prices.                                                                                                                  | sim matrix                          |
 
 ### Split step
-| ID   | Step                                                                              | Size |
-| ---- | --------------------------------------------------------------------------------- | ---- |
-| T10a | Pirate marker, max 2, ocean only, random move                                     | M    |
-| T10b | Strength grows slowly, knights needed to drive off                                | M    |
-| T10c | Rob 2x                                                                            | S    |
-| T10d | Flee mode, avoid stronger players                                                 | M    |
-| T11a | path field, fork layout, cost divisor fix                                         | M    |
-| T11b | techGate helper                                                                   | S    |
-| T11c | Register nodes 1-3 and gate their features                                        | M    |
-| T11d | Register nodes 4-6 and gate their features                                        | M    |
-| T11e | Register nodes 7-9 and gate their features                                        | M    |
-| T11f | Demolish-bridge action, Grand Causeway, Harbor empire                             | L    |
-| T12a | Drown lowest elevation first                                                      | M    |
-| T12b | Make it optional with Tides, add settings                                         | S    |
-| T13a | Flood exposure in scoreVertex                                                     | M    |
-| T13b | Salvage goal                                                                      | M    |
-| T13c | Port and net placement                                                            | M    |
-| T13d | Pirate avoidance                                                                  | M    |
-| T13e | Tech research                                                                     | M    |
-| T13f | Public-info-only dialogue lines                                                   | S    |
-| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP                       | M    |
-| T14b | Check Grand Causeway swing                                                        | S    |
-| T14c | Tune tier prices                                                                  | S    |
+| ID   | Step                                                        | Size |
+| ---- | ----------------------------------------------------------- | ---- |
+| T11a | path field, fork layout, cost divisor fix                   | M    |
+| T11b | techGate helper                                             | S    |
+| T11c | Register nodes 1-3 and gate their features                  | M    |
+| T11d | Register nodes 4-6 and gate their features                  | M    |
+| T11e | Register nodes 7-9 and gate their features                  | M    |
+| T11f | Demolish-bridge action, Grand Causeway, Harbor empire       | L    |
+| T12a | Drown lowest elevation first                                | M    |
+| T12b | Make it optional with Tides, add settings                   | S    |
+| T13a | Flood exposure in scoreVertex                               | M    |
+| T13b | Salvage goal                                                | M    |
+| T13c | Port and net placement                                      | M    |
+| T13d | Pirate avoidance                                            | M    |
+| T13e | Tech research                                               | M    |
+| T13f | Public-info-only dialogue lines                             | S    |
+| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP | M    |
+| T14b | Check Grand Causeway swing                                  | S    |
+| T14c | Tune tier prices                                            | S    |
 Each chunk adds minimal bot support (reads costs and ratios through services, no crashes). T13 is the tuning pass.
 
 **Left for other DLCs (hooks only):** robber/knight blocks harbor (Warlords), wall +1 elevation (Bulwark), bog and silt (Wild Earth), Lighthouse sight (Wild Earth), sea caravans (Guildhall).

@@ -17,6 +17,8 @@ import {
   harborTradesLeft,
   harborUpgradeCost,
   netSpotsView,
+  pirateClientView,
+  pirateDriveView,
   tideClientView,
   wreckClientView
 } from '../packs/tidebound';
@@ -127,6 +129,8 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     harborSpots: self ? harborSpotsView(g, reg, p) : undefined,
     harborsLeft: harborsOn ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
     harborTradesLeft: self && harborsOn && harborCount(g, p.id) > 0 ? harborTradesLeft(g, p.id) : undefined,
+    // Pirates (T10b): the tiles of the pirates you could drive off right now (yourself, on your main-phase turn). Undefined unless the action is in the game.
+    pirateDrives: self ? pirateDriveView(g, reg, p) : undefined,
     stats: {
       resourcesEarned: p.stats.earned || 0,
       tradesMade: p.stats.trades || 0,
@@ -284,11 +288,14 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   const portLevels = g ? harborClientView(g) : null;
   // Active shipwrecks (T9): public wreck markers on sea or shore tiles. Null when Wrecks is off or no wrecks are active.
   const wrecks = g ? wreckClientView(g, gameRegistry(g.rules)) : null;
+  // Active pirates (T10): public markers with their strength and mode. Null when Pirates is off or none are out.
+  const pirates = g ? pirateClientView(g, gameRegistry(g.rules)) : null;
 
   const shared = {
     fishIcons,
     portLevels,
     wrecks,
+    pirates,
     hexOverlays: tideView ? tideView.overlays : null,
     tide: tideView ? tideView.tide : null,
     code: room.code,

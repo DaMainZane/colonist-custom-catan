@@ -28,6 +28,7 @@ import { overlayPatternDefsMarkup, renderElevationMarkup, renderHexOverlaysMarku
 import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
 import { openBridgePicker } from './bridgepicker';
+import { renderPiratesMarkup } from './pirates';
 
 const knownRoads = new Set<number>();
 const knownRoadPieces = new Map<number, { owner: string; pieceType: string }>();
@@ -68,6 +69,7 @@ let lastOverlayHtml = '';
 // Same for the fish icons on the sea (T7c): rewritten only when their markup changes.
 let lastFishHtml = '';
 let lastWrecksHtml = '';
+let lastPiratesHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -200,6 +202,7 @@ function ensureBoardLayers(svg: HTMLElement): {
   overlayLayer: HTMLElement;
   fishLayer: Element;
   wrecksLayer: Element;
+  piratesLayer: Element;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -216,6 +219,7 @@ function ensureBoardLayers(svg: HTMLElement): {
       <g id="boardOverlayLayer"></g>
       <g id="boardFishLayer"></g>
       <g id="boardWrecksLayer"></g>
+      <g id="boardPiratesLayer"></g>
       <g id="boardHexDynamicLayer"></g>
       <g id="boardPortsLayer"></g>
       <g id="roadHighlightLayer"></g>
@@ -231,6 +235,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastOverlayHtml = '';
     lastFishHtml = '';
     lastWrecksHtml = '';
+    lastPiratesHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
@@ -250,11 +255,20 @@ function ensureBoardLayers(svg: HTMLElement): {
     fishLayer.after(wrecksLayer);
     lastWrecksHtml = '';
   }
+  // Same for the pirates layer (T10).
+  let piratesLayer: Element | null = document.getElementById('boardPiratesLayer');
+  if (!piratesLayer) {
+    piratesLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    piratesLayer.id = 'boardPiratesLayer';
+    wrecksLayer.after(piratesLayer);
+    lastPiratesHtml = '';
+  }
   return {
     terrainLayer,
     overlayLayer: document.getElementById('boardOverlayLayer')!,
     fishLayer,
     wrecksLayer,
+    piratesLayer,
     portsLayer: document.getElementById('boardPortsLayer')!,
     hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
     roadRimsLayer: document.getElementById('roadRimsLayer')!,
@@ -686,6 +700,17 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   if (wrecksHtml !== lastWrecksHtml) {
     lastWrecksHtml = wrecksHtml;
     layers.wrecksLayer.innerHTML = wrecksHtml;
+  }
+
+  // Pirates (T10): one ship per pirate on its sea tile with a strength badge. On your main-phase turn the ones you can drive off (the server's `pirateDrives`) get a ring and a click.
+  const piratesHtml = renderPiratesMarkup(
+    state.pirates || [],
+    hexes,
+    isMyTurn && state.phase === 'MAIN' && me ? (me.pirateDrives ?? []) : []
+  );
+  if (piratesHtml !== lastPiratesHtml) {
+    lastPiratesHtml = piratesHtml;
+    layers.piratesLayer.innerHTML = piratesHtml;
   }
 
   // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.
@@ -1463,14 +1488,19 @@ function getTransferTargetEl(actorId: string, resource: string, kind: string): H
   return document.getElementById(`playerRow_${actorId}`);
 }
 
+/** Transfers that feel like being robbed: a robber steal, a Monopoly, and (Tidebound T10) a pirate raid, whose cards go to the bank. */
+function isRobKind(kind: string): boolean {
+  return kind === 'steal' || kind === 'monopoly' || kind === 'pirate';
+}
+
 export function triggerCardTransferAnimations(transfers: any[]): void {
   if (!transfers || transfers.length === 0) return;
 
   const flightMs = 720;
   const cardStackStepMs = 95;
 
-  const hasSteal = transfers.some(t => t.kind === 'steal' || t.kind === 'monopoly');
-  const iWasRobbed = transfers.some(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
+  const hasSteal = transfers.some(t => isRobKind(t.kind));
+  const iWasRobbed = transfers.some(t => isRobKind(t.kind) && t.from === socket.id);
   const hasTrade = transfers.some(t => t.kind === 'playerTrade' || t.kind === 'bankTrade');
   const hasBuyDev = transfers.some(t => t.kind === 'buyDev');
   const hasDiscard = transfers.some(t => t.kind === 'discard');
@@ -1488,7 +1518,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
       handEl.classList.add('hand-stolen-shake');
       setTimeout(() => handEl.classList.remove('hand-stolen-shake'), 650);
 
-      const stolenItems = transfers.filter(t => (t.kind === 'steal' || t.kind === 'monopoly') && t.from === socket.id);
+      const stolenItems = transfers.filter(t => isRobKind(t.kind) && t.from === socket.id);
       const rect = handEl.getBoundingClientRect();
       stolenItems.forEach((st, idx) => {
         const badge = document.createElement('div');
@@ -1546,7 +1576,7 @@ export function triggerCardTransferAnimations(transfers: any[]): void {
       const d = baseGroupDelay + i * cardStackStepMs;
       setTimeout(() => {
         const cardEl = document.createElement('div');
-        const isSteal = tr.kind === 'steal' || tr.kind === 'monopoly';
+        const isSteal = isRobKind(tr.kind);
         let cardClass = `card-${tr.resource}`;
         let innerHtml = '';
 
