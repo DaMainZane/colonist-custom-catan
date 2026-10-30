@@ -1,5 +1,29 @@
 # Change Log
 
+## 2026-10-30 (Pass 78: Tidebound T9a storm event & wreck marker, T9b 65/35 sea/shore fair spawn within 4 tiles, T9c connecting road/bridge/port claim, T9d loot floor rule & slow scaling, T9e two spawn animations; typecheck and tests passed)
+### Added
+- **T9a Storm event & wreck marker (`src/packs/tidebound/wrecks.ts`)**:
+  - `stormEventCard` (`id: 'tidebound.storm'`, `copies: 2`, `pack: 'tidebound.wrecks'`) registered in `EVENT_CARDS` (`drawAndApplyRoundEvent` triggers `spawnStormWreck`; `peekNextEvent` previews `'Storm at Sea'`). When `rules.eventsOn` is false, `onRoundStart` spawns a passive storm wreck every `STORM_CADENCE_ROUNDS = 3` rounds starting at `STORM_FIRST_ROUND = 3`.
+  - Uses an independent derived RNG stream (`deriveWreckRng` / `ensureWreckRng` stored in `g.ext.tidebound.wrecks.rng`), drawing zero values from `g.rng`.
+  - Spawns a timed marker (`kind: 'wreck'`, `target: 'hex'`, `countdown: WRECK_COUNTDOWN_ROUNDS = 4`, `public: true`) via `addMarker`; `tickMarkers` decrements and removes unclaimed wrecks after 4 rounds.
+- **T9b Sea/shore 65/35 placement & fair spawn within 4 tiles (`src/packs/tidebound/wrecks.ts`)**:
+  - `pickWreckHex` rolls `WRECK_SEA_CHANCE = 0.65` (`'sea'` 65% vs `'shore'` 35%, falling back to the other site type if needed).
+  - `wreckCandidates` restricts spawns to non-hidden sea/shore tiles within `WRECK_MAX_PLAYER_DIST = 4` hexes of at least one player (`minPlayerDistanceToHex <= 4`).
+  - Fairness ranking prefers untouched tiles first, then tiles reachable within 4 hexes by the most players, then tiles with the smallest inter-player distance spread (`maxDist - minDist`) and a racing distance around 2 hexes.
+- **T9c First connecting road, bridge, or port claims the wreck (`src/packs/tidebound/wrecks.ts`)**:
+  - `playerTouchesWreck` checks whether a player owns a road, bridge, or rickety bridge touching a corner vertex or border edge of the wreck tile, or owns a port building / settlement / city on a corner vertex of the wreck tile.
+  - `onBuild` claims any touched wreck immediately when a connecting road, bridge, rickety bridge, or port building is placed; `spawnWreckAt` also pays out immediately if a player already touches the tile when the wreck spawns.
+- **T9d Loot with 2x-cost floor rule & slow time scaling (`src/packs/tidebound/wrecks.ts`)**:
+  - Base cards: `3..5` (`WRECK_SEA_MIN_CARDS..WRECK_SEA_MAX_CARDS`) for sea wrecks and `1..2` (`WRECK_SHORE_MIN_CARDS..WRECK_SHORE_MAX_CARDS`) for shore wrecks, plus a small sea-wreck bonus chance (`15%` fish token when Fishing is on, `10%` dev card raised to `25%` with `tidebound.salvage_crew`).
+  - `wreckTimeMultiplier(turnCount)` scales linearly from `1.0` at turn 0 up to `1.4` (`+40%` cap) at `WRECK_SCALE_TURNS = 50` turns; `tidebound.salvage_crew` multiplies loot by `SALVAGE_CREW_LOOT_MULT = 1.25`.
+  - `computeWreckLootCount` enforces the floor rule (`Math.max(scaled, builtCostCards + 1)`), so even a doubled-cost bridge (6 cards) built to claim a wreck nets at least `6 + 1 = 7` cards. Pays from the bank (`bankGive`), or whatever the bank has left when short.
+  - `wreckBotGoal` (`BOT_GOALS`, `generic`): adds `edgeDelta` bonuses for edges touching an active wreck and emits a `'tidebound.wrecks.salvage'` build goal when a road, bridge, or rickety bridge can claim a wreck.
+- **T9e Two spawn animations & client view (`src/server/view.ts`, `src/client/types.ts`, `src/client/icons.ts`, `src/client/audio.ts`, `src/client/render/board.ts`, `src/client/styles.css`)**:
+  - `wreckClientView` sends public `wrecks` (`id`, `hexId`, `site`, `countdown`, and `shoreDir` pointing toward the adjacent sea tile so shore wrecks beach toward the ocean side rather than inland) without leaking secret loot.
+  - Added `wreckMarkup`, `playWreckSpawnSound`, `boardWrecksLayer`, and two distinct CSS/SVG spawn animations: `.wreck-spawn-sea-anim` + `.wreck-sea-whirlpool-ring` for ocean wrecks, and `.wreck-spawn-shore-anim` + `.wreck-shore-surf-wave` for shore wrecks.
+### Tests
+- `tests/tideboundwrecks.test.ts` (new): DLC/addon off = nothing registered, `tidebound.storm` event card & 4-round marker countdown with zero `g.rng` draws, passive storm cadence, 65/35 sea/shore distribution, `<= 4` hex distance cap & fairness ranking, claiming via road/bridge/rickety bridge/port and immediate spawn claim, slow time scaling (+40% at 50 turns), Salvage crew (+25%), 2x-cost floor rule, bank-short handling, fish/dev bonus drops, `wreckClientView` (`shoreDir`), `wreckMarkup`, and `wreckBotGoal`.
+
 ## 2026-10-30 (Pass 77: Tidebound T8a Harbor 1:1 upgrade, limit 1, works while flooded, and T8b max 4 trades/turn + invalid-ratio prompt; typecheck and tests passed)
 ### Added
 - **T8a Harbor (`src/packs/tidebound/harbor.ts`)**: `upgrade_harbor` action (`UPGRADE_HARBOR`, `{ vertexId }`, main phase via `api.phaseAction('main', UPGRADE_HARBOR)`). Upgrades a player's own `city` on any port (`3:1` generic or `2:1` resource port) to `HARBOR_LEVEL = 2` in `g.ext.core.portUpgrades[vertexId]` for `HARBOR_COST` (`2 wood + 1 brick + 1 ore`, routed through `priceOfUpgrade(g, reg, p, HARBOR_UPGRADE_ID, HARBOR_COST)`).

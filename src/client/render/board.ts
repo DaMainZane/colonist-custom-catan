@@ -2,11 +2,12 @@
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
-import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup } from '../icons';
+import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup, wreckMarkup } from '../icons';
 import {
   playTone,
   playPlaceRoadSound,
   playBridgeCollapseSound,
+  playWreckSpawnSound,
   playPlaceSettlementSound,
   playPlaceCitySound,
   playPlaceRobberSound,
@@ -34,6 +35,8 @@ const collapsingBridges = new Map<number, { owner: string; pieceType: string; st
 const COLLAPSE_ANIM_MS = 620;
 const knownBuildings = new Map<number, string>();
 const knownFogHexes = new Set<number>();
+const knownWrecks = new Set<string>();
+const WRECK_ANIM_MS = 760;
 let knownRobberHexId: number | null = null;
 // Tiles that just produced go dark for a moment, then fade back. Keyed so repaints do not restart it.
 const ROLL_DIM_MS = 2000;
@@ -64,6 +67,7 @@ let lastPlacedRoadsKey = '';
 let lastOverlayHtml = '';
 // Same for the fish icons on the sea (T7c): rewritten only when their markup changes.
 let lastFishHtml = '';
+let lastWrecksHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -195,6 +199,7 @@ function ensureBoardLayers(svg: HTMLElement): {
   terrainLayer: HTMLElement;
   overlayLayer: HTMLElement;
   fishLayer: Element;
+  wrecksLayer: Element;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -210,6 +215,7 @@ function ensureBoardLayers(svg: HTMLElement): {
       <g id="boardTerrainLayer"></g>
       <g id="boardOverlayLayer"></g>
       <g id="boardFishLayer"></g>
+      <g id="boardWrecksLayer"></g>
       <g id="boardHexDynamicLayer"></g>
       <g id="boardPortsLayer"></g>
       <g id="roadHighlightLayer"></g>
@@ -224,6 +230,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastPlacedRoadsKey = '';
     lastOverlayHtml = '';
     lastFishHtml = '';
+    lastWrecksHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
@@ -236,10 +243,18 @@ function ensureBoardLayers(svg: HTMLElement): {
     document.getElementById('boardOverlayLayer')!.after(fishLayer);
     lastFishHtml = '';
   }
+  let wrecksLayer: Element | null = document.getElementById('boardWrecksLayer');
+  if (!wrecksLayer) {
+    wrecksLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    wrecksLayer.id = 'boardWrecksLayer';
+    fishLayer.after(wrecksLayer);
+    lastWrecksHtml = '';
+  }
   return {
     terrainLayer,
     overlayLayer: document.getElementById('boardOverlayLayer')!,
     fishLayer,
+    wrecksLayer,
     portsLayer: document.getElementById('boardPortsLayer')!,
     hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
     roadRimsLayer: document.getElementById('roadRimsLayer')!,
@@ -351,11 +366,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     collapsingBridges.clear();
     knownBuildings.clear();
     knownFogHexes.clear();
+    knownWrecks.clear();
     pieceAnimTimestamps.clear();
     roadAnalysisCache.clear();
     knownRobberHexId = robberHexId;
     for (const h of hexes) {
       if (h.fog || h.type === 'fog') knownFogHexes.add(h.id);
+    }
+    for (const w of state.wrecks || []) {
+      knownWrecks.add(w.id);
     }
   }
 
@@ -601,6 +620,72 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   if (fishHtml !== lastFishHtml) {
     lastFishHtml = fishHtml;
     layers.fishLayer.innerHTML = fishHtml;
+  }
+
+  // Shipwrecks (T9): sea wrecks sit on the ocean tile (with a whirlpool spawn animation); shore wrecks beach toward the ocean side of a coastal tile (with a surf-wash spawn animation).
+  const wrecks = state.wrecks || [];
+  const currentWreckIds = new Set<string>();
+  let playedWreckSfx = false;
+  for (const w of wrecks) {
+    currentWreckIds.add(w.id);
+    if (!knownWrecks.has(w.id)) {
+      knownWrecks.add(w.id);
+      pieceAnimTimestamps.set(`wreck_${w.id}`, now);
+      if (state.status !== 'LOBBY' && !playedWreckSfx) {
+        playedWreckSfx = true;
+        playWreckSpawnSound(w.site);
+      }
+      setTimeout(() => syncInFlightUi(), WRECK_ANIM_MS + 30);
+    }
+  }
+  for (const id of [...knownWrecks]) {
+    if (!currentWreckIds.has(id)) knownWrecks.delete(id);
+  }
+
+  let wrecksHtml = '';
+  for (const w of wrecks) {
+    const h = hexes[w.hexId];
+    if (!h || h.fog) continue;
+    const start = pieceAnimTimestamps.get(`wreck_${w.id}`);
+    const elapsed = start !== undefined ? now - start : Infinity;
+    const isAnimating = elapsed < WRECK_ANIM_MS;
+    const delayStyle = isAnimating ? `animation-delay: -${Math.max(0, Math.round(elapsed))}ms;` : '';
+
+    let wx = h.x;
+    let wy = h.y;
+    if (w.site === 'shore' && w.shoreDir) {
+      const dx = Math.sqrt(3) * (w.shoreDir.dq + w.shoreDir.dr / 2);
+      const dy = 1.5 * w.shoreDir.dr;
+      const len = Math.hypot(dx, dy) || 1;
+      wx += (dx / len) * 28;
+      wy += (dy / len) * 28;
+    } else if (w.site === 'sea' && fishIcons[w.hexId] !== undefined) {
+      wy -= 20;
+    }
+
+    const animClass = isAnimating
+      ? w.site === 'sea'
+        ? 'wreck-spawn-sea-anim'
+        : 'wreck-spawn-shore-anim'
+      : '';
+    const spawnEffect = isAnimating
+      ? w.site === 'sea'
+        ? `<circle cx="0" cy="0" r="22" class="wreck-sea-whirlpool-ring" style="${delayStyle}" />`
+        : `<path d="M-20,-10 Q-10,0 -20,10 M-12,-14 Q-2,0 -12,14" class="wreck-shore-surf-wave" style="${delayStyle}" />`
+      : '';
+    const siteLabel = w.site === 'sea' ? 'Sea shipwreck' : 'Shore shipwreck';
+    wrecksHtml += `
+      <g transform="translate(${wx.toFixed(1)}, ${wy.toFixed(1)})" style="pointer-events:none" data-wreck-id="${esc(w.id)}" data-wreck-site="${w.site}">
+        <title>${siteLabel} (${w.countdown} round${w.countdown === 1 ? '' : 's'} left — connect a road, bridge, or port to claim)</title>
+        ${spawnEffect}
+        <g class="${animClass}" style="${delayStyle}">
+          <g transform="scale(1.18)">${wreckMarkup(w.site, w.countdown)}</g>
+        </g>
+      </g>`;
+  }
+  if (wrecksHtml !== lastWrecksHtml) {
+    lastWrecksHtml = wrecksHtml;
+    layers.wrecksLayer.innerHTML = wrecksHtml;
   }
 
   // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.

@@ -127,6 +127,19 @@ export function playBridgeCollapseSound(): void {
   playPitchSweep(190, 68, 0.22, 'triangle', 0.14, 0.08);
 }
 
+// Distinct ocean maelstrom splash vs shore surf crash when a shipwreck spawns (T9e)
+export function playWreckSpawnSound(site: 'sea' | 'shore' = 'sea'): void {
+  if (!ensureAudio()) return;
+  if (site === 'sea') {
+    playNoiseBurst(0.16, 540, 1.6, 0.15, 0);
+    playPitchSweep(240, 92, 0.26, 'sine', 0.14, 0.02);
+    playPitchSweep(330, 165, 0.18, 'triangle', 0.1, 0.11);
+  } else {
+    playNoiseBurst(0.18, 880, 1.8, 0.15, 0);
+    playPitchSweep(310, 145, 0.18, 'triangle', 0.14, 0.03);
+  }
+}
+
 // Warm Colonist wooden pop + two-note build chime when placing a Settlement
 export function playPlaceSettlementSound(): void {
   if (!ensureAudio()) return;

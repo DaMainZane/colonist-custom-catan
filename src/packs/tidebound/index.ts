@@ -138,6 +138,51 @@ export {
 } from './tides';
 export type { TideClientView, TideCluster, TideLevelDef, TideState, TideWarning } from './tides';
 
+export {
+  SALVAGE_CREW_LOOT_MULT,
+  STORM_CADENCE_ROUNDS,
+  STORM_EVENT_ID,
+  STORM_FIRST_ROUND,
+  TECH_SALVAGE_CREW,
+  WRECK_COUNTDOWN_ROUNDS,
+  WRECK_MARKER_KIND,
+  WRECK_MAX_PLAYER_DIST,
+  WRECK_MAX_TIME_BOOST,
+  WRECK_SCALE_TURNS,
+  WRECK_SEA_CHANCE,
+  WRECK_SEA_DEV_CHANCE,
+  WRECK_SEA_DEV_TECH_CHANCE,
+  WRECK_SEA_FISH_CHANCE,
+  WRECK_SEA_MAX_CARDS,
+  WRECK_SEA_MIN_CARDS,
+  WRECK_SHORE_MAX_CARDS,
+  WRECK_SHORE_MIN_CARDS,
+  activeWrecks,
+  claimWreck,
+  computeWreckLootCount,
+  deriveWreckRng,
+  edgesOfHex,
+  ensureWreckRng,
+  isWreckSeaHex,
+  isWreckShoreHex,
+  minPlayerDistanceToHex,
+  pickWreckHex,
+  playerHexDistance,
+  playerTouchesWreck,
+  shoreSeaDirection,
+  spawnStormWreck,
+  spawnWreckAt,
+  stormEventCard,
+  touchingPlayersOfWreck,
+  verticesOfHex,
+  wreckBotGoal,
+  wreckCandidates,
+  wreckClientView,
+  wreckTimeMultiplier,
+  wrecksAddon
+} from './wrecks';
+export type { WreckBonus, WreckClaimResult, WreckClientItem, WreckPayload, WreckSite } from './wrecks';
+
 /**
  * Tidebound: sea, bridges, tides, harbors, fishing, wrecks and pirates.
  * Everything lives in addons (`rules.dlc.tidebound` is the master switch), so with the DLC off nothing here is registered.

@@ -188,8 +188,18 @@ export interface GameState {
   fishIcons?: Record<number, number> | null;
   /** Port upgrade levels (T1, T8): vertex id -> level (1 = raised 2:1 port, 2 = 1:1 harbor). Null when no port is upgraded. */
   portLevels?: Record<number, number> | null;
+  /** Tidebound shipwrecks (T9): active wreck markers on sea or shore tiles. Null when Wrecks is off or no wrecks are active. */
+  wrecks?: WreckView[] | null;
   /** Tidebound Tides (T6): tide facts for the title card, the warning and the heat map. Null when Tides is off. */
   tide?: TideView | null;
+}
+
+export interface WreckView {
+  id: string;
+  hexId: number;
+  site: 'sea' | 'shore';
+  countdown: number;
+  shoreDir: { dq: number; dr: number } | null;
 }
 
 export interface TideView {

@@ -17,7 +17,8 @@ import {
   harborTradesLeft,
   harborUpgradeCost,
   netSpotsView,
-  tideClientView
+  tideClientView,
+  wreckClientView
 } from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
@@ -281,10 +282,13 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   const fishIcons = g ? fishClientView(g, gameRegistry(g.rules)) : null;
   // Port upgrade levels (T1, T8): vertex id -> level (1 = raised 2:1 port, 2 = 1:1 harbor). Null when no port is upgraded.
   const portLevels = g ? harborClientView(g) : null;
+  // Active shipwrecks (T9): public wreck markers on sea or shore tiles. Null when Wrecks is off or no wrecks are active.
+  const wrecks = g ? wreckClientView(g, gameRegistry(g.rules)) : null;
 
   const shared = {
     fishIcons,
     portLevels,
+    wrecks,
     hexOverlays: tideView ? tideView.overlays : null,
     tide: tideView ? tideView.tide : null,
     code: room.code,

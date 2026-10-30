@@ -278,6 +278,35 @@ export function robberMarkup(): string {
   ], 3.2);
 }
 
+/**
+ * Tidebound shipwreck marker (T9): tilted broken wooden hull, snapped mast with tattered sail, and a countdown badge.
+ * `site === 'sea'` tilts deeper in water with a wave line; `site === 'shore'` sits beached at a shallower angle.
+ */
+export function wreckMarkup(site: 'sea' | 'shore', countdown: number): string {
+  const tilt = site === 'sea' ? -14 : 11;
+  const hullFill = site === 'sea' ? '#8c5327' : '#a1622f';
+  const deckFill = '#5c3416';
+  const sailFill = '#e5dccb';
+  const rounds = Math.max(1, Math.round(countdown || 1));
+  const ship = rimmedLayers([
+    // Snapped mast
+    { d: 'M-1.5,-15 L1.5,-15 L2.2,2 L-1.2,2 Z', fill: deckFill },
+    // Tattered triangular sail
+    { d: 'M1,-14 L13,-6 L6,-3 L9,-1 L1,-2 Z', fill: sailFill },
+    // Broken tilted hull
+    { d: 'M-15,0 L14,-1 L10,8 L-11,8 Z', fill: hullFill }
+  ], 3.0);
+  const waterLine = site === 'sea'
+    ? `<path d="M-16,7 Q-8,3 0,7 T16,7" fill="none" stroke="var(--piece-rim)" stroke-width="2.2" stroke-linecap="round"/>`
+    : `<path d="M-15,8.5 L14,8.5" fill="none" stroke="var(--sand, #e6cf9e)" stroke-width="2.4" stroke-linecap="round"/>`;
+  const badge = `
+    <g transform="translate(14, -12)" class="wreck-countdown-badge">
+      <circle r="8.2" style="fill:var(--token);stroke:var(--piece-rim);stroke-width:1.6"/>
+      <text y="3.2" text-anchor="middle" font-size="10" font-weight="800" style="fill:var(--token-ink)">${rounds}</text>
+    </g>`;
+  return `<g class="wreck-marker wreck-${site}"><g transform="rotate(${tilt})">${ship}</g>${waterLine}${badge}</g>`;
+}
+
 // ---------- Card stacks ----------
 
 // Flat resource card stack: small offset per extra card (max 4 visible), glyph and count on the front card.
