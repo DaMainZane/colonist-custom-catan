@@ -71,34 +71,29 @@ Specs: `Ideas.md` (Tidebound), `Tech Tree Design.md` §8, `Map Generation Design
 | T14 | Balance gate    | Sim matrix: Tidebound on/off x tree on/off at 25+ VP. Check Grand Causeway swing and tier prices.                                                                                                                  | sim matrix                          |
 
 ### Split step
-| ID   | Step                                                                    | Size |
-| ---- | ----------------------------------------------------------------------- | ---- |
-| T9a  | Storm event and wreck marker (DONE — Pass 78)                           | M    |
-| T9b  | Sea/shore 65/35 placement, fair spawn within 4 tiles of a player (DONE — Pass 78) | M |
-| T9c  | First connecting road, bridge, or port claims the wreck (DONE — Pass 78) | M   |
-| T9d  | Loot with floor rule and slow scaling (DONE — Pass 78)                  | M    |
-| T9e  | Two spawn animations (DONE — Pass 78)                                   | S    |
-| T10a | Pirate marker, max 2, ocean only, random move                           | M    |
-| T10b | Strength grows slowly, knights needed to drive off                      | M    |
-| T10c | Rob 2x                                                                  | S    |
-| T10d | Flee mode, avoid stronger players                                       | M    |
-| T11a | path field, fork layout, cost divisor fix                               | M    |
-| T11b | techGate helper                                                         | S    |
-| T11c | Register nodes 1-3 and gate their features                              | M    |
-| T11d | Register nodes 4-6 and gate their features                              | M    |
-| T11e | Register nodes 7-9 and gate their features                              | M    |
-| T11f | Demolish-bridge action, Grand Causeway, Harbor empire                   | L    |
-| T12a | Drown lowest elevation first                                            | M    |
-| T12b | Make it optional with Tides, add settings                               | S    |
-| T13a | Flood exposure in scoreVertex                                           | M    |
-| T13b | Salvage goal                                                            | M    |
-| T13c | Port and net placement                                                  | M    |
-| T13d | Pirate avoidance                                                        | M    |
-| T13e | Tech research                                                           | M    |
-| T13f | Public-info-only dialogue lines                                         | S    |
-| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP             | M    |
-| T14b | Check Grand Causeway swing                                              | S    |
-| T14c | Tune tier prices                                                        | S    |
+| ID   | Step                                                                              | Size |
+| ---- | --------------------------------------------------------------------------------- | ---- |
+| T10a | Pirate marker, max 2, ocean only, random move                                     | M    |
+| T10b | Strength grows slowly, knights needed to drive off                                | M    |
+| T10c | Rob 2x                                                                            | S    |
+| T10d | Flee mode, avoid stronger players                                                 | M    |
+| T11a | path field, fork layout, cost divisor fix                                         | M    |
+| T11b | techGate helper                                                                   | S    |
+| T11c | Register nodes 1-3 and gate their features                                        | M    |
+| T11d | Register nodes 4-6 and gate their features                                        | M    |
+| T11e | Register nodes 7-9 and gate their features                                        | M    |
+| T11f | Demolish-bridge action, Grand Causeway, Harbor empire                             | L    |
+| T12a | Drown lowest elevation first                                                      | M    |
+| T12b | Make it optional with Tides, add settings                                         | S    |
+| T13a | Flood exposure in scoreVertex                                                     | M    |
+| T13b | Salvage goal                                                                      | M    |
+| T13c | Port and net placement                                                            | M    |
+| T13d | Pirate avoidance                                                                  | M    |
+| T13e | Tech research                                                                     | M    |
+| T13f | Public-info-only dialogue lines                                                   | S    |
+| T14a | Sim matrix runner: Tidebound on/off x tree on/off at 25+ VP                       | M    |
+| T14b | Check Grand Causeway swing                                                        | S    |
+| T14c | Tune tier prices                                                                  | S    |
 Each chunk adds minimal bot support (reads costs and ratios through services, no crashes). T13 is the tuning pass.
 
 **Left for other DLCs (hooks only):** robber/knight blocks harbor (Warlords), wall +1 elevation (Bulwark), bog and silt (Wild Earth), Lighthouse sight (Wild Earth), sea caravans (Guildhall).
