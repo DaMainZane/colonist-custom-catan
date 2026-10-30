@@ -191,8 +191,8 @@ describe('the schedule', () => {
   it('is dry before the first tide, then every other round, one phase apart', () => {
     expect(TIDE_PERIOD).toBe(2);
     expect(TIDE_FIRST_ROUND).toBe(2);
-    const even: TideCluster = { id: 0, hexIds: [], phase: 0 };
-    const odd: TideCluster = { id: 1, hexIds: [], phase: 1 };
+    const even: TideCluster = { id: 0, hexIds: [], inner: [], phase: 0 };
+    const odd: TideCluster = { id: 1, hexIds: [], inner: [], phase: 1 };
     expect([0, 1].map(r => isFloodedAt(even, r) || isFloodedAt(odd, r))).toEqual([false, false]);
     expect([2, 3, 4, 5, 6].map(r => isFloodedAt(even, r))).toEqual([true, false, true, false, true]);
     expect([2, 3, 4, 5, 6].map(r => isFloodedAt(odd, r))).toEqual([false, true, false, true, false]);

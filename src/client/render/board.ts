@@ -194,7 +194,7 @@ function ensureHexGeomCache(hexes: any[]): void {
 function ensureBoardLayers(svg: HTMLElement): {
   terrainLayer: HTMLElement;
   overlayLayer: HTMLElement;
-  fishLayer: HTMLElement;
+  fishLayer: Element;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -229,7 +229,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     terrainLayer = document.getElementById('boardTerrainLayer')!;
   }
   // A board drawn before the fish layer existed (an open tab across an update) gets it added without a full rebuild.
-  let fishLayer = document.getElementById('boardFishLayer');
+  let fishLayer: Element | null = document.getElementById('boardFishLayer');
   if (!fishLayer) {
     fishLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     fishLayer.id = 'boardFishLayer';

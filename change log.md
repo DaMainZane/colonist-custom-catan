@@ -1,6 +1,6 @@
 # Change Log
 
-## 2026-10-30 (Pass 76: Tidebound T7c fish icon boosts, T7d tide replenish, T7e feed the sea; written, typecheck and tests pending)
+## 2026-10-30 (Pass 76: Tidebound T7c fish icon boosts, T7d tide replenish, T7e feed the sea; typecheck and tests passed)
 ### Added
 - **T7c boosts (`netCatchOnRoll` in `fishing.ts`)**: a sea tile at the net with `ext.fish` > 0 doubles the catch chance (`NET_BOOSTED_CHANCE` = 1/3, `FISH_ICON_MULTIPLIER` = 2). Every fish caught that way uses up one boost of the richest tile at the net (ties go to the lowest id), so a full icon (`FISH_BOOSTS` = 4) is good for 4 fish. Same draw number as before, so every roll that catches at 1 in 6 also catches at 1 in 3. An icon that ran out stays on the tile at 0 (drawn faded); a tile with no icon never gets one from catching. `fishLeft(hex)` reads the count (null = no icon, clamped 0 to 4).
 - **T7d replenish (`replenishFish`, an `onRoundStart` hook)**: every sea tile the tide reaches this round (`tideReachOnSea`: the sea around the coast tiles of each cluster that floods, depth 1 on a normal tide and 2 on a spring tide or a Very high one) that has an icon and fewer than 4 boosts regains one with chance `FISH_REPLENISH_CHANCE` = [0, 0.2, 0.45] by depth. The draw is a hash of seed, round and tile (`FISH_REPLENISH_SALT`), so no `g.rng` draw and nothing stored. Does nothing with Tides off. Event `fishReplenished`, log line.
@@ -18,7 +18,7 @@
 ### Not in this chunk
 - Net works tech (base 1 in 4, 1 off the net price) is T11. Sound and animation for a fish caught or a ground fed. A turn-history entry for `fishCaught`, `fishReplenished` and `seaFed`.
 
-## 2026-10-30 (Pass 75: Tidebound T7b2 nets client, net spots and net bot goal; written, typecheck and tests pending)
+## 2026-10-30 (Pass 75: Tidebound T7b2 nets client, net spots and net bot goal; typecheck and tests passed)
 ### Added
 - **Net spots (`netSpotsView` in `fishing.ts`)**: the vertices where this player could put a net right now (`canPlaceNet` over every vertex). `undefined` when nets are not in the game, off your own turn, or outside the main phase; `[]` when the supply is used up. The price is not checked here (the client reads it from `pieceCosts`, the server checks again on the build). Sent in the player view as `netSpots` (yourself only) with `netsLeft` (`view.ts`), typed in `client/types.ts`.
 - **No net on a port vertex**: `canPlaceNet` now refuses `v.port`. `ratioFor` gives a port to ANY piece of yours on its vertex, so a 2 wood + 1 sheep net there would be a port without a settlement.
@@ -35,7 +35,7 @@
 ### Not in this chunk
 - Fish icon boost and countdown (T7c), tide replenish (T7d), feed the sea (T7e). `robberScore` still reads a net as a settlement-weight target; checked at T13.
 
-## 2026-10-30 (Pass 74: Tidebound T7b1 fishing nets engine; written, typecheck and tests pending)
+## 2026-10-30 (Pass 74: Tidebound T7b1 fishing nets engine; typecheck and tests passed)
 ### Added
 - **Net piece (`src/packs/tidebound/fishing.ts`)**: `NET = 'net'`, `netPiece` (`target: 'vertex'`, `vp: 0`, `produces: 0`, `baseLimit: NET_BASE_LIMIT`, `scaleWithRadius: true`), registered by `tidebound.fishing` with `rules.pieceLimits.net` (same supply rule as bridges). Price `NET_COST` = 2 wood + 1 sheep, base limit 4, so the 5th net on the board costs double (`priceOf`, nothing new).
 - **Placement (`canPlaceNet`)**: build phase only; an empty vertex that touches land and at least one sea tile; next to a road, bridge or rickety bridge you own (`ownsRoadAt`). No distance rule of its own. Cheap checks first, because the build action tries every vertex.
@@ -53,7 +53,7 @@
 - No build button, no net drawing (a net would be drawn as a settlement), no bot goal: T7b2. So nobody builds a net in a real game yet.
 - Fish icon boost and the icon countdown (T7c), tide replenish (T7d), feed the sea (T7e), `robberScore` still reads a net as a settlement-weight target (`produces || 1`), checked at T13.
 
-## 2026-10-30 (Pass 73: Tidebound T7a fish wild token; written, typecheck and tests pending)
+## 2026-10-30 (Pass 73: Tidebound T7a fish wild token; typecheck and tests passed)
 ### Added
 - **T7a fish token (`src/packs/tidebound/fishing.ts`)**: `FISH = 'fish'`, `fishToken` (`WildTokenDef`: `countInDiscard`, `stealable`), registered through `api.define(WILD_TOKENS, ...)`. The token lives in `g.ext.core.wildTokens[playerId].fish`, never in `p.resources` or the bank, so it cannot be traded, `g.bank` has no fish key and nothing caps it.
   - `spend_fish` action (`SPEND_FISH`, `{ resource }`, main phase of your own turn via `api.phaseAction('main', ...)`): one fish becomes 1 card of any resource the bank still has. The fish is only spent when the bank can pay. Counts `p.stats.fishSpent`, emits `fishSpent`, logs. `legal()` gives one entry per resource the bank still holds, none without a fish.
@@ -79,7 +79,7 @@
 - The spend sheet closes after each spend; a player with several fish reopens it. A fish steal has no flight animation.
 - Not looked at in the browser: the fish card, the spend sheet and the discard tray.
 
-## 2026-10-30 (Pass 72: Tidebound T5e ports idle while flooded, T6 tides UI; typecheck and tests pending)
+## 2026-10-30 (Pass 72: Tidebound T5e ports idle while flooded, T6 tides UI; typecheck and tests passed)
 ### Fixed
 - `tests/tideboundtides.test.ts` (T5b): the spring-tide cadence line was written `[1, 2, 3, 4, 5, 6, 7, 8, 12].map(isSpringTide)`. `Array.map` passes the index as the second argument, so `isSpringTide` read it as the tide level (index 5 = Very high, spring every 3rd round, round 6 came out as a spring tide). Not a bug in the engine; the test now calls `isSpringTide(r)`. No other test had the pattern.
 ### Added
@@ -99,7 +99,7 @@
 ### Not in this chunk
 - A visual cue on a port that is idle (it is covered by the flood tint of its tile; the bank ratio shown in the trade panel already reflects it). A bot that reads the warning is T13.
 
-## 2026-10-30 (Pass 71: Tidebound T5c tide level slider, T5d elevation resistance; typecheck and tests pending)
+## 2026-10-30 (Pass 71: Tidebound T5c tide level slider, T5d elevation resistance; typecheck and tests passed)
 ### Added
 - **T5c tide level (`src/packs/tidebound/tides.ts`, `src/server/{types,runtime,lobby}.ts`, `src/client/{actions,main}.ts`, `src/client/render/setup.ts`, `styles.css`)**:
   - `TIDE_LEVELS`: five slider positions (Very low, Low, Medium, High, Very high). Each sets `period` and `duration` (a cluster is flooded `duration` rounds of every `period`, the two phases half a period apart), `springEvery`, `reach` (rings a normal tide covers, 1 or 2; a spring tide is always 2) and, for T5d, `strength` and `springStrength`. Medium (3, the default) is exactly the T5a/T5b behaviour: period 2, duration 1, spring every 4th round, coast ring only. Higher = more often, longer, deeper, stronger. The numbers other than Medium are starting guesses for the T14 balance gate.
