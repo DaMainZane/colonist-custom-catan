@@ -127,6 +127,8 @@ export function renderAll(): void {
     document.getElementById('badgeCityCnt')!.textContent = String(badgeTarget.citiesLeft);
     const bridgeBadge = document.getElementById('badgeBridgeCnt');
     if (bridgeBadge) bridgeBadge.textContent = String(badgeTarget.bridgesLeft ?? 10);
+    const netBadge = document.getElementById('badgeNetCnt');
+    if (netBadge) netBadge.textContent = String(badgeTarget.netsLeft ?? 4);
   }
 
   const pill = document.getElementById('turnStatusPill')!;
@@ -166,6 +168,28 @@ export function renderAll(): void {
     bridgeBtn.title = badgeTarget?.pieceCosts?.rickety_bridge !== undefined
       ? 'Build a bridge across the ocean (choose a full or a rickety one)'
       : 'Build Bridge across ocean';
+  }
+  // Tidebound Fishing (T7b2): the Net button. Shown while the server sends a net price (nets are in the game), or in the lobby while the addon is on.
+  const netsEnabled = Boolean(
+    badgeTarget?.pieceCosts?.net !== undefined ||
+    (s.dlc?.tidebound && s.addons?.['tidebound.fishing'] !== false)
+  );
+  const netBtn = document.getElementById('btnBuildNet') as HTMLButtonElement | null;
+  if (netBtn) {
+    netBtn.style.display = netsEnabled ? '' : 'none';
+    netBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
+    netBtn.classList.toggle('active-mode', buildMode === 'net');
+  }
+  // Tidebound Fishing (T7e): the Feed button. Shown while the server sends a feed price (the action is in the game), or in the lobby while the addon is on.
+  const feedEnabled = Boolean(
+    badgeTarget?.feedCost !== undefined ||
+    (s.dlc?.tidebound && s.addons?.['tidebound.fishing'] !== false)
+  );
+  const feedBtn = document.getElementById('btnFeedSea') as HTMLButtonElement | null;
+  if (feedBtn) {
+    feedBtn.style.display = feedEnabled ? '' : 'none';
+    feedBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
+    feedBtn.classList.toggle('active-mode', buildMode === 'feed');
   }
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
   btn('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);

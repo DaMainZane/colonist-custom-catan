@@ -25,6 +25,14 @@ export interface PlayerView {
   citiesLeft: number;
   roadsLeft: number;
   bridgesLeft?: number;
+  /** Fishing nets left in your supply (Tidebound). Undefined unless nets are in the game. */
+  netsLeft?: number;
+  /** Vertices where you could put a net right now. Only sent to you, on your main-phase turn, and only when nets are in the game. */
+  netSpots?: number[];
+  /** Your price to feed the sea (Tidebound T7e). Only sent to you, and only when feeding is in the game. */
+  feedCost?: Resources;
+  /** Sea tile ids you could feed right now (next to a net of yours, not full). Only sent to you on your main-phase turn; `[]` when you cannot pay. */
+  feedSpots?: number[];
   vp: number;
   /** What other players see (differs from `vp` only for your own hidden VP cards). */
   publicVp?: number;
@@ -168,6 +176,8 @@ export interface GameState {
   techActions?: TechActionsView | null;
   /** Tidebound Tides (T6): flooded tiles (`flood`) and tiles a turn from flooding (`flood-warn`), by hex id. Null when Tides is off. */
   hexOverlays?: Record<number, { kind: string; label?: string }> | null;
+  /** Tidebound fish icons (T7c): sea tile id -> boosts left (0 = used up, still drawn faded). Null when Fishing is off or no tile has one. */
+  fishIcons?: Record<number, number> | null;
   /** Tidebound Tides (T6): tide facts for the title card, the warning and the heat map. Null when Tides is off. */
   tide?: TideView | null;
 }

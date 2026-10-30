@@ -135,6 +135,10 @@ const UI_ICONS: Record<string, string> = {
   devbuy: `<rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M12 9.5v5M9.5 12h5"/>`,
   road: `<path d="M6 18L18 6" stroke-width="5" stroke="currentColor" stroke-linecap="round" fill="none"/>`,
   bridge: `<path d="M3 16h18M5 16v4M19 16v4M5 16a7 6 0 0 1 14 0M9 12v4M12 10v6M15 12v4"/>`,
+  // Tidebound fishing net: a mesh diamond.
+  net: `<path d="M12 3.5L20.5 12 12 20.5 3.5 12z"/><path d="M7.75 7.75l8.5 8.5M16.25 7.75l-8.5 8.5"/>`,
+  // Tidebound feed the sea: a fish.
+  fish: `<path d="M3.5 12c2.6-4.4 8.4-5.6 12.4-2.2L20.5 7v10l-4.6-2.8C11.9 17.6 6.1 16.4 3.5 12z"/><circle cx="8.5" cy="11" r="1" ${FILL}/>`,
   house: `<path ${FILL} d="M12 3.5L3.5 11H6v8.5h12V11h2.5z"/>`,
   city: `<path ${FILL} d="M3.5 20V9.5l4-4 4 4V20zM12.5 20v-7h8v7z"/>`,
   sword: `<path d="M10 14L19 5M7.5 11.5l5 5M10 14l-5 5"/>`,
@@ -240,6 +244,29 @@ export function cityMarkup(col: string): string {
     { d: 'M-11,5 H-6 V9 H-11 Z', fill: LIGHT },
     { d: 'M3,5 H8 V11 H3 Z', fill: LIGHT }
   ], 3.8);
+}
+
+// Tidebound fishing net: a post with a mesh diamond in the owner's color. Smaller than a settlement and clearly not a roof, so the two are never mixed up.
+export function netMarkup(col: string): string {
+  const mesh = `<path d="M-5.25,-8 L5.25,2 M5.25,-8 L-5.25,2" style="fill:none;stroke:var(--piece-rim);stroke-width:1.6;stroke-linecap:round"/>`;
+  return rimmedLayers([
+    { d: 'M-1.6,-3 H1.6 V11 H-1.6 Z', fill: shade(col, 0.7) },
+    { d: 'M0,-13 L10.5,-3 L0,7 L-10.5,-3 Z', fill: col }
+  ], 3.4) + mesh;
+}
+
+/**
+ * Tidebound fishing ground drawn on a sea tile (T7c): a fish with one pip per boost. A filled pip is a boost left, an empty one is used up;
+ * `left` 0 draws the fish as a dashed outline (the icon never goes away, it only waits for the tide or a feed). Colors come from the .fish-ground
+ * classes in styles.css. Drawn around (0, 0) in a 28 unit box, like the glyphs.
+ */
+export function fishGroundMarkup(left: number, max = 4): string {
+  const n = Math.max(0, Math.min(max, Math.round(left)));
+  const pips = Array.from({ length: max }, (_, i) => {
+    const x = (i - (max - 1) / 2) * 7;
+    return `<circle class="fish-pip${i < n ? ' on' : ''}" cx="${x}" cy="11" r="2.4"/>`;
+  }).join('');
+  return `<g class="fish-ground${n <= 0 ? ' spent' : ''}"><g transform="translate(0,-3)"><g class="fish-body"><ellipse cx="-2" cy="0" rx="9.5" ry="6.2"/><path d="M6,0 L13.5,-6.5 L13.5,6.5 Z"/></g><circle class="fish-eye" cx="-6.5" cy="-1.6" r="1.5"/></g>${pips}</g>`;
 }
 
 export function robberMarkup(): string {

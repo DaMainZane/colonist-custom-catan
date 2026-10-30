@@ -3,6 +3,7 @@ import type { Server } from 'socket.io';
 import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
+import { NET } from '../packs/tidebound';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rebindPlayerId, rooms } from './rooms';
 import { applyMapStart, applyRecipeStyle, countLandHexes, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap, syncSettingsToBoard } from './lobby';
 import { mapOptionsView } from './mapmenu';
@@ -687,11 +688,17 @@ export function registerSocketHandlers(io: Server): void {
 
     // ---- Board clicks -------------------------------------------------------
 
-    socket.on('clickVertex', safe(({ code, vertexId }) => {
+    socket.on('clickVertex', safe(({ code, vertexId, piece }) => {
       const g = rooms[code]?.game;
       if (!g) return;
       const v = g.board.vertices[vertexId];
       if (!v) return;
+
+      // Tidebound T7b2: the client asks for a fishing net on an empty vertex (it never sends another piece id here).
+      if (piece === NET) {
+        if (!v.piece) act(code, 'build', { piece: NET, loc: vertexId }, true);
+        return;
+      }
 
       if (g.phase === 'robber_steal' && v.piece && victimsOnHex(g, g.board.robberHexId, socket.id).includes(v.piece.owner)) {
         return act(code, 'steal', { victimId: v.piece.owner });
@@ -724,6 +731,8 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
     // Tidebound T7a: spend one fish token as any 1 resource, and discard fish on a 7 (`wild` = `{ fish: n }` next to the resource cards).
     socket.on('spendFish', safe(({ code, resource }) => act(code, 'spend_fish', { resource }, true)));
+    // Tidebound T7e: pay 1 wheat to fill the fish icon of a sea tile next to one of your nets.
+    socket.on('feedSea', safe(({ code, hexId }) => act(code, 'feed_sea', { hexId }, true)));
     socket.on('discardCards', safe(({ code, discards, wild }) => act(code, 'discard', { cards: discards, wild })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {

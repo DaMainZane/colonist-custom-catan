@@ -1,5 +1,58 @@
 # Change Log
 
+## 2026-10-30 (Pass 76: Tidebound T7c fish icon boosts, T7d tide replenish, T7e feed the sea; written, typecheck and tests pending)
+### Added
+- **T7c boosts (`netCatchOnRoll` in `fishing.ts`)**: a sea tile at the net with `ext.fish` > 0 doubles the catch chance (`NET_BOOSTED_CHANCE` = 1/3, `FISH_ICON_MULTIPLIER` = 2). Every fish caught that way uses up one boost of the richest tile at the net (ties go to the lowest id), so a full icon (`FISH_BOOSTS` = 4) is good for 4 fish. Same draw number as before, so every roll that catches at 1 in 6 also catches at 1 in 3. An icon that ran out stays on the tile at 0 (drawn faded); a tile with no icon never gets one from catching. `fishLeft(hex)` reads the count (null = no icon, clamped 0 to 4).
+- **T7d replenish (`replenishFish`, an `onRoundStart` hook)**: every sea tile the tide reaches this round (`tideReachOnSea`: the sea around the coast tiles of each cluster that floods, depth 1 on a normal tide and 2 on a spring tide or a Very high one) that has an icon and fewer than 4 boosts regains one with chance `FISH_REPLENISH_CHANCE` = [0, 0.2, 0.45] by depth. The draw is a hash of seed, round and tile (`FISH_REPLENISH_SALT`), so no `g.rng` draw and nothing stored. Does nothing with Tides off. Event `fishReplenished`, log line.
+- **T7e feed the sea (`feedSeaAction`, `FEED_SEA`)**: payload `{ hexId }`, main phase of your turn (`api.phaseAction`). Pays `FEED_SEA_COST` = 1 wheat into the bank and sets an open sea tile next to one of YOUR nets to full (4): no icon gets one, an empty one is refilled, a half-full one is topped up. Refuses a full ground, a river channel, a fogged tile, land and a tile not next to your net. No RNG. `stats.seaFed`, event `seaFed`, log line. Bot: `feedSeaScore` in `fishBotGoal` (12 for an empty ground, 10 for none yet, never a ground with boosts left, needs a spare wheat and `FEED_BOT_SPARE` = 4 cards after paying).
+- **Server**: `fishClientView` (public map of sea tile id to boosts left, sent as `fishIcons`, null when Fishing is off or no icon), `feedSpotsView` and `FEED_SEA_COST` (player view `feedSpots` and `feedCost`, yourself only), socket `feedSea` (`{ hexId }` runs `feed_sea`).
+- **Client**: new `boardFishLayer` drawing a fish with 4 pips on every icon tile (`fishGroundMarkup` in `icons.ts`; filled pip = boost left, dashed outline = used up), Feed button (`#btnFeedSea`, recipe popup from `feedCost`, `fish` UI icon), feed mode (`setBuildMode('feed')`, toast saying why when nothing can be fed) drawing a clickable ring on every ground in `feedSpots` and an empty fish on a spot with no icon yet, `clickFeedSpot`, `canClientAffordFeed`. Feed mode draws no road, bridge, net or settlement spots.
+- **`tidebound/index.ts`** exports the T7c to T7e names (`FEED_SEA`, `FEED_SEA_COST`, `FEED_BOT_SPARE`, `NET_BOOSTED_CHANCE`, `FISH_ICON_MULTIPLIER`, `FISH_REPLENISH_CHANCE`, `feedSeaAction`, `feedSpotsView`, `feedableHexIds`, `fishClientView`, `fishLeft`, `netSeaHexIds`, `replenishFish`, `tideReachOnSea`).
+### Tests
+- `tests/tideboundfishgrounds.test.ts` (new): boosts (reading, doubled chance, earlier first catch on the same seed, one boost per catch and the icon stays at 0, richest tile first and lowest id on a tie, a spent icon gives nothing and no `g.rng` draw); replenish (tide reach by depth, nothing without a tide state, slow and faster on a spring tide and none when dry, no growth past 4, none for a tile without an icon, a spent one refills, seeded and no `g.rng` draw); feed (registration, cost, listing and fog, fills and pays the bank, no icon and half full, every refusal changes nothing, river and fog, main phase only, legal list, no `g.rng` draw); client views (`fishClientView`, `feedSpotsView`); bot scores.
+### Decisions
+- Feed price is 1 wheat (from the plan), the boost doubles the chance (1 in 6 to 1 in 3), icons hold 4 boosts, replenish is slow (about 1 boost per 10 rounds beside a flooding coast at Medium). All starting guesses: tune in T14.
+- Feeding is tied to your own nets, so a net is what makes a ground yours to feed; nobody can pay to fill a ground far from every net.
+- Tides refill only tiles that already have an icon; a new icon comes only from feeding.
+- No `g.version` bump: `ext.fish` was already stored (T2c) and nothing new is stored.
+### Not in this chunk
+- Net works tech (base 1 in 4, 1 off the net price) is T11. Sound and animation for a fish caught or a ground fed. A turn-history entry for `fishCaught`, `fishReplenished` and `seaFed`.
+
+## 2026-10-30 (Pass 75: Tidebound T7b2 nets client, net spots and net bot goal; written, typecheck and tests pending)
+### Added
+- **Net spots (`netSpotsView` in `fishing.ts`)**: the vertices where this player could put a net right now (`canPlaceNet` over every vertex). `undefined` when nets are not in the game, off your own turn, or outside the main phase; `[]` when the supply is used up. The price is not checked here (the client reads it from `pieceCosts`, the server checks again on the build). Sent in the player view as `netSpots` (yourself only) with `netsLeft` (`view.ts`), typed in `client/types.ts`.
+- **No net on a port vertex**: `canPlaceNet` now refuses `v.port`. `ratioFor` gives a port to ANY piece of yours on its vertex, so a 2 wood + 1 sheep net there would be a port without a settlement.
+- **Net bot goal (`netBotGoal`, `NET_BOT_MAX` = 3)**: registered by `tidebound.fishing` (`goalClass: 'generic'`, so every tier). A side build: at most 3 nets, only with the price plus 2 spare cards, only next to its own roads and bridges. Scores a vertex by sea tiles around it, +6 per sea tile with a fish icon (T2c), -8 where it could still settle. Priority 42 to 58, so a city or settlement goal wins.
+- **Socket (`server/socket.ts`)**: `clickVertex` with `piece: 'net'` runs `build` for a net on an empty vertex. The client never sends another piece id there.
+- **Client**: Net button (`#btnBuildNet`, recipe popup, supply badge, shown while the server sends a net price or in the lobby with Fishing on), net build mode (`setBuildMode('net')` with a toast saying why when there is nothing to click), spots drawn as dashed diamonds (`.net-spot`) from the server list only (no settlement spots in net mode), `clickNetSpot`, net drawn with `netMarkup` (post and mesh diamond in the owner's colour), `net` UI icon, net recipe and 2x price from `pieceCosts`.
+- **`tidebound/index.ts`**: also exports `NET_BOT_MAX`, `netBotGoal`, `netSpotsView`.
+### Tests
+- `tests/tideboundnetsclient.test.ts` (new): no net on a port vertex (and back without the port); `netSpotsView` (same set as `canPlaceNet` and the legal build list, empty without your own road, `undefined` when nets are off, off your turn or outside main, empty with no supply); the bot goal (registered only with Fishing on, offers a build with the price and 2 spare cards, nothing with just the price, without a spot, without supply or at the limit, prefers a fish icon, and `chooseBotAction` really builds the net).
+### Decisions
+- Bots stop at 3 nets (below the base limit of 4), so a bot never pays double. Tuning is T13.
+- The net spot list is built on the server and drawn as is, so the client has no copy of the placement rule.
+- No `g.version` bump: nothing new is stored in the game state.
+### Not in this chunk
+- Fish icon boost and countdown (T7c), tide replenish (T7d), feed the sea (T7e). `robberScore` still reads a net as a settlement-weight target; checked at T13.
+
+## 2026-10-30 (Pass 74: Tidebound T7b1 fishing nets engine; written, typecheck and tests pending)
+### Added
+- **Net piece (`src/packs/tidebound/fishing.ts`)**: `NET = 'net'`, `netPiece` (`target: 'vertex'`, `vp: 0`, `produces: 0`, `baseLimit: NET_BASE_LIMIT`, `scaleWithRadius: true`), registered by `tidebound.fishing` with `rules.pieceLimits.net` (same supply rule as bridges). Price `NET_COST` = 2 wood + 1 sheep, base limit 4, so the 5th net on the board costs double (`priceOf`, nothing new).
+- **Placement (`canPlaceNet`)**: build phase only; an empty vertex that touches land and at least one sea tile; next to a road, bridge or rickety bridge you own (`ownsRoadAt`). No distance rule of its own. Cheap checks first, because the build action tries every vertex.
+- **Sea tiles at a vertex (`seaHexIdsAt`, `isSeaHex`)**: `v.hexIds` holds land only, so the sea side is read from the land tile's own corner (the two neighbours across the edges that meet there). Same sea test as the fish icons (not land, no `noPort`, not a river channel). Needs no water topology, so Fishing works with Bridges off. T7c reads the same list.
+- **Catch (`netCatchOnRoll`, an `onRoll` hook)**: each net rolls once per roll, a 7 included; hit chance `NET_CATCH_CHANCE` = 1/6; a hit gives the owner one fish (`grantWildToken`), `stats.fishCaught`, event `fishCaught`, log line. The draw is `netDraw(seed, rollCount, vertexId)`, a hash through `createRng`, so it draws nothing from `g.rng`, stores nothing and ignores the tile state (a net keeps fishing under a flood). Roll count = sum of `g.diceStats` (the roll action adds one before the hooks run).
+- **`tidebound/index.ts`**: exports `NET`, `NET_BASE_LIMIT`, `NET_CATCH_CHANCE`, `NET_COST`, `canPlaceNet`, `isSeaHex`, `netCatchOnRoll`, `netPiece`, `seaHexIdsAt`.
+### Tests
+- `tests/tideboundnets.test.ts` (new): registration (on, DLC off, Fishing off), sea tiles by geometry on a lone island, none inland or in open water, river excluded; placement (road, bridge, owner, phase, taken, inland, open water); build (price to the bank, supply, refusals change nothing, legal list, 2x at the base limit); the catch (rate about 1 in 6 over 1200 rolls, per owner, none without sea, seeded, same under a flood, no `g.rng` draw, a real roll gives the same dice and generator state with nets on the board).
+### Decisions
+- Price (2 wood + 1 sheep) and base limit (4) are placeholders, not in `Ideas.md`: no brick, ore or wheat, so a net does not compete with a settlement. Tune in T14. Net works (later tech) takes 1 off the price.
+- Every roll counts, a 7 included. A fish caught on a 7 counts toward that 7's discard like any card.
+- A net is a vertex piece, so like a settlement it blocks the distance rule for settlements next to it, blocks an opponent's road through its corner (Longest Road), and its owner can be picked as a robber victim. Accepted for now; revisit with the T7b2 playtest.
+- No `g.version` bump: nothing new is stored in the game state.
+### Not in this chunk
+- No build button, no net drawing (a net would be drawn as a settlement), no bot goal: T7b2. So nobody builds a net in a real game yet.
+- Fish icon boost and the icon countdown (T7c), tide replenish (T7d), feed the sea (T7e), `robberScore` still reads a net as a settlement-weight target (`produces || 1`), checked at T13.
+
 ## 2026-10-30 (Pass 73: Tidebound T7a fish wild token; written, typecheck and tests pending)
 ### Added
 - **T7a fish token (`src/packs/tidebound/fishing.ts`)**: `FISH = 'fish'`, `fishToken` (`WildTokenDef`: `countInDiscard`, `stealable`), registered through `api.define(WILD_TOKENS, ...)`. The token lives in `g.ext.core.wildTokens[playerId].fish`, never in `p.resources` or the bank, so it cannot be traded, `g.bank` has no fish key and nothing caps it.

@@ -1637,6 +1637,24 @@ svg#boardSvg.is-panning * {
 .hex-elev-label { fill: var(--elev-ink); font-size: 14px; font-weight: 800; text-anchor: middle; letter-spacing: 0.08em; }
 .nav-btn.on { background: var(--accent); color: var(--on-accent); }
 
+/* ---------- Tidebound fishing nets: build spots shown in net mode ---------- */
+.net-spot { fill: var(--accent); fill-opacity: 0.28; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-dasharray: 4 3; }
+.net-spot:hover { fill-opacity: 0.55; }
+
+/* ---------- Tidebound fishing grounds on the sea (T7c) and feed spots (T7e) ---------- */
+/* Every fill has a shape cue as well as a color: a filled pip is a boost left, an empty ring is used up, and a spent fish is a dashed outline. */
+.fish-ground { opacity: 0.92; }
+.fish-ground .fish-body { fill: var(--token); }
+.fish-ground .fish-eye { fill: var(--token-ink); }
+.fish-ground .fish-pip { fill: none; stroke: var(--token); stroke-width: 1.5; }
+.fish-ground .fish-pip.on { fill: var(--token); }
+.fish-ground.spent { opacity: 0.55; }
+.fish-ground.spent .fish-body { fill: none; stroke: var(--token); stroke-width: 1.6; stroke-dasharray: 3 2; }
+.fish-ground.spent .fish-eye { fill: var(--token); }
+.fish-spot .fish-ring { fill: var(--accent); fill-opacity: 0.16; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 4 3; }
+.fish-spot:hover .fish-ring { fill-opacity: 0.42; }
+.fish-spot .fish-new { opacity: 0.6; }
+
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

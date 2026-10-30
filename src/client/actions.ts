@@ -5,6 +5,7 @@ import {
   setVictoryTab, setHideVictoryOverlay, spectateTargetId, setSpectateTargetId
 } from './store';
 import { renderAll, renderVictoryScreen } from './render/index';
+import { canClientAffordPiece, canClientAffordFeed } from './render/board';
 import { showToast } from './ui';
 import { AVATAR_CHOICES } from './avatars';
 
@@ -455,7 +456,21 @@ export function toggleVictoryMapInspect(hide: boolean): void {
 // ---------- Turn actions ----------
 
 export function setBuildMode(mode: string): void {
-  setBuildModeValue(buildMode === mode ? null : mode);
+  const turningOn = buildMode !== mode;
+  setBuildModeValue(turningOn ? mode : null);
+  // Net mode draws only the vertices the server listed, so say why when there is nothing to click.
+  if (turningOn && mode === 'net' && state) {
+    const me = state.players.find(p => p.id === socket.id);
+    if (me && !(me.netsLeft ?? 0)) showToast('You have no nets left.');
+    else if (me && !canClientAffordPiece(me, 'net')) showToast('Not enough resources for a net.');
+    else if (me && !me.netSpots?.length) showToast('A net goes on a coast vertex next to your own road or bridge (not on a port).');
+  }
+  // Feed mode draws only the sea tiles the server listed (next to one of your nets, not full).
+  if (turningOn && mode === 'feed' && state) {
+    const me = state.players.find(p => p.id === socket.id);
+    if (me && !canClientAffordFeed(me)) showToast('You cannot pay for feeding the sea.');
+    else if (me && !me.feedSpots?.length) showToast('Feed a sea tile next to one of your nets that is not full yet.');
+  }
   renderAll();
 }
 

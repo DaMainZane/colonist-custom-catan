@@ -4,7 +4,7 @@ import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
-import { bridgeUpgradeView, tideClientView } from '../packs/tidebound';
+import { FEED_SEA_COST, bridgeUpgradeView, feedSpotsView, fishClientView, netSpotsView, tideClientView } from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -99,6 +99,12 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
     bridgesLeft: p.pieces.bridge ?? 0,
+    // Fishing nets (T7b2): supply left, and (yourself, on your main-phase turn) the vertices a net could go. Both undefined unless nets are in the game.
+    netsLeft: p.pieces.net,
+    netSpots: self ? netSpotsView(g, gameRegistry(g.rules), p) : undefined,
+    // Feed the sea (T7e): the price, and (yourself, on your main-phase turn) the sea tiles you could feed. Both undefined unless the action is in the game.
+    feedCost: self && gameRegistry(g.rules).actions.has('feed_sea') ? FEED_SEA_COST : undefined,
+    feedSpots: self ? feedSpotsView(g, gameRegistry(g.rules), p) : undefined,
     stats: {
       resourcesEarned: p.stats.earned || 0,
       tradesMade: p.stats.trades || 0,
@@ -250,7 +256,11 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   // Tidebound Tides (T6): flooded and warned tiles as hex overlays, plus the tide facts the title card and heat map need. Null when Tides is off.
   const tideView = g ? tideClientView(g, gameRegistry(g.rules)) : null;
 
+  // Fish icons (T7c): sea tile id -> boosts left. Public. Null when Fishing is off or no tile has an icon.
+  const fishIcons = g ? fishClientView(g, gameRegistry(g.rules)) : null;
+
   const shared = {
+    fishIcons,
     hexOverlays: tideView ? tideView.overlays : null,
     tide: tideView ? tideView.tide : null,
     code: room.code,

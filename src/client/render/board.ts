@@ -2,7 +2,7 @@
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
-import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, robberMarkup } from '../icons';
+import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup } from '../icons';
 import {
   playTone,
   playPlaceRoadSound,
@@ -62,6 +62,8 @@ let lastPortsKey = '';
 let lastPlacedRoadsKey = '';
 // The overlay layer is only rewritten when its markup changes, so the flood warning's fading flash is not restarted by every state update.
 let lastOverlayHtml = '';
+// Same for the fish icons on the sea (T7c): rewritten only when their markup changes.
+let lastFishHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -192,6 +194,7 @@ function ensureHexGeomCache(hexes: any[]): void {
 function ensureBoardLayers(svg: HTMLElement): {
   terrainLayer: HTMLElement;
   overlayLayer: HTMLElement;
+  fishLayer: HTMLElement;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -206,6 +209,7 @@ function ensureBoardLayers(svg: HTMLElement): {
       ${overlayPatternDefsMarkup()}
       <g id="boardTerrainLayer"></g>
       <g id="boardOverlayLayer"></g>
+      <g id="boardFishLayer"></g>
       <g id="boardHexDynamicLayer"></g>
       <g id="boardPortsLayer"></g>
       <g id="roadHighlightLayer"></g>
@@ -219,13 +223,23 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastPortsKey = '';
     lastPlacedRoadsKey = '';
     lastOverlayHtml = '';
+    lastFishHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
   }
+  // A board drawn before the fish layer existed (an open tab across an update) gets it added without a full rebuild.
+  let fishLayer = document.getElementById('boardFishLayer');
+  if (!fishLayer) {
+    fishLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    fishLayer.id = 'boardFishLayer';
+    document.getElementById('boardOverlayLayer')!.after(fishLayer);
+    lastFishHtml = '';
+  }
   return {
     terrainLayer,
     overlayLayer: document.getElementById('boardOverlayLayer')!,
+    fishLayer,
     portsLayer: document.getElementById('boardPortsLayer')!,
     hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
     roadRimsLayer: document.getElementById('roadRimsLayer')!,
@@ -432,7 +446,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           if (v.building.type === 'city' && !playedCitySfx) {
             playedCitySfx = true;
             playPlaceCitySound();
-          } else if (v.building.type === 'settlement' && !playedSettleSfx) {
+          } else if ((v.building.type === 'settlement' || v.building.type === 'net') && !playedSettleSfx) {
             playedSettleSfx = true;
             playPlaceSettlementSound();
           }
@@ -555,6 +569,36 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   if (overlayHtml !== lastOverlayHtml) {
     lastOverlayHtml = overlayHtml;
     layers.overlayLayer.innerHTML = overlayHtml;
+  }
+
+  // Fishing grounds (T7c, T7e): a fish with boost pips on every sea tile that has an icon. In feed mode the grounds you could pay to fill
+  // (the server's `feedSpots`) get a clickable ring, and a spot with no icon yet shows an empty fish waiting to be fed.
+  const fishIcons: Record<number, number> = state.fishIcons ?? {};
+  const feedSpotSet = isMyTurn && buildMode === 'feed' && state.phase === 'MAIN' && me && canClientAffordFeed(me)
+    ? new Set<number>(me.feedSpots ?? [])
+    : null;
+  const fishIds = new Set<number>(Object.keys(fishIcons).map(Number));
+  if (feedSpotSet) for (const id of feedSpotSet) fishIds.add(id);
+  let fishHtml = '';
+  for (const id of [...fishIds].sort((a, b) => a - b)) {
+    const h = hexes[id];
+    if (!h || h.fog) continue;
+    const hasIcon = fishIcons[id] !== undefined;
+    const left = hasIcon ? fishIcons[id] : 0;
+    const inner = fishGroundMarkup(left);
+    if (feedSpotSet?.has(id)) {
+      fishHtml += `
+        <g transform="translate(${h.x}, ${h.y})" class="fish-spot" onclick="clickFeedSpot(${id})" style="cursor:pointer">
+          <circle class="fish-ring" r="30" />
+          <g transform="scale(1.25)" class="${hasIcon ? '' : 'fish-new'}">${inner}</g>
+        </g>`;
+    } else {
+      fishHtml += `<g transform="translate(${h.x}, ${h.y}) scale(1.25)" style="pointer-events:none"><title>Fishing ground: ${Math.max(0, left)} of 4 boosts left</title>${inner}</g>`;
+    }
+  }
+  if (fishHtml !== lastFishHtml) {
+    lastFishHtml = fishHtml;
+    layers.fishLayer.innerHTML = fishHtml;
   }
 
   // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.
@@ -783,6 +827,10 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   let verticesHtml = '';
   const staticSpots = vertices.length > 120;
   const canAffordCity = me ? canClientAffordPiece(me, 'city') : false;
+  // Fishing nets (T7b2): in net mode the server's list of legal vertices is drawn instead of the settlement spots.
+  const netSpotSet = isMyTurn && buildMode === 'net' && state.phase === 'MAIN' && me && (me.netsLeft ?? 0) > 0 && canClientAffordPiece(me, 'net')
+    ? new Set<number>(me.netSpots ?? [])
+    : null;
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
@@ -793,10 +841,11 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
       const isCity = v.building.type === 'city';
+      const isNet = v.building.type === 'net';
       const isClickable = canUpgrade || canRobThisBuilding;
       const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id})` : '';
       const ringR = isCity ? 27 : 22;
-      const anim = getPieceAnimAttrs(`${isCity ? 'city' : 'settlement'}_${v.id}`, now);
+      const anim = getPieceAnimAttrs(`${isCity ? 'city' : isNet ? 'net' : 'settlement'}_${v.id}`, now);
 
       verticesHtml += `
         <g transform="translate(${v.x}, ${v.y})" onclick="${clickAttr}" style="${clickAttr ? 'cursor:pointer' : ''}">
@@ -806,11 +855,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
             ${canRobThisBuilding ? `<circle r="${ringR}" class="target-ring rob" />` : ''}
             ${!isCity && canUpgrade && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
             <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-              ${isCity ? cityMarkup(col) : settlementMarkup(col)}
+              ${isCity ? cityMarkup(col) : isNet ? netMarkup(col) : settlementMarkup(col)}
             </g>
           </g>
         </g>
       `;
+    } else if (isMyTurn && (buildMode === 'net' || buildMode === 'feed')) {
+      // Net mode: only the vertices the server listed, and no settlement spots (a net spot can also be a settlement spot). Feed mode draws no vertex spots at all.
+      if (netSpotSet?.has(v.id)) {
+        verticesHtml += `
+        <g onclick="clickNetSpot(${v.id})" style="cursor:pointer">
+          <circle cx="${v.x}" cy="${v.y}" r="20" fill="transparent" />
+          <g transform="translate(${v.x}, ${v.y})"><g class="building-zoom-scale"><path class="net-spot" d="M0,-12 L10,-1 L0,10 L-10,-1 Z" /></g></g>
+        </g>
+      `;
+      }
     } else if (isMyTurn && canClientPlaceSettlement(v, me)) {
       verticesHtml += `
         <g onclick="clickVertex(${v.id})" style="cursor:pointer">
@@ -1042,12 +1101,13 @@ export function triggerAwardAnimation(
   setTimeout(() => banner.remove(), 2450);
 }
 
-export type ClientPieceKey = 'road' | 'bridge' | 'rickety_bridge' | 'settlement' | 'city';
+export type ClientPieceKey = 'road' | 'bridge' | 'rickety_bridge' | 'net' | 'settlement' | 'city';
 
 const CLIENT_BASE_PIECE_LIMITS: Record<ClientPieceKey, number> = {
   road: 15,
   bridge: 10,
   rickety_bridge: 10,
+  net: 4,
   settlement: 5,
   city: 4
 };
@@ -1075,6 +1135,14 @@ export function countClientActivePieces(ownerId: string, piece: ClientPieceKey):
 
 export function isClientPieceDoubleCost(piece: ClientPieceKey, ownerId: string = socket.id || ''): boolean {
   if (!ownerId || !state?.board) return false;
+  if (piece === 'net') {
+    // The net supply scales with the board and the VP target, so the fixed 4 above is only a fallback: trust the price the server sent.
+    const sent = state.players?.find(p => p.id === ownerId)?.pieceCosts?.net;
+    if (sent) {
+      const total = (c: Record<string, number>) => Object.values(c).reduce((a, n) => a + (Number(n) || 0), 0);
+      return total(sent) >= 2 * total(CLIENT_BASE_PIECE_COSTS.net);
+    }
+  }
   return countClientActivePieces(ownerId, piece) >= CLIENT_BASE_PIECE_LIMITS[piece];
 }
 
@@ -1082,6 +1150,7 @@ const CLIENT_BASE_PIECE_COSTS: Record<ClientPieceKey, Record<string, number>> = 
   road: { wood: 1, brick: 1 },
   bridge: { wood: 1, brick: 1, ore: 1 },
   rickety_bridge: { wood: 1 },
+  net: { wood: 2, sheep: 1 },
   settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
   city: { wheat: 2, ore: 3 }
 };
@@ -1162,9 +1231,29 @@ export function canClientPlaceBridge(e: any, me: any): boolean {
   return false;
 }
 
+/** Can you pay the price of feeding the sea? (The server sends `feedCost` only when the action is in the game.) */
+export function canClientAffordFeed(me: any): boolean {
+  const cost = me?.feedCost;
+  if (!me?.resources || !cost || typeof cost !== 'object') return false;
+  return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
+}
+
 export function clickVertex(vertexId: number): void {
   setBuildModeValue(null);
   socket.emit('clickVertex', { code: state.code, vertexId });
+}
+
+/** Tidebound T7b2: build a fishing net on this vertex (only offered in net mode, from the server's list of legal vertices). */
+export function clickNetSpot(vertexId: number): void {
+  setBuildModeValue(null);
+  socket.emit('clickVertex', { code: state.code, vertexId, piece: 'net' });
+}
+
+/** Tidebound T7e: pay to fill the fishing ground on this sea tile (only offered in feed mode, from the server's list of tiles next to your nets). */
+export function clickFeedSpot(hexId: number): void {
+  setBuildModeValue(null);
+  playTone(660, 0.08);
+  socket.emit('feedSea', { code: state.code, hexId });
 }
 
 export function clickEdge(edgeId: number): void {

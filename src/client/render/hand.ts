@@ -10,20 +10,23 @@ import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import { isClientPieceDoubleCost } from './board';
 
-export type RecipeKey = 'dev' | 'road' | 'bridge' | 'settlement' | 'city';
+export type RecipeKey = 'dev' | 'road' | 'bridge' | 'net' | 'feed' | 'settlement' | 'city';
 
 export const BUILD_RECIPES: Record<RecipeKey, string[]> = {
   dev: ['sheep', 'wheat', 'ore'],
   road: ['wood', 'brick'],
   bridge: ['wood', 'brick', 'ore'],
+  net: ['wood', 'wood', 'sheep'],
+  feed: ['wheat'],
   settlement: ['wood', 'brick', 'sheep', 'wheat'],
   city: ['wheat', 'wheat', 'ore', 'ore', 'ore']
 };
 
 export function renderRecipeStripHtml(recipeKey: RecipeKey, me: any): string {
   const baseList = BUILD_RECIPES[recipeKey];
-  const isDouble = recipeKey !== 'dev' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
-  const customCost = recipeKey !== 'dev' ? me?.pieceCosts?.[recipeKey] : null;
+  const isDouble = recipeKey !== 'dev' && recipeKey !== 'feed' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
+  // Feeding the sea is an action, not a piece: its price comes as `feedCost`, not from `pieceCosts`.
+  const customCost = recipeKey === 'feed' ? me?.feedCost : recipeKey !== 'dev' ? me?.pieceCosts?.[recipeKey] : null;
   let list: string[];
   if (customCost && typeof customCost === 'object') {
     list = [];
@@ -51,6 +54,8 @@ function updateActionRecipePopups(me: any): void {
     ['recipePopupDev', 'dev'],
     ['recipePopupRoad', 'road'],
     ['recipePopupBridge', 'bridge'],
+    ['recipePopupNet', 'net'],
+    ['recipePopupFeed', 'feed'],
     ['recipePopupSettle', 'settlement'],
     ['recipePopupCity', 'city']
   ];

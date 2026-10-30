@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -21,12 +21,38 @@ export {
 } from './bridges';
 
 export {
+  FEED_BOT_SPARE,
+  FEED_SEA,
+  FEED_SEA_COST,
   FISH,
+  FISH_ICON_MULTIPLIER,
+  FISH_REPLENISH_CHANCE,
+  NET,
+  NET_BASE_LIMIT,
+  NET_BOOSTED_CHANCE,
+  NET_BOT_MAX,
+  NET_CATCH_CHANCE,
+  NET_COST,
   SPEND_FISH,
+  canPlaceNet,
+  feedSeaAction,
+  feedSpotsView,
+  feedableHexIds,
   fishBotGoal,
+  fishClientView,
+  fishLeft,
   fishToken,
   fishingAddon,
-  spendFishAction
+  isSeaHex,
+  netBotGoal,
+  netCatchOnRoll,
+  netPiece,
+  netSeaHexIds,
+  netSpotsView,
+  replenishFish,
+  seaHexIdsAt,
+  spendFishAction,
+  tideReachOnSea
 } from './fishing';
 
 export {
