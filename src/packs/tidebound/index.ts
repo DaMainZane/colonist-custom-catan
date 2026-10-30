@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -21,6 +21,15 @@ export {
 } from './bridges';
 
 export {
+  FISH,
+  SPEND_FISH,
+  fishBotGoal,
+  fishToken,
+  fishingAddon,
+  spendFishAction
+} from './fishing';
+
+export {
   RICKETY,
   RICKETY_COST,
   RICKETY_HEALTH,
@@ -40,6 +49,36 @@ export {
   upgradeBridgeAction,
   upgradeBridgeCost
 } from './ricketyBridges';
+
+export {
+  FLOODED,
+  TIDE_DEFAULT_LEVEL,
+  TIDE_FIRST_ROUND,
+  TIDE_LEVELS,
+  TIDE_LEVEL_MAX,
+  TIDE_LEVEL_MIN,
+  TIDE_PERIOD,
+  TIDE_CLUSTER_SIZE,
+  TIDE_SPRING_EVERY,
+  applyTides,
+  buildTideClusters,
+  coastHexIds,
+  deriveTideRng,
+  ensureTides,
+  floodDepthAt,
+  floodPlan,
+  hexElevation,
+  isFloodedAt,
+  isPortFlooded,
+  isSpringTide,
+  tideClientView,
+  tideLevelDef,
+  tideLevelOf,
+  tideStrengthAt,
+  tideWarning,
+  tidesAddon
+} from './tides';
+export type { TideClientView, TideCluster, TideLevelDef, TideState, TideWarning } from './tides';
 
 /**
  * Tidebound: sea, bridges, tides, harbors, fishing, wrecks and pirates.

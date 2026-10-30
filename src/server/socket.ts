@@ -722,7 +722,9 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('upgradeBridge', safe(({ code, edgeId }) => act(code, 'upgrade_bridge', { edgeId }, true)));
     socket.on('convertTile', safe(({ code, hexId, resource }) => act(code, 'convert_tile', { hexId, resource }, true)));
     socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
-    socket.on('discardCards', safe(({ code, discards }) => act(code, 'discard', { cards: discards })));
+    // Tidebound T7a: spend one fish token as any 1 resource, and discard fish on a 7 (`wild` = `{ fish: n }` next to the resource cards).
+    socket.on('spendFish', safe(({ code, resource }) => act(code, 'spend_fish', { resource }, true)));
+    socket.on('discardCards', safe(({ code, discards, wild }) => act(code, 'discard', { cards: discards, wild })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {
       act(code, 'play_dev', { card: cardType, resource: monopolyResource }, true);

@@ -3,7 +3,7 @@ import { RESOURCES, RES_META, DEV_META } from '../constants';
 import { getMiniSvg, getDevSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
-import { state, drawerMode, tradeGive, tradeWant, discardSel, clearRes, setDrawerMode, counterTradeId, counterGive, inFlightHandResources, inFlightMyDevCards, spectateTargetId } from '../store';
+import { state, drawerMode, tradeGive, tradeWant, discardSel, discardWild, wildDiscardCount, clearRes, setDrawerMode, counterTradeId, counterGive, inFlightHandResources, inFlightMyDevCards, spectateTargetId } from '../store';
 import { renderInlineDrawer } from './drawer';
 import { adjustCounter } from './trade';
 import { esc } from '../util';
@@ -76,6 +76,31 @@ function devCardHtml(type: string, oldCount: number, newCount: number, canPlay: 
     </div>`;
 }
 
+/** Held wild tokens: how each is named and what it does (Tidebound fish is the first). */
+const WILD_META: Record<string, { name: string; tip: string }> = {
+  fish: { name: 'Fish', tip: 'counts as any 1 resource' }
+};
+
+/** One card stack per held wild token kind. Your own hand is clickable (spend it, or pick it for a discard); other views are plain. */
+function wildStacksHtml(p: any, interactive: boolean): string {
+  const held: Record<string, number> = p?.wildTokens || {};
+  return Object.keys(held).map(id => {
+    let count = held[id] || 0;
+    if (interactive && drawerMode === 'discard') count -= discardWild[id] || 0;
+    count = Math.max(0, count);
+    if (count <= 0) return '';
+    const meta = WILD_META[id] || { name: id, tip: 'wild token' };
+    const action = drawerMode === 'discard' ? 'click to select' : 'click to spend';
+    return buildOverlappingStackHtml(
+      `card-${id}`,
+      getMiniSvg(id),
+      count,
+      interactive ? `onClickHandWild('${id}')` : '',
+      `${meta.name}: ${meta.tip}${interactive ? ` (${action})` : ''}`
+    );
+  }).join('');
+}
+
 export function getSpectateTargetPlayer(): any {
   const players = state?.players || [];
   if (players.length === 0) return null;
@@ -122,6 +147,7 @@ export function renderHand(me: any, isMyTurn: boolean): void {
       if (count <= 0) return '';
       return buildOverlappingStackHtml(`card-${r}`, getMiniSvg(r), count, '', `${RES_META[r].name}: ${count}`);
     }).join('');
+    const specWildHtml = wildStacksHtml(target, false);
 
     const oldDevs: string[] = target.devCards || [];
     const newDevs: string[] = target.newDevCards || [];
@@ -132,8 +158,8 @@ export function renderHand(me: any, isMyTurn: boolean): void {
     const devTypes = Array.from(new Set([...oldDevs, ...newDevs]));
     const devHtml = devTypes.map(c => devCardHtml(c, oldCounts[c] || 0, newCounts[c] || 0, false)).join('');
 
-    let cardsHtml = resHtml;
-    if (resHtml && devHtml) cardsHtml += '<div class="hand-sep"></div>';
+    let cardsHtml = resHtml + specWildHtml;
+    if ((resHtml || specWildHtml) && devHtml) cardsHtml += '<div class="hand-sep"></div>';
     cardsHtml += devHtml;
     if (!cardsHtml) {
       cardsHtml = `<span class="hand-empty">${esc(target.name)}: No cards</span>`;
@@ -196,8 +222,9 @@ export function renderHand(me: any, isMyTurn: boolean): void {
     return devCardHtml(c, oldCounts[c] || 0, newCounts[c] || 0, canPlay);
   }).join('');
 
-  let html = resHtml;
-  if (resHtml && devHtml) html += '<div class="hand-sep"></div>';
+  const wildHtml = wildStacksHtml(me, true);
+  let html = resHtml + wildHtml;
+  if ((resHtml || wildHtml) && devHtml) html += '<div class="hand-sep"></div>';
   html += devHtml;
 
   if (state.status === 'LOBBY') {
@@ -208,6 +235,33 @@ export function renderHand(me: any, isMyTurn: boolean): void {
     html = `<span class="hand-empty">No cards in hand</span>`;
   }
   panel.innerHTML = html;
+}
+
+/** Click a held wild token (fish): pick it for a discard, or on your main phase open the spend sheet. */
+export function onClickHandWild(id: string): void {
+  const me = state.players.find(p => p.id === socket.id);
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+  if (!me) return;
+  const held = me.wildTokens?.[id] || 0;
+
+  if (drawerMode === 'discard') {
+    const totalSelected = RESOURCES.reduce((s, k) => s + discardSel[k], 0) + wildDiscardCount();
+    if ((discardWild[id] || 0) < held && totalSelected < me.discardPending) {
+      discardWild[id] = (discardWild[id] || 0) + 1;
+      playTone(500, 0.05);
+      renderHand(me, isMyTurn);
+      renderInlineDrawer(me, isMyTurn);
+    }
+  } else if (id === 'fish' && held > 0 && isMyTurn && state.phase === 'MAIN' && counterTradeId === null) {
+    if (drawerMode === 'trade') {
+      clearRes(tradeGive);
+      clearRes(tradeWant);
+    }
+    setDrawerMode(drawerMode === 'fish' ? null : 'fish');
+    playTone(560, 0.05);
+    renderHand(me, isMyTurn);
+    renderInlineDrawer(me, isMyTurn);
+  }
 }
 
 export function onClickHandResource(r: string): void {
@@ -222,7 +276,7 @@ export function onClickHandResource(r: string): void {
   }
 
   if (drawerMode === 'discard') {
-    const totalSelected = RESOURCES.reduce((s, k) => s + discardSel[k], 0);
+    const totalSelected = RESOURCES.reduce((s, k) => s + discardSel[k], 0) + wildDiscardCount();
     if (discardSel[r] < me.resources[r] && totalSelected < me.discardPending) {
       discardSel[r]++;
       playTone(500, 0.05);

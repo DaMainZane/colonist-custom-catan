@@ -18,12 +18,12 @@ import {
 } from '../audio';
 import { socket } from '../socket';
 import {
-  state, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap,
+  state, camZoom, camPanX, camPanY, activeBrush, isMouseDown, hasDraggedMap, elevationView,
   buildMode, setBuildModeValue, setCamZoom, setCamPan, getClientSpeed,
   addInFlightResource, releaseInFlightResource, addInFlightDev, releaseInFlightDev
 } from '../store';
 import { renderHand } from './hand';
-import { overlayPatternDefsMarkup, renderHexOverlaysMarkup } from './overlay';
+import { overlayPatternDefsMarkup, renderElevationMarkup, renderHexOverlaysMarkup } from './overlay';
 import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
 import { openBridgePicker } from './bridgepicker';
@@ -60,6 +60,8 @@ let cameraRafPending = false;
 let lastTerrainKey = '';
 let lastPortsKey = '';
 let lastPlacedRoadsKey = '';
+// The overlay layer is only rewritten when its markup changes, so the flood warning's fading flash is not restarted by every state update.
+let lastOverlayHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -216,6 +218,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastTerrainKey = '';
     lastPortsKey = '';
     lastPlacedRoadsKey = '';
+    lastOverlayHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
@@ -544,11 +547,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
   layers.hexDynamicLayer.innerHTML = hexDynHtml;
-  layers.overlayLayer.innerHTML = renderHexOverlaysMarkup(
-    hexes,
-    id => hexGeomCache.get(id)?.innerPoly,
-    (state as any).hexOverlays ?? null
-  );
+  // Tide overlays (flooded tint, warning a turn ahead), or the elevation heat map when the player switched it on (T6).
+  const elevation = state.tide?.elevation ?? null;
+  const overlayHtml = elevationView && elevation
+    ? renderElevationMarkup(hexes, id => hexGeomCache.get(id)?.innerPoly, elevation)
+    : renderHexOverlaysMarkup(hexes, id => hexGeomCache.get(id)?.innerPoly, (state as any).hexOverlays ?? null);
+  if (overlayHtml !== lastOverlayHtml) {
+    lastOverlayHtml = overlayHtml;
+    layers.overlayLayer.innerHTML = overlayHtml;
+  }
 
   // 3. Ports Layer: rebuilds only when coastal ports, port ownership, or lobby port brush changes.
   const canPaintPort = isLobbyHost && activeBrush.type === 'port';

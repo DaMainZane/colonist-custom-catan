@@ -10,6 +10,8 @@ export interface PlayerView {
   difficulty: string | null;
   resourceCount: number;
   resources?: Resources;
+  /** Held wild tokens such as `{ fish: 2 }` (Tidebound). Same visibility as `resources`; undefined when none are held. */
+  wildTokens?: Record<string, number>;
   devCardCount: number;
   devCards?: string[];
   newDevCards?: string[];
@@ -164,6 +166,22 @@ export interface GameState {
   techTree?: TechRowView[] | null;
   /** What your root techs can act on (harbor cities, Ground work tiles). Null on the same terms as `techTree`. */
   techActions?: TechActionsView | null;
+  /** Tidebound Tides (T6): flooded tiles (`flood`) and tiles a turn from flooding (`flood-warn`), by hex id. Null when Tides is off. */
+  hexOverlays?: Record<number, { kind: string; label?: string }> | null;
+  /** Tidebound Tides (T6): tide facts for the title card, the warning and the heat map. Null when Tides is off. */
+  tide?: TideView | null;
+}
+
+export interface TideView {
+  level: number;
+  levelName: string;
+  round: number;
+  /** A tide rose at the start of this round (for the title card). */
+  rose: { round: number; spring: boolean; count: number } | null;
+  /** A tide will rise at the next round start (shown during the last turn of this round). */
+  warning: { round: number; spring: boolean; count: number } | null;
+  /** Height of every visible land tile (1 to 3). Null when all tiles are the same, so the heat map toggle stays hidden. */
+  elevation: Record<number, number> | null;
 }
 
 export interface TechActionsView {

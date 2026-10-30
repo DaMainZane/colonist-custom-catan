@@ -5,7 +5,7 @@ import { getMiniSvg, buildOverlappingStackHtml, uiIcon, robberMarkup } from '../
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import {
-  state, drawerMode, tradeGive, tradeWant, discardSel, clearRes,
+  state, drawerMode, tradeGive, tradeWant, discardSel, discardWild, wildDiscardCount, clearRes,
   setDrawerMode, setBuildModeValue
 } from '../store';
 import { renderAll } from './index';
@@ -136,6 +136,16 @@ export function removeCardFromDiscard(r: string): void {
     renderInlineDrawer(me, isMyTurn);
   }
 }
+export function removeWildFromDiscard(id: string): void {
+  if ((discardWild[id] || 0) <= 0) return;
+  discardWild[id]--;
+  if (discardWild[id] <= 0) delete discardWild[id];
+  playTone(420, 0.05);
+  const me = myPlayer();
+  const isMyTurn = state.players[state.turnIndex]?.id === socket.id;
+  renderHand(me, isMyTurn);
+  renderInlineDrawer(me, isMyTurn);
+}
 export function adjustTradeWant(r: string, delta: number): void {
   tradeWant[r] = Math.max(0, (tradeWant[r] || 0) + delta);
   renderInlineDrawer(myPlayer(), true);
@@ -197,10 +207,10 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       </div>
     `;
   } else if (drawerMode === 'discard') {
-    const picked = RESOURCES.reduce((s, r) => s + discardSel[r], 0);
+    const picked = RESOURCES.reduce((s, r) => s + discardSel[r], 0) + wildDiscardCount();
     const isReady = picked === me.discardPending;
 
-    const trayCardsHtml = RESOURCES.filter(r => discardSel[r] > 0).map(r =>
+    const trayResHtml = RESOURCES.filter(r => discardSel[r] > 0).map(r =>
       buildOverlappingStackHtml(
         `card-${r}`,
         getMiniSvg(r),
@@ -209,6 +219,17 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
         'Click to return to hand'
       )
     ).join('');
+    // Held wild tokens (fish) picked for the discard sit in the tray next to the cards.
+    const trayWildHtml = Object.keys(discardWild).filter(id => discardWild[id] > 0).map(id =>
+      buildOverlappingStackHtml(
+        `card-${id}`,
+        getMiniSvg(id),
+        discardWild[id],
+        `removeWildFromDiscard('${id}')`,
+        'Click to return to hand'
+      )
+    ).join('');
+    const trayCardsHtml = trayResHtml + trayWildHtml;
 
     drawer.innerHTML = `
       <div class="sheet-head">
@@ -221,6 +242,19 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
       </div>
       <div class="sheet-foot">
         <button class="btn primary" ${!isReady ? 'disabled' : ''} onclick="confirmInlineAction()" title="Confirm discard">${uiIcon('check', 18)}Discard</button>
+      </div>
+    `;
+  } else if (drawerMode === 'fish') {
+    btnCancel.style.display = 'flex';
+    const fish = me.wildTokens?.fish || 0;
+    drawer.innerHTML = `
+      <div class="sheet-head">
+        <span class="sheet-title">${getMiniSvg('fish').replace('width="28" height="28"', 'width="22" height="22"')} Spend a fish</span>
+        <span class="sheet-sub">${fish} held</span>
+      </div>
+      <div class="sheet-sub">One fish becomes 1 card of the resource you pick, taken from the bank.</div>
+      <div class="pick-row">
+        ${RESOURCES.map(r => pickCardHtml(r, `spendFishPick('${r}')`, (state.bank?.[r] ?? 0) > 0 ? `Take ${RES_META[r].name}` : `The bank has no ${RES_META[r].name} left`)).join('')}
       </div>
     `;
   } else if (drawerMode === 'robberSteal') {
@@ -322,7 +356,7 @@ export function closeInlineDrawer(): void {
 export function confirmInlineAction(): void {
   if (drawerMode === 'discard') {
     playTone(620, 0.1);
-    socket.emit('discardCards', { code: state.code, discards: discardSel });
+    socket.emit('discardCards', { code: state.code, discards: discardSel, wild: { ...discardWild } });
     setDrawerMode(null);
   }
   renderAll();
@@ -354,6 +388,19 @@ export function proposePlayerTrade(): void {
 
 export function confirmMonopoly(r: string): void {
   socket.emit('playDevCard', { code: state.code, cardType: 'monopoly', monopolyResource: r });
+  setDrawerMode(null);
+  renderAll();
+}
+
+/** Tidebound fish: spend one fish as 1 card of `resource` from the bank. The server checks the rest. */
+export function spendFishPick(resource: string): void {
+  if ((state.bank?.[resource] ?? 0) <= 0) {
+    showToast(`The bank has no ${RES_META[resource]?.name ?? resource} left.`);
+    playTone(300, 0.1);
+    return;
+  }
+  playTone(700, 0.1);
+  socket.emit('spendFish', { code: state.code, resource });
   setDrawerMode(null);
   renderAll();
 }

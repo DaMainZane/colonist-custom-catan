@@ -1,5 +1,6 @@
 // MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | USED BY: server/*, bots, sim
 import { allPacks } from '../packs';
+import { TIDE_DEFAULT_LEVEL } from '../packs/tidebound';
 import { createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';
 import type { Registry, Rules } from '../shared';
 import type { Settings } from './types';
@@ -71,7 +72,8 @@ export function defaultSettings(): Settings {
     eventsOn: false,
     fateTokens: 2,
     techTreeOn: false,
-    fairDice: false
+    fairDice: false,
+    tideLevel: TIDE_DEFAULT_LEVEL
   };
 }
 
@@ -170,6 +172,10 @@ export function rulesFromSettings(s: Settings): Record<string, any> {
   // Off is the absence of the rule, so games without the tech tree or fair dice carry no new state.
   if (s.techTreeOn) out.techTreeOn = true;
   if (s.fairDice) out.fairDice = true;
+  // The tide level is a rule only while Tides is on and the host moved the slider off Medium, so every other game carries nothing new.
+  if (s.tideLevel !== undefined && s.tideLevel !== TIDE_DEFAULT_LEVEL && resolveAddons(allPacks, { dlc: s.dlc, addons: s.addons }).enabled.has('tidebound.tides')) {
+    out.tideLevel = s.tideLevel;
+  }
   return out;
 }
 

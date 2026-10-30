@@ -1,7 +1,15 @@
 // MODULE: per-player filtered view of the game state (hides other hands, hidden tiles, dev cards) | USED BY: server net adapter, bots
 import type { Registry } from './registry';
 import { computeVP, totalCards } from './state';
+import { visibleWildCards } from './tileState';
 import type { GameState, Id } from './types';
+
+/** The shared `ext` as one viewer may see it: other players' held wild tokens (fish) are hidden until the game is over. Same object when no token is held. */
+function extFor(g: GameState, viewerId: Id, over: boolean): Record<string, any> {
+  const tokens = g.ext?.core?.wildTokens;
+  if (!tokens || over) return g.ext;
+  return { ...g.ext, core: { ...g.ext.core, wildTokens: viewerId in tokens ? { [viewerId]: tokens[viewerId] } : {} } };
+}
 
 export function playerView(g: GameState, reg: Registry, viewerId: Id): any {
   const over = g.phase === 'gameover';
@@ -16,7 +24,7 @@ export function playerView(g: GameState, reg: Registry, viewerId: Id): any {
       color: p.color,
       isBot: p.isBot,
       difficulty: p.difficulty,
-      resourceCount: totalCards(p),
+      resourceCount: totalCards(p) + visibleWildCards(g, reg, p.id),
       resources: reveal ? p.resources : undefined,
       devCardCount: p.devCards.length + p.newDevCards.length,
       devCards: self ? p.devCards : undefined,
@@ -54,7 +62,7 @@ export function playerView(g: GameState, reg: Registry, viewerId: Id): any {
     trades: g.trades,
     winner: g.winner,
     log: g.log,
-    ext: g.ext,
+    ext: extFor(g, viewerId, over),
     players
   };
 

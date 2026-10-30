@@ -13,6 +13,8 @@ export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
 export let spectateTargetId: string | null = null;
 export let logTab: 'live' | 'history' = 'live';
+/** Tidebound T6d: draw the elevation heat map instead of the tide overlays (a view toggle, never sent to the server). */
+export let elevationView = false;
 
 export function setLogTab(tab: 'live' | 'history'): void {
   logTab = tab;
@@ -30,6 +32,17 @@ export const panStart = { x: 0, y: 0 };
 export const tradeGive: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 export const tradeWant: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
 export const discardSel: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+/** Held wild tokens (fish) picked for a 7 discard, `{ tokenId: count }`. Sent as `wild` next to the resource cards. */
+export const discardWild: Record<string, number> = {};
+
+export function clearDiscardWild(): void {
+  for (const k of Object.keys(discardWild)) delete discardWild[k];
+}
+
+/** How many held wild tokens are in the current discard pick. */
+export function wildDiscardCount(): number {
+  return Object.values(discardWild).reduce((a, b) => a + b, 0);
+}
 
 // Cards currently flying toward a player's hand or row; held back from display until each flying card lands.
 export const inFlightHandResources: Resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
@@ -84,6 +97,7 @@ export let tradesCollapsed = false;
 export function setCounterTradeId(v: number | null): void { counterTradeId = v; }
 export function setTradesCollapsed(v: boolean): void { tradesCollapsed = v; }
 
+export function setElevationView(v: boolean): void { elevationView = v; }
 export function setState(s: GameState): void { state = s; }
 export function setMapOptions(v: MapOptionsView | null): void { mapOptions = v; }
 export function setSoundOn(v: boolean): void { soundOn = v; }

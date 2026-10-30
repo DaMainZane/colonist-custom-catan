@@ -1,5 +1,5 @@
 import { socket } from '../socket';
-import { state, buildMode, victoryTab, hideVictoryOverlay } from '../store';
+import { state, buildMode, victoryTab, hideVictoryOverlay, elevationView } from '../store';
 import { isPendingSettingsPush } from '../actions';
 import { renderActiveTradeModal } from './trade';
 import { renderHand, getSpectateTargetPlayer } from './hand';
@@ -7,7 +7,7 @@ import { renderInlineDrawer } from './drawer';
 import { renderSidebar } from './sidebar';
 import { renderSetupPage } from './setup';
 import { renderBoard } from './board';
-import { renderTimerPopups } from './overlay';
+import { renderTimerPopups, showEventTitleCard } from './overlay';
 import { renderTechPanel } from './techpanel';
 import { renderBridgePicker } from './bridgepicker';
 import { renderPresetRow } from '../presets';
@@ -20,6 +20,37 @@ import type { PlayerView } from '../types';
 
 let lastVicRenderKey = '';
 let lastBoardGameOverKey = '';
+// Tides (T6): the round the title card was last checked for. Empty = this screen has not seen a state of this game yet, so a join or a
+// reconnect in the middle of a tide does not replay the card.
+let tideSeenKey = '';
+
+/** Tidebound Tides (T6b, T6d): the "tide rises" title card on a new round, and the elevation toggle (shown only when tiles differ in height). */
+function syncTideUi(): void {
+  const tide = state.tide ?? null;
+  const elevBtn = document.getElementById('btnElevation');
+  if (elevBtn) {
+    const has = !!tide?.elevation;
+    elevBtn.style.display = has ? '' : 'none';
+    elevBtn.classList.toggle('on', has && elevationView);
+  }
+  if (!tide || state.status === 'LOBBY' || state.status === 'GAMEOVER') {
+    tideSeenKey = '';
+    return;
+  }
+  const key = `${state.code || ''}:${tide.round}`;
+  if (tideSeenKey === '') {
+    tideSeenKey = key;
+    return;
+  }
+  if (key === tideSeenKey) return;
+  tideSeenKey = key;
+  if (!tide.rose) return;
+  const n = tide.rose.count;
+  const tiles = `${n} ${n === 1 ? 'tile' : 'tiles'}`;
+  showEventTitleCard(tide.rose.spring
+    ? { kicker: 'Round ' + tide.round, title: 'Spring tide!', subtitle: `The sea reaches two tiles inland: ${tiles} under water`, badgeText: tiles, tone: 'danger', icon: 'waves', durationMs: 3000 }
+    : { kicker: 'Round ' + tide.round, title: 'The tide rises', subtitle: `${tiles} under water, no production there`, badgeText: tiles, tone: 'accent', icon: 'waves', durationMs: 2600 });
+}
 
 export function renderAll(): void {
   const me = state.players.find(p => p.id === socket.id);
@@ -169,6 +200,7 @@ export function renderAll(): void {
   renderTimerPopups();
   renderTechPanel(isMyTurn);
   renderBridgePicker(isMyTurn);
+  syncTideUi();
 
   const goKey = `${state.code || ''}:${state.finishedAt || 0}`;
   if (state.status !== 'GAMEOVER') {

@@ -1,10 +1,10 @@
 // MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, techPanelFor, totalCards } from '../shared';
+import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, techPanelFor, totalCards, visibleWildCards, wildTokensOf } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
-import { bridgeUpgradeView } from '../packs/tidebound';
+import { bridgeUpgradeView, tideClientView } from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -81,8 +81,11 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     color: p.color,
     isBot: p.isBot,
     difficulty: p.difficulty,
-    resourceCount: totalCards(p),
+    // Hand size as the table sees it: resource cards plus fish-like tokens (they count for a discard and can be stolen).
+    resourceCount: totalCards(p) + visibleWildCards(g, gameRegistry(g.rules), p.id),
     resources: reveal ? p.resources : undefined,
+    // Held wild tokens ({ fish: n }), same visibility as the hand. Undefined when none are held, so a game without them sends nothing new.
+    wildTokens: reveal && Object.keys(wildTokensOf(g, p.id)).length > 0 ? wildTokensOf(g, p.id) : undefined,
     devCardCount: p.devCards.length + p.newDevCards.length,
     devCards: reveal ? p.devCards : undefined,
     newDevCards: reveal ? p.newDevCards : undefined,
@@ -244,8 +247,12 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   const current = g ? g.players[g.turn] : room.lobbyPlayers[0];
   const robberVictims = g && g.phase === 'robber_steal' && current ? victimsOnHex(g, g.board.robberHexId, current.id) : [];
   const defaultRatios = Object.fromEntries([...registry.resources.keys()].map(r => [r, 4]));
+  // Tidebound Tides (T6): flooded and warned tiles as hex overlays, plus the tide facts the title card and heat map need. Null when Tides is off.
+  const tideView = g ? tideClientView(g, gameRegistry(g.rules)) : null;
 
   const shared = {
+    hexOverlays: tideView ? tideView.overlays : null,
+    tide: tideView ? tideView.tide : null,
     code: room.code,
     hostId: room.hostId,
     status,

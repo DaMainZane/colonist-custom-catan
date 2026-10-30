@@ -6,7 +6,7 @@ import {
   state, camZoom, camPanX, camPanY, isPanning, panStart, discardSel, drawerMode,
   activeBrush, hasDraggedMap,
   setState, setIsMouseDown, setIsPanning, setHasDraggedMap, setCamZoom, setCamPan, setDrawerMode,
-  setBuildModeValue, setHideVictoryOverlay, clearRes, clearAllInFlight, setLogTab
+  setBuildModeValue, setHideVictoryOverlay, clearRes, clearDiscardWild, clearAllInFlight, setLogTab, elevationView, setElevationView
 } from './store';
 import { renderAll } from './render/index';
 import {
@@ -24,10 +24,10 @@ import {
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible
 } from './mapmenu';
-import { onClickHandResource, onClickDevCard } from './render/hand';
+import { onClickHandResource, onClickHandWild, onClickDevCard } from './render/hand';
 import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
-  confirmMonopoly, pickGold, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade
+  confirmMonopoly, pickGold, spendFishPick, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, removeWildFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade
 } from './render/drawer';
 import { sendChat, toggleRoundCollapse, renderSidebar } from './render/sidebar';
 import { toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick } from './render/techpanel';
@@ -39,9 +39,15 @@ import {
 import {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
-  setBrush, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
+  setBrush, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
 } from './actions';
+
+/** Tidebound T6d: switch the board between the tide overlays and the elevation heat map. */
+function toggleElevationView(): void {
+  setElevationView(!elevationView);
+  if (state) renderAll();
+}
 
 function onSetLogTab(tab: 'live' | 'history'): void {
   setLogTab(tab);
@@ -51,23 +57,23 @@ function onSetLogTab(tab: 'live' | 'history'): void {
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
-  switchLobbyTab, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, addBot, removeBot, startGame, rematchLobby,
+  switchLobbyTab, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
   setLogTab: onSetLogTab, toggleRoundCollapse, toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick,
   clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, closeBridgePicker,
-  confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickDevCard,
+  confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickHandWild, onClickDevCard,
   startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier, setSetupOpen,
   startSavePreset, cancelSavePreset, confirmSavePreset, presetNameKey, applyCustomPreset, applyPresetStyle,
   askDeletePreset, cancelDeletePreset, deletePreset,
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible,
-  pickGold, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade,
+  pickGold, spendFishPick, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, removeWildFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade,
   onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave,
   setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
-  showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
+  showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard, toggleElevationView
 });
 
 function animateDice(sum?: number): void {
@@ -93,8 +99,12 @@ function syncAutomaticDrawers(): void {
   } else if (state.phase === 'DISCARD' && me.discardPending > 0) {
     if (drawerMode !== 'discard') {
       clearRes(discardSel);
+      clearDiscardWild();
       setDrawerMode('discard');
     }
+  } else if (drawerMode === 'fish' && !(state.phase === 'MAIN' && state.currentPlayerId === socket.id && (me.wildTokens?.fish || 0) > 0)) {
+    // The spend sheet only makes sense on your own main phase while you still hold a fish.
+    setDrawerMode(null);
   } else if (drawerMode === 'gold' || drawerMode === 'discard' || drawerMode === 'robberSteal') {
     setDrawerMode(null);
   }

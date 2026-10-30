@@ -1,4 +1,4 @@
-// MODULE: S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card) | USED BY: render/board.ts, render/index.ts, main.ts
+// MODULE: S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) | USED BY: render/board.ts, render/index.ts, main.ts
 // Colorblind rule ("Design UI Philosophy.md"): every hex overlay pairs a color tint with a distinct geometric SVG pattern
 // (hatch, waves, dots, chevrons, diagonal crack, rings) so color is never the only signal.
 import { uiIcon } from '../icons';
@@ -7,6 +7,7 @@ import { esc } from '../util';
 export type HexOverlayKind =
   | 'wall-incomplete'
   | 'flood'
+  | 'flood-warn'
   | 'plague'
   | 'wave'
   | 'crack'
@@ -63,6 +64,7 @@ let recapDismissTimer: any = null;
 const PATTERN_IDS: Record<HexOverlayKind, string> = {
   'wall-incomplete': 'ov-pat-wall-incomplete',
   flood: 'ov-pat-flood',
+  'flood-warn': 'ov-pat-flood-warn',
   plague: 'ov-pat-plague',
   wave: 'ov-pat-wave',
   crack: 'ov-pat-crack',
@@ -78,10 +80,15 @@ export function overlayPatternDefsMarkup(): string {
         <rect width="14" height="14" fill="rgba(196, 71, 47, 0.18)" />
         <line x1="0" y1="0" x2="0" y2="14" stroke="#c4472f" stroke-width="4" stroke-opacity="0.65" />
       </pattern>
-      <!-- 2. flood: blue horizontal wave lines -->
+      <!-- 2. flood: sea-blue wave lines. Colors are tokens (--flood-*), so light and dark theme each get their own tint. -->
       <pattern id="ov-pat-flood" width="24" height="14" patternUnits="userSpaceOnUse">
-        <rect width="24" height="14" fill="rgba(59, 126, 161, 0.22)" />
-        <path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="#2b6cb0" stroke-width="2.4" stroke-opacity="0.75" />
+        <rect width="24" height="14" style="fill:var(--flood-tint)" />
+        <path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" style="stroke:var(--flood-line)" stroke-width="2.4" />
+      </pattern>
+      <!-- 2b. flood-warn (a turn ahead): the same waves but dashed and lighter, so a warning never reads as water already there -->
+      <pattern id="ov-pat-flood-warn" width="24" height="14" patternUnits="userSpaceOnUse">
+        <rect width="24" height="14" style="fill:var(--flood-warn-tint)" />
+        <path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" style="stroke:var(--flood-warn-line)" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />
       </pattern>
       <!-- 3. plague: green spore dots -->
       <pattern id="ov-pat-plague" width="16" height="16" patternUnits="userSpaceOnUse">
@@ -138,6 +145,30 @@ export function renderHexOverlaysMarkup(
     html += `<g class="hex-overlay-item hex-overlay-${esc(entry.kind)}" style="pointer-events:none">
       <polygon points="${poly}" fill="url(#${patId})" class="hex-overlay-poly" />
       ${entry.label ? `<text x="${h.x.toFixed(1)}" y="${(h.y + 44).toFixed(1)}" class="hex-overlay-label">${esc(entry.label)}</text>` : ''}
+    </g>`;
+  }
+  return html;
+}
+
+/**
+ * Elevation heat map (T6d): one flat tint per height (1 to 3, darker = higher) plus the number itself, so color is never the only signal.
+ * `elevation` maps hex id to height; hexes without an entry (sea, fog) get nothing.
+ */
+export function renderElevationMarkup(
+  hexes: any[],
+  getInnerPoly: (hexId: number) => string | undefined,
+  elevation: Record<number, number>
+): string {
+  let html = '';
+  for (const h of hexes) {
+    if (!h || h.type === 'water' || h.fog || h.type === 'fog') continue;
+    const e = Math.max(1, Math.min(3, Math.round(Number(elevation[h.id]))));
+    if (!Number.isFinite(e) || elevation[h.id] === undefined) continue;
+    const poly = getInnerPoly(h.id);
+    if (!poly) continue;
+    html += `<g class="hex-elev-item" style="pointer-events:none">
+      <polygon points="${poly}" class="hex-elev hex-elev-${e}" />
+      <text x="${h.x.toFixed(1)}" y="${(h.y + 46).toFixed(1)}" class="hex-elev-label">${'\u25B2'.repeat(e)}</text>
     </g>`;
   }
   return html;

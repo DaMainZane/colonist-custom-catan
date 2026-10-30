@@ -301,6 +301,24 @@ export function toggleAddon(addonId: string): void {
   playTone(curAddons[addonId] ? 540 : 460, 0.04);
 }
 
+/** Names of the Tides slider positions (1 to 5). Must match TIDE_LEVELS in packs/tidebound/tides.ts. */
+const TIDE_LEVEL_NAMES = ['Very low', 'Low', 'Medium', 'High', 'Very high'];
+
+/** While the Tides slider is dragged: show the name of the position under the thumb. Nothing is sent until it is let go. */
+export function previewTideLevel(value: string | number): void {
+  const n = Math.min(5, Math.max(1, Math.round(Number(value)) || 3));
+  const el = document.getElementById('tideLevelName');
+  if (el) el.textContent = TIDE_LEVEL_NAMES[n - 1];
+}
+
+/** Host: set the Tides level (1 low to 5 high). On or off is the Tides addon checkbox. */
+export function setTideLevel(value: string | number): void {
+  if (!state || !requireHost('change the tide level')) return;
+  const n = Math.min(5, Math.max(1, Math.round(Number(value)) || 3));
+  socket.emit('updateSettings', { code: state.code, newSettings: { tideLevel: n } });
+  playTone(420 + n * 30, 0.04);
+}
+
 export function enableAddonWithDeps(addonId: string): void {
   if (!state || !requireHost('enable addon dependencies')) return;
   const curDlc = state.settings?.dlc && typeof state.settings.dlc === 'object' ? { ...state.settings.dlc } : {};

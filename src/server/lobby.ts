@@ -4,6 +4,7 @@ import {
   isKnownMapId, randomSeed, resolveMapOptions, resolveParams, resolvePicks
 } from '../shared';
 import type { Board, HexInit } from '../shared';
+import { TIDE_DEFAULT_LEVEL, TIDE_LEVEL_MAX, TIDE_LEVEL_MIN } from '../packs/tidebound';
 import { normalizeBotChat } from './bots/dialogue/events';
 import { STANDARD_PIECES, STANDARD_SUPPLY, fullRules, mapRegistryFor, registry, scaledPieces, scaledSupply } from './runtime';
 import type { MapMeta, Room, Settings } from './types';
@@ -280,7 +281,8 @@ export function mergeSettingsDetailed(input: any, old: Settings): { settings: Se
     eventsOn: typeof s.eventsOn === 'boolean' ? s.eventsOn : !!old.eventsOn,
     fateTokens: clamp(s.fateTokens, 0, 10, old.fateTokens ?? 2),
     techTreeOn: typeof s.techTreeOn === 'boolean' ? s.techTreeOn : !!old.techTreeOn,
-    fairDice: typeof s.fairDice === 'boolean' ? s.fairDice : !!old.fairDice
+    fairDice: typeof s.fairDice === 'boolean' ? s.fairDice : !!old.fairDice,
+    tideLevel: clamp(s.tideLevel, TIDE_LEVEL_MIN, TIDE_LEVEL_MAX, old.tideLevel ?? TIDE_DEFAULT_LEVEL)
   };
   return { settings, dropped };
 }

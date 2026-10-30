@@ -1,5 +1,5 @@
 // MODULE: actions "move_robber" and "steal" (victim choice when 2+ players are on the hex) | USED BY: packs/base/actions/index
-import { getPlayer, popPhase, publicVP, setPhase } from '../../../shared';
+import { getPlayer, popPhase, publicVP, setPhase, stealableWildTokens } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { clearStealSource, stealOne, victimsOnHex } from '../robbing';
 
@@ -51,7 +51,7 @@ export const stealAction: ActionDef = {
   legal(ctx, pid) {
     const { g, reg } = ctx;
     const victims = victimsOnHex(g, g.board.robberHexId, pid).map(id => getPlayer(g, id)!);
-    const cards = (p: typeof victims[number]) => Object.values(p.resources).reduce((a, b) => a + b, 0);
+    const cards = (p: typeof victims[number]) => Object.values(p.resources).reduce((a, b) => a + b, 0) + stealableWildTokens(g, reg, p.id);
     victims.sort((a, b) => {
       if ((cards(b) > 0 ? 1 : 0) !== (cards(a) > 0 ? 1 : 0)) return (cards(b) > 0 ? 1 : 0) - (cards(a) > 0 ? 1 : 0);
       return publicVP(g, reg, b) - publicVP(g, reg, a);

@@ -1,4 +1,4 @@
-// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, invalid-ratio advice) | USED BY: packs/base/trading, DLC packs, client, bots
+// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, idle-port checks, invalid-ratio advice) | USED BY: packs/base/trading, DLC packs, client, bots
 import { defsOf } from './registry';
 import type { Registry } from './registry';
 import type { GameState, Id } from './types';
@@ -19,6 +19,27 @@ export const MIN_TRADE_RATIO = 2;
 export const HARBOR_RATIO_MODS = 'harborRatioMods';
 /** The lowest ratio a harbor can give. */
 export const HARBOR_MIN_RATIO = 1;
+
+/**
+ * Keyed registry of idle-port checks (Tidebound T5e: a port whose land is under a tide does not trade). A port on an idle vertex is skipped by
+ * `ratioFor`, so its ratio simply does not apply. Nothing registered = every port works, as before.
+ */
+export const PORT_IDLE_CHECKS = 'portIdleChecks';
+
+export interface PortIdleCheck {
+  id: string;
+  /** True when the port on this vertex cannot be used right now. A harbor (T8) opts out by returning false for its own vertex. */
+  idle(g: GameState, reg: Registry, vertexId: number): boolean;
+  replace?: boolean;
+}
+
+/** Is the port on this vertex idle right now? True as soon as any registered check says so. */
+export function isPortIdle(g: GameState, reg: Registry, vertexId: number): boolean {
+  for (const check of defsOf<PortIdleCheck>(reg, PORT_IDLE_CHECKS).values()) {
+    if (check.idle(g, reg, vertexId)) return true;
+  }
+  return false;
+}
 
 export const RATIO_MOD_ORDER = {
   ports: 10,
@@ -70,6 +91,7 @@ export function ratioFor(g: GameState, reg: Registry, pid: Id, resource: string)
     if (!v.piece || v.piece.owner !== pid || !v.port) continue;
     const port = reg.ports.get(v.port);
     if (!port) continue;
+    if (isPortIdle(g, reg, v.id)) continue;
     if (port.resource === null || port.resource === resource) {
       ratio = Math.min(ratio, port.ratio);
       if ((port as any).exemptFloor) exemptFloor = true;

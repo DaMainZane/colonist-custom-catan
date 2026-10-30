@@ -207,8 +207,8 @@ describe('S0.6 Production pipeline & S0.7 Tile state, durability, wild token', (
           repairCost: { wood: 1 }
         });
         api.define(WILD_TOKENS, {
-          id: 'fish',
-          name: 'Fish',
+          id: 'test_fish',
+          name: 'Test Fish',
           countInDiscard: true,
           stealable: true
         });
@@ -238,11 +238,11 @@ describe('S0.6 Production pipeline & S0.7 Tile state, durability, wild token', (
     expect(g.players[0].pieces.road).toBe(15);
 
     // Wild tokens: grant, spend, and verify isWildTokenResource
-    expect(isWildTokenResource(reg, 'fish')).toBe(true);
-    grantWildToken(ctx, 'p1', 'fish', 2);
-    expect(getWildTokens(g, 'p1', 'fish')).toBe(2);
-    spendWildToken(ctx, 'p1', 'fish', 'ore', 1);
-    expect(getWildTokens(g, 'p1', 'fish')).toBe(1);
+    expect(isWildTokenResource(reg, 'test_fish')).toBe(true);
+    grantWildToken(ctx, 'p1', 'test_fish', 2);
+    expect(getWildTokens(g, 'p1', 'test_fish')).toBe(2);
+    spendWildToken(ctx, 'p1', 'test_fish', 'ore', 1);
+    expect(getWildTokens(g, 'p1', 'test_fish')).toBe(1);
     expect(g.players[0].resources.ore).toBe(1);
 
     grantWildPick(ctx, 'p2', 1, 'oasis', 0);

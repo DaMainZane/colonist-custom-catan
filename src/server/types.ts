@@ -49,6 +49,8 @@ export interface Settings {
   techTreeOn?: boolean;
   /** Fair dice toggle (default off). Rolls 2d6 guided by the 36-combination bell curve. */
   fairDice?: boolean;
+  /** Tidebound tide level 1 to 5 (default 3, Medium): the high/low slider of the Tides addon. Only read while Tides is on. */
+  tideLevel?: number;
 }
 
 /** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */

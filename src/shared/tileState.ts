@@ -363,3 +363,47 @@ export function spendWildToken(
   grantWildPick(ctx, pid, use, tokenId);
   return use;
 }
+
+/** Held wild tokens as a plain `{ tokenId: count }` object (zero entries left out). Only ever sent to the owner (or to everyone after the game). */
+export function wildTokensOf(g: GameState, pid: Id): Record<string, number> {
+  const store = g.ext?.core?.wildTokens?.[pid] as Record<string, number> | undefined;
+  const out: Record<string, number> = {};
+  if (!store) return out;
+  for (const [id, n] of Object.entries(store)) if (n > 0) out[id] = n;
+  return out;
+}
+
+/** Held tokens that count toward a 7 discard (`countInDiscard`). 0 when no such token is registered for this game. */
+export function countableWildTokens(g: GameState, reg: Registry, pid: Id): number {
+  let n = 0;
+  for (const wt of defsOf<WildTokenDef>(reg, WILD_TOKENS).values()) {
+    if (wt.countInDiscard) n += getWildTokens(g, pid, wt.id);
+  }
+  return n;
+}
+
+/** Held tokens the robber can steal (`stealable`). 0 when no such token is registered for this game. */
+export function stealableWildTokens(g: GameState, reg: Registry, pid: Id): number {
+  let n = 0;
+  for (const wt of defsOf<WildTokenDef>(reg, WILD_TOKENS).values()) {
+    if (wt.stealable) n += getWildTokens(g, pid, wt.id);
+  }
+  return n;
+}
+
+/** Tokens that make a hand look bigger to the table: they count for a discard or can be stolen. Added to `resourceCount` in the views. */
+export function visibleWildCards(g: GameState, reg: Registry, pid: Id): number {
+  let n = 0;
+  for (const wt of defsOf<WildTokenDef>(reg, WILD_TOKENS).values()) {
+    if (wt.countInDiscard || wt.stealable) n += getWildTokens(g, pid, wt.id);
+  }
+  return n;
+}
+
+/** Removes held tokens and gives nothing back (a discard, a theft). The caller says where they went. Returns how many were removed. */
+export function takeWildToken(g: GameState, pid: Id, tokenId: string, amount = 1): number {
+  const n = Math.min(getWildTokens(g, pid, tokenId), Math.max(0, Math.floor(amount)));
+  if (n <= 0) return 0;
+  ensureWildTokenStore(g, pid)[tokenId] -= n;
+  return n;
+}

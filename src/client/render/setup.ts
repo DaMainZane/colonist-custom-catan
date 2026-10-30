@@ -12,6 +12,9 @@ let lastPreviewSig = '';
 let lastRosterSig = '';
 let lastDlcSig = '';
 
+/** Names of the Tides slider positions (1 to 5). Must match TIDE_LEVELS in packs/tidebound/tides.ts. */
+const TIDE_LEVEL_NAMES = ['Very low', 'Low', 'Medium', 'High', 'Very high'];
+
 /** Built-in catalog fallback for DLC packs not yet registered in the server registry, matching Ideas.md exactly. */
 const CATALOG_DLCS: DlcInfoView[] = [
   {
@@ -254,10 +257,11 @@ function drawScenariosAndDlcs(): void {
   const fateTokens = s.fateTokens ?? 2;
   const techTreeOn = !!s.techTreeOn;
   const fairDice = !!s.fairDice;
+  const tideLevel = Math.min(5, Math.max(1, Math.round(Number(s.tideLevel)) || 3));
   const scenarios: ScenarioPresetView[] = mapOptions?.scenarios || [];
   const { dlcs, addons } = effectiveDlcsAndAddons();
 
-  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, techTreeOn, fairDice, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
+  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, techTreeOn, fairDice, tideLevel, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
   if (sig === lastDlcSig) return;
   lastDlcSig = sig;
 
@@ -312,6 +316,7 @@ function drawScenariosAndDlcs(): void {
     );
     pills.push(techTreeOn ? `<span class="summary-pill on">Tech tree ON</span>` : `<span class="summary-pill">Tech tree off</span>`);
     if (fairDice) pills.push(`<span class="summary-pill on">Fair dice ON</span>`);
+    if (enabledAddons.has('tidebound.tides')) pills.push(`<span class="summary-pill on">Tides · ${esc(TIDE_LEVEL_NAMES[tideLevel - 1])}</span>`);
 
     const blockedHtml = blockedAddons
       .map(b => {
@@ -349,6 +354,16 @@ function drawScenariosAndDlcs(): void {
                   <span class="dlc-addon-name">${esc(a.name)}</span>
                 </label>
                 ${a.description ? `<span class="dlc-addon-desc">${esc(a.description)}</span>` : ''}
+                ${
+                  a.id === 'tidebound.tides' && isActuallyOn
+                    ? `<div class="dlc-addon-opt" title="High tides come more often, stay longer, reach deeper inland and flood higher ground. Low tides are the opposite.">
+                        <span class="dlc-addon-opt-label">Tide level: <strong id="tideLevelName">${esc(TIDE_LEVEL_NAMES[tideLevel - 1])}</strong></span>
+                        <input type="range" min="1" max="5" step="1" value="${tideLevel}" aria-label="Tide level"
+                          oninput="previewTideLevel(this.value)" onchange="setTideLevel(this.value)" />
+                        <span class="dlc-addon-opt-ends"><span>Low</span><span>High</span></span>
+                      </div>`
+                    : ''
+                }
                 ${
                   isBlocked
                     ? `<button type="button" class="dlc-dep-btn" onclick="enableAddonWithDeps('${esc(a.id)}')" title="Click to enable required dependency">Needs ${esc(depLabels)} · Enable</button>`

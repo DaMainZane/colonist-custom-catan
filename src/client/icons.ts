@@ -54,7 +54,10 @@ const GLYPHS: Record<string, GlyphFn> = {
     <circle cx="-5.5" cy="0.5" r="5.2"/><circle cx="1" cy="-4.5" r="6.8"/><circle cx="7.5" cy="0" r="5"/>
     <rect x="-10.5" y="0" width="23" height="5.5"/>
     <rect x="-9" y="8.4" width="15" height="2.4" rx="1.2"/><rect x="-3" y="12" width="12" height="2.4" rx="1.2"/>
-  </g>`
+  </g>`,
+
+  // Tidebound fish token: body and tail in cream, eye cut out in the card color.
+  fish: () => `<g class="g-fish"><ellipse cx="-2" cy="0" rx="9.5" ry="6.2"/><path d="M6,0 L13.5,-6.5 L13.5,6.5 Z"/></g><circle class="g-fish-eye" cx="-6.5" cy="-1.6" r="1.5"/>`
 };
 
 // Packs that add resources or tiles register their own glyph, following the same rules.

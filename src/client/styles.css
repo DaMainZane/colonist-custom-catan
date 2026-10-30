@@ -75,6 +75,16 @@
   --robber: #38414a;
   --target-dark: #1f262d;
 
+  /* Tidebound tides: flooded tile, the warning a turn ahead, and the elevation heat map (darker = higher) */
+  --flood-tint: rgba(59, 126, 161, 0.34);
+  --flood-line: rgba(33, 92, 140, 0.85);
+  --flood-warn-tint: rgba(59, 126, 161, 0.14);
+  --flood-warn-line: rgba(33, 92, 140, 0.8);
+  --elev-1: rgba(236, 224, 168, 0.55);
+  --elev-2: rgba(201, 150, 84, 0.62);
+  --elev-3: rgba(122, 78, 52, 0.72);
+  --elev-ink: #2b2f33;
+
   /* shape, size, depth */
   --r-sm: 6px;
   --r: 8px;
@@ -102,6 +112,14 @@
   --ok: #6aa664;
   --dev: #7b6790;
   --shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  --flood-tint: rgba(118, 190, 222, 0.30);
+  --flood-line: rgba(168, 222, 245, 0.9);
+  --flood-warn-tint: rgba(118, 190, 222, 0.13);
+  --flood-warn-line: rgba(168, 222, 245, 0.85);
+  --elev-1: rgba(236, 224, 168, 0.40);
+  --elev-2: rgba(214, 160, 92, 0.52);
+  --elev-3: rgba(150, 98, 66, 0.66);
+  --elev-ink: #f4f1ea;
 }
 
 /* ---------- Base ---------- */
@@ -136,6 +154,8 @@ svg.glyph, svg.ui-icon { display: block; flex-shrink: 0; }
 .g-spark { fill: var(--glyph-wool); }
 .g-desert { fill: var(--glyph-desert); }
 .g-fog { fill: var(--glyph-fog); }
+.g-fish { fill: var(--glyph-wool); }
+.g-fish-eye { fill: var(--tile-water); }
 .g-dev { fill: var(--dev-ink); }
 .g-dev-bg { fill: var(--dev); }
 
@@ -522,6 +542,8 @@ svg#boardSvg.is-panning * {
 .card-wheat { background: var(--tile-wheat); }
 .card-ore { background: var(--tile-ore); }
 .card-gold { background: var(--tile-gold); }
+/* Tidebound fish token: a wild card that counts as any 1 resource (never in the bank). */
+.card-fish { background: var(--tile-water); }
 .card-dev { background: var(--dev); color: var(--dev-ink); }
 .card-mystery { background: var(--surface-3); color: var(--ink-dim); font-weight: 700; font-size: 22px; }
 
@@ -1592,6 +1614,28 @@ svg#boardSvg.is-panning * {
 .round-recap-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .round-recap-val { font-weight: 800; color: var(--ink); }
 .round-recap-foot { display: flex; justify-content: flex-end; }
+
+/* ---------- DLC addon option row (Tides level slider) ---------- */
+.dlc-addon-opt { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px 24px; max-width: 260px; }
+.dlc-addon-opt-label { font-size: 12px; color: var(--ink-dim); font-weight: 700; }
+.dlc-addon-opt-label strong { color: var(--ink); }
+.dlc-addon-opt input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent, currentColor); }
+.dlc-addon-opt-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-dim); }
+
+/* ---------- Tidebound tides: warning flash, elevation heat map, nav toggle ---------- */
+/* The warning is dashed waves on a light tint that fades up and down now and then (a quiet flash, not a blink). */
+.hex-overlay-flood-warn .hex-overlay-poly { animation: floodWarnFlash 3.2s ease-in-out infinite; }
+@keyframes floodWarnFlash {
+  0%, 55% { opacity: 0.55; }
+  75% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+.hex-elev { stroke: none; }
+.hex-elev-1 { fill: var(--elev-1); }
+.hex-elev-2 { fill: var(--elev-2); }
+.hex-elev-3 { fill: var(--elev-3); }
+.hex-elev-label { fill: var(--elev-ink); font-size: 14px; font-weight: 800; text-anchor: middle; letter-spacing: 0.08em; }
+.nav-btn.on { background: var(--accent); color: var(--on-accent); }
 
 /* ---------- Motion preferences ---------- */
 @media (prefers-reduced-motion: reduce) {
