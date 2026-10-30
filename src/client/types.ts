@@ -50,6 +50,8 @@ export interface PlayerView {
   pieceCosts?: Record<string, Resources>;
   /** Your price to upgrade a rickety bridge to a full bridge. Only sent to you, and only when rickety bridges are in the game. */
   bridgeUpgradeCost?: Resources;
+  /** Whether you have Salvage Crew and can demolish your own bridges on your turn (T11f). */
+  canDemolishBridge?: boolean;
   stats?: {
     resourcesEarned: number;
     tradesMade: number;
@@ -245,12 +247,13 @@ export interface TechRowView {
   id: string;
   name: string;
   branch: string;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
+  path?: 'expansion' | 'industrial';
   description: string;
   prereqs: string[];
   /** Your price in cards. */
   cost: number;
-  /** What research takes (wheat + ore). */
+  /** What research takes (branch resources). */
   payment: Resources;
   owned: boolean;
   canResearch: boolean;

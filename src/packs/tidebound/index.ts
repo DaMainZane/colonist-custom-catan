@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -13,10 +13,15 @@ export {
   BRIDGE,
   BRIDGE_BASE_LIMIT,
   BRIDGE_COST,
+  DEMOLISH_BRIDGE,
   bridgeBotGoal,
+  bridgeDemolishRefund,
+  bridgePaidResources,
   bridgePiece,
   bridgesAddon,
+  canDemolishBridge,
   canPlaceBridge,
+  demolishBridgeAction,
   isOceanEdge
 } from './bridges';
 
@@ -28,6 +33,7 @@ export {
   HARBOR_MAX_TRADES,
   HARBOR_UPGRADE_ID,
   TECH_HARBOR_EMPIRE,
+  TECH_HARBOR_MASTER,
   UPGRADE_HARBOR,
   canUpgradeHarbor,
   harborAddon,
@@ -65,7 +71,12 @@ export {
   NET_BOT_MAX,
   NET_CATCH_CHANCE,
   NET_COST,
+  NET_WORKS_BOOSTED_CHANCE,
+  NET_WORKS_CATCH_CHANCE,
+  NET_WORKS_SAVE_BOOST_CHANCE,
   SPEND_FISH,
+  TECH_FISHING_NETS,
+  TECH_NET_WORKS,
   canPlaceNet,
   feedSeaAction,
   feedSpotsView,
@@ -81,6 +92,7 @@ export {
   netPiece,
   netSeaHexIds,
   netSpotsView,
+  netWorksCostMod,
   replenishFish,
   seaHexIdsAt,
   spendFishAction,
@@ -92,11 +104,16 @@ export {
   RICKETY_COST,
   RICKETY_HEALTH,
   RICKETY_SEVEN_STEP_ID,
+  RICKETY_TECH_CAP_BONUS,
   RICKETY_UPGRADE_COST,
   RICKETY_UPGRADE_ID,
+  TECH_RICKETY_BRIDGES,
   UPGRADE_BRIDGE,
   bridgeUpgradeView,
   bridgesOnBoard,
+  canPlaceRicketyBridge,
+  effectiveBridgeBaseLimit,
+  effectiveBridgeSupplyCap,
   ricketyBotGoal,
   ricketyBridgesAddon,
   ricketyCollapseStep,
@@ -107,6 +124,23 @@ export {
   upgradeBridgeAction,
   upgradeBridgeCost
 } from './ricketyBridges';
+
+export {
+  GRAND_CAUSEWAY_BONUS_VP,
+  GRAND_CAUSEWAY_VP,
+  HARBOR_EMPIRE_RNG_SALT,
+  TECH_GRAND_CAUSEWAY,
+  TECH_HARBOR_CHARTERS,
+  TIDEBOUND_TECH_DEFS,
+  deriveHarborEmpireRng,
+  grandCausewayBonusVp,
+  grandCausewayVpHook,
+  grantHarborEmpireCards,
+  harborEmpireGrantCount,
+  longestRoadHasBridge,
+  registerTideboundTechs,
+  techGate
+} from './tech';
 
 export {
   FLOODED,
@@ -159,6 +193,7 @@ export {
   PIRATE_MAX,
   PIRATE_MAX_STRENGTH,
   PIRATE_ROB_CARDS,
+  TECH_PIRATE_HUNTER,
   activePirates,
   canDrivePirate,
   derivePirateRng,

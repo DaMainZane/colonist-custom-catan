@@ -727,8 +727,9 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('upgradePort', safe(({ code, vertexId }) => act(code, 'upgrade_port', { vertexId }, true)));
     // Tidebound T8a: upgrade one of your port cities to a 1:1 harbor (limit 1, max 4 1:1 trades/turn, works while flooded).
     socket.on('upgradeHarbor', safe(({ code, vertexId }) => act(code, 'upgrade_harbor', { vertexId }, true)));
-    // Tidebound T4c: turn one of your rickety bridges into a full bridge.
+    // Tidebound T4c / T11f: turn one of your rickety bridges into a full bridge, or demolish one of your bridges (Salvage Crew).
     socket.on('upgradeBridge', safe(({ code, edgeId }) => act(code, 'upgrade_bridge', { edgeId }, true)));
+    socket.on('demolishBridge', safe(({ code, edgeId }) => act(code, 'demolish_bridge', { edgeId }, true)));
     socket.on('convertTile', safe(({ code, hexId, resource }) => act(code, 'convert_tile', { hexId, resource }, true)));
     socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
     // Tidebound T7a: spend one fish token as any 1 resource, and discard fish on a 7 (`wild` = `{ fish: n }` next to the resource cards).

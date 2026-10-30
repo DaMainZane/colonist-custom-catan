@@ -31,14 +31,16 @@ import type {
 } from '../../shared';
 import { CITY, SETTLEMENT } from '../base/constants';
 import { seaHexIdsAt } from './fishing';
+import { registerTideboundTechs, TECH_PIRATE_HUNTER } from './tech';
 import {
-  TECH_SALVAGE_CREW,
   WRECK_MAX_PLAYER_DIST,
   isWreckSeaHex,
   minPlayerDistanceToHex,
   playerTouchesWreck,
   verticesOfHex
 } from './wrecks';
+
+export { TECH_PIRATE_HUNTER };
 
 /** Marker kind stored in `g.ext.core.markers` for pirates. Pirates have no countdown: they stay until driven off. */
 export const PIRATE_MARKER_KIND = 'pirate';
@@ -57,7 +59,7 @@ export const PIRATE_GROWTH_ROUNDS = 6;
 export const PIRATE_MAX_STRENGTH = 5;
 /** Loot cards = `PIRATE_LOOT_BASE + strength`, one resource type, paid from the bank (sea wreck pays 3 to 5 before scaling). Loot and knights needed scale by the same step. */
 export const PIRATE_LOOT_BASE = 4;
-/** Expansion tier 3a tech (`TECH_SALVAGE_CREW`, T11): 2 fewer knights needed (never below 1) and +50% loot. Read through `hasTech`, so nothing changes until T11 registers the node. */
+/** Expansion tier 3b tech (`TECH_PIRATE_HUNTER`, T11d): 2 fewer knights needed (never below 1) and +50% loot. */
 export const PIRATE_CREW_KNIGHT_DISCOUNT = 2;
 export const PIRATE_CREW_LOOT_MULT = 1.5;
 /** Cards a pirate takes from each settlement or city in contact with it: 2x the 1 card of a robber steal (T10c). */
@@ -176,13 +178,13 @@ export function pirateKnights(g: GameState, pid: Id): number {
   return Math.max(0, Math.floor(Number(getPlayer(g, pid)?.stats?.knightsPlayed) || 0));
 }
 
-/** Played knights `pid` needs to drive off a pirate of `strength`: the strength itself, 2 fewer with Salvage crew (never below 1). */
+/** Played knights `pid` needs to drive off a pirate of `strength`: the strength itself, 2 fewer with Pirate hunter (never below 1). */
 export function pirateKnightsNeeded(g: GameState, pid: Id, strength: number): number {
   const s = Math.max(1, Math.floor(Number(strength) || 1));
-  return hasTech(g, pid, TECH_SALVAGE_CREW) ? Math.max(1, s - PIRATE_CREW_KNIGHT_DISCOUNT) : s;
+  return hasTech(g, pid, TECH_PIRATE_HUNTER) ? Math.max(1, s - PIRATE_CREW_KNIGHT_DISCOUNT) : s;
 }
 
-/** Cards a pirate of `strength` pays out: `PIRATE_LOOT_BASE + strength`, +50% with Salvage crew. */
+/** Cards a pirate of `strength` pays out: `PIRATE_LOOT_BASE + strength`, +50% with Pirate hunter. */
 export function pirateLootCards(strength: number, hasCrew = false): number {
   const s = Math.max(1, Math.floor(Number(strength) || 1));
   const base = PIRATE_LOOT_BASE + s;
@@ -558,7 +560,7 @@ export const driveOffPirateAction: ActionDef = {
     const stocked = [...reg.resources.keys()].filter(r => (g.bank[r] || 0) > 0);
     const kinds = stocked.length > 0 ? stocked : [...reg.resources.keys()];
     const resource = kinds[rngInt(rng, Math.max(1, kinds.length))] || 'wood';
-    const wanted = pirateLootCards(pl.strength, hasTech(g, pid, TECH_SALVAGE_CREW));
+    const wanted = pirateLootCards(pl.strength, hasTech(g, pid, TECH_PIRATE_HUNTER));
     const paid = bankGive(ctx, pid, resource, wanted);
 
     removeMarker(g, m.id);
@@ -644,6 +646,7 @@ export const piratesAddon: AddonDef = {
     { target: 'tidebound.wrecks', kind: 'content' }
   ],
   register(api) {
+    registerTideboundTechs(api);
     api.define(EVENT_CARDS, pirateRaidCard);
     api.define(BOT_GOALS, pirateBotGoal);
     api.action(driveOffPirateAction);

@@ -893,7 +893,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         <line class="road-hit" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
           onmouseenter="onRoadHover(${e.id}, event)"
           onmousemove="onRoadMove(event)"
-          onmouseleave="onRoadLeave()"${isRickety && ownerId === socket.id ? ` onclick="clickPlacedBridge(${e.id})" style="cursor:pointer"` : ''} />`;
+          onmouseleave="onRoadLeave()"${isBridge && ownerId === socket.id ? ` onclick="clickPlacedBridge(${e.id})" style="cursor:pointer"` : ''} />`;
     }
 
     layers.roadRimsLayer.innerHTML = roadRimsHtml;

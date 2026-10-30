@@ -1,7 +1,7 @@
 // MODULE: actions "upgrade_port" (Tidebound Harbor charters: raise a whole port 3:1 to 2:1) and "convert_tile" (Wild Earth Ground work) | USED BY: packs/base/actions/index
 import { canAfford, getPlayer, hasTech, payToBank, priceOfUpgrade } from '../../../shared';
 import type { ActionDef } from '../../../shared';
-import { CITY, GENERIC_PORT } from '../constants';
+import { CITY, GENERIC_PORT, SETTLEMENT } from '../constants';
 import {
   basicTileIds,
   groundWorkSourceError,
@@ -15,7 +15,8 @@ import {
 } from '../techEffects';
 
 /**
- * Harbor charters (Raise the Port): a city on a 3:1 port becomes a 2:1 port for every resource. It stays an 'any resource' port.
+ * Harbor charters (Raise the Port): a city (or settlement when `tidebound.fishing_nets` is owned) on a 3:1 port
+ * becomes a 2:1 port for every resource. It stays an 'any resource' port.
  * The port id on the vertex does not change; the upgrade is stored in `g.ext.core.portUpgrades[vertexId]`
  * as `{ level: 1, by }` (level = step on the port ladder) and read by the trade ratio modifier in `techEffects.ts`.
  * The payload is just `{ vertexId }`: there is no resource choice.
@@ -29,7 +30,16 @@ export const upgradePortAction: ActionDef = {
     if (!hasTech(g, pid, TECH_HARBOR_CHARTERS)) return 'Research Harbor charters first';
     const v = Number.isInteger(payload?.vertexId) ? g.board.vertices[payload.vertexId] : undefined;
     if (!v) return 'Choose a harbor city';
-    if (!v.piece || v.piece.owner !== pid || v.piece.type !== CITY) return 'A harbor upgrade needs your own city';
+    const allowSettlement = hasTech(g, pid, 'tidebound.fishing_nets');
+    if (
+      !v.piece ||
+      v.piece.owner !== pid ||
+      (v.piece.type !== CITY && !(allowSettlement && v.piece.type === SETTLEMENT))
+    ) {
+      return allowSettlement
+        ? 'A harbor upgrade needs your own settlement or city'
+        : 'A harbor upgrade needs your own city';
+    }
     if (v.port !== GENERIC_PORT) return 'Only a 3:1 port can be upgraded';
     if (portLevel(g, v.id) >= 1) return 'That port is already upgraded';
     if (!canAfford(p, priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST))) return 'Not enough resources for a port upgrade';
@@ -51,9 +61,11 @@ export const upgradePortAction: ActionDef = {
   legal(ctx, pid) {
     const { g } = ctx;
     if (!hasTech(g, pid, TECH_HARBOR_CHARTERS)) return [];
+    const allowSettlement = hasTech(g, pid, 'tidebound.fishing_nets');
     const out: { vertexId: number }[] = [];
     for (const v of g.board.vertices) {
-      if (v.piece?.owner !== pid || v.piece.type !== CITY || v.port !== GENERIC_PORT) continue;
+      if (v.piece?.owner !== pid || v.port !== GENERIC_PORT) continue;
+      if (v.piece.type !== CITY && !(allowSettlement && v.piece.type === SETTLEMENT)) continue;
       out.push({ vertexId: v.id });
     }
     return out;

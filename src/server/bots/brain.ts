@@ -909,8 +909,14 @@ function planList(dc: Dc): Plan[] {
     }
     if (dc.tier.id !== 'main' && hasTech(g, p.id, TECH_HARBOR_CHARTERS)) {
       const upgrades = portUpgrades(g);
+      const allowSettlement = hasTech(g, p.id, 'tidebound.fishing_nets');
       const portCity = g.board.vertices.find(
-        v => v.piece?.owner === p.id && v.piece.type === CITY && v.port && reg.ports.get(v.port)?.resource === null && !upgrades[v.id]
+        v =>
+          v.piece?.owner === p.id &&
+          (v.piece.type === CITY || (allowSettlement && v.piece.type === SETTLEMENT)) &&
+          v.port &&
+          reg.ports.get(v.port)?.resource === null &&
+          !upgrades[v.id]
       );
       if (portCity) {
         // The whole port drops to 2:1, so it pays off when the bot makes or holds a lot of any resource it still trades above 2:1.
@@ -1276,6 +1282,22 @@ function techValue(dc: Dc, techId: string): number {
       if (touchesWeakLand) return 12;
       return 6;
     }
+    case 'tidebound.rickety_bridges':
+      return reg.pieces.has('bridge') ? 16 + (dc.personality === 'roadHog' ? 5 : 0) : 0;
+    case 'tidebound.fishing_nets':
+      return reg.pieces.has('net') ? 16 + (dc.personality === 'portTrader' ? 4 : 0) : 12;
+    case 'tidebound.salvage_crew':
+      return 14 + ((g.ext?.wrecks?.list?.length || 0) > 0 ? 6 : 0);
+    case 'tidebound.net_works':
+      return reg.pieces.has('net') ? 16 : 0;
+    case 'tidebound.pirate_hunter':
+      return (g.ext?.pirates?.list?.length || 0) > 0 ? 18 : 11;
+    case 'tidebound.harbor_master':
+      return reg.actions.has('upgrade_harbor') || reg.actions.has('feed_sea') ? 17 : 0;
+    case 'tidebound.grand_causeway':
+      return reg.pieces.has('bridge') ? 22 + ((p.stats.longestRoad || 0) >= 5 ? 8 : 0) : 0;
+    case 'tidebound.harbor_empire':
+      return 20;
     default:
       return 10;
   }

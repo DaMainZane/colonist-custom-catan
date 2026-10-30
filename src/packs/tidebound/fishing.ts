@@ -1,12 +1,44 @@
-// MODULE: tidebound.fishing addon (T7a fish wild token: spend action, counts for a 7 discard, can be stolen, never in the bank; T7b1 fishing net piece, coast placement rule, catch on every roll; T7b2 net spots for the client view and the net bot goal; T7c fish icon boosts: a sea tile with boosts left doubles a net's catch chance and loses one boost per catch; T7d tide replenish: tides refill icons slowly, a deeper tide faster; T7e feed the sea: 1 wheat fills a ground next to your net; `fishClientView` and `feedSpotsView` for the client) | USED BY: packs/tidebound, server/view, tests
-import { BOT_GOALS, getPlayer, getWildTokens, grantWildToken, makeCtx, placedCount, priceOf, spendWildToken, totalCards, WILD_TOKENS } from '../../shared';
-import type { ActionDef, AddonDef, BotGoalDef, BotGoalItem, Ctx, GameState, Hex, Id, PieceDef, PlayerState, Registry, Resources, WildTokenDef } from '../../shared';
+// MODULE: tidebound.fishing addon (T7a fish wild token: spend action, counts for a 7 discard, can be stolen, never in the bank; T7b1 fishing net piece, coast placement rule, catch on every roll; T7b2 net spots for the client view and the net bot goal; T7c fish icon boosts: a sea tile with boosts left doubles a net's catch chance and loses one boost per catch; T7d tide replenish: tides refill icons slowly, a deeper tide faster; T7e feed the sea: 1 wheat fills a ground next to your net; T11c/d/e tech gates & Net works) | USED BY: packs/tidebound, server/view, tests
+import {
+  BOT_GOALS,
+  COST_MODS,
+  getPlayer,
+  getWildTokens,
+  grantWildToken,
+  hasTech,
+  makeCtx,
+  placedCount,
+  priceOf,
+  spendWildToken,
+  techGate,
+  totalCards,
+  WILD_TOKENS
+} from '../../shared';
+import type {
+  ActionDef,
+  AddonDef,
+  BotGoalDef,
+  BotGoalItem,
+  CostModifier,
+  Ctx,
+  GameState,
+  Hex,
+  Id,
+  PieceDef,
+  PlayerState,
+  Registry,
+  Resources,
+  WildTokenDef
+} from '../../shared';
 import { createRng, rngNext } from '../../shared/rng';
 import { CITY, SETTLEMENT } from '../base/constants';
 import { ownsRoadAt } from '../base/placement';
 import { FISH_BOOSTS } from './seaData';
+import { registerTideboundTechs, TECH_FISHING_NETS, TECH_HARBOR_MASTER, TECH_NET_WORKS } from './tech';
 import { floodDepthAt, tideLevelOf } from './tides';
 import type { TideState } from './tides';
+
+export { TECH_FISHING_NETS, TECH_HARBOR_MASTER, TECH_NET_WORKS };
 
 /** Wild token id of the fish (also in the shared `BUILTIN_WILD_IDS`, so `isWildTokenResource` already knows it). */
 export const FISH = 'fish';
@@ -78,6 +110,7 @@ export const FEED_BOT_SPARE = 4;
  */
 function feedSeaScore(ctx: Ctx, pid: Id, hexId: unknown): number {
   const { g } = ctx;
+  if (!techGate(g, pid, TECH_HARBOR_MASTER)) return 0;
   const p = getPlayer(g, pid);
   const hex = typeof hexId === 'number' ? g.board.hexes[hexId] : undefined;
   if (!p || !hex) return 0;
@@ -114,7 +147,7 @@ export const fishBotGoal: BotGoalDef = {
   }
 };
 
-// ---- T7b1: fishing nets ---------------------------------------------------------------------------------------------------
+// ---- T7b1 & T11d: fishing nets & Net works -------------------------------------------------------------------------------
 
 // A net is a vertex piece on a coast vertex (one that touches land and at least one sea tile), joined to your own road or bridge like a settlement.
 // It makes no number and takes no tile: on every roll each net has a small chance to catch one fish for its owner. Nets ignore Tides (nothing
@@ -123,20 +156,41 @@ export const fishBotGoal: BotGoalDef = {
 
 /** Piece id of the fishing net. */
 export const NET = 'net';
-/** Placeholder price: 2 wood + 1 sheep, so a net does not compete with a settlement for brick, ore or wheat. Net works (a later tech) takes 1 off. Tune in T14. */
+/** Base price: 2 wood + 1 sheep, so a net does not compete with a settlement for brick, ore or wheat. Net works (T11d) takes 1 wood off. */
 export const NET_COST: Resources = { wood: 2, sheep: 1 };
-/** Nets one player may have on the board before the next costs double. Scaled by land radius and VP like bridges. Placeholder: tune in T14. */
+/** Nets one player may have on the board before the next costs double. Scaled by land radius and VP like bridges. */
 export const NET_BASE_LIMIT = 4;
-/** Chance one net catches a fish on one roll (1 in 6, a trickle). A fish icon with boosts left doubles it (T7c); Net works (a later tech) raises the base to 1 in 4. */
+/** Chance one net catches a fish on one roll (1 in 6, a trickle). A fish icon with boosts left doubles it (T7c); Net works (T11d) raises the base to 1 in 4. */
 export const NET_CATCH_CHANCE = 1 / 6;
+/** Base catch chance of a net when its owner has researched `tidebound.net_works` (1 in 4). */
+export const NET_WORKS_CATCH_CHANCE = 1 / 4;
 /** A fish icon at a net doubles the catch chance while it has boosts left (T7c). */
 export const FISH_ICON_MULTIPLIER = 2;
 /** The catch chance of a net with at least one boosted sea tile (1 in 3). */
 export const NET_BOOSTED_CHANCE = NET_CATCH_CHANCE * FISH_ICON_MULTIPLIER;
+/** Boosted catch chance of a net when its owner has researched `tidebound.net_works` (1 in 2). */
+export const NET_WORKS_BOOSTED_CHANCE = NET_WORKS_CATCH_CHANCE * FISH_ICON_MULTIPLIER;
+/** Chance that a boosted catch does NOT consume a fish boost when the owner has researched `tidebound.net_works` (1 in 3). */
+export const NET_WORKS_SAVE_BOOST_CHANCE = 1 / 3;
 /** Mixed into the world seed to get the net draws (the tide stream and the event deck use other salts). */
 const NET_SEED_SALT = 0x6e657473;
+/** Mixed into the world seed to get the Net works boost-save draws (T11d). */
+const NET_BOOST_SAVE_SALT = 0x6e777376;
 /** Mixed into the world seed to get the tide replenish draws (T7d). */
 const FISH_REPLENISH_SALT = 0x66697368;
+
+/**
+ * `COST_MODS` entry for `tidebound.net_works` (T11d):
+ * Reduces the wood cost of building a `net` by 1 (so 2 wood + 1 sheep becomes 1 wood + 1 sheep at 1x, or 3 wood + 2 sheep at 2x).
+ */
+export const netWorksCostMod: CostModifier = {
+  id: 'tidebound.net_works',
+  replace: true,
+  apply(g: GameState, p: PlayerState, def: PieceDef, cost: Resources): Resources {
+    if (def.id !== NET || !hasTech(g, p.id, TECH_NET_WORKS)) return cost;
+    return { ...cost, wood: Math.max(0, (cost.wood || 0) - 1) };
+  }
+};
 
 /** Neighbour of a hex across its edge i (the edge between corner i and corner i + 1). Same table as `shared/topology.ts`. */
 const EDGE_DIR: [number, number][] = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
@@ -183,12 +237,13 @@ export function seaHexIdsAt(g: GameState, reg: Registry, vertexId: number): numb
 }
 
 /**
- * Placement: build phase only, an empty coast vertex (touches land and at least one sea tile) next to a road, bridge or rickety bridge you own.
- * There is no distance rule between nets and other pieces. Never on a port vertex (T7b2): `ratioFor` gives a port to ANY piece of yours on its vertex,
- * so a 3-card net there would be a port without a settlement. The cheap checks come first because the build action tries every vertex.
+ * Placement: build phase only, gated by `techGate(ctx.g, pid, TECH_FISHING_NETS)`, an empty coast vertex (touches land and at least one sea tile)
+ * next to a road, bridge or rickety bridge you own. There is no distance rule between nets and other pieces. Never on a port vertex (T7b2):
+ * `ratioFor` gives a port to ANY piece of yours on its vertex, so a 3-card net there would be a port without a settlement.
  */
 export function canPlaceNet(ctx: Ctx, pid: Id, vertexId: number, mode: 'setup' | 'build'): boolean {
   if (mode !== 'build') return false;
+  if (!techGate(ctx.g, pid, TECH_FISHING_NETS)) return false;
   const v = ctx.g.board.vertices[vertexId];
   if (!v || v.piece || v.port || v.hexIds.length === 0) return false;
   if (!v.edgeIds.some(eId => ownsRoadAt(ctx, pid, eId))) return false;
@@ -264,9 +319,8 @@ function richestGround(g: GameState, seaIds: number[]): number | null {
  * A hit gives its owner one fish. A net that no longer touches a sea tile catches nothing. Draws nothing from `g.rng`.
  *
  * T7c: when at least one sea tile at the net still has a fish boost, the chance is doubled (1 in 3), and every fish caught that way uses up one
- * boost of the richest such tile (ties go to the lowest tile id), so a full icon is good for 4 fish. The draw is the same number either way, so
- * every roll that catches at the base chance also catches when boosted. With no boost left (or no icon) the net is back to 1 in 6, and an icon
- * that ran out stays on the tile at 0.
+ * boost of the richest such tile (ties go to the lowest tile id), so a full icon is good for 4 fish.
+ * T11d (`tidebound.net_works`): base catch chance rises to 1 in 4 (boosted 1 in 2), and a boosted catch has a 1 in 3 chance to NOT consume a boost.
  */
 export function netCatchOnRoll(ctx: Ctx, _sum: number): void {
   const { g, reg } = ctx;
@@ -275,21 +329,43 @@ export function netCatchOnRoll(ctx: Ctx, _sum: number): void {
     if (v.piece?.type !== NET) continue;
     const sea = seaHexIdsAt(g, reg, v.id);
     if (sea.length === 0) continue;
-    const ground = richestGround(g, sea);
-    const chance = ground === null ? NET_CATCH_CHANCE : NET_BOOSTED_CHANCE;
-    if (netDraw(g.seed, roll, v.id) >= chance) continue;
     const owner = getPlayer(g, v.piece.owner);
     if (!owner) continue;
+    const hasNetWorks = hasTech(g, owner.id, TECH_NET_WORKS);
+    const baseChance = hasNetWorks ? NET_WORKS_CATCH_CHANCE : NET_CATCH_CHANCE;
+    const boostedChance = hasNetWorks ? NET_WORKS_BOOSTED_CHANCE : NET_BOOSTED_CHANCE;
+    const ground = richestGround(g, sea);
+    const chance = ground === null ? baseChance : boostedChance;
+    if (netDraw(g.seed, roll, v.id) >= chance) continue;
     grantWildToken(ctx, owner.id, FISH, 1);
     owner.stats.fishCaught = (owner.stats.fishCaught || 0) + 1;
     let left: number | null = null;
+    let savedBoost = false;
     if (ground !== null) {
       const hex = g.board.hexes[ground];
-      left = Math.max(0, (fishLeft(hex) ?? 0) - 1);
-      hex.ext.fish = left;
+      const curLeft = fishLeft(hex) ?? 0;
+      if (hasNetWorks && hashDraw(g.seed, NET_BOOST_SAVE_SALT, roll, v.id) < NET_WORKS_SAVE_BOOST_CHANCE) {
+        left = curLeft;
+        savedBoost = true;
+      } else {
+        left = Math.max(0, curLeft - 1);
+        hex.ext.fish = left;
+      }
     }
-    ctx.emit('fishCaught', { playerId: owner.id, vertexId: v.id, amount: 1, ...(ground !== null ? { hexId: ground, left } : {}) });
-    const rest = ground === null ? '' : left === 0 ? ' (that fishing ground is used up)' : ` (${left} ${left === 1 ? 'boost' : 'boosts'} left on that ground)`;
+    ctx.emit('fishCaught', {
+      playerId: owner.id,
+      vertexId: v.id,
+      amount: 1,
+      ...(ground !== null ? { hexId: ground, left, savedBoost } : {})
+    });
+    const rest =
+      ground === null
+        ? ''
+        : savedBoost
+          ? ` (Net works saved the boost — ${left} left)`
+          : left === 0
+            ? ' (that fishing ground is used up)'
+            : ` (${left} ${left === 1 ? 'boost' : 'boosts'} left on that ground)`;
     ctx.log(`🎣 ${owner.avatar} ${owner.name}'s net caught a fish${rest}`, owner.color);
   }
 }
@@ -358,7 +434,7 @@ export function replenishFish(ctx: Ctx): number[] {
   return grown;
 }
 
-// ---- T7e: feed the sea ----------------------------------------------------------------------------------------------------
+// ---- T7e & T11e: feed the sea (gated by Harbor master when Tech Tree is on) ----------------------------------------------
 
 /** Can this player pay the price of feeding the sea? (Only resources the registry knows can pay.) */
 function canAffordFeed(p: PlayerState, reg: Registry): boolean {
@@ -385,8 +461,8 @@ export function feedableHexIds(g: GameState, reg: Registry, pid: Id): number[] {
 /**
  * Feed the sea. Payload `{ hexId }`. Main phase of your own turn (`api.phaseAction`). Pays `FEED_SEA_COST` (1 wheat) into the bank and sets the
  * sea tile to FISH_BOOSTS: a tile with no icon gets one, an empty one is refilled at once, a half-full one is topped up. A full tile is refused
- * (nothing to buy). The tile must be open sea next to one of YOUR nets, so a net is what makes a ground yours to feed. Tides refill icons
- * slowly by themselves (T7d); this is the fast, paid version. No RNG.
+ * (nothing to buy). The tile must be open sea next to one of YOUR nets, so a net is what makes a ground yours to feed. Gated by
+ * `techGate(g, pid, TECH_HARBOR_MASTER)` when the Tech Tree is on (T11e). No RNG.
  */
 export const feedSeaAction: ActionDef = {
   type: FEED_SEA,
@@ -394,6 +470,7 @@ export const feedSeaAction: ActionDef = {
     const { g, reg } = ctx;
     const p = getPlayer(g, pid);
     if (!p) return 'Unknown player';
+    if (!techGate(g, pid, TECH_HARBOR_MASTER)) return 'Research Harbor master first';
     const id = payload?.hexId;
     if (!Number.isInteger(id)) return 'Choose a sea tile to feed';
     const hex = g.board.hexes[id];
@@ -422,6 +499,7 @@ export const feedSeaAction: ActionDef = {
     ctx.log(`🌊 ${p.avatar} ${p.name} fed the sea: ${before === null ? 'a new fishing ground' : 'a fishing ground is full again'}`, p.color);
   },
   legal(ctx: Ctx, pid: Id): { hexId: number }[] {
+    if (!techGate(ctx.g, pid, TECH_HARBOR_MASTER)) return [];
     const p = getPlayer(ctx.g, pid);
     if (!p || !canAffordFeed(p, ctx.reg)) return [];
     return feedableHexIds(ctx.g, ctx.reg, pid).map(hexId => ({ hexId }));
@@ -451,11 +529,12 @@ export function fishClientView(g: GameState, reg: Registry): Record<number, numb
 
 /**
  * The sea tiles this player could feed right now: what the client draws as clickable grounds in feed mode. `undefined` when feeding the sea is not
- * in the game, or it is not this player's turn in the main phase; `[]` when they cannot pay or have no net with a ground that has room. The server
- * checks everything again when the action arrives.
+ * in the game, locked behind `tidebound.harbor_master`, or it is not this player's turn in the main phase; `[]` when they cannot pay or have no net
+ * with a ground that has room.
  */
 export function feedSpotsView(g: GameState, reg: Registry, p: PlayerState): number[] | undefined {
   if (!reg.actions.has(FEED_SEA)) return undefined;
+  if (!techGate(g, p.id, TECH_HARBOR_MASTER)) return undefined;
   if (g.phase !== 'main' || g.players[g.turn]?.id !== p.id) return undefined;
   if (!canAffordFeed(p, reg)) return [];
   return feedableHexIds(g, reg, p.id);
@@ -464,12 +543,13 @@ export function feedSpotsView(g: GameState, reg: Registry, p: PlayerState): numb
 // ---- T7b2: net spots for the client, and the net bot goal ---------------------------------------------------------------------
 
 /**
- * The vertices where this player could put a net right now: what the client draws as build spots. `undefined` when nets are not in the game, or
- * it is not this player's turn in the main phase, so a game without them (and every other viewer) gets nothing new. The price is not checked here:
- * the client reads it from `pieceCosts`, and the server checks it again when the build arrives.
+ * The vertices where this player could put a net right now: what the client draws as build spots. `undefined` when nets are not in the game,
+ * locked behind `tidebound.fishing_nets`, or it is not this player's turn in the main phase, so a game without them (and every other viewer) gets
+ * nothing new.
  */
 export function netSpotsView(g: GameState, reg: Registry, p: PlayerState): number[] | undefined {
   if (!reg.pieces.has(NET)) return undefined;
+  if (!techGate(g, p.id, TECH_FISHING_NETS)) return undefined;
   if (g.phase !== 'main' || g.players[g.turn]?.id !== p.id) return undefined;
   if ((p.pieces[NET] ?? 0) <= 0) return [];
   const ctx = makeCtx(g, reg);
@@ -493,6 +573,7 @@ export const netBotGoal: BotGoalDef = {
   goalClass: 'generic',
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
     const { g, reg } = ctx;
+    if (!techGate(g, pid, TECH_FISHING_NETS)) return [];
     const p = getPlayer(g, pid);
     if (!p || (p.pieces[NET] ?? 0) <= 0) return [];
     if (placedCount(g, pid, NET) >= NET_BOT_MAX) return [];
@@ -546,13 +627,15 @@ export const fishingAddon: AddonDef = {
   // Same supply rule as bridges: the base limit scales with land radius and VP (`PieceDef.scaleWithRadius`).
   rules: { pieceLimits: { [NET]: NET_BASE_LIMIT } },
   register(api) {
+    registerTideboundTechs(api);
     // T7a: the token and its spend action.
     api.define(WILD_TOKENS, fishToken);
     api.action(spendFishAction);
     api.phaseAction('main', SPEND_FISH);
     api.define(BOT_GOALS, fishBotGoal);
-    // T7b1: the net piece and its catch on every roll (T7c: boosted by fish icons). T7b2: the bot goal (the build button, spots and drawing are client work).
+    // T7b1 & T11d: the net piece, Net works cost modifier, and catch on every roll.
     api.piece(netPiece);
+    api.define(COST_MODS, netWorksCostMod);
     api.hook('onRoll', netCatchOnRoll);
     api.define(BOT_GOALS, netBotGoal);
     // T7d: tides refill fish icons at round start (a no-op while Tides is off). T7e: feed the sea.

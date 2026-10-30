@@ -428,11 +428,15 @@ export function canViewerPeekHand(g: GameState, viewerId: Id, targetId: Id): boo
 
 export const TECH_DEFS = 'techDefs';
 
+export type TechPath = 'expansion' | 'industrial';
+
 export interface TechDef {
   id: string;
   name: string;
   branch: string;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
+  /** Optional sub-path lane within a branch (`'expansion'` | `'industrial'`). */
+  path?: TechPath;
   /** One tech id, or several (all required), so later techs can need nodes from two branches. */
   prereq?: string | string[];
   /** Added to the tier in the cost formula (see `techCostCards`). Default 0. */
@@ -481,6 +485,17 @@ export function hasTech(g: GameState, pid: Id, techId: string): boolean {
   return getPlayerTechs(g, pid).includes(techId);
 }
 
+/**
+ * Tech-gating helper for DLC features:
+ * - When the Tech Tree expansion is OFF (`!g.rules?.techTreeOn`), returns `true`
+ *   so all enabled DLC addons work out of the box without needing research.
+ * - When the Tech Tree expansion is ON (`g.rules.techTreeOn === true`), returns
+ *   `hasTech(g, pid, techId)`.
+ */
+export function techGate(g: GameState, pid: Id, techId: string): boolean {
+  return !g.rules?.techTreeOn || hasTech(g, pid, techId);
+}
+
 /** Tech cost constants, all in one place. Tune them in the sim matrix (Tech Tree Design.md, section 2). */
 export const TECH_COST = { settlement: 1, city: 2, castle: 3, divisor: 3, floor: 2 };
 
@@ -505,7 +520,7 @@ export function techBuildingValue(g: GameState, pid: Id): number {
  *    and `divisor = max(TECH_COST.divisor, round(0.3 * vpToWin))` (3 at 10 VP, 8 at 25 VP).
  *  - If the player has 0 techs and qualifies for Catch-up (`isCatchUpEligible`), cost is reduced by 1 (never below the floor).
  */
-export function techCostCards(g: GameState, reg: Registry, pid: Id, tier: 1 | 2 | 3, offset = 0): number {
+export function techCostCards(g: GameState, reg: Registry, pid: Id, tier: 1 | 2 | 3 | 4, offset = 0): number {
   const v = techBuildingValue(g, pid);
   const vpToWin = Number(g.rules?.vpToWin) || 10;
   const divisor = Math.max(TECH_COST.divisor, Math.round(0.3 * vpToWin));
@@ -607,7 +622,8 @@ export interface TechRow {
   id: string;
   name: string;
   branch: string;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
+  path?: TechPath;
   description: string;
   prereqs: string[];
   /** This player's price in cards, at their current building value. */
@@ -637,6 +653,7 @@ export function techPanelFor(g: GameState, reg: Registry, pid: Id): TechRow[] {
       name: def.name,
       branch: def.branch,
       tier: def.tier,
+      path: def.path,
       description: def.description,
       prereqs: techPrereqs(def),
       cost,

@@ -1,6 +1,5 @@
-// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc) | USED BY: packs/tidebound, tests
+// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) | USED BY: packs/tidebound, tests
 import {
-  aboveBaseLimit,
   BOT_GOALS,
   canAfford,
   COST_MODS,
@@ -8,12 +7,14 @@ import {
   doubledCost,
   DURABILITY_DEFS,
   getPlayer,
+  hasTech,
   payToBank,
   placedCount,
   priceOf,
   priceOfUpgrade,
   SEVEN_STEP_ORDER,
   SEVEN_STEPS,
+  techGate,
   totalCards,
   updateAwards
 } from '../../shared';
@@ -47,8 +48,12 @@ export const RICKETY_UPGRADE_ID = 'upgrade_rickety_bridge';
 export const UPGRADE_BRIDGE = 'upgrade_bridge';
 /** Seven Resolver step id for collapsing rickety bridges on a 7 (T4d). */
 export const RICKETY_SEVEN_STEP_ID = 'tidebound.rickety_collapse';
+/** Tier 2 Expansion tech that unlocks rickety bridges and raises the bridge cap by +4 before 2x price (T11c). */
+export const TECH_RICKETY_BRIDGES = 'tidebound.rickety_bridges';
+/** Extra bridges allowed before the 2x cost threshold (and added to the bridge supply cap) when `tidebound.rickety_bridges` is owned. */
+export const RICKETY_TECH_CAP_BONUS = 4;
 
-// ---- Shared pool ---------------------------------------------------------------------------------------
+// ---- Shared pool & T11c +4 cap bonus -------------------------------------------------------------------
 
 /** Bridges plus rickety bridges this player has on the board. They share one pool, one cap and one 2x-cost threshold. */
 export function bridgesOnBoard(g: GameState, pid: Id): number {
@@ -56,7 +61,24 @@ export function bridgesOnBoard(g: GameState, pid: Id): number {
 }
 
 /**
- * Keeps the two supplies equal to the shared pool: cap (`rules.pieceLimits.bridge`, already scaled by radius and VP) minus what is on the board.
+ * Effective bridge count threshold before bridges / rickety bridges / bridge upgrades cost 2x:
+ * `baseLimit` (10 by default) + `RICKETY_TECH_CAP_BONUS` (4) when `pid` has researched `tidebound.rickety_bridges`.
+ */
+export function effectiveBridgeBaseLimit(g: GameState, pid: Id, baseLimit = BRIDGE_BASE_LIMIT): number {
+  return hasTech(g, pid, TECH_RICKETY_BRIDGES) ? baseLimit + RICKETY_TECH_CAP_BONUS : baseLimit;
+}
+
+/**
+ * Effective shared bridge supply cap for `pid`: `rules.pieceLimits.bridge` (already scaled by radius and VP)
+ * plus `+4` when `pid` has researched `tidebound.rickety_bridges`.
+ */
+export function effectiveBridgeSupplyCap(g: GameState, pid: Id): number {
+  const base = g.rules?.pieceLimits?.[BRIDGE] ?? BRIDGE_BASE_LIMIT;
+  return hasTech(g, pid, TECH_RICKETY_BRIDGES) ? base + RICKETY_TECH_CAP_BONUS : base;
+}
+
+/**
+ * Keeps the two supplies equal to the shared pool: `effectiveBridgeSupplyCap(g, pid)` minus what is on the board.
  * The engine reads one counter per piece id (`p.pieces[id]`), so the pool is kept as two mirrored counters and this puts both right.
  * It is cheap and safe to call at any time. T4d MUST call it after `damagePiece` breaks a rickety bridge, because that hands the piece
  * back to the rickety counter only.
@@ -64,13 +86,25 @@ export function bridgesOnBoard(g: GameState, pid: Id): number {
 export function syncBridgePool(g: GameState, pid: Id): void {
   const p = getPlayer(g, pid);
   if (!p) return;
-  const cap = g.rules.pieceLimits?.[BRIDGE] ?? BRIDGE_BASE_LIMIT;
+  const cap = effectiveBridgeSupplyCap(g, pid);
   const left = Math.max(0, cap - bridgesOnBoard(g, pid));
   p.pieces[BRIDGE] = left;
-  p.pieces[RICKETY] = left;
+  if (p.pieces[RICKETY] !== undefined || g.rules?.pieceLimits?.[RICKETY] !== undefined) {
+    p.pieces[RICKETY] = left;
+  }
 }
 
-// ---- T4a: the piece ------------------------------------------------------------------------------------
+// ---- T4a & T11c: the piece -----------------------------------------------------------------------------
+
+/**
+ * Rickety bridge placement rule:
+ * - Gated by `techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)` (always allowed when `techTreeOn` is off; requires `tidebound.rickety_bridges` when `techTreeOn` is on).
+ * - Otherwise identical to `canPlaceBridge` (ocean edges only, joined to your own building or road-like piece).
+ */
+export function canPlaceRicketyBridge(ctx: Ctx, pid: Id, edgeId: number, mode: 'setup' | 'build'): boolean {
+  if (!techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)) return false;
+  return canPlaceBridge(ctx, pid, edgeId, mode);
+}
 
 export const ricketyPiece: PieceDef = {
   id: RICKETY,
@@ -80,15 +114,13 @@ export const ricketyPiece: PieceDef = {
   vp: 0,
   produces: 0,
   baseLimit: BRIDGE_BASE_LIMIT,
-  // Counts for Longest Road and connects like a bridge. Collapse on a 7 and the Longest Road recalculation come in T4d and T4e.
   roadLike: true,
   scaleWithRadius: true,
   icon: '🪵',
-  // Same rule as a bridge: ocean edges only, joined to your own building or road-like piece.
-  canPlace: canPlaceBridge
+  canPlace: canPlaceRicketyBridge
 };
 
-/** Health 1. Nothing breaks it yet (T4d). `repairCost` is a placeholder: at full health 1 a repair is never legal. */
+/** Health 1. One hit on a 7 breaks it (T4d). `repairCost` is a placeholder: at full health 1 a repair is never legal. */
 export const ricketyDurability: DurabilityDef = {
   id: 'tidebound.rickety',
   pieceId: RICKETY,
@@ -97,33 +129,38 @@ export const ricketyDurability: DurabilityDef = {
 };
 
 /**
- * One 2x threshold for the whole pool: with 10 bridges and rickety bridges together on the board, the next of either costs double.
- * `priceOf` already doubles a piece when ITS OWN count has reached the base limit, so this only adds the doubling for the case where the
- * own count is below it but the pool is not (5 bridges + 5 rickety). Everything else, the upgrade price included, passes through.
+ * Shared 2x cost threshold for the bridge + rickety bridge pool, respecting the +4 cap bonus from `tidebound.rickety_bridges`.
+ * Note: `priceOf` checks `aboveBaseLimit(g, p, def)` (`placedCount >= 10`) before running `COST_MODS`. By computing from `def.cost`
+ * against `effectiveBridgeBaseLimit(g, p.id)` (10 normally, 14 with `tidebound.rickety_bridges`), this both shares the pool threshold
+ * across bridges + rickety bridges AND prevents premature doubling at 10..13 bridges when the tech is owned.
  */
 export const ricketyPoolCostMod: CostModifier = {
   id: 'tidebound.rickety_pool',
+  replace: true,
   apply(g: GameState, p: PlayerState, def: PieceDef, cost: Resources): Resources {
     if (def.id !== BRIDGE && def.id !== RICKETY) return cost;
-    if (aboveBaseLimit(g, p, def)) return cost;
-    return bridgesOnBoard(g, p.id) >= (def.baseLimit ?? BRIDGE_BASE_LIMIT) ? doubledCost(cost) : cost;
+    const limit = effectiveBridgeBaseLimit(g, p.id, def.baseLimit ?? BRIDGE_BASE_LIMIT);
+    return bridgesOnBoard(g, p.id) >= limit ? doubledCost(def.cost) : { ...def.cost };
   }
 };
 
 // ---- T4b: upgrade to a full bridge ----------------------------------------------------------------------
 
-/** What this player pays to upgrade one rickety bridge: 1 brick + 1 ore, doubled once the pool is at the base limit, then the cost modifiers. */
+/** What this player pays to upgrade one rickety bridge: 1 brick + 1 ore, doubled once the pool is at the effective base limit, then the cost modifiers. */
 export function upgradeBridgeCost(g: GameState, reg: Registry, p: PlayerState): Resources {
-  const base = bridgesOnBoard(g, p.id) >= BRIDGE_BASE_LIMIT ? doubledCost(RICKETY_UPGRADE_COST) : RICKETY_UPGRADE_COST;
+  const limit = effectiveBridgeBaseLimit(g, p.id, BRIDGE_BASE_LIMIT);
+  const base = bridgesOnBoard(g, p.id) >= limit ? doubledCost(RICKETY_UPGRADE_COST) : RICKETY_UPGRADE_COST;
   return priceOfUpgrade(g, reg, p, RICKETY_UPGRADE_ID, base);
 }
 
 /**
  * What the client needs to draw the upgrade button (T4c): this player's upgrade price, or `undefined` when rickety bridges are not in the game
- * (DLC or addon off), so a game without them sends nothing new.
+ * (DLC or addon off) or locked behind `tidebound.rickety_bridges`, so a game without them sends nothing new.
  */
 export function bridgeUpgradeView(g: GameState, reg: Registry, p: PlayerState): Resources | undefined {
-  return reg.pieces.has(RICKETY) ? upgradeBridgeCost(g, reg, p) : undefined;
+  if (!reg.pieces.has(RICKETY)) return undefined;
+  if (!techGate(g, p.id, TECH_RICKETY_BRIDGES)) return undefined;
+  return upgradeBridgeCost(g, reg, p);
 }
 
 /**
@@ -136,6 +173,7 @@ export const upgradeBridgeAction: ActionDef = {
     const { g, reg } = ctx;
     const p = getPlayer(g, pid);
     if (!p) return 'Unknown player';
+    if (!techGate(g, pid, TECH_RICKETY_BRIDGES)) return 'Research Rickety bridges first';
     const e = Number.isInteger(payload?.edgeId) ? g.board.edges[payload.edgeId] : undefined;
     if (!e) return 'Choose a rickety bridge';
     if (!e.piece || e.piece.owner !== pid || e.piece.type !== RICKETY) return 'Only your own rickety bridge can be upgraded';
@@ -154,6 +192,7 @@ export const upgradeBridgeAction: ActionDef = {
     ctx.log(`🌉 ${p.avatar} ${p.name} upgraded a rickety bridge to a full bridge`, p.color);
   },
   legal(ctx: Ctx, pid: Id): { edgeId: number }[] {
+    if (!techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)) return [];
     const out: { edgeId: number }[] = [];
     for (const e of ctx.g.board.edges) {
       if (e.piece?.owner === pid && e.piece.type === RICKETY) out.push({ edgeId: e.id });
@@ -173,6 +212,7 @@ export const ricketyBotGoal: BotGoalDef = {
   id: 'tidebound.rickety_bridges',
   goalClass: 'generic',
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
+    if (!techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)) return [];
     const p = getPlayer(ctx.g, pid);
     if (!p || (p.pieces[RICKETY] ?? 0) <= 0) return [];
     if (canAfford(p, priceOf(ctx.g, ctx.reg, p, bridgePiece))) return [];
@@ -189,6 +229,7 @@ export const ricketyBotGoal: BotGoalDef = {
   },
   actionScore(ctx: Ctx, pid: Id, action: { type: string; payload: any }): number {
     if (action.type !== UPGRADE_BRIDGE) return 0;
+    if (!techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)) return 0;
     const p = getPlayer(ctx.g, pid);
     if (!p) return 0;
     const cost = upgradeBridgeCost(ctx.g, ctx.reg, p);

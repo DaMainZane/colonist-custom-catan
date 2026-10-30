@@ -1,15 +1,21 @@
 // MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { encodeRecipe, getPlayer, isOtherVersion, publicVP, score, techPanelFor, totalCards, visibleWildCards, wildTokensOf } from '../shared';
+import { encodeRecipe, getPlayer, hasTech, isOtherVersion, publicVP, score, techPanelFor, totalCards, visibleWildCards, wildTokensOf } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
 import {
+  DEMOLISH_BRIDGE,
   FEED_SEA_COST,
+  TECH_FISHING_NETS,
+  TECH_HARBOR_MASTER,
+  TECH_RICKETY_BRIDGES,
+  TECH_SALVAGE_CREW,
   UPGRADE_HARBOR,
   bridgeUpgradeView,
   feedSpotsView,
   fishClientView,
+  grandCausewayBonusVp,
   harborClientView,
   harborCount,
   harborLimitFor,
@@ -19,6 +25,7 @@ import {
   netSpotsView,
   pirateClientView,
   pirateDriveView,
+  techGate,
   tideClientView,
   wreckClientView
 } from '../packs/tidebound';
@@ -76,6 +83,11 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
   const reveal = self || over || isSpectator;
   const reg = gameRegistry(g.rules);
   const harborsOn = reg.actions.has(UPGRADE_HARBOR);
+  const harborTechOk = harborsOn && techGate(g, p.id, TECH_HARBOR_MASTER);
+  const netTechOk = reg.pieces.has('net') && techGate(g, p.id, TECH_FISHING_NETS);
+  const ricketyTechOk = reg.pieces.has('rickety_bridge') && techGate(g, p.id, TECH_RICKETY_BRIDGES);
+  const feedTechOk = reg.actions.has('feed_sea') && techGate(g, p.id, TECH_HARBOR_MASTER);
+  const canDemolish = self && reg.actions.has(DEMOLISH_BRIDGE) && hasTech(g, p.id, TECH_SALVAGE_CREW);
 
   let settlementsOnBoard = 0;
   let citiesOnBoard = 0;
@@ -118,17 +130,19 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
     bridgesLeft: p.pieces.bridge ?? 0,
-    // Fishing nets (T7b2): supply left, and (yourself, on your main-phase turn) the vertices a net could go. Both undefined unless nets are in the game.
-    netsLeft: p.pieces.net,
+    // Fishing nets (T7b2): supply left, and (yourself, on your main-phase turn) the vertices a net could go. Both undefined unless nets are in the game and unlocked.
+    netsLeft: netTechOk ? p.pieces.net : undefined,
     netSpots: self ? netSpotsView(g, reg, p) : undefined,
-    // Feed the sea (T7e): the price, and (yourself, on your main-phase turn) the sea tiles you could feed. Both undefined unless the action is in the game.
-    feedCost: self && reg.actions.has('feed_sea') ? FEED_SEA_COST : undefined,
+    // Feed the sea (T7e): the price, and (yourself, on your main-phase turn) the sea tiles you could feed. Both undefined unless the action is in the game and unlocked.
+    feedCost: self && feedTechOk ? FEED_SEA_COST : undefined,
     feedSpots: self ? feedSpotsView(g, reg, p) : undefined,
     // Harbors (T8): upgrade price, legal port-city spots on your turn, harbors remaining in your limit, and 1:1 trades left this turn.
-    harborCost: self && harborsOn ? harborUpgradeCost(g, reg, p) : undefined,
+    harborCost: self && harborTechOk ? harborUpgradeCost(g, reg, p) : undefined,
     harborSpots: self ? harborSpotsView(g, reg, p) : undefined,
-    harborsLeft: harborsOn ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
+    harborsLeft: harborTechOk ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
     harborTradesLeft: self && harborsOn && harborCount(g, p.id) > 0 ? harborTradesLeft(g, p.id) : undefined,
+    // Salvage Crew (T11f): whether this player can demolish their own bridges on their turn.
+    canDemolishBridge: canDemolish ? true : undefined,
     // Pirates (T10b): the tiles of the pirates you could drive off right now (yourself, on your main-phase turn). Undefined unless the action is in the game.
     pirateDrives: self ? pirateDriveView(g, reg, p) : undefined,
     stats: {
@@ -139,7 +153,7 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
         city: citiesOnBoard * 2,
         devVp: vpCards,
         largestArmy: g.awards.largestArmy === p.id ? 2 : 0,
-        longestRoad: g.awards.longestRoad === p.id ? 2 : 0
+        longestRoad: g.awards.longestRoad === p.id ? 2 + grandCausewayBonusVp(g, reg, p.id) : 0
       },
       resCards: {
         produced: p.stats.resProduced || 0,
@@ -184,12 +198,20 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
         ore: p.stats.res_ore || 0
       }
     },
-    vp: score(g, gameRegistry(g.rules), p, reveal),
+    vp: score(g, reg, p, reveal),
     // What other players see. Differs from `vp` only for the viewer's own hidden VP cards.
-    publicVp: over ? score(g, gameRegistry(g.rules), p, true) : publicVP(g, gameRegistry(g.rules), p),
-    pieceCosts: Object.fromEntries([...gameRegistry(g.rules).pieces.entries()].map(([id, def]) => [id, pieceCost(g, p, def, gameRegistry(g.rules))])),
-    // Your price to upgrade a rickety bridge (T4c). Undefined unless rickety bridges are in this game, and only sent to yourself.
-    bridgeUpgradeCost: self ? bridgeUpgradeView(g, gameRegistry(g.rules), p) : undefined
+    publicVp: over ? score(g, reg, p, true) : publicVP(g, reg, p),
+    pieceCosts: Object.fromEntries(
+      [...reg.pieces.entries()]
+        .filter(([id]) => {
+          if (id === 'rickety_bridge' && !ricketyTechOk) return false;
+          if (id === 'net' && !netTechOk) return false;
+          return true;
+        })
+        .map(([id, def]) => [id, pieceCost(g, p, def, reg)])
+    ),
+    // Your price to upgrade a rickety bridge (T4c). Undefined unless rickety bridges are in this game and unlocked, and only sent to yourself.
+    bridgeUpgradeCost: self ? bridgeUpgradeView(g, reg, p) : undefined
   };
 }
 

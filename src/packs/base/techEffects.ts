@@ -86,18 +86,25 @@ export function portLevel(g: GameState, vertexId: number): number {
 
 /**
  * A raised 3:1 port trades every resource at 2:1 for whoever holds the city there (it stays an 'any resource' port).
+ * When the player also owns `tidebound.fishing_nets`, a Settlement on a raised 3:1 port also qualifies.
  * It only lowers the ratio (never raises it), and the 2:1 floor in `ratioFor` still applies.
  */
 export const harborCharterModifier: RatioModifier = {
   id: 'tech.harborCharters',
   order: RATIO_MOD_ORDER.harbor,
   apply(g, reg, pid, _resource, current) {
+    const allowSettlement = hasTech(g, pid, 'tidebound.fishing_nets');
     for (const vid of Object.keys(portUpgrades(g))) {
       const id = Number(vid);
       if (portLevel(g, id) < 1) continue;
       if (isPortIdle(g, reg, id)) continue;
       const v = g.board.vertices[id];
-      if (v?.piece && v.piece.owner === pid && v.piece.type !== SETTLEMENT && v.port === GENERIC_PORT) {
+      if (
+        v?.piece &&
+        v.piece.owner === pid &&
+        (v.piece.type !== SETTLEMENT || allowSettlement) &&
+        v.port === GENERIC_PORT
+      ) {
         return Math.min(current, 2);
       }
     }
@@ -159,7 +166,7 @@ export interface TechActionsView {
   harbor: {
     cost: Resources;
     affordable: boolean;
-    /** Your cities on a 3:1 port; `level` 0 = not raised yet, 1 = raised to 2:1. */
+    /** Your cities (or settlements with `tidebound.fishing_nets`) on a 3:1 port; `level` 0 = not raised yet, 1 = raised to 2:1. */
     ports: { vertexId: number; level: number }[];
   } | null;
   /** Null until the player has Ground work. `hexes` is empty once it is used. */
@@ -175,9 +182,11 @@ export function techActionsFor(g: GameState, reg: Registry, pid: Id): TechAction
   const p = getPlayer(g, pid);
   let harbor: TechActionsView['harbor'] = null;
   if (p && hasTech(g, pid, TECH_HARBOR_CHARTERS)) {
+    const allowSettlement = hasTech(g, pid, 'tidebound.fishing_nets');
     const ports: { vertexId: number; level: number }[] = [];
     for (const v of g.board.vertices) {
-      if (v.piece?.owner !== pid || v.piece.type !== CITY || v.port !== GENERIC_PORT) continue;
+      if (v.piece?.owner !== pid || v.port !== GENERIC_PORT) continue;
+      if (v.piece.type !== CITY && !(allowSettlement && v.piece.type === SETTLEMENT)) continue;
       ports.push({ vertexId: v.id, level: portLevel(g, v.id) });
     }
     const cost = priceOfUpgrade(g, reg, p, PORT_UPGRADE_ID, HARBOR_UPGRADE_COST);

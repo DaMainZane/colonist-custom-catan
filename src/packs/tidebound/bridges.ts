@@ -1,13 +1,45 @@
-// MODULE: tidebound.bridges addon (wide-water map perk + T3 Bridge piece, ocean placement rule, 2x cost past 10, Longest Road, and bot goal) | USED BY: packs/tidebound, tests
-import { addWaterTopology, BOT_GOALS, getPlayer, priceOf } from '../../shared';
-import type { AddonDef, BotGoalDef, BotGoalItem, Ctx, Id, PieceDef, Resources } from '../../shared';
+// MODULE: tidebound.bridges addon (wide-water map perk + T3 Bridge piece, ocean placement rule, 2x cost past 10 or 14 with Rickety bridges tech, Longest Road, bot goal, T11f demolish_bridge action & Grand Causeway 16 VP hook) | USED BY: packs/tidebound, tests
+import {
+  addWaterTopology,
+  bankGive,
+  BOT_GOALS,
+  COST_MODS,
+  doubledCost,
+  getPlayer,
+  hasTech,
+  priceOf,
+  updateAwards
+} from '../../shared';
+import type {
+  ActionDef,
+  AddonDef,
+  BotGoalDef,
+  BotGoalItem,
+  Ctx,
+  GameState,
+  Id,
+  PieceDef,
+  Registry,
+  Resources
+} from '../../shared';
 import { SETTLEMENT } from '../base/constants';
 import { ownsRoadAt } from '../base/placement';
+import {
+  bridgesOnBoard,
+  effectiveBridgeBaseLimit,
+  RICKETY,
+  RICKETY_COST,
+  ricketyPoolCostMod,
+  syncBridgePool
+} from './ricketyBridges';
 import { applyElevation, placeFish } from './seaData';
+import { grandCausewayVpHook, registerTideboundTechs, TECH_SALVAGE_CREW } from './tech';
 
 export const BRIDGE = 'bridge';
 export const BRIDGE_BASE_LIMIT = 10;
 export const BRIDGE_COST: Resources = { wood: 1, brick: 1, ore: 1 };
+/** Action type: remove one of your own bridges or rickety bridges for `floor(paid / 2)` cards back from the bank (T11f, unlocked by Salvage crew). */
+export const DEMOLISH_BRIDGE = 'demolish_bridge';
 
 /**
  * True when both sides ("lengths") of the edge touch ocean tiles (no adjacent land hex along the edge).
@@ -53,6 +85,148 @@ export const bridgePiece: PieceDef = {
   scaleWithRadius: true,
   icon: '🌉',
   canPlace: canPlaceBridge
+};
+
+// ---- T11f: demolish_bridge action (unlocked by Salvage crew) ---------------------------------------------------
+
+/**
+ * Paid resource bundle for `pid`'s `pieceType` (`bridge` or `rickety_bridge`) given the current bridge count on the board.
+ * When `bridgesOnBoard(g, pid) > effectiveBridgeBaseLimit(g, pid)`, the latest bridge was built above the 1x cap at 2x cost.
+ */
+export function bridgePaidResources(g: GameState, reg: Registry, pid: Id, pieceType: string): Resources {
+  const def = reg.pieces.get(pieceType);
+  const baseCost = def?.cost ?? (pieceType === RICKETY ? RICKETY_COST : BRIDGE_COST);
+  const limit = effectiveBridgeBaseLimit(g, pid, def?.baseLimit ?? BRIDGE_BASE_LIMIT);
+  return bridgesOnBoard(g, pid) > limit ? doubledCost(baseCost) : { ...baseCost };
+}
+
+/**
+ * Computes the refund (`floor(paid / 2)` cards from the bank) when `pid` demolishes a `bridge` or `rickety_bridge`.
+ * Prefers refunding the resources in the bridge's cost (`wood`, `brick`, `ore` for a bridge; `wood` for a rickety bridge)
+ * while the bank has them in stock, falling back to any other stocked bank resource if a pile is empty.
+ */
+export function bridgeDemolishRefund(
+  g: GameState,
+  reg: Registry,
+  pid: Id,
+  pieceType: string
+): { paidCards: number; refundCards: number; resources: Resources } {
+  const paid = bridgePaidResources(g, reg, pid, pieceType);
+  const paidCards = Object.values(paid).reduce((a, b) => a + (Number(b) || 0), 0);
+  const refundCards = Math.floor(paidCards / 2);
+  const resources: Resources = {};
+  if (refundCards <= 0) return { paidCards, refundCards: 0, resources };
+
+  const preferredOrder = Object.keys(paid).filter(r => (paid[r] || 0) > 0);
+  const fallbackOrder = [...reg.resources.keys()].filter(r => !preferredOrder.includes(r));
+  const order = [...preferredOrder, ...fallbackOrder];
+
+  const simBank: Record<string, number> = { ...g.bank };
+  let rem = refundCards;
+  // First pass: take up to `paid[r]` from the preferred resources in round-robin order
+  let progress = true;
+  while (rem > 0 && progress) {
+    progress = false;
+    for (const r of preferredOrder) {
+      if (rem <= 0) break;
+      if ((simBank[r] || 0) > 0 && (resources[r] || 0) < (paid[r] || 0)) {
+        resources[r] = (resources[r] || 0) + 1;
+        simBank[r] -= 1;
+        rem -= 1;
+        progress = true;
+      }
+    }
+  }
+  // Second pass: if a preferred bank pile was empty, fill any remaining refund cards from other stocked piles
+  progress = true;
+  while (rem > 0 && progress) {
+    progress = false;
+    for (const r of order) {
+      if (rem <= 0) break;
+      if ((simBank[r] || 0) > 0) {
+        resources[r] = (resources[r] || 0) + 1;
+        simBank[r] -= 1;
+        rem -= 1;
+        progress = true;
+      }
+    }
+  }
+
+  return { paidCards, refundCards, resources };
+}
+
+/** Validates whether `pid` can demolish the bridge or rickety bridge on `edgeId`. Returns an error string or `null`. */
+export function canDemolishBridge(g: GameState, pid: Id, edgeId: number): string | null {
+  const p = getPlayer(g, pid);
+  if (!p) return 'Unknown player';
+  if (!hasTech(g, pid, TECH_SALVAGE_CREW)) return 'Research Salvage crew first';
+  const e = Number.isInteger(edgeId) ? g.board.edges[edgeId] : undefined;
+  if (!e || !e.piece || e.piece.owner !== pid || (e.piece.type !== BRIDGE && e.piece.type !== RICKETY)) {
+    return 'Choose one of your own bridges or rickety bridges';
+  }
+  return null;
+}
+
+/**
+ * `demolish_bridge` action (T11f, unlocked by `tidebound.salvage_crew`):
+ * Removes one of `pid`'s own bridges or rickety bridges, refunds `floor(paid / 2)` cards from the bank,
+ * frees the shared bridge cap slot (`syncBridgePool`), and recalculates Longest Road (`updateAwards`).
+ */
+export const demolishBridgeAction: ActionDef = {
+  type: DEMOLISH_BRIDGE,
+  validate(ctx: Ctx, pid: Id, payload: any): string | null {
+    return canDemolishBridge(ctx.g, pid, payload?.edgeId);
+  },
+  apply(ctx: Ctx, pid: Id, payload: any): void {
+    const { g, reg } = ctx;
+    const p = getPlayer(g, pid)!;
+    const edgeId = Number(payload.edgeId);
+    const e = g.board.edges[edgeId]!;
+    const fromType = e.piece!.type;
+
+    // Compute the refund before removing the piece so `bridgesOnBoard` reflects the count when it stood.
+    const { paidCards, refundCards, resources } = bridgeDemolishRefund(g, reg, pid, fromType);
+
+    e.piece = null;
+    if (g.ext?.core?.durability) {
+      delete g.ext.core.durability[`edge:${edgeId}`];
+    }
+    syncBridgePool(g, pid);
+
+    let refunded = 0;
+    for (const [r, n] of Object.entries(resources)) {
+      if (n > 0) refunded += bankGive(ctx, pid, r, n);
+    }
+
+    p.stats.bridgesDemolished = (p.stats.bridgesDemolished || 0) + 1;
+    updateAwards(ctx);
+
+    ctx.emit('bridgeDemolished', {
+      playerId: pid,
+      edgeId,
+      piece: fromType,
+      paidCards,
+      refundCards,
+      refunded,
+      resources
+    });
+    const label = fromType === RICKETY ? 'rickety bridge' : 'bridge';
+    ctx.log(
+      `🪓 ${p.avatar} ${p.name} demolished a ${label}${refunded > 0 ? ` and salvaged ${refunded} card${refunded === 1 ? '' : 's'}` : ''}`,
+      p.color
+    );
+  },
+  legal(ctx: Ctx, pid: Id): { edgeId: number }[] {
+    const { g } = ctx;
+    if (!hasTech(g, pid, TECH_SALVAGE_CREW)) return [];
+    const out: { edgeId: number }[] = [];
+    for (const e of g.board.edges) {
+      if (e.piece?.owner === pid && (e.piece.type === BRIDGE || e.piece.type === RICKETY)) {
+        out.push({ edgeId: e.id });
+      }
+    }
+    return out;
+  }
 };
 
 /**
@@ -135,7 +309,15 @@ export const bridgesAddon: AddonDef = {
     // Crossing capability unlocks islands/archipelago map shapes and water edge topology.
     api.capability('crossing');
     api.piece(bridgePiece);
+    api.define(COST_MODS, ricketyPoolCostMod);
     api.define(BOT_GOALS, bridgeBotGoal);
+    registerTideboundTechs(api);
+    api.action(demolishBridgeAction);
+    api.phaseAction('main', DEMOLISH_BRIDGE);
+    api.hook('vp', grandCausewayVpHook);
+    api.hook('onBuild', (ctx: Ctx, def: PieceDef, pid: Id) => {
+      if (def.id === BRIDGE || def.id === RICKETY) syncBridgePool(ctx.g, pid);
+    });
     // Ensure custom/prepared boards passed into createGame also have water edges populated when Bridges is enabled.
     api.hook('onGameStart', ctx => {
       addWaterTopology(

@@ -83,17 +83,30 @@ function contentHtml(m: PickerMode, me: any): string {
       <div class="bp-title">Build on this edge</div>
       <div class="bp-opts">${optionHtml('bridge', me)}${optionHtml('rickety_bridge', me)}</div>`;
   }
-  const cost = me.bridgeUpgradeCost || {};
-  const affordable = canClientAffordBridgeUpgrade(me);
-  return `
-    <div class="bp-title">Rickety bridge</div>
-    <div class="bp-opts">
+  const edge = state?.board?.edges?.[m.edgeId];
+  const isRickety = edge?.pieceType === 'rickety_bridge';
+  const buttons: string[] = [];
+  if (isRickety && isRicketyEnabled(me)) {
+    const cost = me.bridgeUpgradeCost || {};
+    const affordable = canClientAffordBridgeUpgrade(me);
+    buttons.push(`
       <button class="bp-opt" type="button" ${affordable ? '' : 'disabled'} title="${esc(affordable ? 'Upgrade to a full bridge' : 'Not enough resources')}" onclick="confirmBridgeUpgrade()">
         <span class="bp-name">${uiIcon('bridge', 18)}Upgrade to a full bridge</span>
         <span class="bp-note">${affordable ? 'Replaces it in place' : 'Not enough resources'}</span>
         ${costStripHtml(cost, me.resources)}
-      </button>
-    </div>`;
+      </button>`);
+  }
+  if (me.canDemolishBridge) {
+    const refundCards = isRickety ? 1 : 2;
+    buttons.push(`
+      <button class="bp-opt" type="button" title="Demolish this bridge and refund half its cost" onclick="confirmBridgeDemolish()">
+        <span class="bp-name">${uiIcon('close', 18)}Demolish bridge</span>
+        <span class="bp-note">Refunds ${refundCards} card${refundCards === 1 ? '' : 's'} (Salvage crew)</span>
+      </button>`);
+  }
+  return `
+    <div class="bp-title">${isRickety ? 'Rickety bridge' : 'Bridge'}</div>
+    <div class="bp-opts">${buttons.join('')}</div>`;
 }
 
 /** Screen position of the middle of an edge (same approach as the robber flight). */
@@ -133,11 +146,15 @@ function refresh(isMyTurn: boolean): void {
   }
   const me = state?.players?.find(p => p.id === socket.id);
   const edge = state?.board?.edges?.[mode.edgeId];
+  const canInspectPlaced =
+    edge?.road === socket.id &&
+    ((edge?.pieceType === 'rickety_bridge' && (isRicketyEnabled(me) || Boolean(me?.canDemolishBridge))) ||
+      (edge?.pieceType === 'bridge' && Boolean(me?.canDemolishBridge)));
   const valid = !!(
-    state && me && edge && isMyTurn && state.phase === 'MAIN' && isRicketyEnabled(me) &&
+    state && me && edge && isMyTurn && state.phase === 'MAIN' &&
     (mode.kind === 'build'
-      ? !edge.road && edge.hexIds.length === 0
-      : edge.pieceType === 'rickety_bridge' && edge.road === socket.id)
+      ? isRicketyEnabled(me) && !edge.road && edge.hexIds.length === 0
+      : canInspectPlaced)
   );
   if (!valid) {
     closeBridgePicker();
@@ -176,12 +193,13 @@ export function openBridgePicker(edgeId: number): void {
   }
 }
 
-/** One of your own rickety bridges was clicked (the bridge or its marker): offer the upgrade. */
+/** One of your own bridges was clicked (the bridge or its marker): offer upgrade (rickety) and/or demolish (Salvage Crew). */
 export function clickPlacedBridge(edgeId: number): void {
   if (hasDraggedMap) return;
   if (!state?.code || state.phase !== 'MAIN' || !myTurnNow()) return;
   const edge = state.board.edges[edgeId];
-  if (!edge || edge.pieceType !== 'rickety_bridge' || edge.road !== socket.id) return;
+  if (!edge || edge.road !== socket.id) return;
+  if (edge.pieceType !== 'rickety_bridge' && edge.pieceType !== 'bridge') return;
   mode = { kind: 'upgrade', edgeId };
   lastHtml = '';
   refresh(true);
@@ -209,4 +227,13 @@ export function confirmBridgeUpgrade(): void {
   closeBridgePicker();
   socket.emit('upgradeBridge', { code: state.code, edgeId });
   playTone(600, 0.08);
+}
+
+/** The demolish button (Salvage Crew, T11f): remove your bridge and refund half its resource cost from the bank. */
+export function confirmBridgeDemolish(): void {
+  if (!mode || mode.kind !== 'upgrade' || !state?.code) return;
+  const edgeId = mode.edgeId;
+  closeBridgePicker();
+  socket.emit('demolishBridge', { code: state.code, edgeId });
+  playTone(480, 0.08);
 }

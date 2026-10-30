@@ -1,4 +1,4 @@
-// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors) | USED BY: packs/tidebound, server/view, client, tests
+// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) | USED BY: packs/tidebound, server/view, client, tests
 import {
   addonOn,
   BOT_GOALS,
@@ -10,8 +10,8 @@ import {
   payToBank,
   PORT_IDLE_CHECKS,
   priceOfUpgrade,
-  ratioFor,
   ratioWithoutHarbor,
+  techGate,
   totalCards
 } from '../../shared';
 import type {
@@ -30,6 +30,9 @@ import type {
 } from '../../shared';
 import { CITY, GENERIC_PORT } from '../base/constants';
 import { HARBOR_UPGRADE_COST, portLevel, portUpgrades } from '../base/techEffects';
+import { registerTideboundTechs, TECH_HARBOR_EMPIRE, TECH_HARBOR_MASTER } from './tech';
+
+export { TECH_HARBOR_EMPIRE, TECH_HARBOR_MASTER };
 
 /** Action type for upgrading a port city to a 1:1 harbor. */
 export const UPGRADE_HARBOR = 'upgrade_harbor';
@@ -41,8 +44,6 @@ export const HARBOR_COST: Resources = { ...HARBOR_UPGRADE_COST };
 export const HARBOR_LEVEL = 2;
 /** Default max harbors per player (T8a). */
 export const HARBOR_LIMIT = 1;
-/** Tier 4 tech that raises the harbor limit from 1 to 2 (T11). */
-export const TECH_HARBOR_EMPIRE = 'tidebound.harbor_empire';
 /** Maximum 1:1 trades per turn per harbor (T8b); after 4, the harbor falls back to 2:1 for the rest of the turn. */
 export const HARBOR_MAX_TRADES = 4;
 /** Spare cards a bot keeps in hand after paying for a harbor upgrade so it still has cards left to trade. */
@@ -246,14 +247,15 @@ export const harborIdleExemption: PortIdleCheck = {
   }
 };
 
-// ---- T8a: upgrade_harbor action ---------------------------------------------------------------------------------
+// ---- T8a & T11e: upgrade_harbor action (gated by Harbor master when Tech Tree is on) ----------------------------
 
 /**
  * Port vertices where `pid` owns a city that can be upgraded to a harbor (ignoring whether `pid` can currently afford the resource cost).
- * Empty when `pid` has already reached their harbor limit (`1`, or `2` with Harbor empire).
+ * Empty when `pid` has not unlocked `tidebound.harbor_master` (when `techTreeOn` is on) or has already reached their harbor limit (`1`, or `2` with Harbor empire).
  */
 export function harborCandidateVertices(g: GameState, reg: Registry, pid: Id): number[] {
   if (!addonOn(reg, 'tidebound.harbor')) return [];
+  if (!techGate(g, pid, TECH_HARBOR_MASTER)) return [];
   if (harborCount(g, pid) >= harborLimitFor(g, pid)) return [];
   const out: number[] = [];
   for (const v of g.board.vertices) {
@@ -270,6 +272,7 @@ export function canUpgradeHarbor(g: GameState, reg: Registry, pid: Id, vertexId:
   if (!addonOn(reg, 'tidebound.harbor')) return 'Harbors are not in this game';
   const p = getPlayer(g, pid);
   if (!p) return 'Unknown player';
+  if (!techGate(g, pid, TECH_HARBOR_MASTER)) return 'Research Harbor master first';
   const v = Number.isInteger(vertexId) ? g.board.vertices[vertexId] : undefined;
   if (!v || !v.port || !reg.ports.has(v.port)) return 'Choose a port city';
   if (!v.piece || v.piece.owner !== pid || v.piece.type !== CITY) return 'A harbor upgrade requires your own city on a port';
@@ -307,6 +310,7 @@ export const upgradeHarborAction: ActionDef = {
   },
   legal(ctx: Ctx, pid: Id): { vertexId: number }[] {
     const { g, reg } = ctx;
+    if (!techGate(g, pid, TECH_HARBOR_MASTER)) return [];
     const p = getPlayer(g, pid);
     if (!p || !canAfford(p, harborUpgradeCost(g, reg, p))) return [];
     return harborCandidateVertices(g, reg, pid).map(vertexId => ({ vertexId }));
@@ -317,10 +321,11 @@ export const upgradeHarborAction: ActionDef = {
 
 /**
  * Port vertices `p` can click to upgrade to a harbor on their main-phase turn.
- * `undefined` when harbors are off or it is not `p`'s main-phase turn; `[]` when they cannot afford it or have no eligible port city.
+ * `undefined` when harbors are off, locked behind `tidebound.harbor_master`, or it is not `p`'s main-phase turn; `[]` when they cannot afford it or have no eligible port city.
  */
 export function harborSpotsView(g: GameState, reg: Registry, p: PlayerState): number[] | undefined {
   if (!reg.actions.has(UPGRADE_HARBOR)) return undefined;
+  if (!techGate(g, p.id, TECH_HARBOR_MASTER)) return undefined;
   if (g.phase !== 'main' || g.players[g.turn]?.id !== p.id) return undefined;
   if (!canAfford(p, harborUpgradeCost(g, reg, p))) return [];
   return harborCandidateVertices(g, reg, p.id);
@@ -388,6 +393,7 @@ export const harborBotGoal: BotGoalDef = {
   },
   actionScore(ctx: Ctx, pid: Id, action: { type: string; payload: any }): number {
     if (action.type !== UPGRADE_HARBOR) return 0;
+    if (!techGate(ctx.g, pid, TECH_HARBOR_MASTER)) return 0;
     const p = getPlayer(ctx.g, pid);
     if (!p) return 0;
     const cost = harborUpgradeCost(ctx.g, ctx.reg, p);
@@ -407,6 +413,7 @@ export const harborAddon: AddonDef = {
     { target: 'bot-goals', kind: 'bot' }
   ],
   register(api) {
+    registerTideboundTechs(api);
     api.define(PORT_IDLE_CHECKS, harborIdleExemption);
     api.define(HARBOR_RATIO_MODS, harborRatioMod);
     api.action(upgradeHarborAction);

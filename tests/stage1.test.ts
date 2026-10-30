@@ -188,7 +188,7 @@ describe('Stage 1 — Core Addon Systems & Proving-Ground Content', () => {
       const packIds = new Set(allPacks.map(p => p.id));
       expect(new Set(ids).size).toBe(ids.length);
       for (const d of defs) {
-        expect([1, 2, 3]).toContain(d.tier);
+        expect([1, 2, 3, 4]).toContain(d.tier);
         for (const pre of techPrereqs(d)) expect(ids).toContain(pre);
         if (d.tier === 1) {
           expect(d.dlc).toBeUndefined();

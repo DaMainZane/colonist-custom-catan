@@ -37,6 +37,7 @@ import { validateBuild } from '../base/building';
 import { BRIDGE } from './bridges';
 import { FISH, isSeaHex, seaHexIdsAt } from './fishing';
 import { RICKETY } from './ricketyBridges';
+import { registerTideboundTechs } from './tech';
 
 /** Marker kind stored in `g.ext.core.markers` for shipwrecks. */
 export const WRECK_MARKER_KIND = 'wreck';
@@ -779,6 +780,7 @@ export const wrecksAddon: AddonDef = {
     { target: 'tidebound.bridges', kind: 'mechanic' }
   ],
   register(api) {
+    registerTideboundTechs(api);
     api.define(EVENT_CARDS, stormEventCard);
     api.define(BOT_GOALS, wreckBotGoal);
     api.hook('onBuild', (ctx, def, pid, loc) => {

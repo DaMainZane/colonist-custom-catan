@@ -9,6 +9,14 @@ import { esc } from '../util';
 /** Icon (from `icons.ts`) per tech. A tech added later by a DLC falls back to its branch icon, then to the hub icon. */
 const TECH_ICONS: Record<string, string> = {
   'tidebound.harbor_charters': 'waves',
+  'tidebound.rickety_bridges': 'bridge',
+  'tidebound.fishing_nets': 'net',
+  'tidebound.salvage_crew': 'gift',
+  'tidebound.net_works': 'fish',
+  'tidebound.pirate_hunter': 'sword',
+  'tidebound.harbor_master': 'harbor',
+  'tidebound.grand_causeway': 'trophy',
+  'tidebound.harbor_empire': 'crown',
   'bulwark.stockpiling': 'bank',
   'warlords.plunder': 'sword',
   'wildearth.ground_work': 'tree',
@@ -42,12 +50,18 @@ function cap(s: string): string {
 
 const CSS = `
 #techPanel{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(20,20,20,.5);--tp-node:64px;--tp-hub:76px}
-#techPanel .tp-card{width:min(720px,100%);max-height:calc(100vh - 24px);overflow:auto;padding:14px 18px 18px;border-radius:var(--r-lg);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+#techPanel .tp-card{width:min(760px,100%);max-height:calc(100vh - 24px);overflow:auto;padding:14px 18px 18px;border-radius:var(--r-lg);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 #techPanel .tp-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 #techPanel .tp-head h3{margin:0;font-size:15px;font-weight:700}
 #techPanel .tp-sub{margin:2px 0 4px;font-size:12px;font-weight:500;color:var(--ink-dim)}
 
-#techPanel .tp-stage{position:relative;aspect-ratio:1;margin:0 auto;width:max(300px,min(600px,100%,calc(100vh - 190px)))}
+#techPanel .tp-stage{position:relative;aspect-ratio:1;margin:0 auto;width:max(300px,min(640px,100%,calc(100vh - 180px)))}
+#techPanel .tp-stage.tp-deep{--tp-node:48px;--tp-hub:62px}
+#techPanel .tp-stage.tp-deep .tp-disc svg.ui-icon{width:22px;height:22px}
+#techPanel .tp-stage.tp-deep .tp-cap{width:96px;top:calc(100% + 4px);gap:2px}
+#techPanel .tp-stage.tp-deep .tp-name{font-size:10px}
+#techPanel .tp-stage.tp-deep .tp-cap .recipe-mini-card{width:18px;height:24px}
+#techPanel .tp-stage.tp-deep .tp-cap .recipe-mini-card svg.glyph{width:12px;height:12px}
 #techPanel .tp-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 #techPanel .tp-ring{fill:none;stroke:var(--line);stroke-width:1.5px;stroke-dasharray:3 5;vector-effect:non-scaling-stroke}
 #techPanel .tp-line{stroke:var(--surface-3);stroke-width:4px;stroke-linecap:round;vector-effect:non-scaling-stroke}
@@ -102,7 +116,7 @@ const CSS = `
 #techPanel .tp-mini:disabled{opacity:.45;cursor:not-allowed}
 #techPanel .tp-done{font-size:12px;font-weight:800;color:var(--ok)}
 #techPanel .tp-why{font-size:11.5px;font-weight:500;color:var(--ink-dim)}
-@media (max-width:640px){#techPanel{--tp-node:52px;--tp-hub:60px}#techPanel .tp-disc svg.ui-icon{width:24px;height:24px}}
+@media (max-width:640px){#techPanel{--tp-node:52px;--tp-hub:60px}#techPanel .tp-stage.tp-deep{--tp-node:40px;--tp-hub:50px}#techPanel .tp-disc svg.ui-icon{width:24px;height:24px}}
 `;
 
 /** Builds the Tech button (inside the action bar, left of Trade) and the panel once. */
@@ -151,34 +165,77 @@ interface Placed {
   row: TechRowView;
   x: number;
   y: number;
+  ring: number;
 }
 
+/** Angular lane offset (degrees) for forked branch paths (~17° between expansion and industrial lanes). */
+const PATH_ANGLE_DEG: Record<string, number> = {
+  expansion: -8.5,
+  industrial: 8.5
+};
+
 /**
- * Hub and spoke: one spoke per branch (evenly spaced, the first at the top), one ring per tier.
- * Positions are percentages of a square stage. With only tier 1 there is a single ring; deeper tiers
- * (added later by a DLC) fill the rings between the hub and the edge.
+ * Hub and spoke with 2-path branch forks (T11a):
+ *  - One spoke per branch (evenly spaced around the hub, first at the top).
+ *  - Ring index is the prerequisite chain depth (`1` for root, `parentRing + 1` for children, at least `row.tier`)
+ *    so chained tier-3 steps (`salvage_crew -> pirate_hunter`, `net_works -> harbor_master`) sit on consecutive concentric rings.
+ *  - Nodes with `path: 'expansion' | 'industrial'` fork into two parallel lanes (`-8.5°` and `+8.5°`, `17°` apart) along their branch spoke.
  */
-function layout(rows: TechRowView[], branches: string[]): { placed: Placed[]; radii: Map<number, number> } {
-  const maxTier = Math.max(1, ...rows.map(r => r.tier));
-  const radius = (t: number): number => (maxTier === 1 ? 32 : 17 + ((t - 1) * 17) / (maxTier - 1));
+export function layout(rows: TechRowView[], branches: string[]): { placed: Placed[]; radii: Map<number, number>; maxRing: number } {
+  const byId = new Map<string, TechRowView>(rows.map(r => [r.id, r]));
+  const ringMemo = new Map<string, number>();
+  const ringOf = (r: TechRowView, visiting = new Set<string>()): number => {
+    const hit = ringMemo.get(r.id);
+    if (hit !== undefined) return hit;
+    if (visiting.has(r.id)) return r.tier;
+    visiting.add(r.id);
+    let d = Number(r.tier) || 1;
+    for (const pId of r.prereqs) {
+      const parent = byId.get(pId);
+      if (parent) d = Math.max(d, ringOf(parent, visiting) + 1);
+    }
+    visiting.delete(r.id);
+    ringMemo.set(r.id, d);
+    return d;
+  };
+  const pathOf = (r: TechRowView, visiting = new Set<string>()): 'expansion' | 'industrial' | undefined => {
+    if (r.path) return r.path;
+    if (visiting.has(r.id)) return undefined;
+    visiting.add(r.id);
+    for (const pId of r.prereqs) {
+      const parent = byId.get(pId);
+      const found = parent ? pathOf(parent, visiting) : undefined;
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  const maxRing = Math.max(1, ...rows.map(r => ringOf(r)));
+  const radius = (ring: number): number => (maxRing === 1 ? 32 : 14 + ((ring - 1) * 28) / (maxRing - 1));
   const radii = new Map<number, number>();
   const groups = new Map<string, TechRowView[]>();
   for (const r of rows) {
-    radii.set(r.tier, radius(r.tier));
-    const k = `${r.branch}|${r.tier}`;
+    const ring = ringOf(r);
+    radii.set(ring, radius(ring));
+    const k = `${r.branch}|${ring}`;
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
   const placed: Placed[] = [];
   for (const group of groups.values()) {
     const first = group[0];
-    const base = -90 + (360 * branches.indexOf(first.branch)) / branches.length;
+    const ring = ringOf(first);
+    const rad = radius(ring);
+    const base = -90 + (360 * Math.max(0, branches.indexOf(first.branch))) / Math.max(1, branches.length);
     group.forEach((row, j) => {
-      const a = ((base + (j - (group.length - 1) / 2) * 9) * Math.PI) / 180;
-      const rad = radius(row.tier);
-      placed.push({ row, x: 50 + rad * Math.cos(a), y: 50 + rad * Math.sin(a) });
+      const lane = pathOf(row);
+      const offsetDeg = lane && PATH_ANGLE_DEG[lane] !== undefined
+        ? PATH_ANGLE_DEG[lane]
+        : (j - (group.length - 1) / 2) * 16;
+      const a = ((base + offsetDeg) * Math.PI) / 180;
+      placed.push({ row, x: 50 + rad * Math.cos(a), y: 50 + rad * Math.sin(a), ring });
     });
   }
-  return { placed, radii };
+  return { placed, radii, maxRing };
 }
 
 function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): string {
@@ -187,6 +244,7 @@ function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): stri
   const icon = TECH_ICONS[r.id] ?? BRANCH_ICONS[r.branch] ?? 'tech';
   const tile = BRANCH_TILE[r.branch] ?? '--tile-fog';
   const tipPos = `${p.y >= 50 ? 'tip-t' : 'tip-b'} ${p.x < 30 ? 'tip-l' : p.x > 70 ? 'tip-r' : 'tip-c'}`;
+  const tierLabel = r.path ? `${cap(r.path)} · Tier ${r.tier}` : `Tier ${r.tier}`;
   const foot = r.owned
     ? 'Researched'
     : mode === 'can'
@@ -201,23 +259,25 @@ function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): stri
       <div class="tp-disc">${uiIcon(icon, 30)}${r.owned ? `<span class="tp-check">${uiIcon('check', 14)}</span>` : ''}</div>
       <div class="tp-cap"><span class="tp-name">${esc(r.name)}</span>${r.owned ? '' : costStripHtml(r.payment, hand)}</div>
       <div class="tp-tip ${tipPos}">
-        <div class="tp-tip-head"><span class="tp-tip-name">${esc(r.name)}</span><span class="tp-tip-tier">Tier ${r.tier}</span></div>
+        <div class="tp-tip-head"><span class="tp-tip-name">${esc(r.name)}</span><span class="tp-tip-tier">${esc(tierLabel)}</span></div>
         <div class="tp-tip-desc">${esc(r.description)}</div>
         <div class="tp-tip-foot ${r.owned ? 'owned' : mode === 'can' ? 'can' : ''}">${esc(foot)}</div>
       </div>
     </div>`;
 }
 
-/** Harbor charters: your cities on a 3:1 port, each with one button that raises the whole port to 2:1 (no resource choice). */
+/** Harbor charters: your cities (and settlements with Fishing nets) on a 3:1 port, each with one button that raises the whole port to 2:1. */
 function harborHtml(h: NonNullable<TechActionsView['harbor']>, canAct: boolean, hand: Resources | undefined): string {
   const rows = h.ports.length === 0
-    ? '<div class="tp-why">Build a city on a 3:1 port to raise it.</div>'
+    ? '<div class="tp-why">Build a city on a 3:1 port (or a settlement with Fishing nets) to raise it.</div>'
     : h.ports.map(p => {
+        const bType = state?.board?.vertices?.[p.vertexId]?.building?.type;
+        const bLabel = bType === 'settlement' ? 'Settlement' : 'City';
         if (p.level >= 1) {
-          return `<div class="tp-port">City #${p.vertexId} · <span class="tp-done">2:1 any resource</span></div>`;
+          return `<div class="tp-port">${bLabel} #${p.vertexId} · <span class="tp-done">2:1 any resource</span></div>`;
         }
         const button = `<button class="tp-mini" type="button" ${canAct && h.affordable ? '' : 'disabled'} onclick="upgradePortClick(${p.vertexId})">Raise to 2:1</button>`;
-        return `<div class="tp-port">City #${p.vertexId} · 3:1 port<div class="tp-chips">${button}</div></div>`;
+        return `<div class="tp-port">${bLabel} #${p.vertexId} · 3:1 port<div class="tp-chips">${button}</div></div>`;
       }).join('');
   return `<div class="tp-extra"><div class="tp-extra-title">Raise the port ${costStripHtml(h.cost, hand)}</div>${rows}</div>`;
 }
@@ -270,7 +330,7 @@ export function renderTechPanel(isMyTurn: boolean): void {
   const actions = state.techActions;
   const branches: string[] = [];
   for (const r of rows) if (!branches.includes(r.branch)) branches.push(r.branch);
-  const { placed, radii } = layout(rows, branches);
+  const { placed, radii, maxRing } = layout(rows, branches);
   const at = new Map(placed.map(p => [p.row.id, p]));
 
   const rings = [...radii.values()].map(rad => `<circle class="tp-ring" cx="50" cy="50" r="${rad}"/>`).join('');
@@ -293,7 +353,7 @@ export function renderTechPanel(isMyTurn: boolean): void {
     <div class="tp-card">
       <div class="tp-head"><h3>Tech tree</h3><button class="btn sm" type="button" onclick="toggleTechPanel(false)">Close</button></div>
       <div class="tp-sub">${esc(hint)}</div>
-      <div class="tp-stage">
+      <div class="tp-stage${maxRing >= 4 ? ' tp-deep' : ''}">
         <svg class="tp-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rings}${lines}</svg>
         <div class="tp-hub">${uiIcon('tech', 26)}<span>Tech</span></div>
         ${nodes}

@@ -1,10 +1,13 @@
 import { soundOn, setSoundOn } from './store';
 import { uiIcon } from './icons';
 
-const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+const audioCtx: AudioContext =
+  typeof window !== 'undefined' && (window.AudioContext || (window as any).webkitAudioContext)
+    ? new (window.AudioContext || (window as any).webkitAudioContext)()
+    : (null as any);
 
 function ensureAudio(): boolean {
-  if (!soundOn) return false;
+  if (!soundOn || !audioCtx) return false;
   try {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return true;
