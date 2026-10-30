@@ -10,7 +10,7 @@ import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import { isClientPieceDoubleCost } from './board';
 
-export type RecipeKey = 'dev' | 'road' | 'bridge' | 'net' | 'feed' | 'settlement' | 'city';
+export type RecipeKey = 'dev' | 'road' | 'bridge' | 'net' | 'feed' | 'harbor' | 'settlement' | 'city';
 
 export const BUILD_RECIPES: Record<RecipeKey, string[]> = {
   dev: ['sheep', 'wheat', 'ore'],
@@ -18,15 +18,27 @@ export const BUILD_RECIPES: Record<RecipeKey, string[]> = {
   bridge: ['wood', 'brick', 'ore'],
   net: ['wood', 'wood', 'sheep'],
   feed: ['wheat'],
+  harbor: ['wood', 'wood', 'brick', 'ore'],
   settlement: ['wood', 'brick', 'sheep', 'wheat'],
   city: ['wheat', 'wheat', 'ore', 'ore', 'ore']
 };
 
 export function renderRecipeStripHtml(recipeKey: RecipeKey, me: any): string {
   const baseList = BUILD_RECIPES[recipeKey];
-  const isDouble = recipeKey !== 'dev' && recipeKey !== 'feed' && isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
-  // Feeding the sea is an action, not a piece: its price comes as `feedCost`, not from `pieceCosts`.
-  const customCost = recipeKey === 'feed' ? me?.feedCost : recipeKey !== 'dev' ? me?.pieceCosts?.[recipeKey] : null;
+  const isDouble =
+    recipeKey !== 'dev' &&
+    recipeKey !== 'feed' &&
+    recipeKey !== 'harbor' &&
+    isClientPieceDoubleCost(recipeKey, me?.id || socket.id);
+  // Feeding the sea and building a harbor are actions, not pieces: their prices come as `feedCost` and `harborCost`.
+  const customCost =
+    recipeKey === 'feed'
+      ? me?.feedCost
+      : recipeKey === 'harbor'
+        ? me?.harborCost
+        : recipeKey !== 'dev'
+          ? me?.pieceCosts?.[recipeKey]
+          : null;
   let list: string[];
   if (customCost && typeof customCost === 'object') {
     list = [];
@@ -56,6 +68,7 @@ function updateActionRecipePopups(me: any): void {
     ['recipePopupBridge', 'bridge'],
     ['recipePopupNet', 'net'],
     ['recipePopupFeed', 'feed'],
+    ['recipePopupHarbor', 'harbor'],
     ['recipePopupSettle', 'settlement'],
     ['recipePopupCity', 'city']
   ];

@@ -5,7 +5,7 @@ import {
   setVictoryTab, setHideVictoryOverlay, spectateTargetId, setSpectateTargetId
 } from './store';
 import { renderAll, renderVictoryScreen } from './render/index';
-import { canClientAffordPiece, canClientAffordFeed } from './render/board';
+import { canClientAffordPiece, canClientAffordFeed, canClientAffordHarbor } from './render/board';
 import { showToast } from './ui';
 import { AVATAR_CHOICES } from './avatars';
 
@@ -470,6 +470,13 @@ export function setBuildMode(mode: string): void {
     const me = state.players.find(p => p.id === socket.id);
     if (me && !canClientAffordFeed(me)) showToast('You cannot pay for feeding the sea.');
     else if (me && !me.feedSpots?.length) showToast('Feed a sea tile next to one of your nets that is not full yet.');
+  }
+  // Harbor mode highlights your own cities on ports that can be upgraded to a 1:1 harbor.
+  if (turningOn && mode === 'harbor' && state) {
+    const me = state.players.find(p => p.id === socket.id);
+    if (me && (me.harborsLeft ?? 1) <= 0) showToast('You have already built your harbor.');
+    else if (me && !canClientAffordHarbor(me)) showToast('Not enough resources for a harbor.');
+    else if (me && !me.harborSpots?.length) showToast('Build a city on a port first to upgrade it to a harbor.');
   }
   renderAll();
 }

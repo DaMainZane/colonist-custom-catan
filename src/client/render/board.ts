@@ -305,15 +305,17 @@ function portMarkup(e: any, v1: any, v2: any, h: any, owned: boolean, isLobbyHos
   const sx = mx + nx * 42;
   const sy = my + ny * 42;
 
+  const pLvl = Math.max(state.portLevels?.[e.v1] || 0, state.portLevels?.[e.v2] || 0);
   const any = e.port === '3:1';
   const kind: string = any ? 'any' : e.port;
   const badgeFill = any ? 'var(--token)' : (RES_META[kind]?.color || 'var(--token)');
   const badgeBorder = any ? 'var(--pier-dark)' : (RES_META[kind]?.border || 'var(--pier-dark)');
+  const ratioText = pLvl >= 2 ? '1:1' : pLvl === 1 || !any ? '2:1' : '3:1';
   const label = any
-    ? `<text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 4.5).toFixed(1)}" font-size="13">3:1</text>`
+    ? `<text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 4.5).toFixed(1)}" font-size="13">${ratioText}</text>`
     : `${getBoardIconSvg(kind, Number(sx.toFixed(1)), Number((sy - 4.5).toFixed(1)), 0.56)}
        <rect class="port-ratio-pill" x="${(sx - 13).toFixed(1)}" y="${(sy + 5).toFixed(1)}" width="26" height="12" rx="6" />
-       <text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 14).toFixed(1)}" font-size="8.8">2:1</text>`;
+       <text class="port-text" x="${sx.toFixed(1)}" y="${(sy + 14).toFixed(1)}" font-size="8.8">${ratioText}</text>`;
 
   const canPaintPort = isLobbyHost && activeBrush.type === 'port';
   return `
@@ -609,7 +611,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     if (e.port) {
       const v1 = vertices[e.v1], v2 = vertices[e.v2];
       const owned = Boolean(v1 && v2 && [v1, v2].some((v: any) => v.building && v.building.owner === socket.id));
-      portsSigParts.push(`${e.id}:${e.port}:${owned ? '1' : '0'}`);
+      const pLvl = Math.max(state.portLevels?.[e.v1] || 0, state.portLevels?.[e.v2] || 0);
+      portsSigParts.push(`${e.id}:${e.port}:${owned ? '1' : '0'}:${pLvl}`);
     }
   }
   const portsKey = portsSigParts.join('|');
@@ -831,19 +834,28 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   const netSpotSet = isMyTurn && buildMode === 'net' && state.phase === 'MAIN' && me && (me.netsLeft ?? 0) > 0 && canClientAffordPiece(me, 'net')
     ? new Set<number>(me.netSpots ?? [])
     : null;
+  // Harbors (T8a): in harbor mode the player's upgradable port cities get a clickable upgrade ring.
+  const harborSpotSet = isMyTurn && buildMode === 'harbor' && state.phase === 'MAIN' && me && canClientAffordHarbor(me)
+    ? new Set<number>(me.harborSpots ?? [])
+    : null;
   for (const v of vertices) {
     if (v.building) {
       const owner = state.players.find(p => p.id === v.building.owner);
       const col = owner?.color || '#888';
-      const canUpgrade = isMyTurn && state.phase === 'MAIN' &&
+      const canUpgrade = isMyTurn && state.phase === 'MAIN' && buildMode !== 'harbor' &&
         v.building.owner === socket.id && v.building.type === 'settlement' &&
         me && canAffordCity && me.citiesLeft > 0;
       const canRobThisBuilding = isMyTurn && state.phase === 'ROBBER_STEAL' &&
         v.hexIds.includes(robberHexId) && robberVictimSet.has(v.building.owner);
       const isCity = v.building.type === 'city';
       const isNet = v.building.type === 'net';
-      const isClickable = canUpgrade || canRobThisBuilding;
-      const clickAttr = (isCity ? canRobThisBuilding : isClickable) ? `clickVertex(${v.id})` : '';
+      const canHarbor = isCity && Boolean(harborSpotSet?.has(v.id));
+      const isClickable = canUpgrade || canRobThisBuilding || canHarbor;
+      const clickAttr = canHarbor
+        ? `clickHarborSpot(${v.id})`
+        : (isCity ? canRobThisBuilding : isClickable)
+          ? `clickVertex(${v.id})`
+          : '';
       const ringR = isCity ? 27 : 22;
       const anim = getPieceAnimAttrs(`${isCity ? 'city' : isNet ? 'net' : 'settlement'}_${v.id}`, now);
 
@@ -853,15 +865,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
             ${anim.isAnimating ? `<circle cx="0" cy="0" r="${ringR + 4}" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
             ${clickAttr ? `<circle r="${ringR + 2}" fill="transparent" />` : ''}
             ${canRobThisBuilding ? `<circle r="${ringR}" class="target-ring rob" />` : ''}
-            ${!isCity && canUpgrade && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
+            ${((!isCity && canUpgrade) || canHarbor) && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
             <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
               ${isCity ? cityMarkup(col) : isNet ? netMarkup(col) : settlementMarkup(col)}
             </g>
           </g>
         </g>
       `;
-    } else if (isMyTurn && (buildMode === 'net' || buildMode === 'feed')) {
-      // Net mode: only the vertices the server listed, and no settlement spots (a net spot can also be a settlement spot). Feed mode draws no vertex spots at all.
+    } else if (isMyTurn && (buildMode === 'net' || buildMode === 'feed' || buildMode === 'harbor')) {
+      // Net mode: only the vertices the server listed, and no settlement spots (a net spot can also be a settlement spot). Feed/harbor mode draw no empty-vertex spots.
       if (netSpotSet?.has(v.id)) {
         verticesHtml += `
         <g onclick="clickNetSpot(${v.id})" style="cursor:pointer">
@@ -1238,6 +1250,13 @@ export function canClientAffordFeed(me: any): boolean {
   return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
 }
 
+/** Can you pay the price of upgrading a port city to a harbor? (The server sends `harborCost` only when harbors are in the game.) */
+export function canClientAffordHarbor(me: any): boolean {
+  const cost = me?.harborCost;
+  if (!me?.resources || !cost || typeof cost !== 'object') return false;
+  return Object.entries(cost).every(([r, n]) => (me.resources[r] || 0) >= (Number(n) || 0));
+}
+
 export function clickVertex(vertexId: number): void {
   setBuildModeValue(null);
   socket.emit('clickVertex', { code: state.code, vertexId });
@@ -1254,6 +1273,13 @@ export function clickFeedSpot(hexId: number): void {
   setBuildModeValue(null);
   playTone(660, 0.08);
   socket.emit('feedSea', { code: state.code, hexId });
+}
+
+/** Tidebound T8a: upgrade your city on a port to a 1:1 harbor (only offered in harbor mode, from the server's `harborSpots`). */
+export function clickHarborSpot(vertexId: number): void {
+  setBuildModeValue(null);
+  playTone(680, 0.08);
+  socket.emit('upgradeHarbor', { code: state.code, vertexId });
 }
 
 export function clickEdge(edgeId: number): void {

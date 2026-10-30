@@ -139,6 +139,8 @@ const UI_ICONS: Record<string, string> = {
   net: `<path d="M12 3.5L20.5 12 12 20.5 3.5 12z"/><path d="M7.75 7.75l8.5 8.5M16.25 7.75l-8.5 8.5"/>`,
   // Tidebound feed the sea: a fish.
   fish: `<path d="M3.5 12c2.6-4.4 8.4-5.6 12.4-2.2L20.5 7v10l-4.6-2.8C11.9 17.6 6.1 16.4 3.5 12z"/><circle cx="8.5" cy="11" r="1" ${FILL}/>`,
+  // Tidebound harbor: an anchor.
+  harbor: `<circle cx="12" cy="5.5" r="2.2"/><path d="M12 7.7v12.8M8.5 10.5h7M5.5 15a6.5 6.5 0 0 0 13 0"/>`,
   house: `<path ${FILL} d="M12 3.5L3.5 11H6v8.5h12V11h2.5z"/>`,
   city: `<path ${FILL} d="M3.5 20V9.5l4-4 4 4V20zM12.5 20v-7h8v7z"/>`,
   sword: `<path d="M10 14L19 5M7.5 11.5l5 5M10 14l-5 5"/>`,

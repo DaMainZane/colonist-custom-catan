@@ -33,6 +33,14 @@ export interface PlayerView {
   feedCost?: Resources;
   /** Sea tile ids you could feed right now (next to a net of yours, not full). Only sent to you on your main-phase turn; `[]` when you cannot pay. */
   feedSpots?: number[];
+  /** Your price to upgrade a port city to a 1:1 harbor (Tidebound T8a). Only sent to you, and only when harbors are in the game. */
+  harborCost?: Resources;
+  /** Port vertex ids where you could build a harbor right now. Only sent to you on your main-phase turn; `[]` when you cannot pay or have none. */
+  harborSpots?: number[];
+  /** How many more harbors you can build within your limit (`1` by default, `2` with Harbor empire). */
+  harborsLeft?: number;
+  /** Remaining 1:1 trades across your harbors this turn (max 4 per harbor per turn, T8b). */
+  harborTradesLeft?: number;
   vp: number;
   /** What other players see (differs from `vp` only for your own hidden VP cards). */
   publicVp?: number;
@@ -178,6 +186,8 @@ export interface GameState {
   hexOverlays?: Record<number, { kind: string; label?: string }> | null;
   /** Tidebound fish icons (T7c): sea tile id -> boosts left (0 = used up, still drawn faded). Null when Fishing is off or no tile has one. */
   fishIcons?: Record<number, number> | null;
+  /** Port upgrade levels (T1, T8): vertex id -> level (1 = raised 2:1 port, 2 = 1:1 harbor). Null when no port is upgraded. */
+  portLevels?: Record<number, number> | null;
   /** Tidebound Tides (T6): tide facts for the title card, the warning and the heat map. Null when Tides is off. */
   tide?: TideView | null;
 }

@@ -4,7 +4,21 @@ import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
-import { FEED_SEA_COST, bridgeUpgradeView, feedSpotsView, fishClientView, netSpotsView, tideClientView } from '../packs/tidebound';
+import {
+  FEED_SEA_COST,
+  UPGRADE_HARBOR,
+  bridgeUpgradeView,
+  feedSpotsView,
+  fishClientView,
+  harborClientView,
+  harborCount,
+  harborLimitFor,
+  harborSpotsView,
+  harborTradesLeft,
+  harborUpgradeCost,
+  netSpotsView,
+  tideClientView
+} from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -57,6 +71,8 @@ function fillResources(partial: Record<string, number>): Record<string, number> 
 function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: boolean, isSpectator = false): any {
   const self = p.id === viewerId;
   const reveal = self || over || isSpectator;
+  const reg = gameRegistry(g.rules);
+  const harborsOn = reg.actions.has(UPGRADE_HARBOR);
 
   let settlementsOnBoard = 0;
   let citiesOnBoard = 0;
@@ -82,7 +98,7 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     isBot: p.isBot,
     difficulty: p.difficulty,
     // Hand size as the table sees it: resource cards plus fish-like tokens (they count for a discard and can be stolen).
-    resourceCount: totalCards(p) + visibleWildCards(g, gameRegistry(g.rules), p.id),
+    resourceCount: totalCards(p) + visibleWildCards(g, reg, p.id),
     resources: reveal ? p.resources : undefined,
     // Held wild tokens ({ fish: n }), same visibility as the hand. Undefined when none are held, so a game without them sends nothing new.
     wildTokens: reveal && Object.keys(wildTokensOf(g, p.id)).length > 0 ? wildTokensOf(g, p.id) : undefined,
@@ -101,10 +117,15 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     bridgesLeft: p.pieces.bridge ?? 0,
     // Fishing nets (T7b2): supply left, and (yourself, on your main-phase turn) the vertices a net could go. Both undefined unless nets are in the game.
     netsLeft: p.pieces.net,
-    netSpots: self ? netSpotsView(g, gameRegistry(g.rules), p) : undefined,
+    netSpots: self ? netSpotsView(g, reg, p) : undefined,
     // Feed the sea (T7e): the price, and (yourself, on your main-phase turn) the sea tiles you could feed. Both undefined unless the action is in the game.
-    feedCost: self && gameRegistry(g.rules).actions.has('feed_sea') ? FEED_SEA_COST : undefined,
-    feedSpots: self ? feedSpotsView(g, gameRegistry(g.rules), p) : undefined,
+    feedCost: self && reg.actions.has('feed_sea') ? FEED_SEA_COST : undefined,
+    feedSpots: self ? feedSpotsView(g, reg, p) : undefined,
+    // Harbors (T8): upgrade price, legal port-city spots on your turn, harbors remaining in your limit, and 1:1 trades left this turn.
+    harborCost: self && harborsOn ? harborUpgradeCost(g, reg, p) : undefined,
+    harborSpots: self ? harborSpotsView(g, reg, p) : undefined,
+    harborsLeft: harborsOn ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
+    harborTradesLeft: self && harborsOn && harborCount(g, p.id) > 0 ? harborTradesLeft(g, p.id) : undefined,
     stats: {
       resourcesEarned: p.stats.earned || 0,
       tradesMade: p.stats.trades || 0,
@@ -258,9 +279,12 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
 
   // Fish icons (T7c): sea tile id -> boosts left. Public. Null when Fishing is off or no tile has an icon.
   const fishIcons = g ? fishClientView(g, gameRegistry(g.rules)) : null;
+  // Port upgrade levels (T1, T8): vertex id -> level (1 = raised 2:1 port, 2 = 1:1 harbor). Null when no port is upgraded.
+  const portLevels = g ? harborClientView(g) : null;
 
   const shared = {
     fishIcons,
+    portLevels,
     hexOverlays: tideView ? tideView.overlays : null,
     tide: tideView ? tideView.tide : null,
     code: room.code,

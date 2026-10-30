@@ -22,29 +22,49 @@ export function canExecuteBankTrade(me: any): boolean {
   if (!me || !me.resources) return false;
   const ratios = state.tradeRatios || { wood: 4, brick: 4, sheep: 4, wheat: 4, ore: 4 };
   let credits = 0;
+  let oneToOneUsed = 0;
   for (const r of RESOURCES) {
     const g = tradeGive[r] || 0;
-    if (g > me.resources[r] || g % ratios[r] !== 0) return false;
-    credits += g / ratios[r];
+    const rate = ratios[r] || 4;
+    if (g > me.resources[r] || g % rate !== 0) return false;
+    credits += g / rate;
+    if (rate === 1 && g > 0) oneToOneUsed += g;
+  }
+  if (typeof me.harborTradesLeft === 'number' && oneToOneUsed > me.harborTradesLeft) {
+    return false;
   }
   const wanted = RESOURCES.reduce((s, r) => s + (tradeWant[r] || 0), 0);
   return credits > 0 && credits === wanted;
 }
 
-/** What the bank takes per card for this resource: 4 normally, 3 with a generic port, 2 with its own port (sent by the server). */
+/** What the bank takes per card for this resource: 4 normally, 3 with a generic port, 2 with a 2:1 port, 1 with a harbor (sent by the server). */
 function bankRate(r: string): number {
   return Number(state.tradeRatios?.[r]) || 4;
 }
 
 function rateSource(rate: number): string {
-  return rate === 2 ? ' (your 2:1 port)' : rate === 3 ? ' (your 3:1 port)' : ' (bank rate)';
+  return rate === 1
+    ? ' (your 1:1 harbor)'
+    : rate === 2
+      ? ' (your 2:1 port)'
+      : rate === 3
+        ? ' (your 3:1 port)'
+        : ' (bank rate)';
+}
+
+function harborExplainSuffix(me: any, rate: number): string {
+  if (rate <= 1) return '';
+  if (typeof me?.harborTradesLeft === 'number' && me.harborTradesLeft <= 0) {
+    return ' (harbor 1:1 limit of 4 trades per turn reached; now trading at 2:1)';
+  }
+  return ' (1:1 requires a harbor)';
 }
 
 interface BankAdvice { ok: boolean; text: string; fixable: boolean }
 
 /**
  * Says why the current give/get cards are not a legal bank trade, and what would fix it. The rates are the player's own,
- * so with a port the message names the better rate instead of leaving a disabled button with no reason.
+ * so with a port or harbor the message names the better rate (and explains 1:1 harbors and the 4-trade turn cap) instead of leaving a disabled button with no reason.
  */
 export function bankTradeAdvice(me: any): BankAdvice {
   const giveRes = RESOURCES.filter(r => (tradeGive[r] || 0) > 0);
@@ -54,21 +74,31 @@ export function bankTradeAdvice(me: any): BankAdvice {
   }
   if (canExecuteBankTrade(me)) return { ok: true, text: 'Bank trade is ready.', fixable: false };
 
+  let oneToOneUsed = 0;
   for (const r of giveRes) {
     const have = me?.resources?.[r] || 0;
     const g = tradeGive[r];
     const name = RES_META[r].name;
     if (g > have) return { ok: false, text: `You only hold ${have} ${name}.`, fixable: false };
     const rate = bankRate(r);
+    if (rate === 1) oneToOneUsed += g;
     if (g % rate !== 0) {
       const lower = Math.floor(g / rate) * rate;
       const how = lower >= rate ? `give ${lower} or ${lower + rate}` : `give ${rate}`;
       return {
         ok: false,
-        text: `${name} trades at ${rate}:1${rateSource(rate)}, so ${how} (you are giving ${g}).`,
+        text: `${name} trades at ${rate}:1${rateSource(rate)}${harborExplainSuffix(me, rate)}, so ${how} (you are giving ${g}).`,
         fixable: lower >= rate || have >= rate
       };
     }
+  }
+
+  if (typeof me?.harborTradesLeft === 'number' && oneToOneUsed > me.harborTradesLeft) {
+    return {
+      ok: false,
+      text: `Harbor 1:1 trade limit is 4 per turn (${me.harborTradesLeft} left this turn).`,
+      fixable: false
+    };
   }
 
   const credits = giveRes.reduce((s, r) => s + tradeGive[r] / bankRate(r), 0);
@@ -79,12 +109,17 @@ export function bankTradeAdvice(me: any): BankAdvice {
 
   const portNote = giveRes
     .filter(r => bankRate(r) < 4)
-    .map(r => ` Your ${bankRate(r)}:1 port on ${RES_META[r].name} means ${bankRate(r)} buys 1 card.`)
+    .map(r => ` Your ${bankRate(r)}:1 ${bankRate(r) === 1 ? 'harbor' : 'port'} on ${RES_META[r].name} means ${bankRate(r)} buys 1 card.`)
     .join('');
   if (credits > wantSum) {
     return { ok: false, text: `Your cards pay for ${credits} card${credits === 1 ? '' : 's'} but you asked for ${wantSum}.${portNote}`, fixable: canFix };
   }
-  return { ok: false, text: `You asked for ${wantSum} card${wantSum === 1 ? '' : 's'} but your cards only pay for ${credits}.${portNote}`, fixable: canFix };
+  const maxRate = Math.max(...giveRes.map(r => bankRate(r)));
+  return {
+    ok: false,
+    text: `You asked for ${wantSum} card${wantSum === 1 ? '' : 's'} but your cards only pay for ${credits}${harborExplainSuffix(me, maxRate)}.${portNote}`,
+    fixable: canFix
+  };
 }
 
 /** The "Fix amounts" button: rounds each give pile down to a legal size, then matches a single give pile to what you asked for. */

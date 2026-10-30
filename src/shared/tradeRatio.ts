@@ -28,14 +28,20 @@ export const PORT_IDLE_CHECKS = 'portIdleChecks';
 
 export interface PortIdleCheck {
   id: string;
-  /** True when the port on this vertex cannot be used right now. A harbor (T8) opts out by returning false for its own vertex. */
+  /** True when the port on this vertex cannot be used right now. */
   idle(g: GameState, reg: Registry, vertexId: number): boolean;
+  /** True when this vertex opts out of all idle-port checks (Tidebound T8: a harbor keeps working while flooded). */
+  exempt?(g: GameState, reg: Registry, vertexId: number): boolean;
   replace?: boolean;
 }
 
-/** Is the port on this vertex idle right now? True as soon as any registered check says so. */
+/** Is the port on this vertex idle right now? False if any registered check exempts it; otherwise true as soon as any check says idle. */
 export function isPortIdle(g: GameState, reg: Registry, vertexId: number): boolean {
-  for (const check of defsOf<PortIdleCheck>(reg, PORT_IDLE_CHECKS).values()) {
+  const checks = [...defsOf<PortIdleCheck>(reg, PORT_IDLE_CHECKS).values()];
+  for (const check of checks) {
+    if (check.exempt?.(g, reg, vertexId)) return false;
+  }
+  for (const check of checks) {
     if (check.idle(g, reg, vertexId)) return true;
   }
   return false;
@@ -74,15 +80,34 @@ export interface RatioModifier {
 /**
  * A harbor's ratio for one resource, or null/undefined when the player has no harbor for it.
  * It is applied after the 2:1 floor and can only lower the result (never raise it), but not below `HARBOR_MIN_RATIO`.
+ * Optional hooks validate and record per-turn 1:1 trade usage (Tidebound T8b) and explain why 1:1 is unavailable.
  */
 export interface HarborRatioModifier {
   id: string;
   apply(g: GameState, reg: Registry, pid: Id, resource: string): number | null | undefined;
+  /** Optional batch validation for a proposed bank trade (e.g. checking how many 1:1 trades remain this turn). */
+  validateTrade?(
+    g: GameState,
+    reg: Registry,
+    pid: Id,
+    give: Record<string, number>,
+    get: Record<string, number>
+  ): string | null;
+  /** Optional hook called when a bank trade executes so harbor 1:1 usage can be recorded for the turn. */
+  recordTrade?(
+    g: GameState,
+    reg: Registry,
+    pid: Id,
+    give: Record<string, number>,
+    get: Record<string, number>
+  ): void;
+  /** Optional explanation of why `resource` is not trading at 1:1 right now (e.g. 4-trade turn cap reached vs no harbor). */
+  explainNoOneToOne?(g: GameState, reg: Registry, pid: Id, resource: string): string | null;
   replace?: boolean;
 }
 
-/** Evaluates a player's bank trade ratio for one resource, applying ports, ordered modifiers, and the 2:1 floor (unless exempt). */
-export function ratioFor(g: GameState, reg: Registry, pid: Id, resource: string): number {
+/** Evaluates a player's bank trade ratio for one resource before the harbor 1:1 pass (steps 1 and 2 + the 2:1 floor). */
+export function ratioWithoutHarbor(g: GameState, reg: Registry, pid: Id, resource: string): number {
   let ratio = Number(g.rules?.bankRatio) || 4;
   let exemptFloor = false;
 
@@ -114,7 +139,12 @@ export function ratioFor(g: GameState, reg: Registry, pid: Id, resource: string)
   }
 
   const floor = exemptFloor ? 1 : MIN_TRADE_RATIO;
-  let result = Math.max(floor, Math.round(ratio));
+  return Math.max(floor, Math.round(ratio));
+}
+
+/** Evaluates a player's bank trade ratio for one resource, applying ports, ordered modifiers, the 2:1 floor, and the harbor 1:1 pass. */
+export function ratioFor(g: GameState, reg: Registry, pid: Id, resource: string): number {
+  let result = ratioWithoutHarbor(g, reg, pid, resource);
 
   // 3. Harbor pass: after the floor, so only a harbor can take the ratio below 2:1. Nothing registered = nothing changes.
   if (result > HARBOR_MIN_RATIO) {
@@ -135,6 +165,27 @@ export function tradeRatiosFor(g: GameState, reg: Registry, pid: Id): Record<str
   return out;
 }
 
+/** Records any per-turn harbor 1:1 trade usage when a bank trade executes. */
+export function recordBankTrade(
+  g: GameState,
+  reg: Registry,
+  pid: Id,
+  give: Record<string, number>,
+  get: Record<string, number>
+): void {
+  for (const mod of defsOf<HarborRatioModifier>(reg, HARBOR_RATIO_MODS).values()) {
+    mod.recordTrade?.(g, reg, pid, give, get);
+  }
+}
+
+function harborNoteFor(g: GameState, reg: Registry, pid: Id, resource: string): string {
+  for (const mod of defsOf<HarborRatioModifier>(reg, HARBOR_RATIO_MODS).values()) {
+    const note = mod.explainNoOneToOne?.(g, reg, pid, resource);
+    if (note) return note;
+  }
+  return '1:1 requires a harbor';
+}
+
 /** Explains why a proposed bank trade ratio is invalid, or returns null when valid. Used by bankTrade and UI prompts. */
 export function explainInvalidBankRatio(
   g: GameState,
@@ -144,30 +195,40 @@ export function explainInvalidBankRatio(
   get: Record<string, number>
 ): { ok: boolean; reason: string | null; credits: number; wanted: number; ratios: Record<string, number> } {
   const ratios = tradeRatiosFor(g, reg, pid);
+  const wanted = Object.values(get).reduce((a, b) => a + (b || 0), 0);
   let credits = 0;
   for (const [r, n] of Object.entries(give)) {
     if (!n || n <= 0) continue;
     const rate = ratios[r] ?? (Number(g.rules?.bankRatio) || 4);
     if (n % rate !== 0) {
+      const note = rate > HARBOR_MIN_RATIO ? harborNoteFor(g, reg, pid, r) : '';
       return {
         ok: false,
-        reason: `Bank trade requires ${rate}:1 for ${r.toUpperCase()}! Use Player Trade to offer custom amounts.`,
+        reason: `Bank trade requires ${rate}:1 for ${r.toUpperCase()}${note ? ` (${note})` : ''}! Use Player Trade to offer custom amounts.`,
         credits,
-        wanted: Object.values(get).reduce((a, b) => a + (b || 0), 0),
+        wanted,
         ratios
       };
     }
     credits += n / rate;
   }
-  const wanted = Object.values(get).reduce((a, b) => a + (b || 0), 0);
   if (credits <= 0 || credits !== wanted) {
+    let note = '';
+    if (wanted > credits) {
+      const r = Object.keys(give).find(k => (give[k] || 0) > 0 && (ratios[k] ?? 4) > HARBOR_MIN_RATIO);
+      note = r ? harborNoteFor(g, reg, pid, r) : '1:1 requires a harbor';
+    }
     return {
       ok: false,
-      reason: `Bank trade mismatch: your offered cards equal ${credits} resource(s), but you selected ${wanted} wanted card(s).`,
+      reason: `Bank trade mismatch: your offered cards equal ${credits} resource(s), but you selected ${wanted} wanted card(s)${note ? ` (${note})` : ''}.`,
       credits,
       wanted,
       ratios
     };
+  }
+  for (const mod of defsOf<HarborRatioModifier>(reg, HARBOR_RATIO_MODS).values()) {
+    const err = mod.validateTrade?.(g, reg, pid, give, get);
+    if (err) return { ok: false, reason: err, credits, wanted, ratios };
   }
   return { ok: true, reason: null, credits, wanted, ratios };
 }

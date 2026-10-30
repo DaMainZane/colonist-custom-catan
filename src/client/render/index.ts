@@ -129,6 +129,8 @@ export function renderAll(): void {
     if (bridgeBadge) bridgeBadge.textContent = String(badgeTarget.bridgesLeft ?? 10);
     const netBadge = document.getElementById('badgeNetCnt');
     if (netBadge) netBadge.textContent = String(badgeTarget.netsLeft ?? 4);
+    const harborBadge = document.getElementById('badgeHarborCnt');
+    if (harborBadge) harborBadge.textContent = String(badgeTarget.harborsLeft ?? 1);
   }
 
   const pill = document.getElementById('turnStatusPill')!;
@@ -190,6 +192,17 @@ export function renderAll(): void {
     feedBtn.style.display = feedEnabled ? '' : 'none';
     feedBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
     feedBtn.classList.toggle('active-mode', buildMode === 'feed');
+  }
+  // Tidebound Harbor (T8a): the Harbor button. Shown while the server sends a harbor price, or in the lobby while the addon is on.
+  const harborsEnabled = Boolean(
+    badgeTarget?.harborCost !== undefined ||
+    (s.dlc?.tidebound && s.addons?.['tidebound.harbor'] !== false)
+  );
+  const harborBtn = document.getElementById('btnBuildHarbor') as HTMLButtonElement | null;
+  if (harborBtn) {
+    harborBtn.style.display = harborsEnabled ? '' : 'none';
+    harborBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
+    harborBtn.classList.toggle('active-mode', buildMode === 'harbor');
   }
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
   btn('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);

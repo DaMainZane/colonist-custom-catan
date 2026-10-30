@@ -1,5 +1,22 @@
 # Change Log
 
+## 2026-10-30 (Pass 77: Tidebound T8a Harbor 1:1 upgrade, limit 1, works while flooded, and T8b max 4 trades/turn + invalid-ratio prompt; typecheck and tests passed)
+### Added
+- **T8a Harbor (`src/packs/tidebound/harbor.ts`)**: `upgrade_harbor` action (`UPGRADE_HARBOR`, `{ vertexId }`, main phase via `api.phaseAction('main', UPGRADE_HARBOR)`). Upgrades a player's own `city` on any port (`3:1` generic or `2:1` resource port) to `HARBOR_LEVEL = 2` in `g.ext.core.portUpgrades[vertexId]` for `HARBOR_COST` (`2 wood + 1 brick + 1 ore`, routed through `priceOfUpgrade(g, reg, p, HARBOR_UPGRADE_ID, HARBOR_COST)`).
+  - **1:1 trade ratio (`harborRatioMod` in `HARBOR_RATIO_MODS`)**: a `3:1` generic harbor trades all 5 resources at `1:1`; a `2:1` resource harbor trades that resource at `1:1`.
+  - **Limit 1 per player (`HARBOR_LIMIT = 1`)**: enforced by `harborLimitFor(g, pid)` (`1` by default, or `2` when `tidebound.harbor_empire` is owned).
+  - **Works while flooded**: `PortIdleCheck.exempt` added to `PORT_IDLE_CHECKS` in `src/shared/tradeRatio.ts`; `harborIdleExemption` and `isPortFlooded` in `src/packs/tidebound/tides.ts` keep a harbor active (both at `1:1` and at its `2:1` fallback) while every land tile at its corner is flooded. `harborCharterModifier` in `src/packs/base/techEffects.ts` also checks `isPortIdle` so a flooded level-1 port is idle while a flooded level-2 harbor stays active.
+  - **Minimal bot support (`harborBotGoal`)**: registered in `BOT_GOALS` (`generic`), upgrades an eligible port city when the bot will keep at least `HARBOR_BOT_SPARE = 2` cards after paying, preferring a `3:1` port over a `2:1` port.
+- **T8b Max 4 `1:1` trades per turn per harbor & invalid-ratio prompt (`src/packs/tidebound/harbor.ts`, `src/shared/tradeRatio.ts`, `src/packs/base/actions/bankTrade.ts`, `src/client/render/drawer.ts`)**:
+  - `HARBOR_MAX_TRADES = 4`: each harbor allows up to 4 `1:1` trades per turn (`g.ext.tidebound.harborTrades`, cleared on `onTurnStart` and keyed by `g.turnCount`). Specialised harbors are allocated before generic harbors when a player owns two harbors.
+  - Once a harbor's 4 `1:1` trades for the turn are used, `harborRatioMod` yields `null` and the port falls back to its `2:1` ratio for the rest of the turn.
+  - `explainInvalidBankRatio` (`src/shared/tradeRatio.ts`), `bank_trade` (`src/packs/base/actions/bankTrade.ts`), and `bankTradeAdvice` (`src/client/render/drawer.ts`) explain harbors whenever a proposed bank trade is invalid (`1:1 requires a harbor` or `harbor 1:1 limit of 4 trades per turn reached`).
+- **Server & Client (`src/server/view.ts`, `src/server/socket.ts`, `src/client/types.ts`, `src/client/icons.ts`, `src/client/render/board.ts`, `src/client/render/hand.ts`, `src/client/render/index.ts`, `src/client/actions.ts`, `src/client/main.ts`, `public/index.html`)**:
+  - `portLevels` (`harborClientView`) sent in shared state so port badges on the board update dynamically to `2:1` (level 1) or `1:1` (level 2 Harbor).
+  - `harborCost`, `harborSpots`, `harborsLeft`, and `harborTradesLeft` sent in the player view; `upgradeHarbor` socket handler added; `#btnBuildHarbor` button, recipe popup, harbor build mode, and `clickHarborSpot` wired on the client.
+### Tests
+- `tests/tideboundharbor.test.ts` (new): DLC/addon off = nothing registered, `upgrade_harbor` validation & `1:1` ratios on generic and specialised ports with zero `g.rng` draws, `HARBOR_LIMIT = 1` (and `2` with `tidebound.harbor_empire`), flood exemption (`isPortFlooded` and `isPortIdle`), `harborSpotsView`/`harborClientView`/`harborBotGoal`, `HARBOR_MAX_TRADES = 4` per turn with `2:1` fallback and next-turn reset, batch cap validation, and `explainInvalidBankRatio` harbor prompts.
+
 ## 2026-10-30 (Pass 76: Tidebound T7c fish icon boosts, T7d tide replenish, T7e feed the sea; typecheck and tests passed)
 ### Added
 - **T7c boosts (`netCatchOnRoll` in `fishing.ts`)**: a sea tile at the net with `ext.fish` > 0 doubles the catch chance (`NET_BOOSTED_CHANCE` = 1/3, `FISH_ICON_MULTIPLIER` = 2). Every fish caught that way uses up one boost of the richest tile at the net (ties go to the lowest id), so a full icon (`FISH_BOOSTS` = 4) is good for 4 fish. Same draw number as before, so every roll that catches at 1 in 6 also catches at 1 in 3. An icon that ran out stays on the tile at 0 (drawn faded); a tile with no icon never gets one from catching. `fishLeft(hex)` reads the count (null = no icon, clamped 0 to 4).

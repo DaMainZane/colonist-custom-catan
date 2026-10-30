@@ -11,7 +11,7 @@ import {
 import { renderAll } from './render/index';
 import {
   rerenderBoard, resetCamera, getBoardBounds, triggerFlyingResourceAnimations, triggerCardTransferAnimations,
-  triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickNetSpot, clickFeedSpot, clickEdge,
+  triggerAwardAnimation, onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickNetSpot, clickFeedSpot, clickHarborSpot, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave
 } from './render/board';
 import { respondToTrade, confirmTradeWith, cancelTrade, startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed } from './render/trade';
@@ -70,7 +70,7 @@ Object.assign(window as any, {
   toggleMapMenu, mapPick, mapLandInput, mapLandChange, mapParamInput, mapParamChange, mapReroll, mapCopySeed, mapCopyCode, mapEditSeed,
   mapCancelSeed, mapSeedKey, mapApplySeed, mapToggleLock, mapToggleSeedVisible,
   pickGold, spendFishPick, chooseRobberVictim, confirmMonopoly, adjustDiscard, removeCardFromDiscard, removeWildFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade,
-  onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickNetSpot, clickFeedSpot, clickEdge,
+  onHexInteract, onHexClick, onHexEnter, onEdgeInteract, clickVertex, clickNetSpot, clickFeedSpot, clickHarborSpot, clickEdge,
   onRoadHover, onRoadMove, onRoadLeave,
   setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
   showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard, toggleElevationView

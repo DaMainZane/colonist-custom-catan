@@ -1,4 +1,4 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea) | USED BY: packs/index, server, sims, tests
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt) | USED BY: packs/index, server, sims, tests
 import type { Pack } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
@@ -19,6 +19,38 @@ export {
   canPlaceBridge,
   isOceanEdge
 } from './bridges';
+
+export {
+  HARBOR_BOT_SPARE,
+  HARBOR_COST,
+  HARBOR_LEVEL,
+  HARBOR_LIMIT,
+  HARBOR_MAX_TRADES,
+  HARBOR_UPGRADE_ID,
+  TECH_HARBOR_EMPIRE,
+  UPGRADE_HARBOR,
+  canUpgradeHarbor,
+  harborAddon,
+  harborBotGoal,
+  harborCandidateVertices,
+  harborClientView,
+  harborCount,
+  harborCovers,
+  harborIdleExemption,
+  harborLimitFor,
+  harborRatioMod,
+  harborSpotsView,
+  harborTradesLeft,
+  harborTradesLeftAt,
+  harborTradesLeftForResource,
+  harborTradesUsedAt,
+  harborUpgradeCost,
+  harborsOf,
+  isHarbor,
+  resetHarborTrades,
+  upgradeHarborAction
+} from './harbor';
+export type { HarborTurnTrades } from './harbor';
 
 export {
   FEED_BOT_SPARE,

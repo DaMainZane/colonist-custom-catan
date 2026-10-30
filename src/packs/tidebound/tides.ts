@@ -1,10 +1,11 @@
 // MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) | USED BY: packs/tidebound, server/view, tests
-import { PORT_IDLE_CHECKS } from '../../shared';
+import { addonOn, PORT_IDLE_CHECKS } from '../../shared';
 import type { AddonDef, Ctx, GameState, Hex, Registry } from '../../shared';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { createRng, rngInt, rngShuffle } from '../../shared/rng';
 import type { RngState } from '../../shared/rng';
 import { getTileState, setTileState } from '../../shared/tileState';
+import { isHarbor } from './harbor';
 import { ELEVATION_MAX, ELEVATION_MIN } from './seaData';
 
 // How it works (T5a). Coast land is split into clusters (a cluster is one stretch of coast, about TIDE_CLUSTER_SIZE tiles). Each cluster
@@ -341,9 +342,10 @@ export function applyTides(ctx: Ctx): { risen: number[]; fell: number[] } {
 /**
  * Is the port on this vertex under water? Yes when it touches at least one land tile and every land tile it touches is flooded (a coast vertex
  * between a flooded and a dry tile keeps trading). Sea tiles do not count. Hidden (fog) land never floods, so it keeps the port working.
- * This is what `ratioFor` asks through `PORT_IDLE_CHECKS`; a harbor (T8) will opt out by registering an exemption in front of this check.
+ * A harbor (T8) keeps working while flooded, so it is never idle here or in `PORT_IDLE_CHECKS`.
  */
 export function isPortFlooded(g: GameState, reg: Registry, vertexId: number): boolean {
+  if (addonOn(reg, 'tidebound.harbor') && isHarbor(g, vertexId)) return false;
   const v = g.board.vertices[vertexId];
   if (!v) return false;
   let land = 0;

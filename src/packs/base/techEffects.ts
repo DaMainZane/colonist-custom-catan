@@ -6,6 +6,7 @@ import {
   DISCARD_LIMIT_MODS,
   getPlayer,
   hasTech,
+  isPortIdle,
   priceOfUpgrade,
   RATIO_MOD_ORDER,
   RATIO_MODS,
@@ -90,10 +91,12 @@ export function portLevel(g: GameState, vertexId: number): number {
 export const harborCharterModifier: RatioModifier = {
   id: 'tech.harborCharters',
   order: RATIO_MOD_ORDER.harbor,
-  apply(g, _reg, pid, _resource, current) {
+  apply(g, reg, pid, _resource, current) {
     for (const vid of Object.keys(portUpgrades(g))) {
-      if (portLevel(g, Number(vid)) < 1) continue;
-      const v = g.board.vertices[Number(vid)];
+      const id = Number(vid);
+      if (portLevel(g, id) < 1) continue;
+      if (isPortIdle(g, reg, id)) continue;
+      const v = g.board.vertices[id];
       if (v?.piece && v.piece.owner === pid && v.piece.type !== SETTLEMENT && v.port === GENERIC_PORT) {
         return Math.min(current, 2);
       }

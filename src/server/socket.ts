@@ -725,6 +725,8 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('buyDevCard', safe(({ code }) => act(code, 'buy_dev')));
     socket.on('researchTech', safe(({ code, techId }) => act(code, 'research_tech', { techId }, true)));
     socket.on('upgradePort', safe(({ code, vertexId }) => act(code, 'upgrade_port', { vertexId }, true)));
+    // Tidebound T8a: upgrade one of your port cities to a 1:1 harbor (limit 1, max 4 1:1 trades/turn, works while flooded).
+    socket.on('upgradeHarbor', safe(({ code, vertexId }) => act(code, 'upgrade_harbor', { vertexId }, true)));
     // Tidebound T4c: turn one of your rickety bridges into a full bridge.
     socket.on('upgradeBridge', safe(({ code, edgeId }) => act(code, 'upgrade_bridge', { edgeId }, true)));
     socket.on('convertTile', safe(({ code, hexId, resource }) => act(code, 'convert_tile', { hexId, resource }, true)));

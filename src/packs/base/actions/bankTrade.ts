@@ -1,7 +1,7 @@
 // MODULE: action "bank_trade" (4:1 or better with ports; registry resources only) | USED BY: packs/base/actions/index
-import { getPlayer } from '../../../shared';
+import { explainInvalidBankRatio, getPlayer, recordBankTrade } from '../../../shared';
 import type { ActionDef } from '../../../shared';
-import { parseResources, sumResources, tradeRatios } from '../trading';
+import { parseResources, tradeRatios } from '../trading';
 
 export const bankTradeAction: ActionDef = {
   type: 'bank_trade',
@@ -11,20 +11,12 @@ export const bankTradeAction: ActionDef = {
     const get = parseResources(reg, payload?.get);
     if (!give || !get) return 'Invalid trade';
     const p = getPlayer(g, pid)!;
-    const ratios = tradeRatios(g, reg, pid);
 
-    let credits = 0;
     for (const [r, n] of Object.entries(give)) {
       if (n > (p.resources[r] || 0)) return `Not enough ${r.toUpperCase()}!`;
-      if (n % ratios[r] !== 0) {
-        return `Bank trade requires ${ratios[r]}:1 for ${r.toUpperCase()}! Use Player Trade to offer custom amounts.`;
-      }
-      credits += n / ratios[r];
     }
-    const wanted = sumResources(get);
-    if (credits <= 0 || credits !== wanted) {
-      return `Bank trade mismatch: your offered cards equal ${credits} resource(s), but you selected ${wanted} wanted card(s).`;
-    }
+    const check = explainInvalidBankRatio(g, reg, pid, give, get);
+    if (!check.ok) return check.reason || 'Invalid trade';
     for (const [r, n] of Object.entries(get)) {
       if (n > (g.bank[r] || 0)) return `Bank does not have enough ${r.toUpperCase()}!`;
     }
@@ -35,6 +27,7 @@ export const bankTradeAction: ActionDef = {
     const p = getPlayer(g, pid)!;
     const give = parseResources(reg, payload.give)!;
     const get = parseResources(reg, payload.get)!;
+    recordBankTrade(g, reg, pid, give, get);
     for (const [r, n] of Object.entries(give)) {
       p.resources[r] -= n;
       g.bank[r] += n;
