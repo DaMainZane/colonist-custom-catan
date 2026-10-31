@@ -66,12 +66,17 @@ const goodPack = packWith(api => {
 const regOf = (pack: Pack) => createRegistry([basePack, pack], {}, 'all');
 
 describe('buildVisualManifest (R8.4)', () => {
-  it('is empty when no def has a visual, for the base game and for every shipped registry', () => {
+  it('is empty for the base game and when Tidebound or Tides is off, and carries flood and flood-warn when Tides is on', () => {
     const empty = { version: 1, pieces: [], overlays: [] };
     expect(buildVisualManifest(createRegistry([basePack]))).toEqual(empty);
     expect(buildVisualManifest(createRegistry(allPacks))).toEqual(empty);
-    expect(buildVisualManifest(createRegistry(allPacks, {}, 'all'))).toEqual(empty);
-    expect(buildVisualManifest(registryFor(allPacks, { dlc: { tidebound: true } }))).toEqual(empty);
+    expect(buildVisualManifest(registryFor(allPacks, { dlc: { tidebound: true }, addons: { 'tidebound.tides': false } }))).toEqual(empty);
+    for (const reg of [createRegistry(allPacks, {}, 'all'), registryFor(allPacks, { dlc: { tidebound: true } })]) {
+      const m = buildVisualManifest(reg);
+      expect(m.pieces).toEqual([]);
+      expect(m.overlays.map(o => o.id)).toEqual(['flood', 'flood-warn']);
+      expect(registryVisualProblems(reg)).toEqual([]);
+    }
   });
 
   it('lists pieces and actions with a visual, takes id and kind from the def, and sorts by order then id', () => {

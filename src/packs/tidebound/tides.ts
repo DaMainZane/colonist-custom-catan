@@ -1,6 +1,6 @@
 // MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/seaData, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/addons.generated, packs/tidebound/fishing, packs/tidebound/index
-import { addonOn, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
-import type { AddonDef, Ctx, GameState, Hex, Registry, ViewDataDef } from '../../shared';
+import { addonOn, OVERLAY_KINDS, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
+import type { AddonDef, Ctx, GameState, Hex, OverlayKindVisual, Registry, ViewDataDef } from '../../shared';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { createRng, rngInt, rngShuffle } from '../../shared/rng';
 import type { RngState } from '../../shared/rng';
@@ -476,6 +476,24 @@ export const tideViewData: ViewDataDef = {
   overlays: (g: GameState, reg: Registry) => tideClientView(g, reg)?.overlays
 };
 
+/** R8.8: plain-data look of a flooded tile and of the one-turn-ahead warning (`OVERLAY_KINDS`). Sent in the visual manifest only while Tides is on. */
+export const floodOverlayKind: OverlayKindVisual = {
+  id: 'flood',
+  label: 'Flooded',
+  tint: { light: 'rgba(59, 126, 161, 0.34)', dark: 'rgba(118, 190, 222, 0.30)' },
+  line: { light: 'rgba(33, 92, 140, 0.85)', dark: 'rgba(168, 222, 245, 0.9)' },
+  pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.4" />'
+};
+
+export const floodWarnOverlayKind: OverlayKindVisual = {
+  id: 'flood-warn',
+  label: 'Flood warning',
+  tint: { light: 'rgba(59, 126, 161, 0.14)', dark: 'rgba(118, 190, 222, 0.13)' },
+  line: { light: 'rgba(33, 92, 140, 0.8)', dark: 'rgba(168, 222, 245, 0.85)' },
+  pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />',
+  pulse: true
+};
+
 export const tidesAddon: AddonDef = {
   id: 'tidebound.tides',
   name: 'Tides',
@@ -502,5 +520,8 @@ export const tidesAddon: AddonDef = {
     });
     // R7a.5: the flood overlays and the tide facts for the client state.
     api.define(VIEW_DATA, tideViewData);
+    // R8.8: the `flood` and `flood-warn` overlay visuals for the manifest.
+    api.define(OVERLAY_KINDS, floodOverlayKind);
+    api.define(OVERLAY_KINDS, floodWarnOverlayKind);
   }
 };

@@ -1,4 +1,4 @@
-// MODULE: generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips, spots and shapes; no DOM, no socket, no store) | DEPENDS ON: client/icons, client/types, shared/visual | USED BY: client/pieceui
+// MODULE: generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips, spots and shapes; no DOM, no socket, no store) | DEPENDS ON: client/icons, client/types, shared/visual | USED BY: client/pieceui, client/render/overlay
 import { getMiniSvg, shade, uiIcon } from './icons';
 import type { PlayerView, Resources } from './types';
 import type { ManifestEntry, PiecePlayerData } from '../shared/visual';

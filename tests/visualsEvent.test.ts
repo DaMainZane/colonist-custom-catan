@@ -91,8 +91,9 @@ describe('visuals event (R8.4)', () => {
       expect(JSON.parse(JSON.stringify(v[0].data))).toEqual(v[0].data);
       expect(manifestProblems(v[0].data.manifest)).toEqual([]);
     }
-    // Nothing registers a visual yet, so the manifest is empty (R8.8 fills it).
-    expect(visualsTo(log, 'a')[0].data.manifest).toEqual({ version: 1, pieces: [], overlays: [] });
+    // R8.8 step 1: Tides registers `flood` and `flood-warn` in `OVERLAY_KINDS`; no piece has a visual yet.
+    expect(visualsTo(log, 'a')[0].data.manifest.pieces).toEqual([]);
+    expect(visualsTo(log, 'a')[0].data.manifest.overlays.map((o: any) => o.id)).toEqual(['flood', 'flood-warn']);
   });
 
   it('sends it once per key: a second broadcast sends gameState only', () => {

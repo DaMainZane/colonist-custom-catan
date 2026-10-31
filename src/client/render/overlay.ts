@@ -1,17 +1,21 @@
-// MODULE: S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) | DEPENDS ON: client/icons, client/util | USED BY: client/main, client/render/board, client/render/index
+// MODULE: S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) | DEPENDS ON: client/icons, client/pieceModel, client/util, client/visuals, shared/visual | USED BY: client/main, client/render/board, client/render/index
 // Colorblind rule ("Design UI Philosophy.md"): every hex overlay pairs a color tint with a distinct geometric SVG pattern
 // (hatch, waves, dots, chevrons, diagonal crack, rings) so color is never the only signal.
 import { uiIcon } from '../icons';
+import { isSafeCss, isSafeFragment } from '../pieceModel';
 import { esc } from '../util';
+import { getManifest, manifestRevision, overlayKind } from '../visuals';
+import type { OverlayKindVisual } from '../../shared/visual';
 
-export type HexOverlayKind =
+/** Overlay kinds for DLCs not built yet stay hard-coded here; DLCs that have shipped register theirs in `OVERLAY_KINDS` (`Visual Manifest Design.md`, section f). */
+export type BuiltinHexOverlayKind =
   | 'wall-incomplete'
-  | 'flood'
-  | 'flood-warn'
   | 'plague'
   | 'wave'
   | 'crack'
   | 'season';
+
+export type HexOverlayKind = BuiltinHexOverlayKind | (string & {});
 
 export interface HexOverlayEntry {
   hexId: number;
@@ -61,35 +65,61 @@ const activeTimerPopups = new Map<string, TimerPopupItem>();
 let popupRafId: number | null = null;
 let recapDismissTimer: any = null;
 
-const PATTERN_IDS: Record<HexOverlayKind, string> = {
+const PATTERN_IDS: Record<BuiltinHexOverlayKind, string> = {
   'wall-incomplete': 'ov-pat-wall-incomplete',
-  flood: 'ov-pat-flood',
-  'flood-warn': 'ov-pat-flood-warn',
   plague: 'ov-pat-plague',
   wave: 'ov-pat-wave',
   crack: 'ov-pat-crack',
   season: 'ov-pat-season'
 };
 
-/** SVG <defs> for the 6 colorblind-safe geometric hex overlay patterns. */
-export function overlayPatternDefsMarkup(): string {
+const SAFE_OVERLAY_ID = /^[A-Za-z0-9_-]+$/;
+const OVERLAY_STYLE_ID = 'vis-overlay-vars';
+
+function isSafeOverlayColor(c: string): boolean {
+  return !!c && isSafeCss(c) && !/[;{}]/.test(c);
+}
+
+function isSafeOverlayKind(o: OverlayKindVisual): boolean {
+  return (
+    SAFE_OVERLAY_ID.test(o.id) &&
+    isSafeFragment(o.pattern) &&
+    isSafeOverlayColor(o.tint.light) &&
+    isSafeOverlayColor(o.tint.dark) &&
+    isSafeOverlayColor(o.line.light) &&
+    isSafeOverlayColor(o.line.dark)
+  );
+}
+
+/**
+ * R8.8: CSS custom properties (`--ov-<id>-tint` and `--ov-<id>-line`) for every manifest overlay kind, for light and dark themes.
+ * Empty when the manifest has no overlay kinds.
+ */
+export function overlayVarsCss(overlays: readonly OverlayKindVisual[] = getManifest().overlays): string {
+  const valid = overlays.filter(isSafeOverlayKind);
+  if (valid.length === 0) return '';
+  const light = valid.map(o => `--ov-${o.id}-tint:${o.tint.light};--ov-${o.id}-line:${o.line.light};`).join('');
+  const dark = valid.map(o => `--ov-${o.id}-tint:${o.tint.dark};--ov-${o.id}-line:${o.line.dark};`).join('');
+  return `:root{${light}}:root[data-theme="dark"]{${dark}}`;
+}
+
+function overlayPatternDefsInnerMarkup(overlays: readonly OverlayKindVisual[] = getManifest().overlays): string {
+  const dynamic = overlays
+    .filter(isSafeOverlayKind)
+    .map(
+      o => `
+      <pattern id="ov-pat-${o.id}" width="24" height="14" patternUnits="userSpaceOnUse" style="color:var(--ov-${o.id}-line);stroke:var(--ov-${o.id}-line)">
+        <rect width="24" height="14" style="fill:var(--ov-${o.id}-tint)" />
+        ${o.pattern}
+      </pattern>`
+    )
+    .join('');
   return `
-    <defs id="boardOverlayDefs">
       <!-- 1. wall-incomplete: red diagonal hatch -->
       <pattern id="ov-pat-wall-incomplete" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
         <rect width="14" height="14" fill="rgba(196, 71, 47, 0.18)" />
         <line x1="0" y1="0" x2="0" y2="14" stroke="#c4472f" stroke-width="4" stroke-opacity="0.65" />
-      </pattern>
-      <!-- 2. flood: sea-blue wave lines. Colors are tokens (--flood-*), so light and dark theme each get their own tint. -->
-      <pattern id="ov-pat-flood" width="24" height="14" patternUnits="userSpaceOnUse">
-        <rect width="24" height="14" style="fill:var(--flood-tint)" />
-        <path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" style="stroke:var(--flood-line)" stroke-width="2.4" />
-      </pattern>
-      <!-- 2b. flood-warn (a turn ahead): the same waves but dashed and lighter, so a warning never reads as water already there -->
-      <pattern id="ov-pat-flood-warn" width="24" height="14" patternUnits="userSpaceOnUse">
-        <rect width="24" height="14" style="fill:var(--flood-warn-tint)" />
-        <path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" style="stroke:var(--flood-warn-line)" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />
-      </pattern>
+      </pattern>${dynamic}
       <!-- 3. plague: green spore dots -->
       <pattern id="ov-pat-plague" width="16" height="16" patternUnits="userSpaceOnUse">
         <rect width="16" height="16" fill="rgba(79, 138, 74, 0.20)" />
@@ -111,8 +141,41 @@ export function overlayPatternDefsMarkup(): string {
         <rect width="22" height="22" fill="rgba(217, 164, 65, 0.16)" />
         <circle cx="11" cy="11" r="6.5" fill="none" stroke="#b58524" stroke-width="1.8" stroke-opacity="0.72" />
       </pattern>
-    </defs>
+    `;
+}
+
+/** SVG <defs> for the built-in and manifest colorblind-safe geometric hex overlay patterns. */
+export function overlayPatternDefsMarkup(overlays: readonly OverlayKindVisual[] = getManifest().overlays): string {
+  return `
+    <defs id="boardOverlayDefs" data-rev="${manifestRevision()}">${overlayPatternDefsInnerMarkup(overlays)}</defs>
   `;
+}
+
+/** Keeps `<style id="vis-overlay-vars">` and `<defs id="boardOverlayDefs">` in sync with the current manifest. Safe when `document` is absent (Node tests). */
+export function syncOverlayManifest(): void {
+  if (typeof document === 'undefined') return;
+  const rev = String(manifestRevision());
+  const overlays = getManifest().overlays;
+  const css = overlayVarsCss(overlays);
+  let styleEl = document.getElementById(OVERLAY_STYLE_ID) as HTMLStyleElement | null;
+  if (!css) {
+    if (styleEl) styleEl.remove();
+  } else {
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = OVERLAY_STYLE_ID;
+      document.head.appendChild(styleEl);
+    }
+    if (styleEl.dataset.rev !== rev || styleEl.textContent !== css) {
+      styleEl.textContent = css;
+      styleEl.dataset.rev = rev;
+    }
+  }
+  const defsEl = document.getElementById('boardOverlayDefs');
+  if (defsEl && defsEl.getAttribute('data-rev') !== rev) {
+    defsEl.innerHTML = overlayPatternDefsInnerMarkup(overlays);
+    defsEl.setAttribute('data-rev', rev);
+  }
 }
 
 /** Set or clear a client-side hex overlay tint/pattern (supplements any server-sent `hex.overlay` field). */
@@ -131,6 +194,7 @@ export function renderHexOverlaysMarkup(
   getInnerPoly: (hexId: number) => string | undefined,
   serverOverlays?: Record<number, { kind: HexOverlayKind; label?: string }> | null
 ): string {
+  syncOverlayManifest();
   let html = '';
   for (const h of hexes) {
     if (!h || h.type === 'water' || h.fog || h.type === 'fog') continue;
@@ -138,13 +202,20 @@ export function renderHexOverlaysMarkup(
       clientHexOverlays.get(h.id) ||
       (serverOverlays && serverOverlays[h.id]) ||
       (h.overlay && typeof h.overlay === 'object' ? h.overlay : typeof h.overlay === 'string' ? { kind: h.overlay as HexOverlayKind } : null);
-    if (!entry || !entry.kind || !PATTERN_IDS[entry.kind as HexOverlayKind]) continue;
+    if (!entry || !entry.kind) continue;
+    const kindDef = overlayKind(entry.kind);
+    const validManifestKind = kindDef && isSafeOverlayKind(kindDef) ? kindDef : undefined;
+    const patId = validManifestKind
+      ? `ov-pat-${validManifestKind.id}`
+      : PATTERN_IDS[entry.kind as BuiltinHexOverlayKind];
+    if (!patId) continue;
     const poly = getInnerPoly(h.id);
     if (!poly) continue;
-    const patId = PATTERN_IDS[entry.kind as HexOverlayKind];
-    html += `<g class="hex-overlay-item hex-overlay-${esc(entry.kind)}" style="pointer-events:none">
+    const label = entry.label ?? validManifestKind?.label;
+    const pulseCls = validManifestKind?.pulse ? ' hex-overlay-pulse' : '';
+    html += `<g class="hex-overlay-item hex-overlay-${esc(entry.kind)}${pulseCls}" style="pointer-events:none">
       <polygon points="${poly}" fill="url(#${patId})" class="hex-overlay-poly" />
-      ${entry.label ? `<text x="${h.x.toFixed(1)}" y="${(h.y + 44).toFixed(1)}" class="hex-overlay-label">${esc(entry.label)}</text>` : ''}
+      ${label ? `<text x="${h.x.toFixed(1)}" y="${(h.y + 44).toFixed(1)}" class="hex-overlay-label">${esc(label)}</text>` : ''}
     </g>`;
   }
   return html;

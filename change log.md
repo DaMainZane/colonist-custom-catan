@@ -1,5 +1,19 @@
 # Change Log
 
+## 2026-10-31 (Pass 94: Modular rework R8.8 step 1, migrate `flood` and `flood-warn` overlay kinds onto `OVERLAY_KINDS` and delete their hard-coded client definitions; NOT run, no shell)
+### Changed
+- `src/packs/tidebound/tides.ts` & `src/packs/tidebound/index.ts`: added `floodOverlayKind` (`id: 'flood'`, `label: 'Flooded'`, light/dark `tint` and `line`, wave `pattern`) and `floodWarnOverlayKind` (`id: 'flood-warn'`, `label: 'Flood warning'`, light/dark `tint` and `line`, dashed wave `pattern`, `pulse: true`), registered via `api.define(OVERLAY_KINDS, ...)` inside `tidesAddon.register` and re-exported from `packs/tidebound/index.ts`.
+- `src/client/render/overlay.ts`: added `overlayVarsCss` (`--ov-<id>-tint` and `--ov-<id>-line` for `:root` and `:root[data-theme="dark"]`), `syncOverlayManifest` (keeps `<style id="vis-overlay-vars">` and `<defs id="boardOverlayDefs">` in sync with `manifestRevision()`), dynamic `<pattern id="ov-pat-<id>">` generation in `overlayPatternDefsMarkup`, and manifest lookup (`overlayKind`) in `renderHexOverlaysMarkup` with automatic `label` and `hex-overlay-pulse` class when `pulse` is true. Left the 5 unbuilt-DLC kinds (`wall-incomplete`, `plague`, `wave`, `crack`, `season`) in `BuiltinHexOverlayKind` / `PATTERN_IDS`.
+- `src/client/styles.css`: replaced `.hex-overlay-flood-warn .hex-overlay-poly` and `@keyframes floodWarnFlash` with generic `.hex-overlay-pulse .hex-overlay-poly` and `@keyframes hexOverlayPulse`; added `text-anchor: middle; fill: var(--ink)` to `.hex-overlay-label`.
+- `tests/tideboundtides.test.ts`, `tests/visualManifest.test.ts`, `tests/visualsEvent.test.ts`: added tests for `flood` and `flood-warn` registration in `OVERLAY_KINDS`, `registryVisualProblems`, `overlayVarsCss`, `overlayPatternDefsMarkup`, and `renderHexOverlaysMarkup` before and after the manifest arrives; updated shipped-registry manifest expectations.
+### Deleted
+- Hard-coded `'flood'` and `'flood-warn'` entries from `PATTERN_IDS` and `overlayPatternDefsMarkup()` in `src/client/render/overlay.ts`.
+- Hard-coded `--flood-tint`, `--flood-line`, `--flood-warn-tint`, `--flood-warn-line`, `.hex-overlay-flood-warn`, and `@keyframes floodWarnFlash` from `src/client/styles.css`.
+### Not done
+- Nothing was run (no shell). `tests/view.snapshot.json` and `tests/golden.snapshot.json` untouched (`OVERLAY_KINDS` is sent in the `visuals` event, not `gameState`).
+- Commands, one per line: `npx vitest run tests/tideboundtides.test.ts tests/visualManifest.test.ts tests/visualsEvent.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`.
+- Next: R8.8 step 2 (`net` vertex piece).
+
 ## 2026-10-31 (Pass 93: Modular rework R8.7, generic client code for manifest pieces and actions; NOT run, no shell; nothing registers a visual yet, so the game draws as before)
 ### Changed
 - `src/client/pieceModel.ts` (new, pure, no DOM): `buttonModels` (one button per mode, grouped by `button.group`, ordered by `order` then id; an id or group that is not a plain identifier is left out), `buttonVisible`, `badgeFor`, `recipeCostFor`, `recipeStripHtml`, `canPay`, `modeHint` (first match wins: `noSupply`, `cannotAfford`, `noSpots`; for a group the step must hold for every entry on offer; `spots: null` gives no hint), `spotsForMode`, `entriesAtSpot`, `spotMarkup`, `fillShape` (`{color}`, `{dark}`; a non-hex colour becomes grey), `withRim`, `vertexShapeMarkup`, `edgeShapeMarkup`, `placedEntry`, `iconHtml`, `buttonHtml`, `isSafeFragment`, `isSafeCss` (the client's second lock on top of `visualProblems`).

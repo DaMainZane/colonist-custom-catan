@@ -12,7 +12,9 @@ import {
   coastHexIds,
   ensureTides,
   floodDepthAt,
+  floodOverlayKind,
   floodPlan,
+  floodWarnOverlayKind,
   hexElevation,
   isFloodedAt,
   isPortFlooded,
@@ -24,9 +26,12 @@ import {
   tideWarning
 } from '../src/packs/tidebound';
 import type { TideCluster } from '../src/packs/tidebound';
+import { overlayPatternDefsMarkup, overlayVarsCss, renderHexOverlaysMarkup } from '../src/client/render/overlay';
+import { resetManifest, setManifest } from '../src/client/visuals';
 import { mergeSettings } from '../src/server/lobby';
 import { defaultSettings, rulesFromSettings } from '../src/server/runtime';
-import { buildTopology, createGame, dispatch, makeCtx, ratioFor, registryFor } from '../src/shared';
+import { OVERLAY_KINDS, buildTopology, buildVisualManifest, createGame, defsOf, dispatch, makeCtx, ratioFor, registryFor, registryVisualProblems } from '../src/shared';
+import type { OverlayKindVisual } from '../src/shared';
 import { runProductionPipeline } from '../src/shared/production';
 import { getTileState, isHexRobberBlocked, resolveTileStateDef, setTileState } from '../src/shared/tileState';
 
@@ -878,3 +883,85 @@ describe('tide view for the client (T6)', () => {
     expect(JSON.stringify(b.g.board.hexes)).toBe(JSON.stringify(a.g.board.hexes));
   });
 });
+
+describe('manifest overlay kinds flood and flood-warn (R8.8 step 1)', () => {
+  it('registers flood and flood-warn in OVERLAY_KINDS only while Tides is on, and passes all manifest checks', () => {
+    const { reg } = makeGame(on);
+    const map = defsOf<OverlayKindVisual>(reg, OVERLAY_KINDS);
+    expect([...map.keys()].sort()).toEqual(['flood', 'flood-warn']);
+    expect(map.get('flood')).toEqual(floodOverlayKind);
+    expect(map.get('flood-warn')).toEqual(floodWarnOverlayKind);
+    expect(floodOverlayKind.label).toBe('Flooded');
+    expect(floodWarnOverlayKind.label).toBe('Flood warning');
+    expect(floodWarnOverlayKind.pulse).toBe(true);
+    expect(registryVisualProblems(reg)).toEqual([]);
+
+    const manifest = buildVisualManifest(reg);
+    expect(manifest.overlays).toEqual([floodOverlayKind, floodWarnOverlayKind]);
+
+    for (const rules of [{}, { dlc: { tidebound: false } }, tidesOff]) {
+      const offReg = registryFor(allPacks, rules);
+      expect(defsOf(offReg, OVERLAY_KINDS).size).toBe(0);
+      expect(buildVisualManifest(offReg).overlays).toEqual([]);
+    }
+  });
+
+  it('client overlay renderer builds flood and flood-warn patterns, theme tokens, labels and pulse from the manifest, and leaves the 5 built-in kinds intact', () => {
+    const { reg } = makeGame(on);
+    const hexes = [
+      { id: 0, type: 'wood', x: 10, y: 20 },
+      { id: 1, type: 'brick', x: 50, y: 60 },
+      { id: 2, type: 'sheep', x: 90, y: 100 }
+    ];
+    const poly = (id: number) => `0,0 10,${id}`;
+    resetManifest();
+    try {
+      // Before the manifest arrives: the 5 unbuilt-DLC kinds exist, flood and flood-warn do not.
+      const defsBefore = overlayPatternDefsMarkup();
+      for (const k of ['wall-incomplete', 'plague', 'wave', 'crack', 'season']) {
+        expect(defsBefore).toContain(`id="ov-pat-${k}"`);
+      }
+      expect(defsBefore).not.toContain('id="ov-pat-flood"');
+      expect(defsBefore).not.toContain('id="ov-pat-flood-warn"');
+      expect(overlayVarsCss()).toBe('');
+
+      const htmlBefore = renderHexOverlaysMarkup(hexes, poly, {
+        0: { kind: 'flood' },
+        1: { kind: 'flood-warn' },
+        2: { kind: 'plague' }
+      });
+      expect(htmlBefore).not.toContain('ov-pat-flood');
+      expect(htmlBefore).toContain('url(#ov-pat-plague)');
+
+      // After the Tidebound manifest arrives: theme tokens, patterns, labels and pulse are rendered from the manifest.
+      setManifest(buildVisualManifest(reg));
+      const css = overlayVarsCss();
+      expect(css).toContain('--ov-flood-tint:rgba(59, 126, 161, 0.34)');
+      expect(css).toContain('--ov-flood-line:rgba(33, 92, 140, 0.85)');
+      expect(css).toContain(':root[data-theme="dark"]');
+      expect(css).toContain('--ov-flood-warn-tint:rgba(118, 190, 222, 0.13)');
+
+      const defsAfter = overlayPatternDefsMarkup();
+      expect(defsAfter).toContain('id="ov-pat-flood"');
+      expect(defsAfter).toContain('id="ov-pat-flood-warn"');
+      expect(defsAfter).toContain('var(--ov-flood-tint)');
+      expect(defsAfter).toContain('var(--ov-flood-warn-line)');
+
+      const htmlAfter = renderHexOverlaysMarkup(hexes, poly, {
+        0: { kind: 'flood' },
+        1: { kind: 'flood-warn' },
+        2: { kind: 'plague' }
+      });
+      expect(htmlAfter).toContain('fill="url(#ov-pat-flood)"');
+      expect(htmlAfter).toContain('fill="url(#ov-pat-flood-warn)"');
+      expect(htmlAfter).toContain('fill="url(#ov-pat-plague)"');
+      expect(htmlAfter).toContain('>Flooded</text>');
+      expect(htmlAfter).toContain('>Flood warning</text>');
+      expect(htmlAfter).toContain('class="hex-overlay-item hex-overlay-flood"');
+      expect(htmlAfter).toContain('class="hex-overlay-item hex-overlay-flood-warn hex-overlay-pulse"');
+    } finally {
+      resetManifest();
+    }
+  });
+});
+
