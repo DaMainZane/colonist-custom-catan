@@ -16,7 +16,9 @@
     "headers:write": "node scripts/headers.mjs --write",
     "headers:check": "node scripts/headers.mjs --check",
     "index": "node scripts/index.mjs",
-    "index:check": "node scripts/index.mjs --check"
+    "index:check": "node scripts/index.mjs --check",
+    "addons": "node scripts/addons.mjs",
+    "addons:check": "node scripts/addons.mjs --check"
   },
   "dependencies": {
     "express": "^4.19.2",

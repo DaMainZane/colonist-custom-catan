@@ -161,9 +161,10 @@ function viewsOf(room: any): { active: any; other: any; spectator: any } {
 
 /** The board as a short summary: sizes and what stands on it (the plain board shape is not part of this change). */
 function slim(view: any): any {
+  const { elapsedMs: _elapsedMs, ...rest } = view;
   const b = view.board;
   return {
-    ...view,
+    ...rest,
     board: {
       hexes: b.hexes.length,
       vertices: b.vertices.length,

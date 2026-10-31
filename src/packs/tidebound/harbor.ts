@@ -1,4 +1,4 @@
-// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) | DEPENDS ON: packs/base/constants, packs/base/techEffects, packs/tidebound/tech, shared/index | USED BY: packs/tidebound/index, packs/tidebound/tides
+// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) | DEPENDS ON: packs/base/constants, packs/base/techEffects, packs/tidebound/tech, shared/index | USED BY: packs/tidebound/addons.generated, packs/tidebound/index, packs/tidebound/tides
 import {
   addonOn,
   BOT_GOALS,

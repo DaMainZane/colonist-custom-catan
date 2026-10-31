@@ -69,7 +69,9 @@ describe('lobby card data', () => {
   it('the setup page fallback catalog lists the same Tidebound ids as the server (no placeholder ids)', () => {
     const src = readFileSync(join(__dirname, '../src/client/render/setup.ts'), 'utf8');
     const inClient = new Set([...src.matchAll(/'(tidebound\.[a-z_]+)'/g)].map(m => m[1]));
-    expect([...inClient].sort()).toEqual([...IDS].sort());
+    const serverAddons = mapOptionsView().addons.filter(a => a.pack === 'tidebound').map(a => a.id);
+    expect([...inClient].sort()).toEqual([...serverAddons].sort());
+    expect(serverAddons).toEqual(IDS);
   });
 });
 

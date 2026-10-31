@@ -1,10 +1,10 @@
-// MODULE: template addon (copy this file to start a new addon: one vertex piece, one action, one tech node, a bot goal stub, a client view function; not part of any shipped pack) | DEPENDS ON: packs/base/techEffects, shared/index | USED BY: packs/_template/index
+// MODULE: template addon (copy this file to start a new addon: one vertex piece, one action, one tech node, a bot goal stub, a client view function; not part of any shipped pack) | DEPENDS ON: packs/base/techEffects, shared/index | USED BY: packs/_template/addons.generated, packs/_template/index
 //
 // HOW TO USE THIS FILE (see RECIPES.md for the full steps)
 //   1. Copy it to `src/packs/<dlc>/<name>.ts`.
 //   2. Rename: the `template` prefix in every id (`template.demo` becomes `<dlc>.<name>`), `BEACON`, `TIP_BEACON`, `TECH_DEMO`, `demo*`.
 //   3. Delete the parts you do not need (a piece only, an action only, ...). Every part works on its own.
-//   4. Add the addon to the pack's `addons` array in `packs/<dlc>/index.ts`, after its deps, and export what the server or client imports.
+//   4. Run `npm run addons` (regenerates `packs/<dlc>/addons.generated.ts` in dependency order), and re-export from `packs/<dlc>/index.ts` what the server or client imports.
 //   5. Run `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`.
 //
 // Rules this file follows (EXTENSION POINTS.md has the rest):

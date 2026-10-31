@@ -4,7 +4,7 @@ Five recipes for adding content. Each says which files to touch, in order, and w
 
 Checked against the code: the pack side (`registry.ts`, `addons.ts`, `harbor.ts`, `ricketyBridges.ts`, `tech.ts`) and the server glue (`socket.ts`, `view.ts`), all opened. Also checked in the 2026-10-31 trial: `client/render/board.ts`, `overlay.ts`, `index.ts`, `client/main.ts`, `actions.ts`, `store.ts`, `types.ts`. Not opened, so search before trusting them: shapes in `client/icons.ts`, `public/index.html`, and the DLC card list in `client/render/setup.ts`. Each recipe marks these. Notes ending "Until R8" describe hand-written glue that the rework removes; delete each note when its chunk lands.
 
-After every recipe: `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`. A new addon must not change a game it is not part of, so `tests/golden.snapshot.json` stays untouched.
+After every recipe: `npm run addons` (when adding or changing an addon), `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`. A new addon must not change a game it is not part of, so `tests/golden.snapshot.json` stays untouched.
 
 ## 1. New piece
 
@@ -31,8 +31,8 @@ A piece is a vertex or edge thing a player builds with the base `build` action.
 
 1. **Copy** `tidebound/harbor.ts` (complete and small) or `_template/demo.ts` to `packs/<dlc>/<name>.ts`.
 2. **Fill the `AddonDef`**: `id` must start with `<packId>.`. `links` need 2 or more distinct `{ target, kind }` and at least one target from `GENERAL_SERVICE_IDS` (`shared/addons.ts`); targets that are not General services must be real addon ids. `deps` list addon ids that must be declared earlier. `rules` are defaults merged only while the addon is on. Everything else goes inside `register(api)`.
-3. **Add it to its pack**: the `addons` array in `packs/<dlc>/index.ts`, after its deps. Re-export anything the server or client imports from the pack index.
-4. **Client card list** (search first): the DLC and addon cards in `client/render/setup.ts` have a built-in fallback list; the Tidebound ids in it must match the pack (checked by `tests/tidebound.test.ts`). The server's list comes from the registry (`server/mapmenu.ts`) with no edit.
+3. **Generate the pack's addon list**: run `npm run addons` to regenerate `packs/<dlc>/addons.generated.ts` in dependency order (`packs/<dlc>/index.ts` imports `addons.generated.ts`, so you never edit an `addons` array by hand; `tests/index.test.ts` fails if it is stale). Re-export anything the server or client imports from `packs/<dlc>/index.ts`.
+4. **Client card list**: the DLC and addon cards in `client/render/setup.ts` have a built-in fallback list; its Tidebound ids must match the server's addon list (`mapOptionsView().addons`, checked by `tests/tidebound.test.ts`). The server's list comes from the registry (`server/mapmenu.ts`) with no edit.
 5. **A new DLC pack** (not just an addon): a `Pack` with `deps: ['base']` and an `addons` list, added to `allPacks` in `packs/index.ts`. Not needed for a new addon inside an existing DLC.
 6. **Test**: `auditAddons(allPacks)` returns `[]` (`tests/addons.test.ts`); with the DLC or the addon switched off nothing is registered (`{ dlc: { x: false } }`, `{ addons: { 'x.y': false } }`); with it on the content is there; zero `g.rng` draws.
 

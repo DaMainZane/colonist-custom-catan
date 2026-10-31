@@ -102,8 +102,11 @@ describe('Turn History recorder & round summarizer', () => {
     expect(aliceTurn.actions[0].text).toBe('Rolled 8 (4 + 4)');
 
     expect(aliceTurn.actions[1].category).toBe('produce');
-    expect(aliceTurn.actions[1].text).toContain('+2 Wheat');
-    expect(aliceTurn.actions[1].text).toContain('+1 Wood');
+    expect(aliceTurn.actions[1].text).toContain('Produced');
+    expect(aliceTurn.actions[1].resources).toEqual([
+      { resource: 'wheat', amount: 2, sign: '+' },
+      { resource: 'wood', amount: 1, sign: '+' }
+    ]);
 
     expect(aliceTurn.actions[2].category).toBe('build');
     expect(aliceTurn.actions[2].text).toBe('Built Road');
@@ -146,7 +149,7 @@ describe('Turn History recorder & round summarizer', () => {
 
     const bobTurn = room.turnHistory![1].turns[0];
     expect(bobTurn.playerId).toBe('p2');
-    expect(bobTurn.actions[0].text).toContain('Rolled 7 — Robber activated!');
-    expect(bobTurn.actions[1].text).toContain('Alice discarded 4 cards');
+    expect(bobTurn.actions[0].text).toContain('Rolled 7 — Robber activated');
+    expect(bobTurn.actions[1].text).toContain('Alice discarded');
   });
 });

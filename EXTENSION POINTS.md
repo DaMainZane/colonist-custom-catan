@@ -16,7 +16,7 @@ An addon registers only while its DLC and the addon are on. A duplicate id throw
 | `rules?` | Rule defaults, merged only while on |
 | `register?(api)` | Registers content with `PackApi` |
 
-A new addon is also added to its pack's `addons` array (`packs/<dlc>/index.ts`). A new pack is added to `allPacks` in `packs/index.ts`.
+A new addon is picked up automatically by `npm run addons`, which generates `packs/<dlc>/addons.generated.ts` in dependency order (imported by `packs/<dlc>/index.ts`). A new pack is added to `allPacks` in `packs/index.ts`.
 
 ## PackApi methods (`shared/registry.ts`)
 
@@ -92,4 +92,4 @@ A new action or piece needs no server handler. `act` and `place` are the only ga
 
 - Zero `g.rng` draws in addon code unless the base game already draws there; use a derived stream (see `deriveTideRng` in `tidebound/tides.ts`). The golden snapshot depends on it.
 - A disabled addon must change nothing: register everything inside `register`.
-- After adding imports, run `npm run headers:write`; after adding a file, `npm run index`.
+- After adding or changing an addon, run `npm run addons`; after adding imports, `npm run headers:write`; after adding a file, `npm run index`.

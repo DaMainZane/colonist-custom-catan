@@ -15,6 +15,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `public/index.html` | The single HTML page: name page, setup page, lobby, board, menus |
 | `data/bot_training_logs.jsonl` | Bot training data written by `bots/trainingLog.ts` |
 | `data/bots/_schema.md` | S0.15 cross-game bot memory & player profile JSON schema, caps, and Render portable code spec |
+| `scripts/addons.mjs` | Addon list generator (`npm run addons`; `npm run addons:check` fails if stale). Scans `src/packs/<dlc>/*.ts` for exported `AddonDef` objects, validates pack prefixes, missing deps and cycles, and writes `src/packs/<dlc>/addons.generated.ts` in deterministic dependency order |
 | `scripts/index.mjs` | Index tool. Rewrites the `src/` tables in this file from the `// MODULE:` descriptions (`npm run index`; `npm run index:check` fails if they are stale). Sections and headings are listed in `SECTIONS` at the top of the script |
 | `scripts/headers.mjs` | Header tool. Every `src/**/*.ts` file starts with `// MODULE: what \| DEPENDS ON: a, b \| USED BY: c, d`. You write only the text; the two lists are computed from imports. `npm run headers` reports, `headers:write` fixes, `headers:check` is the CI form (`-- --strict` also fails on stale lists) |
 
@@ -84,6 +85,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 |---|---|
 | `index.ts` | pack list entry point |
 | `_template/index.ts` | template pack (loads the template addon so a test can build a registry from it; not in allPacks, so nothing ships) |
+| `_template/addons.generated.ts` | generated addon list for template (dependency-ordered by scripts/addons.mjs; do not edit by hand) |
 | `_template/demo.ts` | template addon (copy this file to start a new addon: one vertex piece, one action, one tech node, a bot goal stub, a client view function; not part of any shipped pack) |
 | `base/index.ts` | base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) |
 | `base/actions/index.ts` | registers every base action |
@@ -121,6 +123,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `fog/index.ts` | fog pack (hidden tiles, revealed by building next to them, Fog Island preset) |
 | `gold/index.ts` | gold pack (gold tile = pick-a-resource on production, Gold Rush preset) |
 | `tidebound/index.ts` | tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) |
+| `tidebound/addons.generated.ts` | generated addon list for tidebound (dependency-ordered by scripts/addons.mjs; do not edit by hand) |
 | `tidebound/bridgeConsts.ts` | tidebound bridge constants (leaf module with no imports, so bridges.ts and ricketyBridges.ts can both read them at load time without a circular-import hole) |
 | `tidebound/bridgeCore.ts` | bridge placement rule, Bridge piece def and bridge bot goal (the base of the bridge addons, so rickety bridges need not import bridges.ts) |
 | `tidebound/bridges.ts` | tidebound.bridges addon (wide-water map perk + T3 Bridge piece, ocean placement rule, 2x cost past 10 or 14 with Rickety bridges tech, Longest Road, bot goal, T11f demolish_bridge action & Grand Causeway 16 VP hook) |
@@ -257,7 +260,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, the port level (T1a), the harbor-only 1:1 floor (T1c), bot tech tree research/action decisions, and the tree-off no-effect check |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
-| `index.test.ts` | R2 index guard: the `src/` tables in `INDEX.md` match the file headers (runs `scripts/index.mjs --check`; fix with `npm run index`) |
+| `index.test.ts` | R2 & R9.1 guard: the `src/` tables in `INDEX.md` match the file headers (`scripts/index.mjs --check`; fix with `npm run index`) and `packs/<dlc>/addons.generated.ts` files match the addon files (`scripts/addons.mjs --check`; fix with `npm run addons`, plus cycle/missing-dep/prefix failure checks) |
 | `headers.test.ts` | R2 header guard: every `src` file has a `// MODULE:` line with a real description (runs `scripts/headers.mjs --check`; stale `DEPENDS ON` / `USED BY` do not fail it) |
 | `architecture.test.ts` | R3 architecture guard: layer import rules (`shared` imports only `shared`; `packs` import `shared`, own pack and `packs/base`; `server` never imports `client`; `client` imports only `client` and `shared`) and no new circular imports (`KNOWN_CYCLES` lists the two left: client actions/render, server scheduler/net/view) |
 | `template.test.ts` | R5 template guard: the example addon in `src/packs/_template/` passes the Rule of Two audit, registers nothing when off, and its piece, action and client view work when on |
