@@ -1,4 +1,4 @@
-// MODULE: base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) | DEPENDS ON: packs/base/actions/index, packs/base/awards, packs/base/content, packs/base/devcards, packs/base/hooks, packs/base/map/index, +5 more | USED BY: packs/index
+// MODULE: base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) | DEPENDS ON: packs/base/actions/index, packs/base/awards, packs/base/content, packs/base/devcards, packs/base/hooks, packs/base/map/index, +6 more | USED BY: packs/index
 import type { Pack } from '../../shared';
 import { registerActions } from './actions';
 import { registerAwards } from './awards';
@@ -8,6 +8,7 @@ import { registerHooks } from './hooks';
 import { registerMapContent } from './map';
 import { registerPhases } from './phases';
 import { registerPieces } from './pieces';
+import { registerPiecesView } from './piecesView';
 import { registerPortsAndPresets } from './ports';
 import { registerTechRoots } from './techRoots';
 
@@ -37,5 +38,6 @@ export const basePack: Pack = {
     registerActions(api);
     registerTechRoots(api);
     registerHooks(api);
+    registerPiecesView(api);
   }
 };

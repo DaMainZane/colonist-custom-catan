@@ -20,6 +20,10 @@
 - `hand.ts` recipe popups are per-piece code that the R8.8 deletion list in `Rework Progress.md` does not name (already noted in `R8.1 Findings.md`).
 ### Not done
 - No `src/` file changed. R8.3 to R8.7 wait for the owner's OK.
+## 2026-10-31 (Pass 92: Modular rework R8.6 generic per-player piece data `base.pieces_view`)
+### Changed
+- `src/packs/base/piecesView.ts` (new) & `src/packs/base/index.ts`: added always-on `VIEW_DATA` entry `base.pieces_view` (`piecesViewData`, `piecesForPlayer`, `registerPiecesView`) registered in `basePack.register`. Loops over `reg.pieces` and `reg.actions` with a `visual`, skips entries where `available(g, p.id)` is `false`, returns `pieces: undefined` when no piece or action in `reg` has a `visual`, and populates `pieces[id] = { left, cost, spots }` (`spots` computed only when `who.self && !who.over` and the phase/actor gate allows the action right now; `null` otherwise; `[]` when on turn with nothing legal).
+- `tests/piecesView.test.ts` (new) & `INDEX.md`: added 5 tests attaching `visual` in-test to `net`, `rickety_bridge`, `feed_sea`, and `upgrade_harbor`, covering base-game `undefined`, parity with `netSpots`/`feedSpots`/`harborSpots`, `rickety_bridge` ocean-edge validation, absent keys when `available` is `false`, `left: null` for actions, `spots: null` vs `[]`, ascending spots, JSON serialization, and zero `g.rng` draws.
 
 ## 2026-10-31 (Pass 89: Modular rework R8.1 findings & R9.1 auto-generated pack addon lists)
 ### Changed

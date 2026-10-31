@@ -115,6 +115,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `base/phases.ts` | base phases (setup, roll, main, discard, robber, robber steal, pick, game over) |
 | `base/picks.ts` | pending picks (gold, Year of Plenty) -> enters/leaves the pick phase, empties picks when the bank is dry |
 | `base/pieces.ts` | base pieces (road, settlement, city) |
+| `base/piecesView.ts` | generic per-player piece and action view data (R8.6: pieces[id] = { left, cost, spots } for every PieceDef and ActionDef with a visual) |
 | `base/placement.ts` | piece placement rules (settlement, road, city geometry/ownership) |
 | `base/ports.ts` | base ports and map presets (standard, blank, archipelago) |
 | `base/robbing.ts` | robber helpers (victims on a hex, random steal using the seeded RNG, steal-count modifiers, what set the robber off); a steal can also take a held wild token that is `stealable` (fish) |
@@ -268,4 +269,5 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `architecture.test.ts` | R3 architecture guard: layer import rules (`shared` imports only `shared`; `packs` import `shared`, own pack and `packs/base`; `server` never imports `client`; `client` imports only `client` and `shared`) and no new circular imports (`KNOWN_CYCLES` lists the two left: client actions/render, server scheduler/net/view) |
 | `template.test.ts` | R5 template guard: the example addon in `src/packs/_template/` passes the Rule of Two audit, registers nothing when off, and its piece, action and client view work when on |
 | `socketAct.test.ts` | R6 generic `act` socket event: runs one engine action for the socket player, sends the engine reason when refused, ignores malformed envelopes, never answers "Internal error" to junk payloads for the nine moved actions, and (until R6.4 deletes each legacy handler) gives the same answer as the legacy event |
+| `piecesView.test.ts` | R8.6 generic per-player piece and action view data (`base.pieces_view`): `undefined` in base game, spot/cost/left parity with `netSpots`/`feedSpots`/`harborSpots`, `rickety_bridge` ocean edge build validation, absent keys when `available` is false, `spots: null` for other/spectator/off-turn/gameover and `[]` when broke, ascending spots, JSON round-trip and zero `g.rng` draws |
 
