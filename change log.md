@@ -1,5 +1,26 @@
 # Change Log
 
+## 2026-10-31 (Pass 91: Modular rework R8.3, R8.4, R8.5: visual types, the `visuals` event and the client manifest; NOT run, no shell; no real piece has a visual yet, so behavior is unchanged)
+### Changed
+- R8.3: `src/shared/visual.ts` (new: manifest types, `OVERLAY_KINDS`, `PiecePlayerData`, `emptyManifest`); `src/shared/registry.ts` (`PieceDef.visual`, `ActionDef.visual`, `ActionDef.price`, `ActionDef.available`); `src/shared/index.ts` exports; `EXTENSION POINTS.md` (piece, action and `OVERLAY_KINDS` rows); `tests/visual.test.ts`.
+- R8.4: `src/shared/visualManifest.ts` (new: `buildVisualManifest`, and checks for scripts, event attributes, stray braces, non-JSON values, empty hints, overlay without pattern, duplicate ids, group mixing slots); `src/server/runtime.ts` (`visualToggles`, `visualManifestFor`); `src/server/net.ts` (`syncVisuals` in `broadcastRoom`: before `gameState`, in the lobby and in a game, once per addon-set key per socket, always on a socket's first broadcast); `EXTENSION POINTS.md` (new section "What the server sends besides `gameState`"); `tests/visualManifest.test.ts`, `tests/visualsEvent.test.ts`.
+- R8.5: `src/client/visuals.ts` (new: the manifest, safe to read when empty or late, junk gives the empty one, `onVisualsEvent` asks for one re-render only when it changed); `src/client/main.ts` (`socket.on('visuals')`, reset on disconnect); `src/client/types.ts` (`PlayerView.pieces?`); `tests/visuals.test.ts`.
+- `Visual Manifest Design.md`: status set to OK; the transport note now says nothing is sent on connect.
+### Not done
+- Nothing was run (no shell). Commands: `npx vitest run tests/visual.test.ts tests/visualManifest.test.ts tests/visualsEvent.test.ts tests/visuals.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`.
+- R8.7 not started. The generic `pieces[id]` data is R8.6 (another agent). `INDEX.md` Root and `tests/` rows for the new files are not added yet (`npm run index` handles the `src/` tables).
+
+## 2026-10-31 (Pass 90: Modular rework R8.2, visual manifest design doc; docs only, no code, nothing to run)
+### Changed
+- `Visual Manifest Design.md` (new, project root): the manifest types (`shared/visual.ts`, plain data), slots, SVG shape with `{color}` and `{dark}`, button, badge and hint rules, optional `css`, overlay kinds, the tier 2 render module contract, the exact `pieces[id] = { left, cost, spots }` shape (null versus undefined spelled out), server-listed edge spots, the `visuals` event transport, and an open decisions table.
+- `Rework Progress.md`: R8.2 set to `[~]` (written, waiting for the owner's OK), Log line added.
+### Found while reading
+- The brief's three slots are not enough: feed spots are sea tiles, so a `hex` slot is proposed.
+- `mergeViewPlayer` keeps only the first entry per top-level key, so `pieces` cannot come from each addon. The design uses one always-on entry in the base pack.
+- `hand.ts` recipe popups are per-piece code that the R8.8 deletion list in `Rework Progress.md` does not name (already noted in `R8.1 Findings.md`).
+### Not done
+- No `src/` file changed. R8.3 to R8.7 wait for the owner's OK.
+
 ## 2026-10-31 (Pass 89: Modular rework R8.1 findings & R9.1 auto-generated pack addon lists)
 ### Changed
 - **Task A (R8.1)**: Wrote `R8.1 Findings.md` in the project root with exact identifiers and line numbers across 9 sections (`src/client/icons.ts` piece/marker functions and `PieceDef.icon` usage, `public/index.html` build-bar buttons and badges, `src/client/styles.css` and inline per-piece CSS rules, one-paragraph summaries of `bridgepicker.ts`, `pirates.ts`, `drawer.ts`, `hand.ts`, and `techpanel.ts`, `src/server/runtime.ts` `gameRegistry` and `mapRegistryKey` caching, the R8.8 deletion table, placeholder defaults in `lobbyPlayerView` and `renderAll`, variable-`emit` grep hits, and Surprises).

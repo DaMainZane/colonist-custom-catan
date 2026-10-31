@@ -1,4 +1,4 @@
-// MODULE: client entry point (wires DOM events, camera pan and zoom, and socket messages to the renderers) | DEPENDS ON: client/actions, client/audio, client/cursors, client/icons, client/mapmenu, client/presets, +13 more | USED BY: none
+// MODULE: client entry point (wires DOM events, camera pan and zoom, and socket messages to the renderers) | DEPENDS ON: client/actions, client/audio, client/cursors, client/icons, client/mapmenu, client/presets, +14 more | USED BY: none
 import { socket } from './socket';
 import { playDiceRollSound, playDiscardSound, playTone, playVictoryFanfareSound, playYourTurnSound, toggleSound } from './audio';
 import { hydrateIcons } from './icons';
@@ -34,6 +34,7 @@ import { sendChat, toggleRoundCollapse, toggleLogFilter, renderSidebar } from '.
 import { toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick } from './render/techpanel';
 import { clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, confirmBridgeDemolish, closeBridgePicker } from './render/bridgepicker';
 import { clickPirate } from './render/pirates';
+import { onVisualsEvent, resetManifest } from './visuals';
 import {
   setHexOverlay, clearHexOverlays, showTimerPopup, dismissTimerPopup, triggerTimerPopupAction,
   showEventTitleCard, showRoundRecapCard, dismissRoundRecapCard
@@ -114,6 +115,10 @@ function syncAutomaticDrawers(): void {
 
 socket.on('errorMsg', (msg: string) => showToast(msg));
 
+// R8.5: the visual manifest (looks of DLC pieces, actions and overlay kinds). It can arrive before or after the first `gameState`; either order works,
+// because a manifest that changes the controls asks for one re-render when there is a state to draw.
+socket.on('visuals', (payload: unknown) => onVisualsEvent(payload, () => { if (state) renderAll(); }));
+
 socket.on('reconnected', ({ code }: { code: string; name: string }) => {
   showToast(`Reconnected to room ${code}`);
 });
@@ -134,6 +139,8 @@ socket.on('connect', () => {
 });
 
 socket.on('disconnect', () => {
+  // The next connection is a new socket, so the server sends the manifest again; until then draw with none.
+  resetManifest();
   if (state?.code) {
     shouldAutoReconnect = true;
     const me = state.players?.find((p: any) => p.id === socket.id) || state.spectators?.find((s: any) => s.id === socket.id);

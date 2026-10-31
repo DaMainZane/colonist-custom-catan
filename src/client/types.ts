@@ -1,5 +1,7 @@
-// MODULE: loose client-side view types (PlayerView, GameState, Resources) | DEPENDS ON: none | USED BY: client/mapmenu, client/render/index, client/render/setup, client/render/sidebar, client/render/techpanel, client/render/trade, +2 more
+// MODULE: loose client-side view types (PlayerView, GameState, Resources) | DEPENDS ON: shared/visual | USED BY: client/mapmenu, client/render/index, client/render/setup, client/render/sidebar, client/render/techpanel, client/render/trade, +2 more
 // Loose client-side view types. Tightened when shared engine types arrive (Step 2).
+import type { PiecePlayerData } from '../shared/visual';
+
 export type Resources = Record<string, number>;
 
 export interface PlayerView {
@@ -51,6 +53,11 @@ export interface PlayerView {
   publicVp?: number;
   /** Effective cost of each piece type for this player, including 2x above-base scaling and active addon modifiers. */
   pieceCosts?: Record<string, Resources>;
+  /**
+   * R8.6: supply, price and legal spots for every manifest piece or action on offer to this player, by id (`Visual Manifest Design.md`, section h).
+   * Undefined when no piece or action has a visual; a key is absent when that id is not on offer. Sent next to the legacy fields (`netsLeft`, `netSpots`, ...), which stay until R8.8.
+   */
+  pieces?: Record<string, PiecePlayerData>;
   /** Your price to upgrade a rickety bridge to a full bridge. Only sent to you, and only when rickety bridges are in the game. */
   bridgeUpgradeCost?: Resources;
   /** Whether you have Salvage Crew and can demolish your own bridges on your turn (T11f). */

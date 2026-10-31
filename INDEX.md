@@ -78,6 +78,8 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `types.ts` | core engine types (game state, board, players, rules) |
 | `viewData.ts` | view data registry (VIEW_DATA: a piece or addon adds public fields, tile overlays, per-player fields and VP breakdown bonuses to the state the client gets, from its own file) |
 | `views.ts` | per-player filtered view of the game state (hides other hands, hidden tiles, dev cards) |
+| `visual.ts` | visual manifest types (what a piece, action or overlay kind looks like, as plain data the server sends to the client; no functions) |
+| `visualManifest.ts` | builds the visual manifest from a registry (pieces, actions and overlay kinds with a visual) and checks visuals for unsafe markup and non-JSON values |
 
 ## `src/packs/` (game content registered as packs; load order: base, gold, fog, tidebound)
 
@@ -212,6 +214,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `types.ts` | loose client-side view types (PlayerView, GameState, Resources) |
 | `ui.ts` | small UI actions (theme switch, toast, victory confetti overlay) |
 | `util.ts` | small client helpers (HTML escaping, initials) |
+| `visuals.ts` | client copy of the visual manifest (set when the server's `visuals` event arrives, read by the renderers; empty before it arrives and when it never does) |
 
 ## `tests/` (node:test / tsx)
 

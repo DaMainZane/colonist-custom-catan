@@ -23,10 +23,10 @@ A new addon is picked up automatically by `npm run addons`, which generates `pac
 | Method | Registers |
 |---|---|
 | `resource(def)`, `tile(def)` | Resource, tile (`TileDef`: `land`, `numbered`, `produces`, `onProduce`, `habitat`, `noPort`) |
-| `piece(def)` | `PieceDef`: `target` vertex or edge, `cost`, `vp`, `produces`, `upgradeFrom`, `baseLimit`, `roadLike`, `available?(g, pid)` (on offer to this player now? decides only whether it shows in the client's `pieceCosts`; default yes), `canPlace(ctx, pid, loc, mode)` |
+| `piece(def)` | `PieceDef`: `target` vertex or edge, `cost`, `vp`, `produces`, `upgradeFrom`, `baseLimit`, `roadLike`, `available?(g, pid)` (on offer to this player now? decides only whether it shows in the client's `pieceCosts`; default yes), `canPlace(ctx, pid, loc, mode)`, `visual?: PieceVisual` (plain-data look for the client: button, shape, hints; types in `shared/visual.ts`, design in `Visual Manifest Design.md`; nothing reads it until the manifest is sent in R8.4) |
 | `devcard(def)`, `award(def)` | Dev card (`validate`, `play`, `legal`), award (`min`, `metric`) |
 | `phase(def)` | Phase: `actions[]`, `actor`, `onEnter`, `onExit` |
-| `action(def)` | `ActionDef`: `type`, `validate(ctx, pid, payload)`, `apply(ctx, pid, payload)`, `legal?(ctx, pid)` (bot and fuzz candidates; must not use the RNG) |
+| `action(def)` | `ActionDef`: `type`, `validate(ctx, pid, payload)`, `apply(ctx, pid, payload)`, `legal?(ctx, pid)` (bot and fuzz candidates; must not use the RNG), `visual?: PieceVisual` (set `spotKey` for an action with spots), `price?(g, reg, pid)` (this player's price now, for the client's `pieces[type].cost`), `available?(g, pid)` (on offer now? default yes; `validate` does not read it) |
 | `phaseAction(phaseId, actionType)` | Makes an action playable in an existing phase (usually `'main'`). Throws if the phase is unknown. Call from an addon |
 | `port(def)`, `preset(def)` | Port type; old map preset (deprecated, use `quickStart`) |
 | `mapShape(def)`, `mapTerrain(def)`, `mapNumbers(def)`, `mapPerk(def)`, `quickStart(def)` | Map menu content. Pick ids are unique across shapes, terrains, numberings and perks |
@@ -74,6 +74,7 @@ Call sites were opened and checked.
 | `TECH_DEFS` | `shared/stage1.ts` | `{ id, name, branch, tier, path?, prereq?, costOffset?, costResources?, dlc?, description, onUnlock?(ctx, pid) }`; gate a feature with `techGate(g, pid, techId)` |
 | `STEAL_COUNT_MODS` | `packs/base/robbing.ts` | `{ id, apply(g, reg, thiefId, victimId, source, current) => number }` |
 | `VIEW_DATA` | `shared/viewData.ts` | `{ id, priority?, shared?(g, reg), overlays?(g, reg), player?(g, reg, p, who), vpBonus?(g, reg, pid) }`: fields added to the state `server/view.ts` sends. `shared` is public (`null` when its addon is off, so give it a `null` default in an always-on pack-level entry), `overlays` is hex id to `{ kind }` (`undefined`/`null` = not taking part, `{}` = taking part with nothing), `player` is per player (`who.self`, `who.over`, `who.spectator`; `undefined` when off), `vpBonus` is `{ [breakdownKey]: n }`. First wins per field: higher `priority`, then lower id. Merge helpers: `mergeViewShared`, `mergeViewOverlays`, `mergeViewPlayer`, `mergeViewVpBonus` |
+| `OVERLAY_KINDS` | `shared/visual.ts` | `OverlayKindVisual`: `{ id, label, tint: { light, dark }, line: { light, dark }, pattern, icon?, pulse? }`. Plain data (no functions). `pattern` is required: a tint alone fails the colourblind rule. Registered now, sent to the client from R8.4, drawn from R8.8 |
 
 Not checked: registries defined inside a single pack (outside the files above). Search for `export const .* = '` before assuming none exist.
 
@@ -87,6 +88,13 @@ A new action or piece needs no server handler. `act` and `place` are the only ga
 | `place` | `{ code, piece, loc }` | The `build` action for any registered piece (`build` checks the id, the spot, supply and price) |
 
 `clickVertex` and `clickEdge` are only the base clicks (steal victim, settlement to city, new settlement; road, or bridge on an ocean edge). The base game events (`rollDice`, `endTurn`, trades, ...) keep one handler each.
+
+## What the server sends besides `gameState`
+
+| Event | Payload | When |
+|---|---|---|
+| `mapOptions` | the map menu options | On connect, and in the lobby whenever the room's addon set changes (`syncMapOptions` in `server/net.ts`) |
+| `visuals` | `{ key, manifest }`: the visual manifest (`VisualManifest` in `shared/visual.ts`, built by `buildVisualManifest` in `shared/visualManifest.ts`) | In `broadcastRoom`, before `gameState`, in the lobby and in a game. The first broadcast to a socket always sends it (even an empty manifest); after that only when the addon set changes. `key` is the addon set. The client keeps it in `client/visuals.ts` and copes with it arriving before or after the first `gameState` |
 
 ## Rules to keep when using these
 

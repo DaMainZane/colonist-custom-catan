@@ -1,9 +1,9 @@
 // MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | DEPENDS ON: packs/index, packs/tidebound/index, server/types, shared/index | USED BY: server/bots/dialogue/context, server/bots/dialogue/index, server/bots/scheduler, server/bots/sim, server/game, server/lobby, +6 more
 import { allPacks } from '../packs';
 import { TIDE_DEFAULT_LEVEL } from '../packs/tidebound';
-import { createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';
-import type { Registry, Rules } from '../shared';
-import type { Settings } from './types';
+import { buildVisualManifest, createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';
+import type { Registry, Rules, VisualManifest } from '../shared';
+import type { Room, Settings } from './types';
 
 /** One registry for the whole process: every shipped pack, in load order. */
 export const registry = createRegistry(allPacks);
@@ -39,6 +39,24 @@ export function mapRegistryFor(s: Pick<Settings, 'dlc' | 'addons'>): Registry {
     mapRegistries.set(key, reg);
   }
   return reg;
+}
+
+/**
+ * The DLC and addon toggles that decide what a room's client may draw (R8.4): the game's own rules during a game, the lobby settings before it.
+ * Both carry `dlc` and `addons`, so `mapRegistryKey` and `mapRegistryFor` accept either.
+ */
+export function visualToggles(room: Pick<Room, 'game' | 'settings'>): Pick<Settings, 'dlc' | 'addons'> {
+  const src: any = room.game ? room.game.rules : room.settings;
+  return { dlc: src?.dlc ?? {}, addons: src?.addons ?? {} };
+}
+
+/**
+ * The visual manifest for an addon set: plain JSON, the same for every player in a game, `{ version: 1, pieces: [], overlays: [] }` when no enabled
+ * addon registers a visual. Not cached: it is built when a socket's key changes (a join, a toggle, a rematch), which is rare, and a cache would
+ * hold a stale copy if a test edits the registry.
+ */
+export function visualManifestFor(s: Pick<Settings, 'dlc' | 'addons'>): VisualManifest {
+  return buildVisualManifest(mapRegistryFor(s));
 }
 
 export function defaultSettings(): Settings {

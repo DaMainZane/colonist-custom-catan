@@ -1,9 +1,10 @@
-// MODULE: registry + pack loader (all game content is registered here) | DEPENDS ON: shared/addons, shared/ctx, shared/mapoptions, shared/rng, shared/types | USED BY: shared/addons, shared/botGoals, shared/coreServices, shared/ctx, shared/engine, shared/eventDeck, +16 more
+// MODULE: registry + pack loader (all game content is registered here) | DEPENDS ON: shared/addons, shared/ctx, shared/mapoptions, shared/rng, shared/types, shared/visual | USED BY: shared/addons, shared/botGoals, shared/coreServices, shared/ctx, shared/engine, shared/eventDeck, +17 more
 import type { AddonDef, AddonInfo, DlcInfo } from './addons';
 import type { Ctx } from './ctx';
 import type { MapOptionBase, NumbersDef, PerkDef, QuickStartDef, ShapeOpDef, TerrainDef } from './mapoptions';
 import type { RngState } from './rng';
 import type { GameState, Id, Resources, Rules } from './types';
+import type { PieceVisual } from './visual';
 
 export interface ResourceDef { id: string; name: string; color: string; border: string; icon?: string; replace?: boolean }
 
@@ -59,6 +60,8 @@ export interface PieceDef {
   /** Base defense strength of a vertex building (settlement 1, city 2, castle 3). See shared/coreServices.ts. */
   baseDefense?: number;
   icon?: string;
+  /** Plain-data look for the client (button, shape, hints). Nothing reads it until the manifest is sent (R8.4); leave it out and the piece behaves as before. */
+  visual?: PieceVisual;
   /**
    * Is this piece on offer to this player right now (a tech unlocks it, say)? Decides whether it shows in the client's `pieceCosts`. Default: yes.
    * It does not check placement or cost, and the build action does not read it.
@@ -116,6 +119,12 @@ export interface ActionDef {
   apply(ctx: Ctx, pid: Id, payload: any): void;
   /** Candidate payloads for bots/fuzz tests. The engine filters them through validate. */
   legal?(ctx: Ctx, pid: Id): any[];
+  /** Plain-data look for the client (button, hints, spot marker). An action with a `visual` also sets `visual.spotKey`. Nothing reads it until R8.4. */
+  visual?: PieceVisual;
+  /** This player's price for the action now, for `PlayerView.pieces[type].cost` (R8.6). Default: `{}`. */
+  price?(g: GameState, reg: Registry, pid: Id): Resources;
+  /** Is the action on offer to this player now (a tech unlocks it, say)? Decides whether it appears in `PlayerView.pieces` (R8.6). Default: yes. Not read by `validate`. */
+  available?(g: GameState, pid: Id): boolean;
   replace?: boolean;
 }
 
