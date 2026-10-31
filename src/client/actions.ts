@@ -306,6 +306,8 @@ export function toggleAddon(addonId: string): void {
 
 /** Names of the Tides slider positions (1 to 5). Must match TIDE_LEVELS in packs/tidebound/tides.ts. */
 const TIDE_LEVEL_NAMES = ['Very low', 'Low', 'Medium', 'High', 'Very high'];
+/** Names of the Rising sea slider positions (1 to 5). Must match RISING_SEA_LEVELS in packs/tidebound/risingSea.ts. */
+const RISING_SEA_LEVEL_NAMES = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
 /** While the Tides slider is dragged: show the name of the position under the thumb. Nothing is sent until it is let go. */
 export function previewTideLevel(value: string | number): void {
@@ -319,6 +321,21 @@ export function setTideLevel(value: string | number): void {
   if (!state || !requireHost('change the tide level')) return;
   const n = Math.min(5, Math.max(1, Math.round(Number(value)) || 3));
   socket.emit('updateSettings', { code: state.code, newSettings: { tideLevel: n } });
+  playTone(420 + n * 30, 0.04);
+}
+
+/** While the Rising sea slider is dragged: show the name of the position under the thumb. */
+export function previewRisingSeaLevel(value: string | number): void {
+  const n = Math.min(5, Math.max(1, Math.round(Number(value)) || 3));
+  const el = document.getElementById('risingSeaLevelName');
+  if (el) el.textContent = RISING_SEA_LEVEL_NAMES[n - 1];
+}
+
+/** Host: set the Rising sea level (1 slow to 5 fast). On or off is the Rising sea addon checkbox. */
+export function setRisingSeaLevel(value: string | number): void {
+  if (!state || !requireHost('change the rising sea rate')) return;
+  const n = Math.min(5, Math.max(1, Math.round(Number(value)) || 3));
+  socket.emit('updateSettings', { code: state.code, newSettings: { risingSeaLevel: n } });
   playTone(420 + n * 30, 0.04);
 }
 

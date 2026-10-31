@@ -14,6 +14,8 @@ let lastDlcSig = '';
 
 /** Names of the Tides slider positions (1 to 5). Must match TIDE_LEVELS in packs/tidebound/tides.ts. */
 const TIDE_LEVEL_NAMES = ['Very low', 'Low', 'Medium', 'High', 'Very high'];
+/** Names of the Rising sea slider positions (1 to 5). Must match RISING_SEA_LEVELS in packs/tidebound/risingSea.ts. */
+const RISING_SEA_LEVEL_NAMES = ['Very slow', 'Slow', 'Medium', 'Fast', 'Very fast'];
 
 /** Built-in catalog fallback for DLC packs not yet registered in the server registry, matching Ideas.md exactly. */
 const CATALOG_DLCS: DlcInfoView[] = [
@@ -258,10 +260,11 @@ function drawScenariosAndDlcs(): void {
   const techTreeOn = !!s.techTreeOn;
   const fairDice = !!s.fairDice;
   const tideLevel = Math.min(5, Math.max(1, Math.round(Number(s.tideLevel)) || 3));
+  const risingSeaLevel = Math.min(5, Math.max(1, Math.round(Number(s.risingSeaLevel)) || 3));
   const scenarios: ScenarioPresetView[] = mapOptions?.scenarios || [];
   const { dlcs, addons } = effectiveDlcsAndAddons();
 
-  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, techTreeOn, fairDice, tideLevel, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
+  const sig = JSON.stringify([dlcMap, addonFlags, eventsOn, fateTokens, techTreeOn, fairDice, tideLevel, risingSeaLevel, s.vpToWin, s.boardRadius, scenarios.length, dlcs.length]);
   if (sig === lastDlcSig) return;
   lastDlcSig = sig;
 
@@ -317,6 +320,7 @@ function drawScenariosAndDlcs(): void {
     pills.push(techTreeOn ? `<span class="summary-pill on">Tech tree ON</span>` : `<span class="summary-pill">Tech tree off</span>`);
     if (fairDice) pills.push(`<span class="summary-pill on">Fair dice ON</span>`);
     if (enabledAddons.has('tidebound.tides')) pills.push(`<span class="summary-pill on">Tides · ${esc(TIDE_LEVEL_NAMES[tideLevel - 1])}</span>`);
+    if (enabledAddons.has('tidebound.rising_sea')) pills.push(`<span class="summary-pill on">Rising sea · ${esc(RISING_SEA_LEVEL_NAMES[risingSeaLevel - 1])}</span>`);
 
     const blockedHtml = blockedAddons
       .map(b => {
@@ -361,6 +365,16 @@ function drawScenariosAndDlcs(): void {
                         <input type="range" min="1" max="5" step="1" value="${tideLevel}" aria-label="Tide level"
                           oninput="previewTideLevel(this.value)" onchange="setTideLevel(this.value)" />
                         <span class="dlc-addon-opt-ends"><span>Low</span><span>High</span></span>
+                      </div>`
+                    : ''
+                }
+                ${
+                  a.id === 'tidebound.rising_sea' && isActuallyOn
+                    ? `<div class="dlc-addon-opt" title="Faster rising sea starts earlier and drowns coastal land more often. Slower gives more rounds before the coast shrinks.">
+                        <span class="dlc-addon-opt-label">Rising rate: <strong id="risingSeaLevelName">${esc(RISING_SEA_LEVEL_NAMES[risingSeaLevel - 1])}</strong></span>
+                        <input type="range" min="1" max="5" step="1" value="${risingSeaLevel}" aria-label="Rising sea rate"
+                          oninput="previewRisingSeaLevel(this.value)" onchange="setRisingSeaLevel(this.value)" />
+                        <span class="dlc-addon-opt-ends"><span>Slow</span><span>Fast</span></span>
                       </div>`
                     : ''
                 }

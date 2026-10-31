@@ -1,5 +1,22 @@
 # Change Log
 
+## 2026-10-31 (Pass 96: Tidebound T12 — T12a lowest-elevation-first drowning & T12b optional with Tides, rate settings, and drowned overlays; typecheck and tests passed)
+### Added
+- **T12a Coast-inward lowest-elevation-first drowning (`src/packs/tidebound/risingSea.ts`, `src/packs/tidebound/index.ts`)**:
+  - `DROWNED = 'drowned'` (`DEFAULT_TILE_STATES.drowned`: `blocksProduction: true`, `blocksRobber: true`, permanent with no `until`), `RISING_SEA_FIRST_ROUND = 3`, `RISING_SEA_CADENCE_ROUNDS = 2`, `RISING_SEA_RNG_SALT = 0x52534541`.
+  - Independent derived RNG stream `deriveRisingSeaRng(seed)` / `ensureRisingSeaRng(g)` stored in `g.ext.tidebound.risingSeaRng` (zero `g.rng` draws).
+  - `risingSeaFrontierHexIds(g, reg)` selects visible non-drowned land hexes touching sea or already-`drowned` land (advancing coast-inward as coastal tiles drown, never reading or exposing hidden fog hexes).
+  - `lowestElevationFrontierHexIds(g, reg)` filters the frontier to the lowest `hexElevation` tier (`1` before `2` before `3`), and `pickRisingSeaHex(g, reg)` breaks ties via `ensureRisingSeaRng(g)`.
+  - `drownHex(ctx, hexId)` permanently sets `{ id: 'drowned' }` (overwriting temporary `flooded` and surviving `applyTides` drying), emits `tileStateChanged` and `risingSeaDrowned`, and logs the drowned tile.
+  - `isPortDrowned(g, reg, vertexId)` (`PORT_IDLE_CHECKS`: `tidebound.rising_sea.drowned`) idles non-harbor ports whose adjacent land hexes are all submerged (`drowned` or `flooded`), while Harbors (`HARBOR_LEVEL = 2`) remain active.
+- **T12b Optional with Tides, rate settings, and client overlays (`src/packs/tidebound/risingSea.ts`, `src/server/{types,runtime,lobby}.ts`, `src/client/render/setup.ts`, `src/client/{actions,main}.ts`)**:
+  - `tidebound.rising_sea` has no dependency on `tidebound.tides`: works standalone when Tides is off, or alongside Tides when both are on (`applyTides` leaves `drowned` tiles untouched and `tideWarning` skips them).
+  - `RISING_SEA_LEVELS` (1 `Very slow` to 5 `Very fast`, default 3 `Medium`: `firstRound: 3, cadence: 2, tilesPerPulse: 1`), `risingSeaLevelDef`, `risingSeaLevelOf`, and `risingSeaConfigOf` (supporting both `rules.risingSeaLevel` 1–5 and direct `risingSeaFirstRound` / `risingSeaCadence` / `risingSeaTilesPerPulse` rule overrides).
+  - Lobby setting `Settings.risingSeaLevel` (clamped 1–5 in `mergeSettings`, mapped to `rules.risingSeaLevel` by `rulesFromSettings` only while `tidebound.rising_sea` is enabled and off Medium) and host setup slider (`previewRisingSeaLevel`, `setRisingSeaLevel`, summary pill `Rising sea · <level>`).
+  - `risingSeaViewData` (`VIEW_DATA`, `id: 'tidebound.rising_sea.view'`, `priority: 10`) and `risingSeaOverlays(g, reg)`: returns `undefined` when no tile is drowned (preserving `null` `hexOverlays` when Tides is off and leaving `view.snapshot.json` untouched), and marks visible drowned tiles with `{ kind: 'flood', label: 'Drowned' }` at higher priority than Tides.
+### Tests
+- `tests/tideboundrisingsea.test.ts` (new): 9 tests covering T12a (DLC/addon off zero effect, coast-inward frontier expansion and fog exclusion, lowest-elevation-first ordering `1 -> 2 -> 3`, round-clock cadence and derived RNG determinism with zero `g.rng` draws, permanent `drowned` blocking of production and robber placement, Tides drying survival, and port/harbor idleness) and T12b (standalone operation with `tidebound.tides: false`, combined operation with `tidebound.tides: true`, `risingSeaOverlays` / `mergeViewOverlays` priority, `RISING_SEA_LEVELS` 1–5 clamping and scaling, rule overrides, and lobby `mergeSettings` / `rulesFromSettings`).
+
 ## 2026-10-31 (Pass 95: Modular rework R9.2 to R9.4, the lantern proof piece and the docs for it; NOT run, no shell)
 ### Changed
 - `src/packs/_template/lantern.ts` (new, the only new source file): addon `template.lantern` with `lanternPiece` (vertex, price 2 ore + 1 wheat, 1 VP, supply 3 through `rules.pieceLimits`, `canPlace` = empty land corner next to an edge piece you own, and a `visual`: slot `vertex`, button, three hints, a house-like shape with `{color}` and `{dark}`) and `lanternBotGoal` (generic tier, builds on the corner with the most land tiles). No `VIEW_DATA` entry: `base.pieces_view` already sends `pieces[id] = { left, cost, spots }` for any piece with a `visual`. No tip action and no tech node (those stay in `demo.ts`).

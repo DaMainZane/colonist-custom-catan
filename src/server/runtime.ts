@@ -1,6 +1,6 @@
 // MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | DEPENDS ON: packs/index, packs/tidebound/index, server/types, shared/index | USED BY: server/bots/dialogue/context, server/bots/dialogue/index, server/bots/scheduler, server/bots/sim, server/game, server/lobby, +6 more
 import { allPacks } from '../packs';
-import { TIDE_DEFAULT_LEVEL } from '../packs/tidebound';
+import { RISING_SEA_DEFAULT_LEVEL, TIDE_DEFAULT_LEVEL } from '../packs/tidebound';
 import { buildVisualManifest, createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';
 import type { Registry, Rules, VisualManifest } from '../shared';
 import type { Room, Settings } from './types';
@@ -190,9 +190,13 @@ export function rulesFromSettings(s: Settings): Record<string, any> {
   // Off is the absence of the rule, so games without the tech tree or fair dice carry no new state.
   if (s.techTreeOn) out.techTreeOn = true;
   if (s.fairDice) out.fairDice = true;
-  // The tide level is a rule only while Tides is on and the host moved the slider off Medium, so every other game carries nothing new.
-  if (s.tideLevel !== undefined && s.tideLevel !== TIDE_DEFAULT_LEVEL && resolveAddons(allPacks, { dlc: s.dlc, addons: s.addons }).enabled.has('tidebound.tides')) {
+  // The tide level and rising sea level are rules only while their addon is on and the host moved the slider off Medium.
+  const enabledAddons = resolveAddons(allPacks, { dlc: s.dlc, addons: s.addons }).enabled;
+  if (s.tideLevel !== undefined && s.tideLevel !== TIDE_DEFAULT_LEVEL && enabledAddons.has('tidebound.tides')) {
     out.tideLevel = s.tideLevel;
+  }
+  if (s.risingSeaLevel !== undefined && s.risingSeaLevel !== RISING_SEA_DEFAULT_LEVEL && enabledAddons.has('tidebound.rising_sea')) {
+    out.risingSeaLevel = s.risingSeaLevel;
   }
   return out;
 }

@@ -43,7 +43,7 @@ import {
 import {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, saveSessionInfo, clearSavedRoom, syncRejoinButton,
   copyInviteLink, switchLobbyTab, toggleLobbyToolbar, toggleGameMenu,
-  setBrush, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
+  setBrush, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, previewRisingSeaLevel, setRisingSeaLevel, pushSettings, schedulePushSettings, addBot, removeBot, startGame, rematchLobby, switchVictoryTab,
   toggleVictoryMapInspect, setBuildMode, mainTurnButton, rollDice, buyDevCard, cycleAvatar, cycleBotTier, collapseLobbyUi, setSetupOpen
 } from './actions';
 
@@ -61,7 +61,7 @@ function onSetLogTab(tab: 'live' | 'chat' | 'history'): void {
 // Inline onclick="..." handlers in index.html and in generated markup resolve against window.
 Object.assign(window as any, {
   createRoom, joinRoom, spectateRoom, toggleSpectate, selectSpectateTarget, rejoinSavedRoom, downloadTrainingLog, copyInviteLink, toggleSound, toggleTheme, resetCamera, toggleLobbyToolbar, toggleGameMenu,
-  switchLobbyTab, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, addBot, removeBot, startGame, rematchLobby,
+  switchLobbyTab, applyPreset, applyScenario, toggleDlc, toggleAddon, enableAddonWithDeps, previewTideLevel, setTideLevel, previewRisingSeaLevel, setRisingSeaLevel, addBot, removeBot, startGame, rematchLobby,
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,

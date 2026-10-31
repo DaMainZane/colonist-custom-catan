@@ -1,11 +1,37 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) | DEPENDS ON: packs/tidebound/addons.generated, packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/pirates, packs/tidebound/ricketyBridges, +5 more | USED BY: packs/index, server/lobby, server/runtime
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates, T12 rising sea lowest-elevation drowning & rate settings) | DEPENDS ON: packs/tidebound/addons.generated, packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/pirates, packs/tidebound/ricketyBridges, +5 more | USED BY: packs/index, server/lobby, server/runtime
 import { VIEW_DATA } from '../../shared';
 import type { Pack, ViewDataDef } from '../../shared';
 import { tideboundAddons } from './addons.generated';
 import { portLevelsViewData } from './harbor';
 
 export { tideboundAddons } from './addons.generated';
-export { risingSeaAddon } from './risingSea';
+export {
+  DROWNED,
+  RISING_SEA_CADENCE_ROUNDS,
+  RISING_SEA_DEFAULT_LEVEL,
+  RISING_SEA_FIRST_ROUND,
+  RISING_SEA_LEVELS,
+  RISING_SEA_LEVEL_MAX,
+  RISING_SEA_LEVEL_MIN,
+  RISING_SEA_RNG_SALT,
+  applyRisingSea,
+  deriveRisingSeaRng,
+  drownHex,
+  ensureRisingSeaRng,
+  isDrownedHex,
+  isPortDrowned,
+  isRisingSeaRound,
+  lowestElevationFrontierHexIds,
+  pickRisingSeaHex,
+  risingSeaAddon,
+  risingSeaConfigOf,
+  risingSeaFrontierHexIds,
+  risingSeaLevelDef,
+  risingSeaLevelOf,
+  risingSeaOverlays,
+  risingSeaViewData
+} from './risingSea';
+export type { RisingSeaLevelDef } from './risingSea';
 
 export {
   BRIDGE,

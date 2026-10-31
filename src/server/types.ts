@@ -51,6 +51,8 @@ export interface Settings {
   fairDice?: boolean;
   /** Tidebound tide level 1 to 5 (default 3, Medium): the high/low slider of the Tides addon. Only read while Tides is on. */
   tideLevel?: number;
+  /** Tidebound rising sea level 1 to 5 (default 3, Medium): the slow/fast slider of the Rising sea addon. Only read while Rising sea is on. */
+  risingSeaLevel?: number;
 }
 
 /** How the lobby map was made, kept beside the board (the recipe is enough to rebuild it with the same generator version). */

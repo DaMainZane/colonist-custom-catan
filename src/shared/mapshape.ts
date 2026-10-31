@@ -1,4 +1,4 @@
-// MODULE: land field for the shape stage (heightfield, cleanup, exact count fix, blob growth, retry loop) | DEPENDS ON: shared/mapcheck, shared/mapoptions, shared/maprecipe, shared/noise, shared/rng, shared/topology | USED BY: packs/base/map/shapes, packs/tidebound/seaData, packs/tidebound/tides, shared/index, shared/mapcells, shared/mapgen, +1 more
+// MODULE: land field for the shape stage (heightfield, cleanup, exact count fix, blob growth, retry loop) | DEPENDS ON: shared/mapcheck, shared/mapoptions, shared/maprecipe, shared/noise, shared/rng, shared/topology | USED BY: packs/base/map/shapes, packs/tidebound/risingSea, packs/tidebound/seaData, packs/tidebound/tides, shared/index, shared/mapcells, +2 more
 import { BASELINE_SPOTS, estimateVertices } from './mapcheck';
 import type { MapCtx, ShapeOpDef } from './mapoptions';
 import { cellPoint } from './noise';
