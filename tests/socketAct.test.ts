@@ -214,3 +214,107 @@ describe('the nine moved events', () => {
     });
   }
 });
+
+/** Values a hostile or broken client could send as `loc` (the build action must refuse every one). */
+const JUNK_LOC: any[] = [undefined, null, 'x', '1', 1.5, -1, 1e9, NaN, [1], {}, true];
+
+/** The first edge a land tile touches (the base client's `clickEdge` builds a road there). */
+function landEdgeId(g: any): number {
+  return g.board.edges.findIndex((e: any) => e.hexIds.length > 0);
+}
+
+// R6.5: one `place` event for every piece, so a new piece needs no handler in socket.ts.
+describe('the place event', () => {
+  it('has a handler, and clickVertex and clickEdge no longer take a piece', () => {
+    const c = connect('b');
+    expect(c.handlers.has('place')).toBe(true);
+    expect(c.handlers.has('clickVertex')).toBe(true);
+    expect(c.handlers.has('clickEdge')).toBe(true);
+  });
+
+  it('answers like clickEdge for the base road, and changes nothing when both are refused', () => {
+    const viaPlace = makeRoom();
+    const viaClick = makeRoom();
+    const edgeId = landEdgeId(viaPlace.game);
+    expect(edgeId).toBeGreaterThanOrEqual(0);
+    const a = connect('b');
+    const b = connect('b');
+    const before = JSON.stringify(viaPlace.game);
+    a.send('place', { code: viaPlace.code, piece: 'road', loc: edgeId });
+    b.send('clickEdge', { code: viaClick.code, edgeId });
+    expect(a.errors()).toHaveLength(1);
+    expect(a.errors()).toEqual(b.errors());
+    expect(JSON.stringify(viaPlace.game)).toBe(before);
+    expect(JSON.stringify(viaClick.game)).toBe(before);
+  });
+
+  it('ignores a piece sent to clickVertex and clickEdge (they only do the base clicks now)', () => {
+    const withPiece = makeRoom();
+    const without = makeRoom();
+    const edgeId = landEdgeId(withPiece.game);
+    const a = connect('b');
+    const b = connect('b');
+    a.send('clickVertex', { code: withPiece.code, vertexId: 0, piece: 'net' });
+    b.send('clickVertex', { code: without.code, vertexId: 0 });
+    a.send('clickEdge', { code: withPiece.code, edgeId, piece: 'rickety_bridge' });
+    b.send('clickEdge', { code: without.code, edgeId });
+    expect(a.errors()).toEqual(b.errors());
+    expect(JSON.stringify(withPiece.game)).toBe(JSON.stringify(without.game));
+  });
+
+  it('refuses an unknown piece, including names that exist on every object', () => {
+    const room = makeRoom();
+    const c = connect('b');
+    const before = JSON.stringify(room.game);
+    for (const piece of ['no_such_piece', '__proto__', 'constructor', 'toString', '']) {
+      const seen = c.errors().length;
+      c.send('place', { code: room.code, piece, loc: 0 });
+      const errs = c.errors().slice(seen);
+      expect(errs, `piece ${JSON.stringify(piece)}`).toHaveLength(1);
+      expect(errs[0]).not.toMatch(/^Internal error/);
+    }
+    expect(JSON.stringify(room.game)).toBe(before);
+  });
+
+  it('refuses a bad loc for every piece, never answers "Internal error", and changes nothing', () => {
+    const room = makeRoom();
+    const c = connect('b');
+    const before = JSON.stringify(room.game);
+    for (const piece of ['road', 'settlement', 'city', 'bridge', 'rickety_bridge', 'net']) {
+      for (const loc of JUNK_LOC) {
+        const seen = c.errors().length;
+        c.send('place', { code: room.code, piece, loc });
+        const errs = c.errors().slice(seen);
+        const label = `${piece} at ${JSON.stringify(loc) ?? 'undefined'}`;
+        expect(errs, label).toHaveLength(1);
+        expect(errs[0], label).not.toMatch(/^Internal error/);
+      }
+    }
+    expect(JSON.stringify(room.game)).toBe(before);
+  });
+
+  it('ignores a malformed envelope: no toast, no crash, no change', () => {
+    const room = makeRoom();
+    const c = connect('b');
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const before = JSON.stringify(room.game);
+    const envelopes: any[] = [
+      undefined,
+      null,
+      'place',
+      7,
+      [],
+      {},
+      { code: room.code },
+      { piece: 'road', loc: 0 },
+      { code: 7, piece: 'road', loc: 0 },
+      { code: room.code, piece: 5, loc: 0 },
+      { code: room.code, piece: ['road'], loc: 0 },
+      { code: 'NOPE0', piece: 'road', loc: 0 }
+    ];
+    for (const data of envelopes) c.send('place', data);
+    expect(c.errors()).toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
+    expect(JSON.stringify(room.game)).toBe(before);
+  });
+});

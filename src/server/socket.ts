@@ -1,9 +1,8 @@
-// MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | DEPENDS ON: packs/base/constants, packs/base/robbing, packs/tidebound/index, server/bots/dialogue, server/bots/tiers, server/game, +8 more | USED BY: server/main
+// MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | DEPENDS ON: packs/base/constants, packs/base/robbing, server/bots/dialogue, server/bots/tiers, server/game, server/lobby, +7 more | USED BY: server/main
 import type { Server } from 'socket.io';
 import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
-import { NET } from '../packs/tidebound';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rebindPlayerId, rooms } from './rooms';
 import { applyMapStart, applyRecipeStyle, countLandHexes, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap, syncSettingsToBoard } from './lobby';
 import { mapOptionsView } from './mapmenu';
@@ -688,17 +687,12 @@ export function registerSocketHandlers(io: Server): void {
 
     // ---- Board clicks -------------------------------------------------------
 
-    socket.on('clickVertex', safe(({ code, vertexId, piece }) => {
+    // Base clicks only: steal victim, settlement to city, empty vertex to settlement. Any other piece goes through `place` below.
+    socket.on('clickVertex', safe(({ code, vertexId }) => {
       const g = rooms[code]?.game;
       if (!g) return;
       const v = g.board.vertices[vertexId];
       if (!v) return;
-
-      // Tidebound T7b2: the client asks for a fishing net on an empty vertex (it never sends another piece id here).
-      if (piece === NET) {
-        if (!v.piece) act(code, 'build', { piece: NET, loc: vertexId }, true);
-        return;
-      }
 
       if (g.phase === 'robber_steal' && v.piece && victimsOnHex(g, g.board.robberHexId, socket.id).includes(v.piece.owner)) {
         return act(code, 'steal', { victimId: v.piece.owner });
@@ -709,12 +703,23 @@ export function registerSocketHandlers(io: Server): void {
       if (!v.piece) act(code, 'build', { piece: SETTLEMENT, loc: vertexId }, true);
     }));
 
-    socket.on('clickEdge', safe(({ code, edgeId, piece }) => {
+    // The base client's edge click: a road, or a bridge on an ocean edge (no land tile touches it). A chosen piece goes through `place`.
+    socket.on('clickEdge', safe(({ code, edgeId }) => {
       const g = rooms[code]?.game;
       const e = g?.board.edges[edgeId];
-      const chosen = piece || (e && e.hexIds.length === 0 ? 'bridge' : ROAD);
-      act(code, 'build', { piece: chosen, loc: edgeId }, true);
+      act(code, 'build', { piece: e && e.hexIds.length === 0 ? 'bridge' : ROAD, loc: edgeId }, true);
     }));
+
+    // R6.5: the generic piece entry. `{ code, piece, loc }` builds any registered piece for this socket's player, so a new piece needs no handler here.
+    // The client's object is untrusted: `code` and `piece` must be strings; `loc` is checked by the build action (whole number, a real vertex or edge),
+    // and so are the piece id, the supply, the rule for the spot and the price. It always reports.
+    socket.on('place', (data: any) => {
+      try {
+        const { code, piece, loc } = data !== null && typeof data === 'object' ? data : ({} as any);
+        if (typeof code !== 'string' || typeof piece !== 'string') return;
+        act(code, 'build', { piece, loc }, true);
+      } catch (err) { console.error('Socket handler error:', err); }
+    });
     socket.on('clickHex', safe(({ code, hexId }) => act(code, 'move_robber', { hexId })));
     socket.on('stealFromPlayer', safe(({ code, victimId }) => act(code, 'steal', { victimId })));
 

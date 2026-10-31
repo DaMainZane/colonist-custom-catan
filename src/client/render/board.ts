@@ -1375,7 +1375,7 @@ export function clickVertex(vertexId: number): void {
 /** Tidebound T7b2: build a fishing net on this vertex (only offered in net mode, from the server's list of legal vertices). */
 export function clickNetSpot(vertexId: number): void {
   setBuildModeValue(null);
-  socket.emit('clickVertex', { code: state.code, vertexId, piece: 'net' });
+  socket.emit('place', { code: state.code, piece: 'net', loc: vertexId });
 }
 
 /** Tidebound T7e: pay to fill the fishing ground on this sea tile (only offered in feed mode, from the server's list of tiles next to your nets). */

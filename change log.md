@@ -1,5 +1,18 @@
 # Change Log
 
+## 2026-10-31 (Pass 88: Modular rework R6.4, R6.5, R6.7: the nine events and the piece clicks moved to `act` and `place`; R6.6 skipped on purpose; the user ran Pass 87 clean, this pass NOT run, no shell)
+### Changed
+- R6.4 (found already done, not edited this pass): `socket.ts` has no handler for `researchTech`, `upgradePort`, `upgradeHarbor`, `upgradeBridge`, `demolishBridge`, `convertTile`, `spendFish`, `feedSea`, `drivePirate`. The client emits `act` for all nine (checked by reading: `techpanel.ts` x3, `drawer.ts` `spendFishPick`, `pirates.ts` `clickPirate` with `drive_off_pirate`, `bridgepicker.ts` upgrade and demolish, `board.ts` `clickFeedSpot` and `clickHarborSpot`). The user's `git grep` for the nine camelCase names in `src/client`, `src/packs`, `src/server`, `tests` and `scripts` found no emit left.
+- R6.5, `src/server/socket.ts`: new `place` handler `{ code, piece, loc }` runs `act(code, 'build', { piece, loc }, true)` (`code` and `piece` must be strings, anything else is dropped; `loc` is checked by `validateBuild`). `clickVertex` lost its `piece` parameter and the `NET` branch; `clickEdge` lost its `piece` parameter (road, or bridge on an ocean edge). The `NET` import is gone, so `socket.ts` no longer imports from `packs/tidebound`.
+- R6.5, client: `clickNetSpot` (`board.ts`) emits `place` with `piece: 'net'`; `chooseBridgeType` (`bridgepicker.ts`) emits `place` with the chosen piece. `clickVertex` and `clickEdge` in `board.ts` still emit the base events.
+- Behavior difference: a net on an occupied vertex used to be dropped silently by the `!v.piece` check, now `canPlace` refuses it and the player sees the reason toast.
+- `tests/socketAct.test.ts`: new `place` block. Handler present; `place road` answers like `clickEdge` on the same edge; a `piece` sent to `clickVertex` or `clickEdge` is ignored (twin rooms give the same errors and state); unknown pieces (`__proto__`, `constructor`, ...); eleven junk `loc` values for six pieces (one error, never "Internal error", state unchanged); malformed envelopes (no toast, no `console.error`, no change).
+- R6.7 docs: `ROUTER.md` (New piece, New action, New socket event rows and the Glue names `socket.ts` bullet), `RECIPES.md` (recipe 1 step 4, recipe 2 steps 3 and 4, recipe 5 steps 2 and 4, header note), `EXTENSION POINTS.md` (new "What the client sends" section: `act` and `place`). The D note for `clickEdge` is gone.
+### Skipped on purpose
+- R6.6 (the 22 base game events stay as they are). The traps are in `Rework Progress.md`.
+### To run, one command per line
+- `npx vitest run tests/socketAct.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`. Then `git grep -nE "emit\('(clickVertex|clickEdge)'" -- src tests scripts` and check that no hit sends a `piece`.
+
 ## 2026-10-31 (Pass 87: Modular rework R6.1 to R6.3: the generic `act` socket event and its test; written and NOT run; nothing moved yet, no shipped behavior change)
 ### Changed
 - `src/server/socket.ts`: one new handler under "Turn actions": `socket.on('act', ({ code, type, payload }) => ...)`. `type` and `code` must be strings (else ignored); `payload` must be a plain object (else `{}`); it calls `act(code, type, payload, true)`, so `dispatch` refuses unknown or illegal types and the reason goes back to the player. No registry pre-check. A malformed envelope (`null`, string, array, missing fields) is dropped silently, and nothing reaches `console.error`. All 25 legacy events are still there.

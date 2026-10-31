@@ -216,7 +216,7 @@ export function chooseBridgeType(piece: string): void {
   const edgeId = mode.edgeId;
   closeBridgePicker();
   setBuildModeValue(null);
-  socket.emit('clickEdge', { code: state.code, edgeId, piece });
+  socket.emit('place', { code: state.code, piece, loc: edgeId });
   playTone(600, 0.08);
 }
 

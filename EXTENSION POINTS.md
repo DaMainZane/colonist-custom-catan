@@ -77,6 +77,17 @@ Call sites were opened and checked.
 
 Not checked: registries defined inside a single pack (outside the files above). Search for `export const .* = '` before assuming none exist.
 
+## What the client sends (`server/socket.ts`)
+
+A new action or piece needs no server handler. `act` and `place` are the only game entries a module uses; both always send the engine's refusal reason back to the player, and treat the client's object as untrusted.
+
+| Event | Payload | Runs |
+|---|---|---|
+| `act` | `{ code, type, payload }` | Any registered action type (`dispatch` refuses unknown or illegal ones). `type` must be a string and `payload` a plain object, else `{}` |
+| `place` | `{ code, piece, loc }` | The `build` action for any registered piece (`build` checks the id, the spot, supply and price) |
+
+`clickVertex` and `clickEdge` are only the base clicks (steal victim, settlement to city, new settlement; road, or bridge on an ocean edge). The base game events (`rollDice`, `endTurn`, trades, ...) keep one handler each.
+
 ## Rules to keep when using these
 
 - Zero `g.rng` draws in addon code unless the base game already draws there; use a derived stream (see `deriveTideRng` in `tidebound/tides.ts`). The golden snapshot depends on it.
