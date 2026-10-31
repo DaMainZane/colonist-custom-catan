@@ -15,7 +15,7 @@ Tracks the steps in `Modular Rework Plan.md`. Tick a box when the step is done a
 | R6    | [x]    | Generic server dispatch. Done and green (2026-10-31, Pass 87 and 88; the `clickVertex`/`clickEdge` grep sends no `piece`). R6.6 skipped on purpose |
 | R7    | [x]    | R7a done and green (2026-10-31, Pass 85 and 86: all six commands clean). R7b (client reads) is done inside R8. Generic client view data (also removes the client cycle) |
 | R8    | [ ]    | Visual manifest. The longest chunk; steps: section R8 below. Needs R6 and R7a first                                                                                     |
-| R9    | [ ]    | Proof piece, no edits outside its own file. Steps: section R9 below (includes auto-registration of addons)                                                              |
+| R9    | [~]    | R9.1 done, R9.2 and R9.4 written (Pass 95, not run), R9.3 needs your run. Steps: section R9 below                                                           |
 ## Steps for R6 to R9 (written 2026-10-31, nothing started)
 
 Why: the fresh-reader trial (Log, 2026-10-31) showed a new piece still needs hand edits in `server/view.ts`, `server/socket.ts`, `client/render/index.ts` (`renderAll`), `client/render/board.ts`, `client/actions.ts` (`setBuildMode`), `client/main.ts` (`Object.assign(window, ...)`), `client/types.ts`, `client/icons.ts` and `public/index.html`. Goal: a piece is one module you drop in. These steps remove that glue.
@@ -29,34 +29,6 @@ Not opened yet: `client/icons.ts`, `public/index.html`, `public/styles.css`, `cl
 ### R6: last update
 - [ ] skipped on purpose, revisit only if wanted - R6.6 Optional, recommended to skip: move the 22 pass-through base events too. Traps if you do: `discardCards` renames `discards` to `cards`; `playDevCard` renames `cardType` to `card` and `monopolyResource` to `resource`; six events are silent on refusal today (`rollDice`, `endTurn`, `buyDevCard`, `clickHex`, `stealFromPlayer`, `discardCards`), so `act` would start showing error toasts for them unless an `ActionDef.silent` flag is added
 
-### R8: visual manifest and generic client (includes R7b)
-
-Needs R6 (`place`) and R7a (`VIEW_DATA`). This is the long one.
-
-Constraint: `client` may not import `packs`. So a piece's visuals must be plain data (JSON, no functions) that the server sends to the client. Animated things (wrecks, pirates, fish) are too custom for data; they stay as client render modules that register themselves, so `board.ts` does not need an edit.
-
-- [x] R8.1 Read: `client/icons.ts` (`netMarkup`, `fishGroundMarkup`, `wreckMarkup`, piece shapes, and how `PieceDef.icon` is used), `public/index.html` (the build bar buttons and badges), `public/styles.css` (`net-spot`, `fish-ring`, `bridge-upgrade-dot`, `spot-pulse`), `bridgepicker.ts`, `pirates.ts`, `drawer.ts` and `hand.ts` (spend-a-fish sheet), `techpanel.ts`, `server/runtime.ts` (`gameRegistry`, `mapRegistryKey`)
-- [x] R8.2 Write `Visual Manifest Design.md` (one page) before any code and get your OK. Decide: (a) types in `shared/visual.ts`, plain data only; (b) slots `vertex`, `edge`, `edge:ocean`; (c) shape as an SVG string with a `{color}` placeholder; (d) button (label, icon, order), badge, hint texts (no supply, cannot afford, no spots); (e) optional `css` string injected once (`pirates.ts` already does this with `ensure...Styles`); (f) overlay kinds as `{ id, tint, pattern }`; (g) which things are tier 2 render modules
-- [~] R8.3 Add `visual?: PieceVisual` to `PieceDef` and `ActionDef` (feed and harbor are actions with a button and spots), and overlay kinds as a keyed registry through `api.define`
-- [~] R8.4 Send the manifest to the client. Decide the transport: a `visuals` event like `mapOptions`, or part of the first state of a game. Note `syncMapOptions` in `net.ts` is skipped in a game (`optionsKey` is null when `room.game`), so in-game needs its own key. The client must cope with the manifest arriving before or after the first `gameState`
-- [~] R8.5 Client side: `client/visuals.ts` holds the manifest; `tests/visuals.test.ts` covers it
-- [x] R8.6 Generic per-player piece data: `pieces[id] = { left, cost, spots }` from `VIEW_DATA.player()`, sent next to the legacy fields (`netsLeft`, `netSpots`, `feedSpots`, `harborSpots`, ...) so nothing breaks while migrating; `tests/view.snapshot.json` is regenerated here on purpose, as a reviewed diff. Every manifest piece uses server-listed spots; edge pieces use client-side `canClientPlaceBridge` today, which moves to server spots
-- [x] R8.7 New generic client code, written beside the old: button builder into a container (`#pieceButtons`), spot layer, shape drawing, one `clickSpot(pieceId, loc)` that emits `place`, hint toasts from the manifest. `Object.assign(window, ...)` gets one name instead of `clickNetSpot`, `clickFeedSpot`, `clickHarborSpot`
-- [~] R8.8 Migrate one piece at a time, delete its old special case after each: (1) [~] overlay kinds `flood` and `flood-warn` (leave `wall-incomplete`, `plague`, `wave`, `crack`, `season`: they belong to DLCs not built yet) (2) `net` (3) harbor (4) feed (5) rickety and full bridge as `edge:ocean` (the bridge picker stays a tier 2 module) (6) fish, wrecks, pirates layers as tier 2 modules. Per piece, delete: its block in `renderAll`, its hint in `setBuildMode`, its shape in `icons.ts`, its button in `index.html`, its field in `types.ts` and the legacy alias in `view.ts`, its entries in `board.ts` (`ClientPieceKey`, `CLIENT_BASE_PIECE_*`, spot sets, `isNet`)
-- [ ] R8.9 Delete the lobby placeholders: `bridgesLeft: 10` in `lobbyPlayerView` and the `?? 10`, `?? 4`, `?? 1` badge defaults in `renderAll` (defaults come from the manifest)
-- [ ] R8.10 Read `KNOWN_CYCLES` in `tests/architecture.test.ts` and find the two baselined client/server cycles. The plan expects the client one to go; if it did, delete its baseline entry, if not leave it and say why
-- [ ] R8.11 Docs: `ROUTER.md` and `RECIPES.md` rewritten so a piece recipe is "one file plus its test"; `Visual Manifest Design.md` linked from `INDEX.md`
-- [ ] Done when: search `client/render/index.ts`, `board.ts`, `actions.ts`, `main.ts`, `icons.ts` for `net`, `harbor`, `feed` finds no per-piece code, and a manifest piece needs no `types.ts` or `index.html` edit
-
-### R9: proof piece and auto-registration
-
-- [x] R9.1 Today a new addon is added by hand to the pack's `addons` array (`packs/<dlc>/index.ts`) and the Tidebound ids are mirrored in the `client/render/setup.ts` fallback card list. Read both. Add a script (`npm run addons`, or fold into `npm run index`) that generates `packs/<dlc>/addons.generated.ts` from the addon files, ordered so every dep comes first, with a test that fails when it is stale (like `tests/index.test.ts`). Replace the hand-written arrays. Derive the setup page list from the server's `dlcs` and `addons` (already in `MapOptionsView`) or keep a test that they match
-- [ ] R9.2 Pick the proof piece with you. Suggestion: the template beacon (vertex piece) trimmed to one file holding the addon, the `PieceDef` with `visual`, a `VIEW_DATA` entry and a `BOT_GOALS` entry
-- [ ] R9.3 Prove it: `git status` shows only the new file in `packs/<dlc>/`, its new test file, and generated files (`INDEX.md`, `addons.generated.ts`). No other file edited. Then you run a bot game and a browser game: the button appears, the spots light up, the piece builds, scores and the bots use it
-- [ ] R9.4 Docs: `RECIPES.md` shrinks to "write one file", the glue lists leave `ROUTER.md`, update `README.md`, `CLAUDE.md`, change log, `INDEX.md`
-- [ ] R9.5 You commit once
-- [ ] Done when: the proof piece works with no edits outside its own file and its test
-
 ### Decisions for you (none block D or R7a)
 
 - Move the 22 base game events to `act` (R6.6)? Recommended no: they are base game, not modules, and six are silent on refusal.
@@ -64,6 +36,7 @@ Constraint: `client` may not import `packs`. So a piece's visuals must be plain 
 - Base pieces (road, settlement, city) stay hard-coded; only DLC pieces use the manifest. Revisit after R9.
 - Tier 2 render modules for wrecks, pirates, fish: agreed that they stay code, not data?
 - Proof piece for R9.2.
+
 ## Log
 
 - Created. Baseline report: 140 files, all headers need updating.
@@ -144,4 +117,10 @@ Constraint: `client` may not import `packs`. So a piece's visuals must be plain 
   - Updated `tests/tideboundtides.test.ts`, `tests/visualManifest.test.ts`, and `tests/visualsEvent.test.ts`. `tests/view.snapshot.json` and `tests/golden.snapshot.json` untouched.
   - To run, one command per line: `npx vitest run tests/tideboundtides.test.ts tests/visualManifest.test.ts tests/visualsEvent.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`.
   - Next: R8.8 step 2 (`net` vertex piece).
+
+- 2026-10-31 R9.2 and R9.4 written (Pass 95), NOT RUN, no shell:
+  - R9.2: new `src/packs/_template/lantern.ts` (vertex piece with `visual`, 1 VP, supply 3, `canPlace` next to your own edge piece, `lanternBotGoal`) and `tests/lantern.test.ts`. The proof is in the `_template` pack because `tests/tidebound.test.ts` pins the 8 Tidebound addon ids and `setup.ts` mirrors them.
+  - R9.4 (piece path only): `RECIPES.md`, `ROUTER.md`, `CLAUDE.md`, `INDEX.md` tests row, change log. The hand-written glue of net, harbor, feed and bridge is still documented, because R8.8 steps 2 to 6 have not landed.
+  - To run, one command per line: `npm run addons`, `npx vitest run tests/lantern.test.ts tests/template.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`. Pass 93 (R8.7) and Pass 94 (R8.8 step 1) were never run either; if the lantern fails in the browser, run those first.
+  - Likely first failures: `chooseBotAction` picks something else than the lantern (change the hand or the priority in `lanternBotGoal`); `mergeViewPlayer(...).pieces` missing if `base.pieces_view` skips the piece (read `piecesForPlayer`); a `tests/template.test.ts` case that counted the template pack's addons or pieces; `tests/architecture.test.ts` if it dislikes `_template/lantern.ts` importing `packs/base/placement` (`fishing.ts` makes the same import).
 

@@ -1,5 +1,18 @@
 # Change Log
 
+## 2026-10-31 (Pass 95: Modular rework R9.2 to R9.4, the lantern proof piece and the docs for it; NOT run, no shell)
+### Changed
+- `src/packs/_template/lantern.ts` (new, the only new source file): addon `template.lantern` with `lanternPiece` (vertex, price 2 ore + 1 wheat, 1 VP, supply 3 through `rules.pieceLimits`, `canPlace` = empty land corner next to an edge piece you own, and a `visual`: slot `vertex`, button, three hints, a house-like shape with `{color}` and `{dark}`) and `lanternBotGoal` (generic tier, builds on the corner with the most land tiles). No `VIEW_DATA` entry: `base.pieces_view` already sends `pieces[id] = { left, cost, spots }` for any piece with a `visual`. No tip action and no tech node (those stay in `demo.ts`).
+- `tests/lantern.test.ts` (new): Rule of Two audit, nothing registered when off, manifest entry (`registryVisualProblems` is empty, plain JSON), `pieces[id]` through `mergeViewPlayer` (broke: `spots: []`; can pay: corners next to the road; other viewer: `spots: null`; off: no `pieces` key), build through `dispatch` (VP +1 through `score`, supply, zero `g.rng` draws, the corner stops being a spot), refusal away from your roads, bot goal and `chooseBotAction` building it with exactly the price in hand.
+- Docs: `RECIPES.md` (intro, recipe 1 steps 1, 4, 5, 6, 7: a piece is one file, the old client-glue list is gone and replaced by a note not to copy the hand-written pieces), `ROUTER.md` (New piece row), `CLAUDE.md` (glue bullet), `INDEX.md` (`tests/` row; the `src/` row for `lantern.ts` comes from `npm run index`).
+### Deviations from the R9 plan
+- The proof lives in the `_template` pack, not in a shipped DLC: `tests/tidebound.test.ts` pins the Tidebound addon list (8 ids) and the `client/render/setup.ts` fallback list, so a 9th Tidebound addon would force edits outside its own file.
+- No `VIEW_DATA` entry (the plan listed one): the generic `pieces_view` made it unnecessary.
+- `ROUTER.md` still lists the hand-written glue of the net, harbor, feed and bridge pieces in its glue names, `RECIPES.md` recipe 5 and the `client/render/board.ts` and `overlay.ts` notes: R8.8 steps 2 to 6 and R8.9 have not landed, so those lists stay until then. `README.md` unchanged.
+### Not done
+- Nothing was run (no shell). Commands, one per line: `npm run addons`, `npx vitest run tests/lantern.test.ts tests/template.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`.
+- R9.3 browser and bot game, and R9.5 commit: not done. The code of Pass 93 (R8.7) and Pass 94 (R8.8 step 1) was also never run.
+
 ## 2026-10-31 (Pass 94: Modular rework R8.8 step 1, migrate `flood` and `flood-warn` overlay kinds onto `OVERLAY_KINDS` and delete their hard-coded client definitions; NOT run, no shell)
 ### Changed
 - `src/packs/tidebound/tides.ts` & `src/packs/tidebound/index.ts`: added `floodOverlayKind` (`id: 'flood'`, `label: 'Flooded'`, light/dark `tint` and `line`, wave `pattern`) and `floodWarnOverlayKind` (`id: 'flood-warn'`, `label: 'Flood warning'`, light/dark `tint` and `line`, dashed wave `pattern`, `pulse: true`), registered via `api.define(OVERLAY_KINDS, ...)` inside `tidesAddon.register` and re-exported from `packs/tidebound/index.ts`.

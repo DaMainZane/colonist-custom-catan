@@ -16,7 +16,7 @@ Instructions for Claude Code (and any other agent) working in this repo. Keep th
 - No `g.rng` draws in addon code unless the base game already draws there. Use a derived stream. `tests/golden.snapshot.json` must stay untouched unless the task is a deliberate behavior change.
 - Every `src/**/*.ts` file starts with one line: `// MODULE: what | DEPENDS ON: a, b | USED BY: c, d`. Write only the description. The two lists are generated.
 - `INDEX.md`'s `src/` tables are generated from those headers: never edit them by hand. Root, Docs and `tests/` tables are hand-written; update them when you add a file there.
-- Hand-written glue still exists in `server/socket.ts`, `server/view.ts`, `client/icons.ts`, `client/render/board.ts` and `client/main.ts` (R6 to R8 of `Modular Rework Plan.md` remove it). The recipes say where it is touched.
+- Hand-written glue still exists for the net, harbor, feed and bridge pieces (R8.8 migrates them), in `client/icons.ts`, `client/render/board.ts` and `client/main.ts`. A new piece with a `visual` needs none (`src/packs/_template/lantern.ts` is the proof; recipe 1 in `RECIPES.md`). Actions need none (the client emits `act`).
 - Removable files get a `[del.]` name prefix instead of being deleted.
 - Tidebound chunk T12 (`tidebound/risingSea.ts`) comes before R6.
 

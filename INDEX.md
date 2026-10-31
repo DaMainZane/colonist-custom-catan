@@ -89,6 +89,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `_template/index.ts` | template pack (loads the template addon so a test can build a registry from it; not in allPacks, so nothing ships) |
 | `_template/addons.generated.ts` | generated addon list for template (dependency-ordered by scripts/addons.mjs; do not edit by hand) |
 | `_template/demo.ts` | template addon (copy this file to start a new addon: one vertex piece, one action, one tech node, a bot goal stub, a client view function; not part of any shipped pack) |
+| `_template/lantern.ts` | template lantern addon (R9 proof piece: a one-file vertex piece with a visual, a score and a bot goal; needs no edit outside this file and its test) |
 | `base/index.ts` | base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) |
 | `base/actions/index.ts` | registers every base action |
 | `base/actions/bankTrade.ts` | action "bank_trade" (4:1 or better with ports; registry resources only) |
@@ -272,4 +273,5 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `template.test.ts` | R5 template guard: the example addon in `src/packs/_template/` passes the Rule of Two audit, registers nothing when off, and its piece, action and client view work when on |
 | `socketAct.test.ts` | R6 generic `act` socket event: runs one engine action for the socket player, sends the engine reason when refused, ignores malformed envelopes, never answers "Internal error" to junk payloads for the nine moved actions, and (until R6.4 deletes each legacy handler) gives the same answer as the legacy event |
 | `piecesView.test.ts` | R8.6 generic per-player piece and action view data (`base.pieces_view`): `undefined` in base game, spot/cost/left parity with `netSpots`/`feedSpots`/`harborSpots`, `rickety_bridge` ocean edge build validation, absent keys when `available` is false, `spots: null` for other/spectator/off-turn/gameover and `[]` when broke, ascending spots, JSON round-trip and zero `g.rng` draws |
+| `lantern.test.ts` | R9 proof piece (`_template/lantern.ts`, one file): Rule of Two audit, nothing registered when off, visual manifest entry is safe plain JSON, `pieces[id]` from `base.pieces_view` (supply, price, spots next to your own road, no spots for other viewers, absent when off), generic `build` (1 VP, supply, zero `g.rng` draws, spot gone after building), refusal away from your roads, bot goal and the brain building it |
 
