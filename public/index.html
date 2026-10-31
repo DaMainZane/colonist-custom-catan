@@ -289,6 +289,13 @@
       <!-- Hint bar -->
       <div id="hintBar"></div>
 
+      <!-- Game Timer & Round HUD (top right ocean, next to Live Log) -->
+      <div id="gameClockHud" class="game-clock-hud" style="display:none;">
+        <span id="gameRoundText" class="game-round-text">Round 1</span>
+        <span class="game-clock-sep">·</span>
+        <span id="gameTimerText" class="game-timer-text">00:00</span>
+      </div>
+
       <!-- Active trade offer -->
       <div id="activeTradeModal"></div>
 
@@ -381,16 +388,17 @@
     <div class="right-sidebar">
       <div id="logSection">
         <div class="log-head-tabs">
-          <button class="log-tab-btn active" id="tabBtnLogLive" onclick="setLogTab('live')" title="Real-time action log">Live Log</button>
-          <button class="log-tab-btn" id="tabBtnLogHistory" onclick="setLogTab('history')" title="Summarize rounds and player turns">Turn History</button>
+          <button class="log-tab-btn active" id="tabBtnLogLive" onclick="setLogTab('live')" title="Merged Live Log & Turn History">Live Log</button>
+          <button class="log-tab-btn" id="tabBtnLogChat" onclick="setLogTab('chat')" title="Table Chat">Chat</button>
         </div>
+        <div id="logFilterBar" class="log-filter-bar"></div>
         <div id="logFeed" class="log-feed"></div>
         <div id="turnHistoryFeed" class="turn-history-feed" style="display:none;"></div>
-      </div>
-      <div id="chatSection">
-        <div id="chatFeed"></div>
-        <div class="chat-input-wrap">
-          <input id="chatInput" type="text" placeholder="Send a message" onkeydown="if(event.key==='Enter') sendChat()" />
+        <div id="chatSection" style="display:none;">
+          <div id="chatFeed"></div>
+          <div class="chat-input-wrap">
+            <input id="chatInput" type="text" placeholder="Send a message" onkeydown="if(event.key==='Enter') sendChat()" />
+          </div>
         </div>
       </div>
       <div class="bank-bar" id="bankBar"></div>

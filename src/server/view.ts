@@ -299,6 +299,7 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
     turnCount: g ? Math.max(1, g.turnCount) : 1,
     startedAt: room.startedAt,
     finishedAt: room.finishedAt,
+    elapsedMs: room.startedAt ? Math.max(0, (room.finishedAt || Date.now()) - room.startedAt) : 0,
     longestRoadOwner: g ? g.awards.longestRoad ?? null : null,
     largestArmyOwner: g ? g.awards.largestArmy ?? null : null,
     activeTrade,

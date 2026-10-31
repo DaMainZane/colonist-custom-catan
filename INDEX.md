@@ -200,10 +200,10 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `render/overlay.ts` | S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) |
 | `render/pirates.ts` | Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles |
 | `render/setup.ts` | world setup page (host only, between the name page and the board): which screen shows, tile preview, roster, scenarios, DLC cards |
-| `render/sidebar.ts` | right sidebar (log, chat, bank, player rows) |
+| `render/sidebar.ts` | right sidebar (merged live log & turn history with RS card icons and click-to-filter, chat leaf, bank, player rows) |
 | `render/techpanel.ts` | tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar |
 | `render/trade.ts` | active trade offer stack (top right), per-offer timers, trade responses and counter-offer editor |
-| `render/turnclock.ts` | turn clock readout and countdown bar in the turn pill (counts down from the time left the server sent) |
+| `render/turnclock.ts` | turn clock readout and countdown bar in the turn pill, plus the top-right ocean game timer & round number HUD |
 | `socket.ts` | the single socket.io connection shared by all client modules |
 | `store.ts` | shared mutable client UI state (game state, build and drawer modes, camera, selections) with setters |
 | `types.ts` | loose client-side view types (PlayerView, GameState, Resources) |

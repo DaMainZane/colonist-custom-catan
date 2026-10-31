@@ -170,6 +170,7 @@ export interface GameState {
   turnCount?: number;
   startedAt?: number | null;
   finishedAt?: number | null;
+  elapsedMs?: number;
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
   activeTrade: TradeView | null;
@@ -263,11 +264,21 @@ export interface TechRowView {
   reason: string | null;
 }
 
+export interface TurnActionResource {
+  resource: string;
+  amount: number;
+  sign?: '+' | '-' | '';
+}
+
 export interface TurnActionItem {
   category: 'roll' | 'produce' | 'build' | 'rob' | 'dev' | 'trade' | 'discard' | 'event' | 'award';
   icon: string;
   text: string;
   badge?: string;
+  resources?: TurnActionResource[];
+  piece?: string;
+  devCard?: string;
+  diceSum?: number;
   timestamp: number;
 }
 

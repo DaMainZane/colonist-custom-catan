@@ -1,12 +1,22 @@
 // MODULE: Turn history recorder & round summarizer | DEPENDS ON: server/types, shared/index | USED BY: server/game, server/types
-import type { GameEvent, GameState } from '../shared';
+import type { GameEvent } from '../shared';
 import type { Room } from './types';
+
+export interface TurnActionResource {
+  resource: string;
+  amount: number;
+  sign?: '+' | '-' | '';
+}
 
 export interface TurnActionItem {
   category: 'roll' | 'produce' | 'build' | 'rob' | 'dev' | 'trade' | 'discard' | 'event' | 'award';
   icon: string;
   text: string;
   badge?: string;
+  resources?: TurnActionResource[];
+  piece?: string;
+  devCard?: string;
+  diceSum?: number;
   timestamp: number;
 }
 
@@ -32,20 +42,13 @@ const RESOURCE_NAMES: Record<string, string> = {
   sheep: 'Sheep',
   wheat: 'Wheat',
   ore: 'Ore',
-  gold: 'Gold'
-};
-
-const RESOURCE_ICONS: Record<string, string> = {
-  wood: '🌲',
-  brick: '🧱',
-  sheep: '🐑',
-  wheat: '🌾',
-  ore: '⛰️',
-  gold: '🪙'
+  gold: 'Gold',
+  fish: 'Fish'
 };
 
 /**
- * Records key player actions and engine events into structured round summaries for high game transparency.
+ * Records key player actions, resource card changes, and engine events into structured round/turn summaries
+ * for the unified Live Log & Turn History view.
  */
 export function recordTurnHistory(
   room: Room,
@@ -80,9 +83,9 @@ export function recordTurnHistory(
   if (isSetup) {
     const existing = roundSummary.turns.filter(t => t.playerId === playerId);
     const latest = existing[existing.length - 1];
-    const hasSettle = latest?.actions.some(a => a.category === 'build' && a.text.includes('Settlement'));
-    const hasRoad = latest?.actions.some(a => a.category === 'build' && a.text.includes('Road'));
-    if (!latest || (hasSettle && hasRoad && (actionType === 'placeSettlement' || actionType === 'buildSettlement'))) {
+    const hasSettle = latest?.actions.some(a => a.category === 'build' && a.piece === 'settlement');
+    const hasRoad = latest?.actions.some(a => a.category === 'build' && a.piece === 'road');
+    if (!latest || (hasSettle && hasRoad && (actionType === 'placeSettlement' || actionType === 'buildSettlement' || (actionType === 'build' && payload?.piece === 'settlement')))) {
       turnSummary = {
         turnCount: 0,
         playerId,
@@ -114,8 +117,15 @@ export function recordTurnHistory(
 
   const now = Date.now();
 
-  // Aggregate productions for the actor
-  const productionsMap: Record<string, number> = {};
+  // Aggregate productions per player so every player's resource gains show with RS card icons
+  const productionsByPlayer = new Map<string, Record<string, number>>();
+  const bankGiveMap: Record<string, number> = {};
+  const bankGetMap: Record<string, number> = {};
+  const p2pGiveMap: Record<string, number> = {};
+  const p2pGetMap: Record<string, number> = {};
+  let p2pPartnerName = '';
+  const discardByPlayer = new Map<string, Record<string, number>>();
+  const monopolyMap: Record<string, number> = {};
 
   for (const ev of events) {
     const d = ev.data ?? {};
@@ -127,15 +137,17 @@ export function recordTurnHistory(
         if (sum === 7) {
           turnSummary.actions.push({
             category: 'roll',
-            icon: '🎲',
+            icon: 'roll',
+            diceSum: 7,
             badge: '7',
-            text: 'Rolled 7 — Robber activated!',
+            text: 'Rolled 7 — Robber activated',
             timestamp: now
           });
         } else {
           turnSummary.actions.push({
             category: 'roll',
-            icon: '🎲',
+            icon: 'roll',
+            diceSum: sum,
             badge: String(sum),
             text: `Rolled ${sum} (${d1} + ${d2})`,
             timestamp: now
@@ -145,8 +157,11 @@ export function recordTurnHistory(
       }
 
       case 'produced': {
-        if (d.playerId === playerId && d.resource && d.amount > 0) {
-          productionsMap[d.resource] = (productionsMap[d.resource] || 0) + d.amount;
+        const pid = d.playerId || playerId;
+        if (d.resource && d.amount > 0) {
+          const map = productionsByPlayer.get(pid) || {};
+          map[d.resource] = (map[d.resource] || 0) + d.amount;
+          productionsByPlayer.set(pid, map);
         }
         break;
       }
@@ -154,27 +169,33 @@ export function recordTurnHistory(
       case 'built': {
         const piece = d.piece || payload?.piece || 'settlement';
         let text = 'Built piece';
-        let icon = '🔨';
         let badge = piece;
         if (piece === 'settlement') {
           text = isSetup ? 'Placed initial Settlement' : 'Built Settlement';
-          icon = '🏠';
           badge = 'Settlement';
         } else if (piece === 'city') {
           text = 'Upgraded to City';
-          icon = '🏰';
           badge = 'City';
         } else if (piece === 'road') {
           text = isSetup ? 'Placed initial Road' : 'Built Road';
-          icon = '🛣️';
           badge = 'Road';
+        } else if (piece === 'bridge') {
+          text = 'Built Bridge';
+          badge = 'Bridge';
+        } else if (piece === 'rickety_bridge') {
+          text = 'Built Rickety Bridge';
+          badge = 'Rickety Bridge';
+        } else if (piece === 'net') {
+          text = 'Placed Fishing Net';
+          badge = 'Net';
         } else {
           text = `Built ${piece}`;
           badge = piece;
         }
         turnSummary.actions.push({
           category: 'build',
-          icon,
+          icon: piece,
+          piece,
           badge,
           text,
           timestamp: now
@@ -185,8 +206,8 @@ export function recordTurnHistory(
       case 'robberMoved': {
         turnSummary.actions.push({
           category: 'rob',
-          icon: '🥷',
-          badge: `#${d.hexId}`,
+          icon: 'robber',
+          badge: `Hex #${d.hexId}`,
           text: `Moved Robber to hex #${d.hexId}`,
           timestamp: now
         });
@@ -194,51 +215,51 @@ export function recordTurnHistory(
       }
 
       case 'transferred': {
+        const amt = Number(d.amount) || 1;
+        const res = d.resource || '';
         if (d.kind === 'steal') {
           const victim = g.players.find(x => x.id === d.from);
           const victimName = victim?.name || d.from || 'player';
           turnSummary.actions.push({
             category: 'rob',
-            icon: '⚔️',
+            icon: 'steal',
             badge: 'Rob',
-            text: `Robbed 1 resource from ${victimName}`,
+            resources: [{ resource: 'mystery', amount: amt, sign: '+' }],
+            text: `Robbed from ${victimName}`,
             timestamp: now
           });
         } else if (d.kind === 'discard') {
-          const discPlayer = g.players.find(x => x.id === d.from || x.id === d.to);
-          turnSummary.actions.push({
-            category: 'discard',
-            icon: '🗑️',
-            badge: `-${d.amount}`,
-            text: `${discPlayer?.name || 'Player'} discarded ${d.amount} cards on 7`,
-            timestamp: now
-          });
+          const discId = d.from || playerId;
+          const map = discardByPlayer.get(discId) || {};
+          const key = res || 'mystery';
+          map[key] = (map[key] || 0) + amt;
+          discardByPlayer.set(discId, map);
         } else if (d.kind === 'playerTrade') {
           const partnerId = d.from === playerId ? d.to : d.from;
           const partner = g.players.find(x => x.id === partnerId);
-          turnSummary.actions.push({
-            category: 'trade',
-            icon: '🤝',
-            badge: 'Player Trade',
-            text: `Traded with ${partner?.name || 'player'}`,
-            timestamp: now
-          });
+          if (partner?.name) p2pPartnerName = partner.name;
+          if (res) {
+            if (d.from === playerId) p2pGiveMap[res] = (p2pGiveMap[res] || 0) + amt;
+            else p2pGetMap[res] = (p2pGetMap[res] || 0) + amt;
+          }
         } else if (d.kind === 'bankTrade') {
-          turnSummary.actions.push({
-            category: 'trade',
-            icon: '🏦',
-            badge: 'Bank',
-            text: 'Traded with the Bank',
-            timestamp: now
-          });
+          if (res) {
+            if (d.from === playerId) bankGiveMap[res] = (bankGiveMap[res] || 0) + amt;
+            else if (d.to === playerId) bankGetMap[res] = (bankGetMap[res] || 0) + amt;
+          }
         } else if (d.kind === 'monopoly') {
-          turnSummary.actions.push({
-            category: 'dev',
-            icon: '🃏',
-            badge: 'Monopoly',
-            text: `Monopolized ${d.amount} ${d.resource}!`,
-            timestamp: now
-          });
+          if (res) monopolyMap[res] = (monopolyMap[res] || 0) + amt;
+        } else if (d.kind === 'pick' || d.kind === 'gold') {
+          if (res) {
+            turnSummary.actions.push({
+              category: 'produce',
+              icon: res,
+              badge: `+${amt}`,
+              resources: [{ resource: res, amount: amt, sign: '+' }],
+              text: 'Picked resource',
+              timestamp: now
+            });
+          }
         }
         break;
       }
@@ -246,9 +267,10 @@ export function recordTurnHistory(
       case 'devBought': {
         turnSummary.actions.push({
           category: 'dev',
-          icon: '🃏',
+          icon: 'dev',
+          devCard: 'back',
           badge: 'Dev Card',
-          text: 'Bought a Development Card',
+          text: 'Bought Development Card',
           timestamp: now
         });
         break;
@@ -257,23 +279,14 @@ export function recordTurnHistory(
       case 'devPlayed': {
         const card = d.card || payload?.card || 'dev';
         let cardTitle = 'Development Card';
-        let icon = '🃏';
-        if (card === 'knight') {
-          cardTitle = 'Knight';
-          icon = '⚔️';
-        } else if (card === 'roadBuilding') {
-          cardTitle = 'Road Building (+2 roads)';
-          icon = '🛣️';
-        } else if (card === 'yearOfPlenty') {
-          cardTitle = 'Year of Plenty (+2 picks)';
-          icon = '🌾';
-        } else if (card === 'monopoly') {
-          cardTitle = 'Monopoly';
-          icon = '💰';
-        }
+        if (card === 'knight') cardTitle = 'Knight';
+        else if (card === 'roadBuilding') cardTitle = 'Road Building';
+        else if (card === 'yearOfPlenty') cardTitle = 'Year of Plenty';
+        else if (card === 'monopoly') cardTitle = 'Monopoly';
         turnSummary.actions.push({
           category: 'dev',
-          icon,
+          icon: card,
+          devCard: card,
           badge: cardTitle,
           text: `Played ${cardTitle}`,
           timestamp: now
@@ -284,9 +297,74 @@ export function recordTurnHistory(
       case 'bridgeUpgraded': {
         turnSummary.actions.push({
           category: 'build',
-          icon: '🌉',
+          icon: 'bridge',
+          piece: 'bridge',
           badge: 'Bridge',
-          text: 'Upgraded Rickety Bridge to full Bridge',
+          text: 'Upgraded Rickety Bridge to Bridge',
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'bridgeDemolished': {
+        const resList: TurnActionResource[] = Object.entries((d.resources || {}) as Record<string, number>)
+          .filter(([, n]) => n > 0)
+          .map(([resource, amount]) => ({ resource, amount, sign: '+' as const }));
+        turnSummary.actions.push({
+          category: 'build',
+          icon: 'bridge',
+          piece: 'bridge',
+          badge: 'Demolish',
+          resources: resList.length > 0 ? resList : undefined,
+          text: `Demolished ${d.piece === 'rickety_bridge' ? 'Rickety Bridge' : 'Bridge'}`,
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'harborUpgraded': {
+        turnSummary.actions.push({
+          category: 'build',
+          icon: 'harbor',
+          piece: 'harbor',
+          badge: 'Harbor',
+          text: 'Upgraded port city to 1:1 Harbor',
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'portUpgraded': {
+        turnSummary.actions.push({
+          category: 'build',
+          icon: 'harbor',
+          piece: 'harbor',
+          badge: '2:1 Port',
+          text: 'Raised 3:1 port to 2:1',
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'seaFed': {
+        turnSummary.actions.push({
+          category: 'produce',
+          icon: 'fish',
+          badge: 'Feed Sea',
+          resources: [{ resource: 'wheat', amount: 1, sign: '-' }],
+          text: `Fed fishing ground on tile #${d.hexId}`,
+          timestamp: now
+        });
+        break;
+      }
+
+      case 'techResearched': {
+        const techName = d.name || d.techId || 'Tech';
+        turnSummary.actions.push({
+          category: 'dev',
+          icon: 'tech',
+          badge: 'Tech',
+          text: `Researched ${techName}`,
           timestamp: now
         });
         break;
@@ -297,9 +375,10 @@ export function recordTurnHistory(
         const owner = g.players.find(x => x.id === d.ownerId);
         turnSummary.actions.push({
           category: 'event',
-          icon: '💥',
+          icon: 'bridge',
+          piece: d.piece || 'bridge',
           badge: 'Collapsed',
-          text: owner ? `${owner.name}'s ${pieceLabel} collapsed!` : `${pieceLabel} collapsed!`,
+          text: owner ? `${owner.name}'s ${pieceLabel} collapsed` : `${pieceLabel} collapsed`,
           timestamp: now
         });
         break;
@@ -308,9 +387,9 @@ export function recordTurnHistory(
       case 'pirateSpawned': {
         turnSummary.actions.push({
           category: 'event',
-          icon: '🏴‍☠️',
+          icon: 'pirate',
           badge: `Strength ${d.strength}`,
-          text: `A pirate ship appeared on tile #${d.hexId}`,
+          text: `Pirate ship appeared on tile #${d.hexId}`,
           timestamp: now
         });
         break;
@@ -321,11 +400,12 @@ export function recordTurnHistory(
         const n = Number(d.amount) || 0;
         turnSummary.actions.push({
           category: 'rob',
-          icon: '🏴‍☠️',
+          icon: 'pirate',
           badge: n > 0 ? `-${n}` : 'Raid',
+          resources: n > 0 ? [{ resource: 'mystery', amount: n, sign: '-' }] : undefined,
           text: n > 0
-            ? `Pirates robbed ${victim?.name || 'a player'} of ${n} card${n === 1 ? '' : 's'}`
-            : `Pirates raided ${victim?.name || 'a player'}, but found no cards`,
+            ? `Pirates robbed ${victim?.name || 'a player'}`
+            : `Pirates raided ${victim?.name || 'a player'} (no cards)`,
           timestamp: now
         });
         break;
@@ -334,9 +414,9 @@ export function recordTurnHistory(
       case 'pirateFleeing': {
         turnSummary.actions.push({
           category: 'event',
-          icon: '⛵',
+          icon: 'pirate',
           badge: 'Fleeing',
-          text: 'A pirate ship ran for open water',
+          text: 'Pirate ship fled for open water',
           timestamp: now
         });
         break;
@@ -344,11 +424,13 @@ export function recordTurnHistory(
 
       case 'pirateDriven': {
         const driver = g.players.find(x => x.id === d.playerId);
+        const amt = Number(d.amount) || 0;
         turnSummary.actions.push({
           category: 'event',
-          icon: '⚔️',
+          icon: 'pirate',
           badge: 'Pirate',
-          text: `${driver?.name || 'A player'} drove off a pirate ship (strength ${d.strength}) and took ${d.amount} ${d.resource}`,
+          resources: d.resource && amt > 0 ? [{ resource: d.resource, amount: amt, sign: '+' }] : undefined,
+          text: `${driver?.name || 'Player'} drove off pirate (str ${d.strength})`,
           timestamp: now
         });
         break;
@@ -364,7 +446,7 @@ export function recordTurnHistory(
           : `${prev ? `${prev.name} lost` : 'Lost'} ${name}`;
         turnSummary.actions.push({
           category: 'award',
-          icon: d.playerId ? '🏆' : '📉',
+          icon: 'award',
           badge: name,
           text,
           timestamp: now
@@ -375,7 +457,7 @@ export function recordTurnHistory(
       case 'eventDrawn': {
         turnSummary.actions.push({
           category: 'event',
-          icon: '📜',
+          icon: 'event',
           badge: d.title || 'Event',
           text: `Event: ${d.title}`,
           timestamp: now
@@ -387,9 +469,9 @@ export function recordTurnHistory(
         const winner = g.players.find(x => x.id === d.winnerId);
         turnSummary.actions.push({
           category: 'award',
-          icon: '👑',
+          icon: 'winner',
           badge: 'Winner',
-          text: `🏆 ${winner?.name || 'Player'} won the game!`,
+          text: `${winner?.name || 'Player'} won the game!`,
           timestamp: now
         });
         break;
@@ -397,29 +479,110 @@ export function recordTurnHistory(
     }
   }
 
-  // Push consolidated production action if any resources were produced
-  const prodEntries = Object.entries(productionsMap);
-  if (prodEntries.length > 0) {
-    const desc = prodEntries.map(([res, amt]) => {
-      const ico = RESOURCE_ICONS[res] || '';
-      const nm = RESOURCE_NAMES[res] || res;
-      return `${ico} +${amt} ${nm}`.trim();
-    }).join(', ');
-
+  // Push consolidated production actions (actor first, then any other players who produced on this roll)
+  const orderedProdPids = [
+    ...(productionsByPlayer.has(playerId) ? [playerId] : []),
+    ...[...productionsByPlayer.keys()].filter(id => id !== playerId)
+  ];
+  for (const pid of orderedProdPids) {
+    const prodMap = productionsByPlayer.get(pid)!;
+    const prodEntries = Object.entries(prodMap).filter(([, a]) => a > 0);
+    if (prodEntries.length === 0) continue;
+    const prodPlayer = g.players.find(x => x.id === pid);
+    const total = prodEntries.reduce((s, [, a]) => s + a, 0);
+    const resources: TurnActionResource[] = prodEntries.map(([resource, amount]) => ({
+      resource,
+      amount,
+      sign: '+'
+    }));
+    const label = pid === playerId ? 'Produced' : `${prodPlayer?.name || 'Player'} got`;
     turnSummary.actions.push({
       category: 'produce',
-      icon: '🌾',
-      badge: `+${prodEntries.reduce((s, [, a]) => s + a, 0)}`,
-      text: `Produced: ${desc}`,
+      icon: prodEntries[0][0],
+      badge: `+${total}`,
+      resources,
+      text: label,
+      timestamp: now
+    });
+  }
+
+  // Push consolidated discards
+  for (const [discId, discMap] of discardByPlayer.entries()) {
+    const entries = Object.entries(discMap).filter(([, a]) => a > 0);
+    if (entries.length === 0) continue;
+    const discPlayer = g.players.find(x => x.id === discId);
+    const total = entries.reduce((s, [, a]) => s + a, 0);
+    const resources: TurnActionResource[] = entries.map(([resource, amount]) => ({
+      resource,
+      amount,
+      sign: '-'
+    }));
+    turnSummary.actions.push({
+      category: 'discard',
+      icon: entries[0][0],
+      badge: `-${total}`,
+      resources,
+      text: `${discPlayer?.name || 'Player'} discarded`,
+      timestamp: now
+    });
+  }
+
+  // Push consolidated Bank Trade
+  const bankGiveEntries = Object.entries(bankGiveMap);
+  const bankGetEntries = Object.entries(bankGetMap);
+  if (bankGiveEntries.length > 0 || bankGetEntries.length > 0) {
+    const resources: TurnActionResource[] = [
+      ...bankGiveEntries.map(([resource, amount]) => ({ resource, amount, sign: '-' as const })),
+      ...bankGetEntries.map(([resource, amount]) => ({ resource, amount, sign: '+' as const }))
+    ];
+    turnSummary.actions.push({
+      category: 'trade',
+      icon: 'bank',
+      badge: 'Bank',
+      resources,
+      text: 'Bank trade',
+      timestamp: now
+    });
+  }
+
+  // Push consolidated Player Trade
+  const p2pGiveEntries = Object.entries(p2pGiveMap);
+  const p2pGetEntries = Object.entries(p2pGetMap);
+  if (p2pGiveEntries.length > 0 || p2pGetEntries.length > 0) {
+    const resources: TurnActionResource[] = [
+      ...p2pGiveEntries.map(([resource, amount]) => ({ resource, amount, sign: '-' as const })),
+      ...p2pGetEntries.map(([resource, amount]) => ({ resource, amount, sign: '+' as const }))
+    ];
+    turnSummary.actions.push({
+      category: 'trade',
+      icon: 'trade',
+      badge: 'Player Trade',
+      resources,
+      text: `Traded with ${p2pPartnerName || 'player'}`,
+      timestamp: now
+    });
+  }
+
+  // Push consolidated Monopoly
+  for (const [res, amt] of Object.entries(monopolyMap)) {
+    if (amt <= 0) continue;
+    turnSummary.actions.push({
+      category: 'dev',
+      icon: 'monopoly',
+      devCard: 'monopoly',
+      badge: 'Monopoly',
+      resources: [{ resource: res, amount: amt, sign: '+' }],
+      text: `Monopolized ${RESOURCE_NAMES[res] || res}`,
       timestamp: now
     });
   }
 
   // If action was endTurn and no other actions happened this turn, log passed turn
-  if (actionType === 'endTurn' && turnSummary.actions.length === 0) {
+  if ((actionType === 'endTurn' || actionType === 'end_turn') && turnSummary.actions.length === 0) {
     turnSummary.actions.push({
       category: 'roll',
-      icon: '⏭️',
+      icon: 'pass',
+      badge: 'Pass',
       text: 'Passed turn',
       timestamp: now
     });
