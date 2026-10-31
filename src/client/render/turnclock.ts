@@ -10,6 +10,8 @@ let clockKey = '';
 let totalMs = 1;
 
 let gameTicker = 0;
+let gameAnchorKey = '';
+let gameOriginPerfMs = 0;
 
 /** The text and bar for the pill, or '' when there is no clock. Call when the pill is redrawn. */
 export function turnClockHtml(): string {
@@ -37,7 +39,7 @@ function fmtElapsed(ms: number): string {
 function paintGameHud(): void {
   const hud = document.getElementById('gameClockHud');
   if (!hud) return;
-  if (!state || state.status === 'LOBBY' || !state.startedAt) {
+  if (!state || state.status === 'LOBBY') {
     hud.style.display = 'none';
     return;
   }
@@ -49,8 +51,15 @@ function paintGameHud(): void {
   }
   const timerEl = document.getElementById('gameTimerText');
   if (timerEl) {
-    const end = state.finishedAt || Date.now();
-    timerEl.textContent = fmtElapsed(end - state.startedAt);
+    let elapsed = 0;
+    if (state.status === 'GAMEOVER') {
+      elapsed = typeof state.elapsedMs === 'number'
+        ? state.elapsedMs
+        : (state.startedAt && state.finishedAt ? Math.max(0, state.finishedAt - state.startedAt) : Math.max(0, performance.now() - gameOriginPerfMs));
+    } else {
+      elapsed = Math.max(0, performance.now() - gameOriginPerfMs);
+    }
+    timerEl.textContent = fmtElapsed(elapsed);
   }
 }
 
@@ -70,11 +79,26 @@ function paint(): void {
 
 /** Starts, restarts or stops the turn countdown and the top-right ocean game timer + round number HUD. */
 export function syncTurnClockDisplay(): void {
-  paintGameHud();
-  if (!state || state.status !== 'PLAYING' || !state.startedAt) {
+  if (!state || state.status === 'LOBBY') {
+    gameAnchorKey = '';
     if (gameTicker) { clearInterval(gameTicker); gameTicker = 0; }
-  } else if (!gameTicker && typeof window !== 'undefined') {
-    gameTicker = window.setInterval(paintGameHud, 1000);
+    paintGameHud();
+  } else {
+    const key = `${state.code || ''}:${state.startedAt || 0}`;
+    const serverElapsed = typeof state.elapsedMs === 'number'
+      ? state.elapsedMs
+      : (state.startedAt ? Math.max(0, (state.finishedAt || Date.now()) - state.startedAt) : 0);
+    const currentElapsed = performance.now() - gameOriginPerfMs;
+    if (key !== gameAnchorKey || Math.abs(currentElapsed - serverElapsed) > 2000) {
+      gameAnchorKey = key;
+      gameOriginPerfMs = performance.now() - serverElapsed;
+    }
+    paintGameHud();
+    if (state.status === 'GAMEOVER') {
+      if (gameTicker) { clearInterval(gameTicker); gameTicker = 0; }
+    } else if (!gameTicker && typeof window !== 'undefined') {
+      gameTicker = window.setInterval(paintGameHud, 250);
+    }
   }
 
   const c = state?.turnClock;

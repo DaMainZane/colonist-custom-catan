@@ -170,6 +170,7 @@ export interface GameState {
   turnCount?: number;
   startedAt?: number | null;
   finishedAt?: number | null;
+  elapsedMs?: number;
   longestRoadOwner: string | null;
   largestArmyOwner: string | null;
   activeTrade: TradeView | null;
