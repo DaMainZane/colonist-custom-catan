@@ -197,6 +197,8 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `icons.ts` | flat resource pictograms, dev card glyphs, UI icons, piece shapes |
 | `main.ts` | client entry point (wires DOM events, camera pan and zoom, and socket messages to the renderers) |
 | `mapmenu.ts` | lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) |
+| `pieceModel.ts` | generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips, spots and shapes; no DOM, no socket, no store) |
+| `pieceui.ts` | generic piece UI (R8.7: draws the build-bar buttons, the spot layer and the placed shapes of manifest pieces and actions, shows their hints and sends their clicks; the logic is in client/pieceModel) |
 | `presets.ts` | custom map presets (list saved in this browser, preset row in the lobby dock) |
 | `render/index.ts` | renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state |
 | `render/board.ts` | board SVG renderer, camera, board input and board animations |

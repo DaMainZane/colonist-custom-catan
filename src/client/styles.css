@@ -1744,6 +1744,12 @@ svg#boardSvg.is-panning * {
 .net-spot { fill: var(--accent); fill-opacity: 0.28; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-dasharray: 4 3; }
 .net-spot:hover { fill-opacity: 0.55; }
 
+/* R8.7: generated piece buttons live in a wrapper that must not change the action bar layout */
+.piece-buttons { display: contents; }
+/* R8.7: the rim layer of a manifest shape is the same fragment forced to the rim colour and widened (an element with class no-rim is left out) */
+.vis-rim * { fill: var(--piece-rim) !important; stroke: var(--piece-rim) !important; stroke-width: var(--vis-rim, 3.4px) !important; stroke-linejoin: round; }
+.vis-rim .no-rim { display: none; }
+
 /* ---------- Tidebound fishing grounds on the sea (T7c) and feed spots (T7e) ---------- */
 /* Every fill has a shape cue as well as a color: a filled pip is a boost left, an empty ring is used up, and a spent fish is a dashed outline. */
 .fish-ground { opacity: 0.92; }

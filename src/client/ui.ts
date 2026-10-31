@@ -1,4 +1,4 @@
-// MODULE: small UI actions (theme switch, toast, victory confetti overlay) | DEPENDS ON: none | USED BY: client/actions, client/main, client/mapmenu, client/presets, client/render/drawer, client/render/trade
+// MODULE: small UI actions (theme switch, toast, victory confetti overlay) | DEPENDS ON: none | USED BY: client/actions, client/main, client/mapmenu, client/pieceui, client/presets, client/render/drawer, +1 more
 
 export function toggleTheme(): void {
   const root = document.documentElement;

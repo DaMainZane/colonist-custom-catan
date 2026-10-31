@@ -1,4 +1,4 @@
-// MODULE: renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state | DEPENDS ON: client/actions, client/avatars, client/icons, client/mapmenu, client/presets, client/render/board, +13 more | USED BY: client/actions, client/main, client/render/drawer
+// MODULE: renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state | DEPENDS ON: client/actions, client/avatars, client/icons, client/mapmenu, client/pieceui, client/presets, +14 more | USED BY: client/actions, client/main, client/render/drawer
 import { socket } from '../socket';
 import { state, buildMode, victoryTab, hideVictoryOverlay, elevationView } from '../store';
 import { isPendingSettingsPush } from '../actions';
@@ -11,6 +11,7 @@ import { renderBoard } from './board';
 import { renderTimerPopups, showEventTitleCard } from './overlay';
 import { renderTechPanel } from './techpanel';
 import { renderBridgePicker } from './bridgepicker';
+import { renderPieceButtons } from '../pieceui';
 import { renderPresetRow } from '../presets';
 import { renderMapMenu, renderQuickStarts } from '../mapmenu';
 import { turnClockHtml, syncTurnClockDisplay } from './turnclock';
@@ -205,6 +206,8 @@ export function renderAll(): void {
     harborBtn.disabled = !(isMyTurn && state.phase === 'MAIN');
     harborBtn.classList.toggle('active-mode', buildMode === 'harbor');
   }
+  // R8.7: buttons for manifest pieces and actions (empty until a piece has a visual). Shows the spectated player's supplies for a spectator.
+  renderPieceButtons(badgeTarget, isMyTurn);
   btn('btnTradeDrawer').disabled = !(isMyTurn && state.phase === 'MAIN');
   btn('btnBuyDev').disabled = !(isMyTurn && state.phase === 'MAIN' && me?.resources.sheep >= 1 && me?.resources.wheat >= 1 && me?.resources.ore >= 1 && state.devDeckCount > 0);
   btn('btnBuildRoad').disabled = !(isMyTurn && (state.phase === 'MAIN' || state.phase === 'SETUP_ROAD'));

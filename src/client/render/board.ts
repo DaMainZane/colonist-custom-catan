@@ -1,4 +1,4 @@
-// MODULE: board SVG renderer, camera, board input and board animations | DEPENDS ON: client/audio, client/constants, client/icons, client/render/bridgepicker, client/render/hand, client/render/overlay, +5 more | USED BY: client/actions, client/main, client/render/bridgepicker, client/render/hand, client/render/index
+// MODULE: board SVG renderer, camera, board input and board animations | DEPENDS ON: client/audio, client/constants, client/icons, client/pieceui, client/render/bridgepicker, client/render/hand, +6 more | USED BY: client/actions, client/main, client/render/bridgepicker, client/render/hand, client/render/index
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
@@ -29,6 +29,7 @@ import { renderSidebar, visibleRect } from './sidebar';
 import { esc } from '../util';
 import { openBridgePicker } from './bridgepicker';
 import { renderPiratesMarkup } from './pirates';
+import { hasPlacedShape, isPieceMode, pieceSpotsMarkup, placedEdgeMarkup, placedVertexMarkup } from '../pieceui';
 
 const knownRoads = new Set<number>();
 const knownRoadPieces = new Map<number, { owner: string; pieceType: string }>();
@@ -70,6 +71,8 @@ let lastOverlayHtml = '';
 let lastFishHtml = '';
 let lastWrecksHtml = '';
 let lastPiratesHtml = '';
+// R8.7: the generic spot layer for manifest pieces is only rewritten when its markup changes.
+let lastPieceSpotsHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -203,6 +206,7 @@ function ensureBoardLayers(svg: HTMLElement): {
   fishLayer: Element;
   wrecksLayer: Element;
   piratesLayer: Element;
+  pieceSpotsLayer: Element;
   portsLayer: HTMLElement;
   hexDynamicLayer: HTMLElement;
   roadRimsLayer: HTMLElement;
@@ -228,6 +232,7 @@ function ensureBoardLayers(svg: HTMLElement): {
       <g id="roadHitsLayer"></g>
       <g id="roadSpotsLayer"></g>
       <g id="boardVerticesLayer"></g>
+      <g id="boardPieceSpotsLayer"></g>
     `;
     lastTerrainKey = '';
     lastPortsKey = '';
@@ -236,6 +241,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastFishHtml = '';
     lastWrecksHtml = '';
     lastPiratesHtml = '';
+    lastPieceSpotsHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
@@ -255,6 +261,14 @@ function ensureBoardLayers(svg: HTMLElement): {
     fishLayer.after(wrecksLayer);
     lastWrecksHtml = '';
   }
+  // Same for the generic piece spots layer (R8.7), which sits above the vertices so its spots can be clicked.
+  let pieceSpotsLayer: Element | null = document.getElementById('boardPieceSpotsLayer');
+  if (!pieceSpotsLayer) {
+    pieceSpotsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    pieceSpotsLayer.id = 'boardPieceSpotsLayer';
+    document.getElementById('boardVerticesLayer')!.after(pieceSpotsLayer);
+    lastPieceSpotsHtml = '';
+  }
   // Same for the pirates layer (T10).
   let piratesLayer: Element | null = document.getElementById('boardPiratesLayer');
   if (!piratesLayer) {
@@ -269,6 +283,7 @@ function ensureBoardLayers(svg: HTMLElement): {
     fishLayer,
     wrecksLayer,
     piratesLayer,
+    pieceSpotsLayer,
     portsLayer: document.getElementById('boardPortsLayer')!,
     hexDynamicLayer: document.getElementById('boardHexDynamicLayer')!,
     roadRimsLayer: document.getElementById('roadRimsLayer')!,
@@ -481,7 +496,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           if (v.building.type === 'city' && !playedCitySfx) {
             playedCitySfx = true;
             playPlaceCitySound();
-          } else if ((v.building.type === 'settlement' || v.building.type === 'net') && !playedSettleSfx) {
+          } else if ((v.building.type === 'settlement' || v.building.type === 'net' || hasPlacedShape(v.building.type)) && !playedSettleSfx) {
             playedSettleSfx = true;
             playPlaceSettlementSound();
           }
@@ -856,6 +871,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const my = (v1.y + v2.y) / 2;
       const anim = getPieceAnimAttrs(`road_${e.id}`, now);
 
+      // R8.7: an edge piece that the manifest describes is drawn from its shape (the generic path; the bridge code below stays until R8.8 migrates it).
+      const genericEdge = placedEdgeMarkup(e.pieceType, col, { x: x1, y: y1 }, { x: x2, y: y2 });
+      if (genericEdge) {
+        if (anim.isAnimating) {
+          roadRimsHtml += `<g transform="translate(${mx}, ${my})"><circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" /></g>`;
+        }
+        roadBodiesHtml += `<g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">${genericEdge}</g>`;
+        roadHitsHtml += `
+        <line class="road-hit" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+          onmouseenter="onRoadHover(${e.id}, event)"
+          onmousemove="onRoadMove(event)"
+          onmouseleave="onRoadLeave()" />`;
+        continue;
+      }
+
       let bridgePlanksHtml = '';
       if (isBridge) {
         const dx = x2 - x1;
@@ -967,7 +997,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
           ? `clickVertex(${v.id})`
           : '';
       const ringR = isCity ? 27 : 22;
-      const anim = getPieceAnimAttrs(`${isCity ? 'city' : isNet ? 'net' : 'settlement'}_${v.id}`, now);
+      const anim = getPieceAnimAttrs(`${v.building.type}_${v.id}`, now);
 
       verticesHtml += `
         <g transform="translate(${v.x}, ${v.y})" onclick="${clickAttr}" style="${clickAttr ? 'cursor:pointer' : ''}">
@@ -977,12 +1007,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
             ${canRobThisBuilding ? `<circle r="${ringR}" class="target-ring rob" />` : ''}
             ${((!isCity && canUpgrade) || canHarbor) && !canRobThisBuilding ? `<circle r="${ringR}" class="target-ring upgrade" />` : ''}
             <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-              ${isCity ? cityMarkup(col) : isNet ? netMarkup(col) : settlementMarkup(col)}
+              ${placedVertexMarkup(v.building.type, col) ?? (isCity ? cityMarkup(col) : isNet ? netMarkup(col) : settlementMarkup(col))}
             </g>
           </g>
         </g>
       `;
-    } else if (isMyTurn && (buildMode === 'net' || buildMode === 'feed' || buildMode === 'harbor')) {
+    } else if (isMyTurn && (buildMode === 'net' || buildMode === 'feed' || buildMode === 'harbor' || isPieceMode(buildMode))) {
       // Net mode: only the vertices the server listed, and no settlement spots (a net spot can also be a settlement spot). Feed/harbor mode draw no empty-vertex spots.
       if (netSpotSet?.has(v.id)) {
         verticesHtml += `
@@ -1003,6 +1033,13 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   }
 
   layers.verticesLayer.innerHTML = verticesHtml;
+
+  // 7. Generic spots of manifest pieces and actions (R8.7): the spots of the active build mode, from the server's `pieces[id].spots`. Empty until a piece has a visual.
+  const pieceSpotsHtml = pieceSpotsMarkup(me, isMyTurn);
+  if (pieceSpotsHtml !== lastPieceSpotsHtml) {
+    lastPieceSpotsHtml = pieceSpotsHtml;
+    layers.pieceSpotsLayer.innerHTML = pieceSpotsHtml;
+  }
 }
 
 // Updates camera viewBox smoothly via requestAnimationFrame on pan/zoom without reconstructing the SVG DOM.

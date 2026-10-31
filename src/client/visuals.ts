@@ -1,4 +1,4 @@
-// MODULE: client copy of the visual manifest (set when the server's `visuals` event arrives, read by the renderers; empty before it arrives and when it never does) | DEPENDS ON: shared/visual | USED BY: client/main
+// MODULE: client copy of the visual manifest (set when the server's `visuals` event arrives, read by the renderers; empty before it arrives and when it never does) | DEPENDS ON: shared/visual | USED BY: client/main, client/pieceui
 import { emptyManifest } from '../shared/visual';
 import type { ManifestEntry, OverlayKindVisual, VisualManifest, VisualSlot } from '../shared/visual';
 

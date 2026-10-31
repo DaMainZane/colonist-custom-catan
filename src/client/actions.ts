@@ -1,4 +1,4 @@
-// MODULE: client UI actions (host-only edit guard, build mode and brush selection, affordability checks, requests sent to the server) | DEPENDS ON: client/audio, client/avatars, client/render/board, client/render/index, client/socket, client/store, +1 more | USED BY: client/main, client/render/index
+// MODULE: client UI actions (host-only edit guard, build mode and brush selection, affordability checks, requests sent to the server) | DEPENDS ON: client/audio, client/avatars, client/pieceui, client/render/board, client/render/index, client/socket, +2 more | USED BY: client/main, client/render/index
 import { playTone } from './audio';
 import { socket } from './socket';
 import {
@@ -8,6 +8,7 @@ import {
 import { renderAll, renderVictoryScreen } from './render/index';
 import { canClientAffordPiece, canClientAffordFeed, canClientAffordHarbor } from './render/board';
 import { showToast } from './ui';
+import { pieceModeHint } from './pieceui';
 import { AVATAR_CHOICES } from './avatars';
 
 // Map and lobby editing belongs to the host. Everyone else points with a cursor (Shift = laser).
@@ -478,6 +479,11 @@ export function setBuildMode(mode: string): void {
     if (me && (me.harborsLeft ?? 1) <= 0) showToast('You have already built your harbor.');
     else if (me && !canClientAffordHarbor(me)) showToast('Not enough resources for a harbor.');
     else if (me && !me.harborSpots?.length) showToast('Build a city on a port first to upgrade it to a harbor.');
+  }
+  // R8.7: a generated mode (a manifest piece or action) says why there is nothing to click, from its own hint texts. Empty for the hand-written modes above.
+  if (turningOn && state) {
+    const hint = pieceModeHint(mode, state.players.find(p => p.id === socket.id));
+    if (hint) showToast(hint);
   }
   renderAll();
 }
