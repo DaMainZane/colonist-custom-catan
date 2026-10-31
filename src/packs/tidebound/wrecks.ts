@@ -1,4 +1,4 @@
-// MODULE: tidebound.wrecks addon (T9a: storm event & wreck marker; T9b: 65/35 sea/shore placement, fair spawn within 4 tiles of a player; T9c: first connecting road, bridge, or port claims the wreck; T9d: loot with 2x-cost floor rule & slow time scaling; T9e: client view with sea/shore spawn animation data; minimal bot salvage goal) | USED BY: packs/tidebound, server/view, client, tests
+// MODULE: tidebound.wrecks addon (T9a: storm event & wreck marker; T9b: 65/35 sea/shore placement, fair spawn within 4 tiles of a player; T9c: first connecting road, bridge, or port claims the wreck; T9d: loot with 2x-cost floor rule & slow time scaling; T9e: client view with sea/shore spawn animation data; minimal bot salvage goal) | DEPENDS ON: packs/base/building, packs/base/constants, packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/ricketyBridges, packs/tidebound/tech, +1 more | USED BY: packs/tidebound/index, packs/tidebound/pirates
 import {
   addMarker,
   addonOn,
@@ -15,7 +15,8 @@ import {
   priceOf,
   removeMarker,
   rngInt,
-  rngNext
+  rngNext,
+  VIEW_DATA
 } from '../../shared';
 import type {
   AddonDef,
@@ -30,7 +31,8 @@ import type {
   PieceDef,
   Registry,
   Resources,
-  RngState
+  RngState,
+  ViewDataDef
 } from '../../shared';
 import { CITY, ROAD, SETTLEMENT } from '../base/constants';
 import { validateBuild } from '../base/building';
@@ -702,6 +704,15 @@ export function wreckClientView(g: GameState, reg: Registry): WreckClientItem[] 
   });
 }
 
+/**
+ * VIEW_DATA entry (R7a.5, group 3): the public `wrecks` field of the client state. Registered inside the wrecks addon, so it exists only while Wrecks
+ * is on. While it is off the pack's always-on `tidebound.view_defaults` entry supplies `wrecks: null` (a public field is null when off).
+ */
+export const wreckViewData: ViewDataDef = {
+  id: 'tidebound.wrecks.view',
+  shared: (g: GameState, reg: Registry) => ({ wrecks: wreckClientView(g, reg) })
+};
+
 // ---- Minimal bot support (`BOT_GOALS`) -------------------------------------------------------------------------
 
 /** Does placing an edge at `edgeId` touch the wreck on `hexId`? */
@@ -783,6 +794,8 @@ export const wrecksAddon: AddonDef = {
     registerTideboundTechs(api);
     api.define(EVENT_CARDS, stormEventCard);
     api.define(BOT_GOALS, wreckBotGoal);
+    // R7a.5: the public wreck markers for the client state.
+    api.define(VIEW_DATA, wreckViewData);
     api.hook('onBuild', (ctx, def, pid, loc) => {
       claimTouchedWrecksOnBuild(ctx, def, pid, loc);
     });

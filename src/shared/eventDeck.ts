@@ -1,4 +1,4 @@
-// MODULE: S0.11 seeded event deck (service 16: `event-deck`, base + DLC cards, top-card preview, fate token veto/uphold, derived RNG stream) | USED BY: packs, shared/stage1, bots
+// MODULE: S0.11 seeded event deck (service 16: `event-deck`, base + DLC cards, top-card preview, fate token veto/uphold, derived RNG stream) | DEPENDS ON: shared/ctx, shared/history, shared/registry, shared/rng, shared/state, shared/tileState, +1 more | USED BY: shared/index, shared/stage1
 import type { Ctx } from './ctx';
 import { appendPublicHistory } from './history';
 import { defsOf } from './registry';

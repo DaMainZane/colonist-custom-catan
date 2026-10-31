@@ -1,3 +1,4 @@
+// MODULE: renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state | DEPENDS ON: client/actions, client/avatars, client/icons, client/mapmenu, client/presets, client/render/board, +13 more | USED BY: client/actions, client/main, client/render/drawer
 import { socket } from '../socket';
 import { state, buildMode, victoryTab, hideVictoryOverlay, elevationView } from '../store';
 import { isPendingSettingsPush } from '../actions';

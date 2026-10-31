@@ -1,6 +1,6 @@
-// MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) | USED BY: packs/tidebound, server/view, tests
-import { addonOn, PORT_IDLE_CHECKS } from '../../shared';
-import type { AddonDef, Ctx, GameState, Hex, Registry } from '../../shared';
+// MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/seaData, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/fishing, packs/tidebound/index
+import { addonOn, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
+import type { AddonDef, Ctx, GameState, Hex, Registry, ViewDataDef } from '../../shared';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { createRng, rngInt, rngShuffle } from '../../shared/rng';
 import type { RngState } from '../../shared/rng';
@@ -464,6 +464,18 @@ export function tideClientView(g: GameState, reg: Registry): TideClientView | nu
   };
 }
 
+/**
+ * VIEW_DATA entry (R7a.5, group 5): the tile overlays (`hexOverlays`) and the public `tide` field of the client state, both from `tideClientView`.
+ * Registered inside the tides addon. `overlays()` returns `undefined` while there is no tide view, so the merged `hexOverlays` stays `null`; with a view
+ * it returns the overlays object (`{}` when nothing is marked, as the old code sent). While Tides is off the pack's always-on `tidebound.view_defaults`
+ * entry supplies `tide: null`. The view is built once per call (it is pure), so the two parts each build it.
+ */
+export const tideViewData: ViewDataDef = {
+  id: 'tidebound.tides.view',
+  shared: (g: GameState, reg: Registry) => ({ tide: tideClientView(g, reg)?.tide ?? null }),
+  overlays: (g: GameState, reg: Registry) => tideClientView(g, reg)?.overlays
+};
+
 export const tidesAddon: AddonDef = {
   id: 'tidebound.tides',
   name: 'Tides',
@@ -488,5 +500,7 @@ export const tidesAddon: AddonDef = {
     api.hook('onRoundStart', (ctx: Ctx) => {
       applyTides(ctx);
     });
+    // R7a.5: the flood overlays and the tide facts for the client state.
+    api.define(VIEW_DATA, tideViewData);
   }
 };

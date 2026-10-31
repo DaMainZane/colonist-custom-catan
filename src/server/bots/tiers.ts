@@ -1,4 +1,4 @@
-// MODULE: bot tier profiles (Main / Secondary / Overload), personalities, small hash helper | USED BY: bots/brain, bots/scheduler, bots/sim, bots/dialogue, server/socket, server/rooms
+// MODULE: bot tier profiles (Main / Secondary / Overload), personalities, small hash helper | DEPENDS ON: none | USED BY: server/bots/brain, server/bots/dialogue/engine, server/bots/dialogue/lines/index, server/bots/dialogue/types, server/bots/scheduler, server/bots/sim, +3 more
 //
 // A tier is plain data. The brain reads these numbers and never checks the tier name, so a new tier is a new row.
 // All numbers are starting guesses; bots/sim.ts (runLadder) is how they get tuned.

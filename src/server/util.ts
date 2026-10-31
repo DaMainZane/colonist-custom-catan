@@ -1,4 +1,4 @@
-// MODULE: small pure helpers (clamp, pips) | USED BY: server/*, bots
+// MODULE: small pure helpers (clamp, pips) | DEPENDS ON: none | USED BY: server/bots/brain, server/bots/mapProfile, server/bots/trainingLog, server/lobby
 export function clamp(val: any, min: number, max: number, fallback: number): number {
   const n = Number(val);
   if (Number.isNaN(n)) return fallback;

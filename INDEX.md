@@ -1,6 +1,6 @@
 # File Index
 
-What every file does. Paths are relative to the repo root. Most source files start with a `// MODULE: what | USED BY: who` line; where a file has none, its row is worked out from its imports and `change log.md`. Update this file when you add, move or delete a file.
+What every file does. Paths are relative to the repo root. Every source file starts with a `// MODULE: what | DEPENDS ON: a, b | USED BY: c, d` line (see `scripts/headers.mjs`; the two lists are generated, only the description is written by hand). The `src/` tables below are generated from those headers (description text only): run `npm run index` after you add, move, delete or re-describe a file; `tests/index.test.ts` fails when they are stale. To change a row, edit the file's header, never the table. The Root, Docs and `tests/` tables are still hand-written.
 
 ## Root
 
@@ -15,6 +15,8 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `public/index.html` | The single HTML page: name page, setup page, lobby, board, menus |
 | `data/bot_training_logs.jsonl` | Bot training data written by `bots/trainingLog.ts` |
 | `data/bots/_schema.md` | S0.15 cross-game bot memory & player profile JSON schema, caps, and Render portable code spec |
+| `scripts/index.mjs` | Index tool. Rewrites the `src/` tables in this file from the `// MODULE:` descriptions (`npm run index`; `npm run index:check` fails if they are stale). Sections and headings are listed in `SECTIONS` at the top of the script |
+| `scripts/headers.mjs` | Header tool. Every `src/**/*.ts` file starts with `// MODULE: what \| DEPENDS ON: a, b \| USED BY: c, d`. You write only the text; the two lists are computed from imports. `npm run headers` reports, `headers:write` fixes, `headers:check` is the CI form (`-- --strict` also fails on stale lists) |
 
 ## Docs
 
@@ -31,170 +33,182 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `Design UI Philosophy.md`  | Visual direction and design tokens                 |
 | `Tech Tree Design.md`      | Locked spec for the 5 root techs, per-player building-value cost formula, and per-tech hooks |
 | `Handoff - Tech Tree Roots.md` | Handoff guide and step-by-step work order for implementing the 5 tech tree roots |
+| `Modular Rework Plan.md` | Plan R0 to R9 for making the codebase easier to extend and to navigate (headers, boundary tests, router, generic server and client, visual manifest) |
+| `Rework Progress.md` | Checklist and log for the rework plan |
+| `ROUTER.md` | One page: task kind to the files to open and the file to copy as a pattern (read this first before changing code) |
+| `EXTENSION POINTS.md` | One line per `PackApi` method, hook and keyed registry (`COST_MODS`, `BOT_GOALS`, `SEVEN_STEPS`, ...) with signatures and defining files |
+| `Handoff - Modular Rework.md` | Where the rework stands and what to do next (read this first for rework work) |
+| `RECIPES.md` | Five step-by-step recipes (new piece, action, addon, tech node, client overlay): files to touch in order, the real file to copy, where hand-written glue still is |
+| `CLAUDE.md` | Instructions for Claude Code: read `ROUTER.md` first, never read whole folders, search for a symbol first, layer rules, the commands to run after a change |
 
 ## `src/shared/` (pure engine: no sockets, DOM or timers; runs on server and client)
 
 | File | What it does |
 |---|---|
-| `index.ts` | Public entry that re-exports the engine |
-| `types.ts` | Core types: game state, board, players, rules |
-| `registry.ts` | Registry, pack loader, definition types (`PieceDef`, `ActionDef`, `PhaseDef`, hooks); `createRegistry` (optional enabled-addon set), `mergeRules`, keyed registries (`api.define`, `defsOf`), `api.phaseAction` (an addon adds its action to a phase that already exists) |
-| `addons.ts` | DLC and addon manifest: `AddonDef`, General service ids, `resolveAddons`, `registryFor`, `addonOn`, `auditAddons` (Rule of Two) |
-| `pricing.ts` | Piece cost and limit service: `priceOf`, `priceOfUpgrade`, `placedCount`, `aboveBaseLimit`, `scaledPieceLimit`, cost modifiers (`COST_MODS`) |
-| `tradeRatio.ts` | S0.5 Trade ratio service: `ratioFor`, `ratioWithoutHarbor`, `tradeRatiosFor`, `recordBankTrade`, `explainInvalidBankRatio`, `RATIO_MODS`, 2:1 floor, gem port exemption, harbor-only 1:1 pass (`HARBOR_RATIO_MODS`, `HARBOR_MIN_RATIO`, per-turn trade validation/recording hooks and harbor explanations), idle ports (`PORT_IDLE_CHECKS`, `isPortIdle` with `exempt` hook so harbors keep trading while flooded) |
-| `production.ts` | S0.6 Production pipeline: ordered stages (`PRODUCTION_STEPS`), `effectiveHexNumber`, `matchingHexesForRoll`, `runProductionPipeline` |
-| `tileState.ts` | S0.7 Tile state (`TILE_STATES`, `getTileState`, `setTileState`, `tickTileStates`), durability & repair (`DURABILITY_DEFS`, `damagePiece`, `repairPiece`), wild tokens (`WILD_TOKENS`, `grantWildPick`, `grantWildToken`, `spendWildToken`, `takeWildToken`, `wildTokensOf`, `countableWildTokens`, `stealableWildTokens`, `visibleWildCards`) |
-| `sevenResolver.ts` | S0.8 Seven Resolver: ordered step pipeline (`SEVEN_STEPS`), `DISCARD_LIMIT_MODS`, `effectiveDiscardLimit`, `countableCardsForSeven` (hand plus held tokens that count for a discard), `resolveSeven` with side-effect cap |
-| `coreServices.ts` | S0.9 Marker system (`addMarker`, `tickMarkers`), Ledger (`addLedgerEntry`, `settleLedgerEntry`), Strength & defense (`vertexDefense`, `playerTotalStrength`), Relations matrix (`getRelation`, `addOpinion`, `breakTreaty`) |
-| `history.ts` | S0.10 Public history ring buffer (`appendPublicHistory`, `getPublicHistory`, `detectStreaks`) and stats registry (`STAT_HANDLERS`, `runStatHandlers`) |
-| `eventDeck.ts` | S0.11 Seeded event deck (`EVENT_CARDS`, `ensureEventDeck`, `peekNextEvent`, `vetoPreviewEvent`, `upholdPreviewEvent`, `drawAndApplyRoundEvent`) |
-| `stage1.ts` | Stage 1 core systems & proving-ground content: S1.1 Taxes & Catch-up levers, S1.2 Public Contract Board & rarity tiers, S1.3 Spies & intel ladder, S1.4 Tech tree (`techResearchCheck`, `researchTech`, `techPanelFor`, cost formula) & Local Nemesis & Round recap, S1.5 Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
-| `botGoals.ts` | S0.14 Bot goal registry (`BOT_GOALS`, tier-gated `evaluateBotGoals`, `botGoalVertexDelta`, `botGoalEdgeDelta`, `botGoalActionScore`, `botGoalThreatDelta`) |
-| `ctx.ts` | Action context: state, registry, event and log emitters (`makeCtx`) |
-| `engine.ts` | `createGame`, `dispatch`, `checkAction`, `legalActions`, `activeActors`, `updateAwards`, `checkWinner` |
-| `state.ts` | Helpers: players, bank (`bankGive`, `payToBank`), `canAfford`, production, `computeVP`, phase stack (`setPhase`, `pushPhase`, `popPhase`), round clock (`endRoundIfLastSeat`, `everyNRounds`), `score`, `publicVP`, `startTurn` |
-| `views.ts` | `playerView`: per-player view that hides other hands, hidden tiles, dev cards and other players' held wild tokens (fish) until game over |
-| `rng.ts` | Seeded RNG (mulberry32): `createRng`, `rngInt`, `rngPick`, `rngShuffle` |
-| `palette.ts` | Player colors and avatars |
-| `noise.ts` | Seeded value noise (`createNoise`, `cellPoint`) |
-| `topology.ts` | Hex-grid topology: vertices, edges, ports, and optional water-edge topology for crossing packs (`buildTopology`, `addWaterTopology`, `hexDistance`, `portCap`) |
-| `mapgen.ts` | Board generator: shape, terrain, numbers, extras, ports (`generateMap`), plus the old `generateBoard` |
-| `maprecipe.ts` | Map recipe (seed, radius, picks, params), share code, per-stage RNG, `GEN_VERSION` |
-| `mapoptions.ts` | Map option types (shape ops, terrain and number styles, perks, quick starts), flags, pick resolution; `PerkDef.afterGenerated(inits, ctx, cells)` gets the land cells with their ranked height |
-| `mapshape.ts` | Shape stage: land field, cleanup, exact land count, blob growth, retry loop; wide-water helpers (`seaExtra`, `seaGrow`, `canvasRadiusFor`, `gapRoom`, `wideGap`, `centersTooClose`; `LandField.baseRadius`) that do nothing without the Tidebound perk |
-| `mapcells.ts` | Per-cell height, moisture, coast distance and landmass; neighbour lists |
-| `mapterrain.ts` | Terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) |
-| `mapmix.ts` | `island_mix` fix-up: every landmass of 4+ tiles gets at least two resource types |
-| `mapcheck.ts` | Board checks: landmasses, lakes, usable spots, fairness, `MapReport` |
-| `numbers.ts` | Number tokens: real-game pool scaled to any board, red numbers never touch (random swaps, then a deterministic sweep for any red pair left) |
+| `index.ts` | public entry of the shared engine |
+| `addons.ts` | DLC and addon manifest (types, General service ids, enabled-set resolution, link audit) |
+| `botGoals.ts` | bot goal registry (Service 18 — S0.14; lets addons publish bot goals, vertex/edge deltas, action scores, and threat deltas) |
+| `coreServices.ts` | S0.9 Marker system (10), Ledger (13), Strength & defense model (9), Relations matrix (14) |
+| `ctx.ts` | action context (state + registry + event/log emitters) |
+| `engine.ts` | game engine (createGame, dispatch pipeline, legal actions, awards, win check) |
+| `eventDeck.ts` | S0.11 seeded event deck (service 16: `event-deck`, base + DLC cards, top-card preview, fate token veto/uphold, derived RNG stream) |
+| `history.ts` | S0.10 public history ring buffer, change log, and stats registry (service 15: `history`) |
+| `mapcells.ts` | per-cell data for terrain and number styles (height, moisture, coast distance, landmass) and neighbour lists |
+| `mapcheck.ts` | board checks (landmasses, lakes, usable spots, fairness, MapReport) |
+| `mapgen.ts` | board generator (staged pipeline: shape, terrain, numbers, extras, ports; plus the old generateBoard) driven by the registry |
+| `mapmix.ts` | island resource mix (terrain fix-up: every landmass of 4 or more tiles gets at least two resource types) |
+| `mapoptions.ts` | map option definitions (shape ops, terrain and number styles, perks, quick starts), generator flags, pick resolution |
+| `maprecipe.ts` | map recipe (seed + radius + picks + params), share code, per-stage RNG streams, GEN_VERSION |
+| `mapshape.ts` | land field for the shape stage (heightfield, cleanup, exact count fix, blob growth, retry loop) |
+| `mapterrain.ts` | terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) |
+| `noise.ts` | seeded lattice value noise (integer hash, only + - * / and floor, so a saved seed gives the same map on any engine) |
+| `numbers.ts` | number tokens (real-game pool, scaled to any board size, red numbers never touch) |
+| `palette.ts` | player colors and avatars |
+| `pricing.ts` | piece cost and limit service (placed counts, base limit with doubled cost above it, registered cost modifiers) |
+| `production.ts` | S0.6 production pipeline (service 6: ordered stages for number shift, tile state, base yield, piece multiplier, wild token, tax, bank-short, discard check) |
+| `registry.ts` | registry + pack loader (all game content is registered here) |
+| `rng.ts` | seeded RNG (mulberry32), state is plain JSON |
+| `sevenResolver.ts` | S0.8 Seven Resolver (service 17: ordered pipeline for discard, karaoke, robber, volcano, decay with max DLC side-effects cap) |
+| `stage1.ts` | Stage 1 General features (Taxes & Catch-up levers, Public Contract Board & Rarity Tiers, Spies & Intel Ladder, Tech Tree with Empire-Size Pricing, Local Nemesis & Round Recap, Proving-Ground Content & Sandbox Economy) |
+| `state.ts` | engine helpers (players, bank, costs, phases, production, VP, turn start) |
+| `tileState.ts` | S0.7 tile state layer (service 7), durability & repair (service 8), and wild token (service 12) |
+| `topology.ts` | pure hex-grid topology (vertices, edges, ports, robber start) |
+| `tradeRatio.ts` | trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, idle-port checks, invalid-ratio advice) |
+| `types.ts` | core engine types (game state, board, players, rules) |
+| `viewData.ts` | view data registry (VIEW_DATA: a piece or addon adds public fields, tile overlays, per-player fields and VP breakdown bonuses to the state the client gets, from its own file) |
+| `views.ts` | per-player filtered view of the game state (hides other hands, hidden tiles, dev cards) |
 
 ## `src/packs/` (game content registered as packs; load order: base, gold, fog, tidebound)
 
 | File | What it does |
 |---|---|
-| `index.ts` | `allPacks`: the pack list |
-| `base/index.ts` | Base game pack: registers everything below |
-| `base/constants.ts` | Piece and port ids shared inside the base pack |
-| `base/content.ts` | Resources and tiles (wood, brick, sheep, wheat, ore, desert, water) |
-| `base/pieces.ts` | Road, settlement, city |
-| `base/placement.ts` | Placement rules (geometry and ownership) |
-| `base/building.ts` | Build validation and piece placement (cost, supply, upgrade, `onBuild`) |
-| `base/setup.ts` | Setup flow: snake order, second-round resources, hand-off to turn 1 |
-| `base/phases.ts` | Phases: setup, roll, main, discard, robber, robber steal, pick, game over |
-| `base/picks.ts` | Pending picks (gold, Year of Plenty); enters and leaves the pick phase |
-| `base/hooks.ts` | Game start state, per-action stats, pick settling, trade pruning |
-| `base/awards.ts` | Longest Road and Largest Army |
-| `base/longestRoad.ts` | Longest road metric (DFS, blocked by opponent pieces) |
-| `base/devcards.ts` | Knight, victory point, road building, year of plenty, monopoly |
-| `base/robbing.ts` | Robber victims on a hex, seeded random steal (the pool also holds the victim's `stealable` wild tokens, fish), steal-count modifiers (`STEAL_COUNT_MODS`, `stealCount`) and the knight/7 steal source |
-| `base/trading.ts` | Bank ratios from ports, resource parsing, multi-offer stack, trade execution |
-| `base/ports.ts` | Ports and the old map presets (standard, blank, archipelago) |
-| `base/actions/index.ts` | Registers every base action |
-| `base/actions/build.ts` | `build` |
-| `base/actions/roll.ts` | `roll` (seeded or fair-dice curve-guided 2d6 rolls, production, seven leads to discard and robber) |
-| `base/actions/devCards.ts` | `buy_dev`, `play_dev` (only Knight playable before rolling in `roll` phase) |
-| `base/actions/bankTrade.ts` | `bank_trade` |
-| `base/actions/tradeOffers.ts` | `propose_trade`, `respond_trade`, `counter_trade`, `confirm_trade`, `cancel_trade` |
-| `base/actions/owed.ts` | `discard` (resources, plus optional `wild` tokens that count toward the hand), `pick` |
-| `base/actions/robber.ts` | `move_robber`, `steal` |
-| `base/actions/endTurn.ts` | `end_turn` |
-| `base/actions/research.ts` | `research_tech` (rules in `shared/stage1.ts`; no legal actions while `rules.techTreeOn` is off) |
-| `base/techRoots.ts` | The 5 root techs (one per DLC branch) and `registerTechRoots` |
-| `base/techEffects.ts` | Effects of the 5 root techs: Stockpiling, Road levy, Harbor charters (raises a whole port 3:1 to 2:1, port level per vertex in `portUpgrades`), Plunder modifiers; Ground work helpers; `techActionsFor` for the panel |
-| `base/actions/techActions.ts` | `upgrade_port` (Harbor charters, payload `{ vertexId }`, no resource choice) and `convert_tile` (Ground work) |
-| `base/map/index.ts` | Hexagon shape, random terrain, standard numbers, Standard and Blank quick starts |
-| `base/map/shapes.ts` | Continent, ring, islands, archipelago, continents; lake, river, satellites, ragged |
-| `base/map/terrain.ts` | Spread, clustered, realistic terrain styles |
-| `base/map/numbers.ts` | Balanced number style |
-| `gold/index.ts` | Gold tile (pick a resource on production), Gold Rush preset |
-| `fog/index.ts` | Hidden tiles, revealed by building next to them, Fog Island preset |
-| `tidebound/index.ts` | Tidebound DLC pack: lists the 8 addons in dependency order and re-exports the Bridge, Rickety bridge, Tides, Fishing, Harbor, Wrecks, Pirates, and Tech helpers |
-| `tidebound/tech.ts` | Tidebound tech tree nodes (T11a–T11f): 8 extension nodes (`rickety_bridges`, `fishing_nets`, `salvage_crew`, `net_works`, `pirate_hunter`, `harbor_master`, `grand_causeway`, `harbor_empire`) registered via `registerTideboundTechs`, `techGate` re-export, Grand Causeway 16 VP Longest Road hook (`grandCausewayVpHook`, `grandCausewayBonusVp`, `longestRoadHasBridge`), and Harbor Empire unlock grant (`grantHarborEmpireCards`, `deriveHarborEmpireRng`, zero `g.rng` draws) |
-| `tidebound/bridges.ts` | `tidebound.bridges` addon: registers the `wide_water` map perk (T2a–T2c), the `crossing` capability, the `bridge` piece (`BRIDGE`, `canPlaceBridge`, `isOceanEdge`, cost road + 1 ore, base limit 10 or 14 with `rickety_bridges` tech scaled by radius/VP, 2x cost past limit, counts toward Longest Road), `demolish_bridge` (`DEMOLISH_BRIDGE`, refunds `floor(paid/2)` cards from the bank, requires `salvage_crew`), `grandCausewayVpHook`, and `bridgeBotGoal` (T3a–T3e, T11f) |
-| `tidebound/seaData.ts` | T2b2 and T2c map data for the wide-water perk: `elevationOf`, `applyElevation` (`ext.elevation` 1 to 3 on land by ranked height), `placeFish` (`ext.fish` on seeded sea tiles, shore sea more than open sea). No RNG draws |
-| `tidebound/ricketyBridges.ts` | `tidebound.rickety_bridges` addon (T4a–T4e, T11c): `rickety_bridge` piece (`RICKETY`, 1 wood, health 1 through a `DURABILITY_DEFS` entry, road-like, same placement rule as a bridge, gated by `techGate(..., 'tidebound.rickety_bridges')`), one shared pool with bridges (`syncBridgePool` keeps both supplies equal; `ricketyPoolCostMod` makes 10—or 14 with `rickety_bridges` tech—bridges and rickety bridges together the 2x threshold), the `upgrade_bridge` action (`{ edgeId }`, 1 brick + 1 ore, doubled at the pool limit), `ricketyCollapseStep` (`SEVEN_STEPS`, breaks all rickety bridges on a 7, syncs the pool, and recalculates Longest Road), `ricketyBotGoal`, and `bridgeUpgradeView` |
-| `tidebound/tides.ts` | `tidebound.tides` addon (T5a to T5e and the data for T6; T5e: `isPortFlooded` registered as a `PORT_IDLE_CHECKS` check; T6: `floodPlan`, `tideWarning` (one turn ahead, last seat's turn), `tideClientView` = overlays + tide facts + elevation for the client): uses the base `flooded` tile state (blocks production and robber placement), coast clusters (`coastHexIds`, `buildTideClusters`: coast land cut into stretches of about 6 tiles, each with its `inner` second ring, a phase 0 or 1 dealt half and half), the tide level (`TIDE_LEVELS`, five slider positions Very low to Very high, each with period, duration, spring cadence, reach and strength; `tideLevelOf` reads `rules.tideLevel`, Medium is the default), the schedule (`isFloodedAt`: dry before round 2, then `duration` rounds of every `period`, phases half a period apart; `isSpringTide`; `floodDepthAt`: 0 dry, 1 coast, 2 coast and inland, a spring tide reaches every cluster), elevation resistance (`hexElevation`, `tideStrengthAt`: a tile floods when the tide strength is at least its `ext.elevation`), `ensureTides` (data in `g.ext.tidebound.tides`, built at game start) and `applyTides` (round start: sets and clears the state, emits `tileStateChanged` and `tideChanged` with `held` tiles). Uses a derived RNG stream (`deriveTideRng`), never `g.rng` |
-| `tidebound/fishing.ts` | `tidebound.fishing` addon (T7a–T7e, T11c–T11e): the fish wild token (`FISH`, `fishToken`: counts for a 7 discard, stealable, never in a hand or the bank; data in `g.ext.core.wildTokens`), the `spend_fish` action (`SPEND_FISH`, `{ resource }`, main phase, one fish = 1 card the bank still has) and `fishBotGoal`. Nets (`NET`, gated by `techGate(..., 'tidebound.fishing_nets')`, reduced by 1 wood with `tidebound.net_works`), `canPlaceNet`, `netCatchOnRoll` (1/6 base or 1/3 boosted; 1/4 base or 1/2 boosted with 1/3 boost-save chance under `tidebound.net_works`), `netSpotsView`, `netBotGoal`, `replenishFish`, and `feed_sea` (`FEED_SEA`, gated by `techGate(..., 'tidebound.harbor_master')`, 1 wheat fills a sea tile next to your net to 4 boosts) |
-| `tidebound/harbor.ts` | `tidebound.harbor` addon (T8a, T8b, T11e, T11f): `upgrade_harbor` action (`UPGRADE_HARBOR`, `{ vertexId }`, main phase, gated by `techGate(..., 'tidebound.harbor_master')`, upgrades a player's own `city` on a port to `HARBOR_LEVEL = 2` for `HARBOR_COST` = 2 wood + 1 brick + 1 ore via `priceOfUpgrade`), limit `HARBOR_LIMIT = 1` per player (or 2 with `tidebound.harbor_empire`), flood exemption (`harborIdleExemption` in `PORT_IDLE_CHECKS` + `isPortFlooded`), `harborRatioMod` in `HARBOR_RATIO_MODS` (1:1 up to `HARBOR_MAX_TRADES = 4` trades per turn per harbor, then falls back to 2:1 for the rest of the turn, resetting on `onTurnStart`), invalid-ratio harbor explanations, `harborBotGoal`, `harborSpotsView`, and `harborClientView` |
-| `tidebound/wrecks.ts` | `tidebound.wrecks` addon (T9a–T9e, T11d): `stormEventCard` (`tidebound.storm`, 2 copies in `EVENT_CARDS`, plus passive storm cadence every 3 rounds when `eventsOn` is off), derived RNG stream (`deriveWreckRng` / `ensureWreckRng`, zero `g.rng` draws), timed `wreck` marker (`WRECK_COUNTDOWN_ROUNDS = 4`), 65/35 sea/shore placement (`WRECK_SEA_CHANCE = 0.65`) and fair equidistant spawn within `WRECK_MAX_PLAYER_DIST = 4` hexes of a player (`pickWreckHex`, `wreckCandidates`), claiming on first connecting road/bridge/rickety bridge/port (`playerTouchesWreck`, `claimWreck`, `spawnWreckAt`), loot with slow time scaling (`wreckTimeMultiplier` up to +40% at 50 turns), `tidebound.salvage_crew` (+25% loot and higher dev drop odds), and the 2x-cost floor rule (`computeWreckLootCount`), `wreckBotGoal`, and `wreckClientView` (`shoreDir` toward the sea) |
-| `tidebound/pirates.ts` | `tidebound.pirates` addon (T10a–T10d, T11d): `tidebound.pirate_raid` event card plus a passive spawn (round 4, then every 4th, when `eventsOn` is off), public `pirate` markers (max `PIRATE_MAX` 2, ocean only, within 4 tiles of a player, derived RNG `derivePirateRng`, zero `g.rng` draws), `pirateRoundStep` (an `onRoundStart` hook: strength follows the round via `pirateStrengthAt`, flee, or one random step, then rob), `drive_off_pirate` (`DRIVE_OFF_PIRATE`, `{ hexId }`: needs played knights equal to `pirateKnightsNeeded`—reduced by 2 with `tidebound.pirate_hunter`, min 1—and a road, bridge or port touching the tile, pays `pirateLootCards` from the bank with +50% under `tidebound.pirate_hunter`), rob 2 cards from every settlement and city in contact (`PIRATE_ROB_CARDS`, `transferred` kind `pirate`), flee mode, and the 2-tile avoid rule (`guardedVertices`, `isGuardedHex`), `pirateClientView`, `pirateDriveView`, `pirateBotGoal` |
-| `tidebound/risingSea.ts` | Addon stub (id, name, description, deps, `links`); the content is added by T12 |
+| `index.ts` | pack list entry point |
+| `_template/index.ts` | template pack (loads the template addon so a test can build a registry from it; not in allPacks, so nothing ships) |
+| `_template/demo.ts` | template addon (copy this file to start a new addon: one vertex piece, one action, one tech node, a bot goal stub, a client view function; not part of any shipped pack) |
+| `base/index.ts` | base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) |
+| `base/actions/index.ts` | registers every base action |
+| `base/actions/bankTrade.ts` | action "bank_trade" (4:1 or better with ports; registry resources only) |
+| `base/actions/build.ts` | action "build" (any registered piece, setup or paid, free roads) |
+| `base/actions/devCards.ts` | actions "buy_dev" and "play_dev" (dev cards are looked up in the registry) |
+| `base/actions/endTurn.ts` | action "end_turn" (new dev cards become playable, next player rolls) |
+| `base/actions/owed.ts` | actions "discard" and "pick" (resources owed after a seven / gold / Year of Plenty); a discard may also give up held wild tokens that count toward the hand (fish) |
+| `base/actions/research.ts` | action "research_tech" (spend wheat + ore on a tech; the rules live in shared/stage1.ts) |
+| `base/actions/robber.ts` | actions "move_robber" and "steal" (victim choice when 2+ players are on the hex) |
+| `base/actions/roll.ts` | action "roll" (seeded dice, production, seven -> Seven Resolver pipeline) |
+| `base/actions/techActions.ts` | actions "upgrade_port" (Tidebound Harbor charters: raise a whole port 3:1 to 2:1) and "convert_tile" (Wild Earth Ground work) |
+| `base/actions/tradeOffers.ts` | actions "propose_trade", "respond_trade", "counter_trade", "confirm_trade", "cancel_trade" (player-to-player trading) |
+| `base/awards.ts` | awards (Longest Road, Largest Army) |
+| `base/building.ts` | build validation and piece placement (cost, supply, upgrade, onBuild hooks) |
+| `base/constants.ts` | ids and small maps shared inside the base pack |
+| `base/content.ts` | base resources and tiles (wood, brick, sheep, wheat, ore, desert, water) |
+| `base/devcards.ts` | base development cards (knight, victory point, road building, year of plenty, monopoly) |
+| `base/hooks.ts` | base hooks (game start state, S0.10 per-pack stats handler, round hooks, pick settling and trade pruning) |
+| `base/longestRoad.ts` | longest road metric (DFS over a player's roads and road-like edge pieces, blocked by opponent pieces) |
+| `base/map/index.ts` | base map content (hexagon shape, random terrain, standard numbers, Standard and Blank quick starts) |
+| `base/map/numbers.ts` | base number styles (balanced; `standard` lives in index.ts) |
+| `base/map/shapes.ts` | base map shapes (continent, ring, islands, archipelago, continents; lake, river, satellites, ragged) |
+| `base/map/terrain.ts` | base terrain styles (spread, clustered, realistic; `random` lives in index.ts) |
+| `base/phases.ts` | base phases (setup, roll, main, discard, robber, robber steal, pick, game over) |
+| `base/picks.ts` | pending picks (gold, Year of Plenty) -> enters/leaves the pick phase, empties picks when the bank is dry |
+| `base/pieces.ts` | base pieces (road, settlement, city) |
+| `base/placement.ts` | piece placement rules (settlement, road, city geometry/ownership) |
+| `base/ports.ts` | base ports and map presets (standard, blank, archipelago) |
+| `base/robbing.ts` | robber helpers (victims on a hex, random steal using the seeded RNG, steal-count modifiers, what set the robber off); a steal can also take a held wild token that is `stealable` (fish) |
+| `base/setup.ts` | setup flow (snake order, second-round resources, hand-off to the first turn) |
+| `base/techEffects.ts` | effects of the 5 root techs (Stockpiling, Road levy, Harbor charters = raise a whole port 3:1 to 2:1, Plunder, Ground work): modifiers, state helpers, and the lists the tech panel shows |
+| `base/techRoots.ts` | the 5 root techs of the tech tree (one per DLC branch, base-tier so they never need their DLC) and their effects |
+| `base/trading.ts` | trade helpers (bank ratios from ratioFor service, resource parsing, multi-offer stack, player trade execution) |
+| `fog/index.ts` | fog pack (hidden tiles, revealed by building next to them, Fog Island preset) |
+| `gold/index.ts` | gold pack (gold tile = pick-a-resource on production, Gold Rush preset) |
+| `tidebound/index.ts` | tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) |
+| `tidebound/bridgeConsts.ts` | tidebound bridge constants (leaf module with no imports, so bridges.ts and ricketyBridges.ts can both read them at load time without a circular-import hole) |
+| `tidebound/bridgeCore.ts` | bridge placement rule, Bridge piece def and bridge bot goal (the base of the bridge addons, so rickety bridges need not import bridges.ts) |
+| `tidebound/bridges.ts` | tidebound.bridges addon (wide-water map perk + T3 Bridge piece, ocean placement rule, 2x cost past 10 or 14 with Rickety bridges tech, Longest Road, bot goal, T11f demolish_bridge action & Grand Causeway 16 VP hook) |
+| `tidebound/fishing.ts` | tidebound.fishing addon (T7a fish wild token: spend action, counts for a 7 discard, can be stolen, never in the bank; T7b1 fishing net piece, coast placement rule, catch on every roll; T7b2 net spots for the client view and the net bot goal; T7c fish icon boosts: a sea tile with boosts left doubles a net's catch chance and loses one boost per catch; T7d tide replenish: tides refill icons slowly, a deeper tide faster; T7e feed the sea: 1 wheat fills a ground next to your net; T11c/d/e tech gates & Net works) |
+| `tidebound/harbor.ts` | tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) |
+| `tidebound/pirates.ts` | tidebound.pirates addon (T10a: pirate marker, max 2, ocean tiles only, random move each round, event card + passive spawn cadence; T10b: strength grows slowly with the round, `drive_off_pirate` needs played knights and a road/bridge/port touching the tile, loot grows with strength; T10c: a pirate robs 2 cards from every settlement/city in contact; T10d: flee mode (flee chance climbs after every rob, runs at least 2 tiles from the robbed city), avoids tiles within 2 of a city of a player with more knights than its strength; client view and minimal bot goal) |
+| `tidebound/ricketyBridges.ts` | tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) |
+| `tidebound/risingSea.ts` | tidebound.rising_sea addon stub (tiles drown lowest elevation first; content arrives in T12) |
+| `tidebound/seaData.ts` | Tidebound map data (elevation 1 to 3 on land, seeded fish icons on sea tiles), written by the wide_water perk |
+| `tidebound/tech.ts` | Tidebound tech tree nodes (T11a-T11f: 8 extension nodes across Expansion & Industrial paths, techGate re-export, Grand Causeway 16 VP hook, Harbor Empire ceil(V/2) bank card grant) |
+| `tidebound/tides.ts` | tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) |
+| `tidebound/wrecks.ts` | tidebound.wrecks addon (T9a: storm event & wreck marker; T9b: 65/35 sea/shore placement, fair spawn within 4 tiles of a player; T9c: first connecting road, bridge, or port claims the wreck; T9d: loot with 2x-cost floor rule & slow time scaling; T9e: client view with sea/shore spawn animation data; minimal bot salvage goal) |
 
 ## `src/server/` (thin adapter over the engine, plus bots)
 
 | File | What it does |
 |---|---|
-| `main.ts` | Entry: Express and Socket.io, `/health`, bot training log endpoints, `/api/memory/export` and `/api/memory/import` |
-| `socket.ts` | Socket handlers for lobby editing, spectating, scenario presets and game actions (all game actions go through engine `dispatch`; `upgradeBridge` runs `upgrade_bridge`, `spendFish` runs `spend_fish`, `feedSea` runs `feed_sea`, `discardCards` passes `wild` for fish, `clickVertex` with `piece: 'net'` builds a net) |
-| `game.ts` | Game runner: start, rematch, run one action, turn engine events into client effects |
-| `rooms.ts` | Room registry, lobby roster, spectators, status, reconnect (`rebindPlayerId`) |
-| `lobby.ts` | Lobby board tools: generate from a recipe, quick starts, settings merge (`dlc`, `addons`, `eventsOn`, `fateTokens`), painting terrain, numbers, robber, ports; map, picks and quick starts come from the room's DLC-aware registry (`mapRegistryFor`) |
-| `runtime.ts` | Shared base registry, dynamic `gameRegistry(rules)`, the room map registry (`mapRegistryKey`, `mapRegistryFor`: plain while no addon is on, cached per addon set), settings to rules mapping, defaults |
-| `net.ts` | Broadcast: sends each human and spectator their own view, clears one-shot effects, wakes the bots; in the lobby sends a socket the room's map option list when its addon set changes |
-| `view.ts` | Builds the `gameState` shape the client renders (with spectator card reveal, per-player `pieceCosts`, your own `bridgeUpgradeCost` when rickety bridges are in the game, `wildTokens` per player with the same visibility as the hand, your own `netSpots` and `netsLeft` when nets are in the game, your own `feedSpots` and `feedCost` when feeding the sea is in the game, the public `fishIcons`, and `hexOverlays` + `tide` when Tides is on) |
-| `turnClock.ts` | Per-turn clock for humans (base time plus increment per action) |
-| `presets.ts` | Custom map presets as plain JSON: save, validate, rebuild |
-| `mapmenu.ts` | Map options, quick starts, scenario presets, DLCs and addons as JSON for the lobby and setup page; `mapOptionsForSettings` gives the list for one room's addon set (cached) |
-| `persistence.ts` | S0.15 Cross-game bot memory & player profile store (`data/bots/*.json`, caps, public-only event filter, schema migration, Render `CTMEM1.` export/import) |
-| `types.ts` | Server room types: settings, room, spectators, client-facing effects |
-| `util.ts` | `clamp`, `getPips` |
+| `game.ts` | game runner (start/rematch, dispatch one action, turn engine events into client effects) |
+| `lobby.ts` | lobby board tools (generate from a recipe, quick starts, settings merge, paint terrain/numbers/robber/ports) on the engine board |
+| `main.ts` | server entry (Express and Socket.io, /health, bot training log endpoints, serves the client) |
+| `mapmenu.ts` | map menu data (the registry's map options, quick starts, DLC/addon catalog and scenarios as plain JSON) |
+| `net.ts` | socket broadcast (sends each human player their own view, clears one-shot effects, wakes the bots) |
+| `persistence.ts` | S0.15 cross-game bot memory & player profile persistence (Service 19; JSON disk store + portable base64url export/import for Render free tier) |
+| `presets.ts` | custom map presets (the lobby map as plain JSON: save, validate, rebuild) |
+| `rooms.ts` | rooms (registry of rooms, lobby roster, status, helpers over the engine game) |
+| `runtime.ts` | engine runtime for the server (registry, settings -> rules mapping, defaults) |
+| `socket.ts` | socket handlers (lobby editing + game actions; every game action goes through engine dispatch) |
+| `turnClock.ts` | per-turn clock for human players (base time per turn, plus an increment for each completed action) |
+| `turnHistory.ts` | Turn history recorder & round summarizer |
+| `types.ts` | server room types (lobby settings, room, client-facing effects) |
+| `util.ts` | small pure helpers (clamp, pips) |
+| `view.ts` | client state builder (engine state -> the `gameState` shape the current client renders) |
 
 ### `src/server/bots/`
 
 | File | What it does |
 |---|---|
-| `brain.ts` | Pure bot decision: game state to one action; reads tier, map profile, grudges, `BOT_GOALS`, and tech tree research/actions when `techTreeOn` is on |
-| `tiers.ts` | Tier profiles (Main, Secondary, Overload), personalities, hash helper |
-| `mapProfile.ts` | Landmasses, fog and gold share, average pips, port count, resource scarcity |
-| `scheduler.ts` | Waits a game-speed delay, then lets one bot act after each broadcast |
-| `sim.ts` | Bot-vs-bot simulator with invariant checks, `runLadder`, and S0.16 `runSimMatrix` (with `techTreeOn` on/off and scenario subset support) |
-| `trainingLog.ts` | Training data logger: pre-action features, chosen actions, outcome labels |
-| `dialogue.ts` | One-line re-export of `dialogue/index.ts` (existing imports use this path) |
-| `dialogue/index.ts` | Entry: engine events to chat lines, game start, replies to human chat |
-| `dialogue/engine.ts` | Filter, weighted pick, repeat memory, slot fill, rate limit, chat post |
-| `dialogue/context.ts` | Builds the public-only context a line is filled from |
-| `dialogue/events.ts` | Event table: chance, major flag, allowed slots, private-risk set, chat levels |
-| `dialogue/types.ts` | Dialogue types |
-| `dialogue/lines/index.ts` | All lines, plus which event and style pairs are silent on purpose |
-| `dialogue/lines/awards.ts` | Lines for awards and the score race |
-| `dialogue/lines/build.ts` | Lines for building and dev cards |
-| `dialogue/lines/robber.ts` | Lines for the robber and steals |
-| `dialogue/lines/roll.ts` | Lines for dice results |
-| `dialogue/lines/table.ts` | Lines for game start and end, the map, fog reveals, replies to chat |
-| `dialogue/lines/trade.ts` | Lines for trading and the bank |
+| `brain.ts` | bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) |
+| `dialogue.ts` | bot dialogue (re-export, the engine lives in bots/dialogue/) |
+| `dialogue/index.ts` | bot dialogue entry (engine events -> chat lines, game start, replies to human chat) |
+| `dialogue/context.ts` | builds the public-only DialogueCtx a line is filled from (no hidden information is read here) |
+| `dialogue/engine.ts` | dialogue engine (filter, weighted pick, repeat memory, slot fill, alternation, rate limit, chat post) |
+| `dialogue/events.ts` | dialogue event table (chance, major flag, allowed slots, private-risk set, chat levels) |
+| `dialogue/lines/index.ts` | all dialogue lines, plus which (event, style) pairs are silent on purpose |
+| `dialogue/lines/awards.ts` | dialogue lines for awards and the score race |
+| `dialogue/lines/build.ts` | dialogue lines for building and development cards |
+| `dialogue/lines/robber.ts` | dialogue lines for the robber (moved onto a bot, placed by a bot) and steals |
+| `dialogue/lines/roll.ts` | dialogue lines for dice results (sevens, discards, good and dry rolls) |
+| `dialogue/lines/table.ts` | dialogue lines for the start and end of a game, the map, fog reveals and replies to human chat |
+| `dialogue/lines/trade.ts` | dialogue lines for trading and the bank |
+| `dialogue/types.ts` | bot dialogue types (events, line data shape, public context) |
+| `mapProfile.ts` | map profile (landmasses, fog and gold share, average pips, port count; built once per board, refreshed when fog is revealed) |
+| `scheduler.ts` | bot scheduler (waits a game-speed-scaled delay, then lets one bot act, after every broadcast) |
+| `sim.ts` | bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and S0.16 sim matrix) |
+| `tiers.ts` | bot tier profiles (Main / Secondary / Overload), personalities, small hash helper |
+| `trainingLog.ts` | AI bot training data logger (captures pre-action state features, legal action counts, chosen actions, and terminal VP/win rewards) |
 
 ## `src/client/` (browser client)
 
 | File | What it does |
 |---|---|
-| `main.ts` | Client entry: wires DOM, socket and board input events |
-| `actions.ts` | Client-to-server actions (lobby, spectate, DLC/addon toggles, Tides level, scenario presets, settings, game, rejoin, AI log download) |
-| `socket.ts` | Creates the socket.io connection |
-| `store.ts` | Shared mutable UI state (includes the fish picked for a discard) |
-| `types.ts` | Loose client-side view types |
-| `globals.d.ts` | Declares the global `io` from the socket.io script tag |
-| `constants.ts` | Resource and dev card metadata (names, token colors) |
-| `icons.ts` | Flat resource pictograms (and the fish token), dev card glyphs, UI icons, piece shapes, the fishing ground fish with boost pips (`fishGroundMarkup`), and shipwreck markers (`wreckMarkup`) |
-| `avatars.ts` | Pictogram avatar faces keyed by the shared avatar id |
-| `audio.ts` | Sound effects and the sound toggle |
-| `ui.ts` | Theme switch, toast, victory confetti |
-| `util.ts` | HTML escaping, initials |
-| `mapmenu.ts` | Lobby map menu drawn from the server's option list |
-| `presets.ts` | Custom map presets saved in this browser, preset row in the lobby dock |
-| `cursors.ts` | Lobby cursors and Shift laser trail |
-| `styles.css` | All styling and design tokens (copied to `dist/public/app.css`) |
-| `render/index.ts` | Render coordinator and the 6-tab post-game victory screen |
-| `render/board.ts` | Board SVG renderer, camera, board input and board animations; the overlay layer (tide tint, warning, or the elevation heat map) is rewritten only when its markup changes; rickety bridges drawn dashed with two planks, collapse animation (`.bridge-collapse-anim`, `.bridge-collapse-ring`) when a rickety bridge breaks on a 7, upgrade marker on your own rickety bridges you can pay for, `clickEdge` opens the bridge picker when rickety bridges are in the game; nets drawn with `netMarkup`, and in net mode only the server's `netSpots` are drawn (dashed diamonds); fishing grounds (`fishIcons`) drawn on their own layer (`boardFishLayer`, rewritten only when its markup changes), and in feed mode (`setBuildMode('feed')`) a clickable ring on each tile in the server's `feedSpots` (`clickFeedSpot`); shipwrecks (`wrecks`) drawn on `boardWrecksLayer` with distinct ocean whirlpool (`.wreck-spawn-sea-anim`) and shore surf-wash (`.wreck-spawn-shore-anim`) spawn animations; pirates (`pirates`, T10) drawn on `boardPiratesLayer` through `renderPiratesMarkup`, with a click on the ones in your `pirateDrives`; the `pirate` transfer kind counts as a robbery for the card animation |
-| `render/pirates.ts` | Tidebound T10: pirate ship markup with a strength badge (`pirateMarkup`), the pirates layer markup (`renderPiratesMarkup`: a pulsing ring and a click on the pirates you can drive off), `clickPirate` (sends `drivePirate`); adds its own styles once |
-| `render/hand.ts` | Player hand (resources, fish tokens, dev cards, spectator hand inspector) and click handlers (`onClickHandWild`: pick a fish for a discard or open the spend sheet) |
-| `render/drawer.ts` | Bottom-left sheet: bank trade, discard (cards and fish), gold, monopoly, spend a fish, robber victim picker |
-| `render/trade.ts` | Stacked trade offers, timers, responses, counter-offer editor |
-| `render/sidebar.ts` | Right sidebar: log, chat, bank, player rows, spectator strip |
-| `render/setup.ts` | World setup page (host only): screen switching, tile preview, scenario presets, DLC/addon toggles (server list first, built-in fallback catalog; the Tidebound ids in it must match the pack, see `tidebound.test.ts`), the Tides level slider under the Tides row, active summary strip, player/spectator strip |
-| `render/overlay.ts` | S0.13 Overlay and popup kit: 7 colorblind-safe SVG hex overlays (flood and flood-warn colors come from `--flood-*` tokens, so both themes work), the elevation heat map markup (`renderElevationMarkup`), timer-bar popup stack, event title cards, round-end recap card |
-| `render/turnclock.ts` | Turn clock readout and countdown bar |
-| `render/techpanel.ts` | Tech panel: radial hub-and-spoke tree with 2-path branch forks (`layout`: `'expansion'` and `'industrial'` lanes separated by 17° across concentric prerequisite-chain rings), costs as mini resource cards (`costStripHtml`, also used by the bridge picker), description on hover, Harbor charters (one Raise to 2:1 button per port city or settlement with Fishing nets) and Ground work controls, and the Tech button in the action bar; draws its own DOM and styles |
-| `render/bridgepicker.ts` | Tidebound T4c / T11f: one popup that sits over an ocean edge. On an empty edge (rickety bridges in the game and unlocked) it is the type picker (Bridge or Rickety bridge, prices as mini cards, disabled with a reason); on your own placed bridge it offers Upgrade to a full bridge (rickety) and/or Demolish bridge (Salvage crew). Draws its own DOM and styles; `renderBridgePicker` keeps it in step with each state or closes it |
+| `actions.ts` | client UI actions (host-only edit guard, build mode and brush selection, affordability checks, requests sent to the server) |
+| `audio.ts` | WebAudio sound effects (tones, dice roll, discard, your turn, victory fanfare) and the sound toggle |
+| `avatars.ts` | player avatars (flat pictogram faces keyed by the shared avatar id, falls back to the name initial) |
+| `constants.ts` | resource and dev card metadata (names, token colors) |
+| `cursors.ts` | lobby cursors and laser pointer (non-hosts cannot edit the map, they point at it instead) |
+| `globals.d.ts` | type declaration for the global socket.io `io`, loaded by a script tag in index.html |
+| `icons.ts` | flat resource pictograms, dev card glyphs, UI icons, piece shapes |
+| `main.ts` | client entry point (wires DOM events, camera pan and zoom, and socket messages to the renderers) |
+| `mapmenu.ts` | lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) |
+| `presets.ts` | custom map presets (list saved in this browser, preset row in the lobby dock) |
+| `render/index.ts` | renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state |
+| `render/board.ts` | board SVG renderer, camera, board input and board animations |
+| `render/bridgepicker.ts` | bridge picker (Tidebound T4c: type picker popup on an empty ocean edge, upgrade popup on your own rickety bridge, one popup that sits over the edge) |
+| `render/drawer.ts` | bottom-left sheet (trade, discard, gold, monopoly, robber victim picker) |
+| `render/hand.ts` | player hand (resource stacks + dev cards) and hand click handlers |
+| `render/overlay.ts` | S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) |
+| `render/pirates.ts` | Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles |
+| `render/setup.ts` | world setup page (host only, between the name page and the board): which screen shows, tile preview, roster, scenarios, DLC cards |
+| `render/sidebar.ts` | right sidebar (log, chat, bank, player rows) |
+| `render/techpanel.ts` | tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar |
+| `render/trade.ts` | active trade offer stack (top right), per-offer timers, trade responses and counter-offer editor |
+| `render/turnclock.ts` | turn clock readout and countdown bar in the turn pill (counts down from the time left the server sent) |
+| `socket.ts` | the single socket.io connection shared by all client modules |
+| `store.ts` | shared mutable client UI state (game state, build and drawer modes, camera, selections) with setters |
+| `types.ts` | loose client-side view types (PlayerView, GameState, Resources) |
+| `ui.ts` | small UI actions (theme switch, toast, victory confetti overlay) |
+| `util.ts` | small client helpers (HTML escaping, initials) |
 
 ## `tests/` (node:test / tsx)
 
@@ -243,4 +257,9 @@ What every file does. Paths are relative to the repo root. Most source files sta
 | `stage1.test.ts` | Stage 1 core systems & proving-ground content (S1.1–S1.5): Taxes & Catch-up, Public Contract Board, Spies, Tech Tree & Local Nemesis & Round Recap, Karaoke 7, Bot Drinking Game, Hats, Sandbox Economy |
 | `techroots.test.ts` | Effects of the 5 root techs, the two tech actions, the port level (T1a), the harbor-only 1:1 floor (T1c), bot tech tree research/action decisions, and the tree-off no-effect check |
 | `golden.snapshot.json` | Recorded hashes for the golden test (created on its first run) |
+| `index.test.ts` | R2 index guard: the `src/` tables in `INDEX.md` match the file headers (runs `scripts/index.mjs --check`; fix with `npm run index`) |
+| `headers.test.ts` | R2 header guard: every `src` file has a `// MODULE:` line with a real description (runs `scripts/headers.mjs --check`; stale `DEPENDS ON` / `USED BY` do not fail it) |
+| `architecture.test.ts` | R3 architecture guard: layer import rules (`shared` imports only `shared`; `packs` import `shared`, own pack and `packs/base`; `server` never imports `client`; `client` imports only `client` and `shared`) and no new circular imports (`KNOWN_CYCLES` lists the two left: client actions/render, server scheduler/net/view) |
+| `template.test.ts` | R5 template guard: the example addon in `src/packs/_template/` passes the Rule of Two audit, registers nothing when off, and its piece, action and client view work when on |
+| `socketAct.test.ts` | R6 generic `act` socket event: runs one engine action for the socket player, sends the engine reason when refused, ignores malformed envelopes, never answers "Internal error" to junk payloads for the nine moved actions, and (until R6.4 deletes each legacy handler) gives the same answer as the legacy event |
 

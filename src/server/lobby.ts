@@ -1,4 +1,4 @@
-// MODULE: lobby board tools (generate from a recipe, quick starts, settings merge, paint terrain/numbers/robber/ports) on the engine board | USED BY: server/socket, server/rooms, server/game
+// MODULE: lobby board tools (generate from a recipe, quick starts, settings merge, paint terrain/numbers/robber/ports) on the engine board | DEPENDS ON: packs/tidebound/index, server/bots/dialogue/events, server/runtime, server/types, server/util, shared/index | USED BY: server/game, server/presets, server/rooms, server/socket
 import {
   REAL_NUMBER_POOL, SHARE_PREFIX, buildTopology, cleanSeed, createRng, decodeRecipe, generateBoard, generateMap, hexDistance,
   isKnownMapId, randomSeed, resolveMapOptions, resolveParams, resolvePicks

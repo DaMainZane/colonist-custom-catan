@@ -1,4 +1,4 @@
-// MODULE: base resources and tiles (wood, brick, sheep, wheat, ore, desert, water) | USED BY: packs/base/index
+// MODULE: base resources and tiles (wood, brick, sheep, wheat, ore, desert, water) | DEPENDS ON: shared/index | USED BY: packs/base/index
 import type { Habitat, PackApi } from '../../shared';
 
 const RESOURCES = [

@@ -1,8 +1,9 @@
-// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) | USED BY: packs/index, server, sims, tests
-import type { Pack } from '../../shared';
+// MODULE: tidebound pack (DLC: 8 addons with links; T1 sea tiles, T2 wide water + sea data, T3 bridges, T4 rickety bridges, T5a tides schedule, T5b spring tide, T5c tide level, T5d elevation, T5e idle ports, T6 tide view for the client, T7a fish token, T7b1 fishing nets, T7b2 net spots + net bot goal, T7c fish icon boosts, T7d tide replenish, T7e feed the sea, T8a harbor 1:1 upgrade, T8b 4 trades/turn + invalid-ratio prompt, T9 wrecks, T10 pirates, T11 tech tree nodes & gates) | DEPENDS ON: packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/pirates, packs/tidebound/ricketyBridges, packs/tidebound/risingSea, +4 more | USED BY: packs/index, server/lobby, server/runtime, server/socket
+import { VIEW_DATA } from '../../shared';
+import type { Pack, ViewDataDef } from '../../shared';
 import { bridgesAddon } from './bridges';
 import { fishingAddon } from './fishing';
-import { harborAddon } from './harbor';
+import { harborAddon, portLevelsViewData } from './harbor';
 import { piratesAddon } from './pirates';
 import { ricketyBridgesAddon } from './ricketyBridges';
 import { risingSeaAddon } from './risingSea';
@@ -268,8 +269,20 @@ export {
 export type { WreckBonus, WreckClaimResult, WreckClientItem, WreckPayload, WreckSite } from './wrecks';
 
 /**
+ * Always-on view defaults (R7a.5, trap 1). A public field of the client state is `null` when its addon is off, but an entry registered inside an
+ * addon does not exist while that addon is off, so the field would be missing instead of null. This entry is registered in the pack's own `register`
+ * (it runs with every game, DLC on or off) at a priority below every addon entry; the merge is first-wins, so an addon's entry overrides it.
+ * Each group that moves into VIEW_DATA adds its field here as `null`.
+ */
+const tideboundViewDefaults: ViewDataDef = {
+  id: 'tidebound.view_defaults',
+  priority: -100,
+  shared: () => ({ fishIcons: null, wrecks: null, pirates: null, tide: null })
+};
+
+/**
  * Tidebound: sea, bridges, tides, harbors, fishing, wrecks and pirates.
- * Everything lives in addons (`rules.dlc.tidebound` is the master switch), so with the DLC off nothing here is registered.
+ * Everything lives in addons (`rules.dlc.tidebound` is the master switch), so with the DLC off no content is registered (only the view defaults above).
  * Addon order matters: a dependency must be declared before the addon that needs it.
  */
 export const tideboundPack: Pack = {
@@ -286,5 +299,9 @@ export const tideboundPack: Pack = {
     wrecksAddon,
     piratesAddon
   ],
-  register() {}
+  register(api) {
+    api.define(VIEW_DATA, tideboundViewDefaults);
+    // Always on, not in an addon: `portLevels` was never gated by the Harbor addon (see `portLevelsViewData`).
+    api.define(VIEW_DATA, portLevelsViewData);
+  }
 };

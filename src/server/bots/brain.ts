@@ -1,4 +1,4 @@
-// MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | USED BY: bots/scheduler, bots/sim, server/game
+// MODULE: bot brain (pure: game state -> the one action a bot wants to take; reads the bot's tier, the map profile and grudges; no timers, no sockets) | DEPENDS ON: packs/base/building, packs/base/constants, packs/base/techEffects, packs/base/trading, server/bots/mapProfile, server/bots/tiers, +2 more | USED BY: server/bots/scheduler, server/bots/sim, server/game
 import {
   allTechDefs,
   botGoalActionScore,

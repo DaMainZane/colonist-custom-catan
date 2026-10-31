@@ -1,4 +1,4 @@
-// MODULE: player avatars (flat pictogram faces keyed by the shared avatar id, falls back to the name initial) | USED BY: render/*, actions.ts
+// MODULE: player avatars (flat pictogram faces keyed by the shared avatar id, falls back to the name initial) | DEPENDS ON: client/util | USED BY: client/actions, client/render/drawer, client/render/hand, client/render/index, client/render/setup, client/render/sidebar, +1 more
 import { esc, initial } from './util';
 
 // The ids are the avatar strings the server hands out (shared/palette.ts AVATARS). Keep the two lists in step.

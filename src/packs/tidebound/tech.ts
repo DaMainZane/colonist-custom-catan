@@ -1,4 +1,4 @@
-// MODULE: Tidebound tech tree nodes (T11a-T11f: 8 extension nodes across Expansion & Industrial paths, techGate re-export, Grand Causeway 16 VP hook, Harbor Empire ceil(V/2) bank card grant) | USED BY: packs/tidebound/*, server/view, server/bots, client/render/techpanel, tests
+// MODULE: Tidebound tech tree nodes (T11a-T11f: 8 extension nodes across Expansion & Industrial paths, techGate re-export, Grand Causeway 16 VP hook, Harbor Empire ceil(V/2) bank card grant) | DEPENDS ON: packs/base/techEffects, packs/tidebound/bridgeConsts, packs/tidebound/ricketyBridges, shared/index | USED BY: packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/index, packs/tidebound/pirates, packs/tidebound/wrecks
 import {
   bankGive,
   createRng,
@@ -18,10 +18,11 @@ import type {
   PlayerState,
   Registry,
   RngState,
-  TechDef
+  TechDef,
+  ViewDataDef
 } from '../../shared';
 import { TECH_HARBOR_CHARTERS } from '../base/techEffects';
-import { BRIDGE, BRIDGE_BASE_LIMIT } from './bridges';
+import { BRIDGE, BRIDGE_BASE_LIMIT } from './bridgeConsts';
 import { RICKETY, RICKETY_TECH_CAP_BONUS, syncBridgePool } from './ricketyBridges';
 
 export { TECH_HARBOR_CHARTERS, techGate };
@@ -123,6 +124,16 @@ export function grandCausewayBonusVp(g: GameState, reg: Registry, pid: Id): numb
 export function grandCausewayVpHook(g: GameState, reg: Registry, p: PlayerState, _includeHidden?: boolean): number {
   return grandCausewayBonusVp(g, reg, p.id);
 }
+
+/**
+ * VIEW_DATA entry (R7a.5, group 12): the Grand Causeway bonus in `stats.vpBreakdown`, added to the `longestRoad` key. Only while the player holds Longest
+ * Road (the same check `server/view.ts` made before adding the bonus; `grandCausewayBonusVp` is 0 without the tech or a bridge in the road). The base 2 VP
+ * stays in `view.ts`. Registered by the bridges addon, next to `grandCausewayVpHook`.
+ */
+export const grandCausewayViewData: ViewDataDef = {
+  id: 'tidebound.grand_causeway.view',
+  vpBonus: (g, reg, pid) => (g.awards.longestRoad === pid ? { longestRoad: grandCausewayBonusVp(g, reg, pid) } : undefined)
+};
 
 // ---- T11f: Harbor Empire unlock grant (`ceil(V / 2)` random cards from the bank, zero `g.rng` draws) -----------
 

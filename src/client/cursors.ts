@@ -1,4 +1,4 @@
-// MODULE: lobby cursors and laser pointer (non-hosts cannot edit the map, they point at it instead) | USED BY: main.ts
+// MODULE: lobby cursors and laser pointer (non-hosts cannot edit the map, they point at it instead) | DEPENDS ON: client/socket, client/store | USED BY: client/main
 // Cursor positions are sent in board (SVG) coordinates, so they line up for everyone whatever their pan and zoom.
 // Hold Shift while moving the mouse to leave a short glowing laser trail.
 import { socket } from './socket';

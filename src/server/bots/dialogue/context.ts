@@ -1,4 +1,4 @@
-// MODULE: builds the public-only DialogueCtx a line is filled from (no hidden information is read here) | USED BY: bots/dialogue/index, bots/dialogue/engine, tests
+// MODULE: builds the public-only DialogueCtx a line is filled from (no hidden information is read here) | DEPENDS ON: server/bots/dialogue/types, server/bots/mapProfile, server/runtime, server/types, shared/index | USED BY: server/bots/dialogue/index
 //
 // LEAK RULE: chat reaches every player, so this file may only read what everyone can already see: the pieces on the
 // board, the awards, the rules, how many cards a player holds (a count, never which cards) and the VP shown to others.

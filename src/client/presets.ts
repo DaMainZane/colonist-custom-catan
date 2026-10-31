@@ -1,4 +1,4 @@
-// MODULE: custom map presets (list saved in this browser, preset row in the lobby dock) | USED BY: main.ts, render/index.ts
+// MODULE: custom map presets (list saved in this browser, preset row in the lobby dock) | DEPENDS ON: client/audio, client/icons, client/socket, client/store, client/ui, client/util | USED BY: client/main, client/render/index
 // Built-in presets are fixed chips in index.html. Custom ones are the lobby map saved as JSON in localStorage:
 // the server builds the JSON on save and validates it again on load (src/server/presets.ts).
 // "Editing" a custom preset = load it, change the map, then save under the same name (it replaces the old one).

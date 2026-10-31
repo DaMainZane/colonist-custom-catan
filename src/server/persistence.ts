@@ -1,4 +1,4 @@
-// MODULE: S0.15 cross-game bot memory & player profile persistence (Service 19; JSON disk store + portable base64url export/import for Render free tier) | USED BY: server/main, server/game, tests
+// MODULE: S0.15 cross-game bot memory & player profile persistence (Service 19; JSON disk store + portable base64url export/import for Render free tier) | DEPENDS ON: none | USED BY: server/main
 import fs from 'node:fs';
 import path from 'node:path';
 

@@ -1,4 +1,4 @@
-// MODULE: player colors and avatars | USED BY: engine (createGame), UI later
+// MODULE: player colors and avatars | DEPENDS ON: none | USED BY: shared/engine, shared/index
 export const PLAYER_COLORS: string[] = [
   '#e53935', // Red
   '#1e88e5', // Blue

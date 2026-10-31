@@ -1,4 +1,4 @@
-// MODULE: all dialogue lines, plus which (event, style) pairs are silent on purpose | USED BY: bots/dialogue/engine, tests
+// MODULE: all dialogue lines, plus which (event, style) pairs are silent on purpose | DEPENDS ON: server/bots/dialogue/lines/awards, server/bots/dialogue/lines/build, server/bots/dialogue/lines/robber, server/bots/dialogue/lines/roll, server/bots/dialogue/lines/table, server/bots/dialogue/lines/trade, +2 more | USED BY: server/bots/dialogue/engine
 import type { ChatStyle } from '../../tiers';
 import type { DialogueEvent, Line } from '../types';
 import { AWARD_LINES } from './awards';

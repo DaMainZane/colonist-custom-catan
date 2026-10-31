@@ -1,4 +1,4 @@
-// MODULE: awards (Longest Road, Largest Army) | USED BY: packs/base/index
+// MODULE: awards (Longest Road, Largest Army) | DEPENDS ON: packs/base/longestRoad, shared/index | USED BY: packs/base/index
 import type { PackApi } from '../../shared';
 import { longestRoadFor } from './longestRoad';
 

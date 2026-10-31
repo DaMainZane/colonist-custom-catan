@@ -1,4 +1,4 @@
-// MODULE: number tokens (real-game pool, scaled to any board size, red numbers never touch) | USED BY: mapgen, lobby, tests
+// MODULE: number tokens (real-game pool, scaled to any board size, red numbers never touch) | DEPENDS ON: shared/rng | USED BY: shared/index, shared/mapgen
 import { rngInt, rngNext, rngShuffle } from './rng';
 import type { RngState } from './rng';
 

@@ -1,4 +1,4 @@
-// MODULE: S0.10 public history ring buffer, change log, and stats registry (service 15: `history`) | USED BY: packs/base/hooks, DLC packs, bots
+// MODULE: S0.10 public history ring buffer, change log, and stats registry (service 15: `history`) | DEPENDS ON: shared/ctx, shared/registry, shared/types | USED BY: shared/eventDeck, shared/index, shared/stage1
 import type { Ctx, GameEvent } from './ctx';
 import { defsOf } from './registry';
 import type { GameState, Id } from './types';

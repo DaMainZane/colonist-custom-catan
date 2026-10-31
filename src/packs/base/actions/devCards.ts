@@ -1,4 +1,4 @@
-// MODULE: actions "buy_dev" and "play_dev" (dev cards are looked up in the registry) | USED BY: packs/base/actions/index
+// MODULE: actions "buy_dev" and "play_dev" (dev cards are looked up in the registry) | DEPENDS ON: shared/index | USED BY: packs/base/actions/index
 import { canAfford, getPlayer, payToBank } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 

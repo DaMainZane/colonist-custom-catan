@@ -1,4 +1,4 @@
-// MODULE: dialogue engine (filter, weighted pick, repeat memory, slot fill, alternation, rate limit, chat post) | USED BY: bots/dialogue/index, tests
+// MODULE: dialogue engine (filter, weighted pick, repeat memory, slot fill, alternation, rate limit, chat post) | DEPENDS ON: server/bots/dialogue/events, server/bots/dialogue/lines/index, server/bots/dialogue/types, server/bots/tiers, server/types | USED BY: server/bots/dialogue/index
 import type { Room } from '../../types';
 import { personalityOf, tierFromDifficulty, tierProfile } from '../tiers';
 import type { ChatStyle, Personality } from '../tiers';

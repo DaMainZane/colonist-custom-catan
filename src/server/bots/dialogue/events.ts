@@ -1,4 +1,4 @@
-// MODULE: dialogue event table (chance, major flag, allowed slots, private-risk set, chat levels) | USED BY: bots/dialogue/*, server/lobby, tests
+// MODULE: dialogue event table (chance, major flag, allowed slots, private-risk set, chat levels) | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/engine, server/lobby
 import type { BotChatLevel, DialogueEvent } from './types';
 
 export const ALL_EVENTS: DialogueEvent[] = [

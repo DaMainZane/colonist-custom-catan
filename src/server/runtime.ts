@@ -1,4 +1,4 @@
-// MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | USED BY: server/*, bots, sim
+// MODULE: engine runtime for the server (registry, settings -> rules mapping, defaults) | DEPENDS ON: packs/index, packs/tidebound/index, server/types, shared/index | USED BY: server/bots/dialogue/context, server/bots/dialogue/index, server/bots/scheduler, server/bots/sim, server/game, server/lobby, +6 more
 import { allPacks } from '../packs';
 import { TIDE_DEFAULT_LEVEL } from '../packs/tidebound';
 import { createRegistry, mergeRules, registryFor, resolveAddons } from '../shared';

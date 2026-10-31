@@ -1,3 +1,4 @@
+// MODULE: WebAudio sound effects (tones, dice roll, discard, your turn, victory fanfare) and the sound toggle | DEPENDS ON: client/icons, client/store | USED BY: client/actions, client/main, client/mapmenu, client/presets, client/render/board, client/render/bridgepicker, +5 more
 import { soundOn, setSoundOn } from './store';
 import { uiIcon } from './icons';
 

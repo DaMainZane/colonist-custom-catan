@@ -1,4 +1,4 @@
-// MODULE: turn clock readout and countdown bar in the turn pill (counts down from the time left the server sent) | USED BY: render/index.ts
+// MODULE: turn clock readout and countdown bar in the turn pill (counts down from the time left the server sent) | DEPENDS ON: client/store, client/types | USED BY: client/render/index
 import { state } from '../store';
 import type { GameState } from '../types';
 

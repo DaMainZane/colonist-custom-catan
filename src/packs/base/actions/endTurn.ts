@@ -1,4 +1,4 @@
-// MODULE: action "end_turn" (new dev cards become playable, next player rolls) | USED BY: packs/base/actions/index
+// MODULE: action "end_turn" (new dev cards become playable, next player rolls) | DEPENDS ON: shared/index | USED BY: packs/base/actions/index
 import { checkWinner, currentPlayer, endRoundIfLastSeat, startTurn } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 

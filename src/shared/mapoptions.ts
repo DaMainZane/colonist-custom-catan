@@ -1,4 +1,4 @@
-// MODULE: map option definitions (shape ops, terrain and number styles, perks, quick starts), generator flags, pick resolution | USED BY: registry, mapgen, packs, server/lobby, tests
+// MODULE: map option definitions (shape ops, terrain and number styles, perks, quick starts), generator flags, pick resolution | DEPENDS ON: shared/mapshape, shared/registry, shared/rng, shared/topology, shared/types | USED BY: packs/tidebound/seaData, shared/index, shared/mapcells, shared/mapgen, shared/mapmix, shared/mapshape, +1 more
 import type { Registry } from './registry';
 import type { LandField } from './mapshape';
 import type { RngState } from './rng';

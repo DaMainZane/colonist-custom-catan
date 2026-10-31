@@ -1,4 +1,4 @@
-// MODULE: pending picks (gold, Year of Plenty) -> enters/leaves the pick phase, empties picks when the bank is dry | USED BY: hooks
+// MODULE: pending picks (gold, Year of Plenty) -> enters/leaves the pick phase, empties picks when the bank is dry | DEPENDS ON: shared/index | USED BY: packs/base/hooks
 import { popPhase, pushPhase } from '../../shared';
 import type { Ctx } from '../../shared';
 

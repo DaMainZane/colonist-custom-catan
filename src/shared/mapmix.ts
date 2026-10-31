@@ -1,4 +1,4 @@
-// MODULE: island resource mix (terrain fix-up: every landmass of 4 or more tiles gets at least two resource types) | USED BY: mapgen (the `island_mix` perk)
+// MODULE: island resource mix (terrain fix-up: every landmass of 4 or more tiles gets at least two resource types) | DEPENDS ON: shared/mapoptions, shared/registry, shared/rng | USED BY: shared/index, shared/mapgen
 import type { CellInfo } from './mapoptions';
 import type { Registry } from './registry';
 import { rngInt } from './rng';

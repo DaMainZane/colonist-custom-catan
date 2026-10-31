@@ -1,4 +1,4 @@
-// MODULE: active trade offer stack (top right), per-offer timers, trade responses and counter-offer editor | USED BY: render/index.ts, main.ts
+// MODULE: active trade offer stack (top right), per-offer timers, trade responses and counter-offer editor | DEPENDS ON: client/audio, client/avatars, client/constants, client/icons, client/render/hand, client/socket, +4 more | USED BY: client/main, client/render/hand, client/render/index
 import { RESOURCES, RES_META } from '../constants';
 import { getMiniSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';

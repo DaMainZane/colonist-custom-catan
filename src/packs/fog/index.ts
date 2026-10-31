@@ -1,4 +1,4 @@
-// MODULE: fog pack (hidden tiles, revealed by building next to them, Fog Island preset) | USED BY: server, sims, tests
+// MODULE: fog pack (hidden tiles, revealed by building next to them, Fog Island preset) | DEPENDS ON: packs/base/constants, shared/index | USED BY: packs/index
 import { getPlayer, produceFromHex, rngShuffle } from '../../shared';
 import type { Ctx, HexInit, Id, Pack } from '../../shared';
 import { ROAD } from '../base/constants';

@@ -1,4 +1,4 @@
-// MODULE: action "bank_trade" (4:1 or better with ports; registry resources only) | USED BY: packs/base/actions/index
+// MODULE: action "bank_trade" (4:1 or better with ports; registry resources only) | DEPENDS ON: packs/base/trading, shared/index | USED BY: packs/base/actions/index
 import { explainInvalidBankRatio, getPlayer, recordBankTrade } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { parseResources, tradeRatios } from '../trading';

@@ -1,4 +1,4 @@
-// MODULE: base number styles (balanced; `standard` lives in index.ts) | USED BY: packs/base/map
+// MODULE: base number styles (balanced; `standard` lives in index.ts) | DEPENDS ON: shared/index | USED BY: packs/base/map/index
 import { cellPoint, dealBalanced, dealByRichness, rankNormalize, settleNumbers } from '../../../shared';
 import type { PackApi } from '../../../shared';
 

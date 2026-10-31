@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for the robber (moved onto a bot, placed by a bot) and steals | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for the robber (moved onto a bot, placed by a bot) and steals | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 // Steal and robbed lines are risk 'private': they never name a card, because chat is public.
 import type { Line } from '../types';
 

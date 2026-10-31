@@ -1,4 +1,4 @@
-// MODULE: base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) | USED BY: server, sims, tests, other packs
+// MODULE: base game pack (resources, tiles, pieces, dev cards, awards, ports, presets, phases, actions) | DEPENDS ON: packs/base/actions/index, packs/base/awards, packs/base/content, packs/base/devcards, packs/base/hooks, packs/base/map/index, +5 more | USED BY: packs/index
 import type { Pack } from '../../shared';
 import { registerActions } from './actions';
 import { registerAwards } from './awards';

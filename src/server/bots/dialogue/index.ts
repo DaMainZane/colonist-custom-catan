@@ -1,4 +1,4 @@
-// MODULE: bot dialogue entry (engine events -> chat lines, game start, replies to human chat) | USED BY: server/game, server/socket (via bots/dialogue.ts)
+// MODULE: bot dialogue entry (engine events -> chat lines, game start, replies to human chat) | DEPENDS ON: packs/base/constants, server/bots/dialogue/context, server/bots/dialogue/engine, server/bots/dialogue/types, server/runtime, server/types, +1 more | USED BY: server/bots/dialogue
 //
 // Every trigger here uses public information only (see context.ts). A steal never passes the stolen card on,
 // a discard only passes the count, and a dev card purchase never passes the card type.

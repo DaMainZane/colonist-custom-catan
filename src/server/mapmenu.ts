@@ -1,4 +1,4 @@
-// MODULE: map menu data (the registry's map options, quick starts, DLC/addon catalog and scenarios as plain JSON) | USED BY: server/socket, tests
+// MODULE: map menu data (the registry's map options, quick starts, DLC/addon catalog and scenarios as plain JSON) | DEPENDS ON: server/runtime, server/types, shared/index | USED BY: server/net, server/socket
 // The client draws the whole map menu and DLC setup cards from this list, so a pack that registers a shape, style, perk or DLC addon shows up
 // with no client change (design section 12, "What the server sends").
 import { allMapOptions } from '../shared';

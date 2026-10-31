@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for building and development cards | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for building and development cards | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 // Dev card purchases are risk 'private' (the card type is never named). Monopoly may name the resource: it is public.
 import type { Line } from '../types';
 

@@ -1,4 +1,4 @@
-// MODULE: small client helpers (HTML escaping, initials) | USED BY: render/*, icons.ts
+// MODULE: small client helpers (HTML escaping, initials) | DEPENDS ON: none | USED BY: client/avatars, client/mapmenu, client/presets, client/render/board, client/render/bridgepicker, client/render/drawer, +8 more
 
 export function esc(s: any): string {
   return String(s ?? '')

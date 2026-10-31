@@ -1,4 +1,4 @@
-// MODULE: gold pack (gold tile = pick-a-resource on production, Gold Rush preset) | USED BY: server, sims, tests, packs/fog (reveals use it)
+// MODULE: gold pack (gold tile = pick-a-resource on production, Gold Rush preset) | DEPENDS ON: shared/index | USED BY: packs/index
 import { getPlayer } from '../../shared';
 import type { Pack } from '../../shared';
 

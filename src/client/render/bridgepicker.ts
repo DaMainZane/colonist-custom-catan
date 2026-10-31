@@ -1,4 +1,4 @@
-// MODULE: bridge picker (Tidebound T4c: type picker popup on an empty ocean edge, upgrade popup on your own rickety bridge, one popup that sits over the edge) | USED BY: render/board, render/index, main
+// MODULE: bridge picker (Tidebound T4c: type picker popup on an empty ocean edge, upgrade popup on your own rickety bridge, one popup that sits over the edge) | DEPENDS ON: client/audio, client/icons, client/render/board, client/render/techpanel, client/socket, client/store, +1 more | USED BY: client/main, client/render/board, client/render/index
 import { uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
@@ -225,7 +225,7 @@ export function confirmBridgeUpgrade(): void {
   if (!mode || mode.kind !== 'upgrade' || !state?.code) return;
   const edgeId = mode.edgeId;
   closeBridgePicker();
-  socket.emit('upgradeBridge', { code: state.code, edgeId });
+  socket.emit('act', { code: state.code, type: 'upgrade_bridge', payload: { edgeId } });
   playTone(600, 0.08);
 }
 
@@ -234,6 +234,6 @@ export function confirmBridgeDemolish(): void {
   if (!mode || mode.kind !== 'upgrade' || !state?.code) return;
   const edgeId = mode.edgeId;
   closeBridgePicker();
-  socket.emit('demolishBridge', { code: state.code, edgeId });
+  socket.emit('act', { code: state.code, type: 'demolish_bridge', payload: { edgeId } });
   playTone(480, 0.08);
 }

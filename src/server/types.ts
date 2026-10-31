@@ -1,4 +1,4 @@
-// MODULE: server room types (lobby settings, room, client-facing effects) | USED BY: server/*, bots, sim
+// MODULE: server room types (lobby settings, room, client-facing effects) | DEPENDS ON: server/bots/dialogue/types, server/turnHistory, shared/index | USED BY: server/bots/dialogue/context, server/bots/dialogue/engine, server/bots/dialogue/index, server/bots/scheduler, server/game, server/lobby, +9 more
 import type { Board, GameState, MapRecipe, MapReport } from '../shared';
 import type { BotChatLevel } from './bots/dialogue/types';
 

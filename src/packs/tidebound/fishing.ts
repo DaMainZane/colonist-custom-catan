@@ -1,4 +1,4 @@
-// MODULE: tidebound.fishing addon (T7a fish wild token: spend action, counts for a 7 discard, can be stolen, never in the bank; T7b1 fishing net piece, coast placement rule, catch on every roll; T7b2 net spots for the client view and the net bot goal; T7c fish icon boosts: a sea tile with boosts left doubles a net's catch chance and loses one boost per catch; T7d tide replenish: tides refill icons slowly, a deeper tide faster; T7e feed the sea: 1 wheat fills a ground next to your net; T11c/d/e tech gates & Net works) | USED BY: packs/tidebound, server/view, tests
+// MODULE: tidebound.fishing addon (T7a fish wild token: spend action, counts for a 7 discard, can be stolen, never in the bank; T7b1 fishing net piece, coast placement rule, catch on every roll; T7b2 net spots for the client view and the net bot goal; T7c fish icon boosts: a sea tile with boosts left doubles a net's catch chance and loses one boost per catch; T7d tide replenish: tides refill icons slowly, a deeper tide faster; T7e feed the sea: 1 wheat fills a ground next to your net; T11c/d/e tech gates & Net works) | DEPENDS ON: packs/base/constants, packs/base/placement, packs/tidebound/seaData, packs/tidebound/tech, packs/tidebound/tides, shared/index, +1 more | USED BY: packs/tidebound/index, packs/tidebound/pirates, packs/tidebound/wrecks
 import {
   BOT_GOALS,
   COST_MODS,
@@ -12,6 +12,7 @@ import {
   spendWildToken,
   techGate,
   totalCards,
+  VIEW_DATA,
   WILD_TOKENS
 } from '../../shared';
 import type {
@@ -28,6 +29,7 @@ import type {
   PlayerState,
   Registry,
   Resources,
+  ViewDataDef,
   WildTokenDef
 } from '../../shared';
 import { createRng, rngNext } from '../../shared/rng';
@@ -260,6 +262,8 @@ export const netPiece: PieceDef = {
   baseLimit: NET_BASE_LIMIT,
   scaleWithRadius: true,
   icon: '🎣',
+  // R7a.5 (group 11): shows in the client's `pieceCosts` only once the Fishing nets tech is unlocked (was a hard-coded line in `server/view.ts`).
+  available: (g: GameState, pid: Id) => techGate(g, pid, TECH_FISHING_NETS),
   canPlace: canPlaceNet
 };
 
@@ -528,6 +532,15 @@ export function fishClientView(g: GameState, reg: Registry): Record<number, numb
 }
 
 /**
+ * VIEW_DATA entry (R7a.5, group 1): the public `fishIcons` field of the client state. Registered inside the fishing addon, so it exists only while
+ * Fishing is on. While it is off the pack's always-on `tidebound.view_defaults` entry supplies `fishIcons: null` (a public field is null when off).
+ */
+export const fishViewData: ViewDataDef = {
+  id: 'tidebound.fishing.view',
+  shared: (g: GameState, reg: Registry) => ({ fishIcons: fishClientView(g, reg) })
+};
+
+/**
  * The sea tiles this player could feed right now: what the client draws as clickable grounds in feed mode. `undefined` when feeding the sea is not
  * in the game, locked behind `tidebound.harbor_master`, or it is not this player's turn in the main phase; `[]` when they cannot pay or have no net
  * with a ground that has room.
@@ -559,6 +572,37 @@ export function netSpotsView(g: GameState, reg: Registry, p: PlayerState): numbe
   }
   return out;
 }
+
+/**
+ * VIEW_DATA entry (R7a.5, group 6): the player's net fields. `netsLeft` (supply left) is sent for every viewer once nets are in the game and unlocked;
+ * `netSpots` (where a net could go) is for yourself only. Both are `undefined` otherwise, so a game without nets sends nothing new.
+ * The gate is the same expression `server/view.ts` used (`netTechOk`).
+ */
+export const netViewData: ViewDataDef = {
+  id: 'tidebound.fishing.nets_view',
+  player: (g, reg, p, who) => {
+    const netTechOk = reg.pieces.has(NET) && techGate(g, p.id, TECH_FISHING_NETS);
+    return {
+      netsLeft: netTechOk ? p.pieces[NET] : undefined,
+      netSpots: who.self ? netSpotsView(g, reg, p) : undefined
+    };
+  }
+};
+
+/**
+ * VIEW_DATA entry (R7a.5, group 7): the player's feed-the-sea fields, for yourself only. `feedCost` is the price, `feedSpots` the sea tiles you could feed.
+ * `undefined` unless the action is in the game and unlocked. The gate is the same expression `server/view.ts` used (`feedTechOk`).
+ */
+export const feedViewData: ViewDataDef = {
+  id: 'tidebound.fishing.feed_view',
+  player: (g, reg, p, who) => {
+    const feedTechOk = reg.actions.has(FEED_SEA) && techGate(g, p.id, TECH_HARBOR_MASTER);
+    return {
+      feedCost: who.self && feedTechOk ? FEED_SEA_COST : undefined,
+      feedSpots: who.self ? feedSpotsView(g, reg, p) : undefined
+    };
+  }
+};
 
 /** Nets a bot keeps on the board. Below the base limit (4), so a bot never pays double for one. Tuning is T13. */
 export const NET_BOT_MAX = 3;
@@ -633,8 +677,11 @@ export const fishingAddon: AddonDef = {
     api.action(spendFishAction);
     api.phaseAction('main', SPEND_FISH);
     api.define(BOT_GOALS, fishBotGoal);
+    // R7a.5: the public fish icons for the client state.
+    api.define(VIEW_DATA, fishViewData);
     // T7b1 & T11d: the net piece, Net works cost modifier, and catch on every roll.
     api.piece(netPiece);
+    api.define(VIEW_DATA, netViewData);
     api.define(COST_MODS, netWorksCostMod);
     api.hook('onRoll', netCatchOnRoll);
     api.define(BOT_GOALS, netBotGoal);
@@ -644,5 +691,6 @@ export const fishingAddon: AddonDef = {
     });
     api.action(feedSeaAction);
     api.phaseAction('main', FEED_SEA);
+    api.define(VIEW_DATA, feedViewData);
   }
 };

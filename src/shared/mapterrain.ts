@@ -1,4 +1,4 @@
-// MODULE: terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) | USED BY: packs/base/map/terrain, tests
+// MODULE: terrain placement algorithms (swap energy for spread and clustered, habitat fit for realistic) | DEPENDS ON: shared/mapcells, shared/registry, shared/rng | USED BY: shared/index
 import { cellNeighbours } from './mapcells';
 import type { Habitat } from './registry';
 import { rngInt, rngNext, rngShuffle } from './rng';

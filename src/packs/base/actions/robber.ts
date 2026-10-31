@@ -1,4 +1,4 @@
-// MODULE: actions "move_robber" and "steal" (victim choice when 2+ players are on the hex) | USED BY: packs/base/actions/index
+// MODULE: actions "move_robber" and "steal" (victim choice when 2+ players are on the hex) | DEPENDS ON: packs/base/robbing, shared/index | USED BY: packs/base/actions/index
 import { getPlayer, popPhase, publicVP, setPhase, stealableWildTokens } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { clearStealSource, stealOne, victimsOnHex } from '../robbing';

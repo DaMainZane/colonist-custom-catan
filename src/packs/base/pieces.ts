@@ -1,4 +1,4 @@
-// MODULE: base pieces (road, settlement, city) | USED BY: packs/base/index
+// MODULE: base pieces (road, settlement, city) | DEPENDS ON: packs/base/constants, packs/base/placement, shared/index | USED BY: packs/base/index
 import type { PackApi } from '../../shared';
 import { BASE_PIECE_LIMITS, CITY, ROAD, SETTLEMENT } from './constants';
 import { canPlaceRoad, canPlaceSettlement, canUpgradeToCity } from './placement';

@@ -1,4 +1,4 @@
-// MODULE: S0.6 production pipeline (service 6: ordered stages for number shift, tile state, base yield, piece multiplier, wild token, tax, bank-short, discard check) | USED BY: packs/base/actions/roll, DLC packs
+// MODULE: S0.6 production pipeline (service 6: ordered stages for number shift, tile state, base yield, piece multiplier, wild token, tax, bank-short, discard check) | DEPENDS ON: shared/ctx, shared/registry, shared/state, shared/tileState, shared/types | USED BY: shared/index
 import type { Ctx } from './ctx';
 import { defsOf } from './registry';
 import type { GameState, Hex, Id } from './types';

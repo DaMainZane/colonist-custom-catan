@@ -1,4 +1,4 @@
-// MODULE: lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) | USED BY: render/index.ts, main.ts
+// MODULE: lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) | DEPENDS ON: client/audio, client/icons, client/socket, client/store, client/types, client/ui, +1 more | USED BY: client/main, client/render/index
 // Everything here is drawn from `mapOptions`, which the server sends once per connection from the registry, so a pack that
 // registers a shape, style or perk appears in the menu with no change in this file (design sections 12 and 13).
 // Only the host edits. Everyone else sees the same menu read-only, the seed included (design 5.8).

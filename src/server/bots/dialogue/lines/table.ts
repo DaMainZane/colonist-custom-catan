@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for the start and end of a game, the map, fog reveals and replies to human chat | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for the start and end of a game, the map, fog reveals and replies to human chat | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 // Chat replies are canned: they never answer anything about the game state.
 import type { Line } from '../types';
 

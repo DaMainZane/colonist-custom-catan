@@ -13,6 +13,9 @@ npm run build      # production bundle in dist/
 npm start          # run dist/main.js
 npm test           # vitest
 npm run typecheck
+npm run headers    # report file headers that are missing or out of date
+npm run headers:write   # fix them (adds DEPENDS ON / USED BY from the imports)
+npm run index      # regenerate the src tables in INDEX.md from the file headers
 ```
 
 ## Where things are
@@ -20,13 +23,14 @@ npm run typecheck
 | Folder | What lives there |
 |---|---|
 | `src/shared/` | Pure game engine and map generator (no sockets, DOM or timers). Runs on server and client |
-| `src/packs/` | Game content registered as packs: `base`, `gold`, `fog` |
+| `src/packs/` | Game content registered as packs: `base`, `gold`, `fog`, `tidebound`; `_template` is an example, not shipped |
 | `src/server/` | Express and Socket.io adapter over the engine, rooms and lobby, bots in `bots/` |
 | `src/client/` | Browser client (TypeScript, SVG board, `render/` for screens) |
 | `public/` | Static page (`index.html`), copied to `dist/public` |
-| `tests/` | Unit tests and bot-vs-bot simulations |
+| `tests/` | Unit tests and bot-vs-bot simulations, plus the header and architecture guards |
+| `scripts/` | `headers.mjs` (file header tool), `index.mjs` (generates the `src/` tables in `INDEX.md`) |
 
-`INDEX.md` lists every file and what it does.
+`INDEX.md` lists every file and what it does. **To change something, start with `ROUTER.md`** (task to files), then `EXTENSION POINTS.md` (every registration method, hook and registry) and `RECIPES.md` (five step-by-step recipes: piece, action, addon, tech node, client overlay). `src/packs/_template/` is a copyable example addon that is never shipped. `CLAUDE.md` tells Claude Code how to work in this repo.
 
 ## How it works
 
@@ -35,7 +39,9 @@ npm run typecheck
 - **The server is authoritative.** It sends each player a filtered view, so hidden hands, hidden tiles and dev cards never leak.
 - **Maps are recipes.** A recipe (seed, radius, picks, params) is turned into a board by `generateMap`, with each stage on its own RNG stream. The same share code gives the same map. Details in `Map Generation Design.md`.
 - **Bots.** Tiers (Main, Secondary, Overload) are plain data profiles that the brain reads. `sim.ts` runs bot-vs-bot games for testing and tier tuning. Details in `Bot AI Design.md` and `Bot Dialogue Design.md`.
-- **Most source files** start with a `// MODULE: what | USED BY: who` line. Add one to new files.
+- **Every source file** starts with `// MODULE: what | DEPENDS ON: a, b | USED BY: c, d`. Write the description for a new file and run `npm run headers:write` to fill in the two lists, then `npm run index` to update `INDEX.md`. `tests/headers.test.ts` fails if a file has no description, and `tests/index.test.ts` fails if `INDEX.md` is stale.
+- **Import boundaries are tested.** `tests/architecture.test.ts` enforces which folder may import which, and fails on new circular imports. Rules are at the top of that file.
+- **Rework in progress.** See `Handoff - Modular Rework.md` before changing structure.
 
 ## Server endpoints
 

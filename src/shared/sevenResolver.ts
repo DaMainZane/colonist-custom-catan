@@ -1,4 +1,4 @@
-// MODULE: S0.8 Seven Resolver (service 17: ordered pipeline for discard, karaoke, robber, volcano, decay with max DLC side-effects cap) | USED BY: packs/base/actions/roll, DLC packs
+// MODULE: S0.8 Seven Resolver (service 17: ordered pipeline for discard, karaoke, robber, volcano, decay with max DLC side-effects cap) | DEPENDS ON: shared/ctx, shared/registry, shared/state, shared/tileState, shared/types | USED BY: shared/index, shared/stage1
 import type { Ctx } from './ctx';
 import { defsOf } from './registry';
 import type { Registry } from './registry';

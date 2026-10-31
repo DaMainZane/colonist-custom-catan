@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for awards and the score race | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for awards and the score race | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 // Overload never telegraphs, so it has no "one point from winning" line. oneVpLeft is risk 'private' (it talks about plans).
 import type { Line } from '../types';
 

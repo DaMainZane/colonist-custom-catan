@@ -1,0 +1,33 @@
+// MODULE: template pack (loads the template addon so a test can build a registry from it; not in allPacks, so nothing ships) | DEPENDS ON: packs/_template/demo, shared/index | USED BY: none
+import type { Pack } from '../../shared';
+import { demoAddon } from './demo';
+
+export {
+  BEACON,
+  BEACON_COST,
+  BEACON_LIMIT,
+  TECH_DEMO,
+  TIP_BEACON,
+  TIP_COST,
+  beaconPiece,
+  beaconSpotsView,
+  beaconsOf,
+  canPlaceBeacon,
+  demoAddon,
+  demoBotGoal,
+  demoTech,
+  demoViewData,
+  tipBeaconAction
+} from './demo';
+
+/**
+ * A DLC pack that exists only to hold `demoAddon`. A real DLC pack looks the same: `deps: ['base']`, an `addons` list in
+ * dependency order, and an empty `register` (the content lives in the addons). Never add this pack to `allPacks`.
+ */
+export const templatePack: Pack = {
+  id: 'template',
+  name: 'Template (not shipped)',
+  deps: ['base'],
+  addons: [demoAddon],
+  register() {}
+};

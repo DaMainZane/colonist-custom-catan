@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for dice results (sevens, discards, good and dry rolls) | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for dice results (sevens, discards, good and dry rolls) | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 // Styles: friendly = Main, neutral = Secondary, cold = Overload. Lines are plain data, see ../types.ts.
 import type { Line } from '../types';
 

@@ -1,4 +1,4 @@
-// MODULE: tidebound.rising_sea addon stub (tiles drown lowest elevation first; content arrives in T12) | USED BY: packs/tidebound
+// MODULE: tidebound.rising_sea addon stub (tiles drown lowest elevation first; content arrives in T12) | DEPENDS ON: shared/index | USED BY: packs/tidebound/index
 import type { AddonDef } from '../../shared';
 
 export const risingSeaAddon: AddonDef = {

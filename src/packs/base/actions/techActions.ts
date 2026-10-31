@@ -1,4 +1,4 @@
-// MODULE: actions "upgrade_port" (Tidebound Harbor charters: raise a whole port 3:1 to 2:1) and "convert_tile" (Wild Earth Ground work) | USED BY: packs/base/actions/index
+// MODULE: actions "upgrade_port" (Tidebound Harbor charters: raise a whole port 3:1 to 2:1) and "convert_tile" (Wild Earth Ground work) | DEPENDS ON: packs/base/constants, packs/base/techEffects, shared/index | USED BY: packs/base/actions/index
 import { canAfford, getPlayer, hasTech, payToBank, priceOfUpgrade } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { CITY, GENERIC_PORT, SETTLEMENT } from '../constants';

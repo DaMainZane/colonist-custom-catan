@@ -1,4 +1,4 @@
-// MODULE: setup flow (snake order, second-round resources, hand-off to the first turn) | USED BY: actions/build
+// MODULE: setup flow (snake order, second-round resources, hand-off to the first turn) | DEPENDS ON: packs/base/constants, shared/index | USED BY: packs/base/actions/build
 import { produceFromHex, setPhase, startTurn } from '../../shared';
 import type { Ctx, Id, PieceDef } from '../../shared';
 import { SETTLEMENT } from './constants';

@@ -1,4 +1,4 @@
-// MODULE: custom map presets (the lobby map as plain JSON: save, validate, rebuild) | USED BY: server/socket, tests
+// MODULE: custom map presets (the lobby map as plain JSON: save, validate, rebuild) | DEPENDS ON: server/lobby, server/runtime, server/types, shared/index | USED BY: server/socket
 // Presets are stored in the host's browser. The server never keeps them: it turns the lobby map into JSON when the host
 // saves, and checks every value again when the host loads one, so a stale or edited preset cannot break a room.
 import { buildTopology, cleanSeed, makeRecipe, validateBoard } from '../shared';

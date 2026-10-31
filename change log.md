@@ -1,5 +1,127 @@
 # Change Log
 
+## 2026-10-31 (Pass 87: Modular rework R6.1 to R6.3: the generic `act` socket event and its test; written and NOT run; nothing moved yet, no shipped behavior change)
+### Changed
+- `src/server/socket.ts`: one new handler under "Turn actions": `socket.on('act', ({ code, type, payload }) => ...)`. `type` and `code` must be strings (else ignored); `payload` must be a plain object (else `{}`); it calls `act(code, type, payload, true)`, so `dispatch` refuses unknown or illegal types and the reason goes back to the player. No registry pre-check. A malformed envelope (`null`, string, array, missing fields) is dropped silently, and nothing reaches `console.error`. All 25 legacy events are still there.
+- `tests/socketAct.test.ts` (new): fake io and fake socket (Bob, `socket.id` = `'b'`), two-player Tidebound game in Bob's main phase. Cases: `act end_turn` equals a direct `runAction`; a refusal sends the engine reason and changes nothing; unknown types (`no_such_action`, `__proto__`, `constructor`, `toString`, empty); malformed envelopes; eleven junk payloads for each of the nine moved action types (one error, never "Internal error", state unchanged); and for each of the nine legacy events, while its handler exists, the same refusal text as `act`. Once R6.4 deletes a handler, its case passes without comparing.
+- `INDEX.md`: `socketAct.test.ts` row in the tests table.
+### R6.1 findings
+- Callers of `runAction` (read, not searched; no content search was available): `server/socket.ts` (`act`) and `server/bots/scheduler.ts` (4 sites: trade timer `cancel_trade`; turn-clock expiry, auto-discard and the forced `end_turn` or bot move; `runBotStep` and its fallback). The `game.ts` header lists only these two as users. Not checked: `tests/`, `scripts/`, `server/bots/sim.ts` (probably `dispatch` direct). Run `git grep -n runAction -- tests scripts src` to confirm.
+- Registered action types: 18 base (`build`, `roll`, `buy_dev`, `play_dev`, `bank_trade`, `propose_trade`, `respond_trade`, `counter_trade`, `confirm_trade`, `cancel_trade`, `discard`, `pick`, `move_robber`, `steal`, `end_turn`, `research_tech`, `upgrade_port`, `convert_tile`) and 6 Tidebound (`upgrade_harbor`, `upgrade_bridge`, `demolish_bridge`, `spend_fish`, `feed_sea`, `drive_off_pirate`). `gold`, `fog`, `tides`, `wrecks`, `risingSea` and `tech` register none. Every one of the 24 already has a client event, so the generic handler opens nothing a client could not already send. **`ActionDef.serverOnly` is not added**: no type needs it. Add it when a server-driven action appears (the template's `template_tip_beacon` is client-reachable on purpose).
+- Rule that follows: with `act` a client can name any registered type, so every `validate` must treat the payload as untrusted (wrong types, `null`, arrays). The junk test above checks this for the nine moved types.
+### The 25 socket game events
+| # | Event | Action type | Client payload -> engine payload | Report |
+|---|---|---|---|---|
+| 1 | `clickVertex` | `build` (or `steal`) | `{ vertexId, piece? }` -> `build { piece, loc }` for a net, a city on your settlement, or a settlement on an empty vertex; `steal { victimId }` in `robber_steal` | build yes, steal no |
+| 2 | `clickEdge` | `build` | `{ edgeId, piece? }` -> `{ piece, loc }`; default piece is `bridge` on an edge with no hex, else `road` | yes |
+| 3 | `clickHex` | `move_robber` | `{ hexId }` | no |
+| 4 | `stealFromPlayer` | `steal` | `{ victimId }` | no |
+| 5 | `rollDice` | `roll` | `{}` | no |
+| 6 | `endTurn` | `end_turn` | `{}` | no |
+| 7 | `buyDevCard` | `buy_dev` | `{}` | no |
+| 8 | `researchTech` | `research_tech` | `{ techId }` (same keys) | yes |
+| 9 | `upgradePort` | `upgrade_port` | `{ vertexId }` | yes |
+| 10 | `upgradeHarbor` | `upgrade_harbor` | `{ vertexId }` | yes |
+| 11 | `upgradeBridge` | `upgrade_bridge` | `{ edgeId }` | yes |
+| 12 | `demolishBridge` | `demolish_bridge` | `{ edgeId }` | yes |
+| 13 | `convertTile` | `convert_tile` | `{ hexId, resource }` | yes |
+| 14 | `pickGoldResource` | `pick` | `{ resource }` | yes |
+| 15 | `spendFish` | `spend_fish` | `{ resource }` | yes |
+| 16 | `feedSea` | `feed_sea` | `{ hexId }` | yes |
+| 17 | `drivePirate` | `drive_off_pirate` | `{ hexId }` | yes |
+| 18 | `discardCards` | `discard` | `{ discards, wild }` -> `{ cards, wild }` (renamed) | no |
+| 19 | `playDevCard` | `play_dev` | `{ cardType, monopolyResource }` -> `{ card, resource }` (renamed) | yes |
+| 20 | `bankTrade` | `bank_trade` | `{ give, get }` | yes |
+| 21 | `proposeTrade` | `propose_trade` | `{ offer, request }` | yes |
+| 22 | `respondTrade` | `respond_trade` | `{ decision, tradeId }` | yes |
+| 23 | `counterTrade` | `counter_trade` | `{ offer, request, tradeId }` | yes |
+| 24 | `confirmTradeWithPartner` | `confirm_trade` | `{ partnerId, tradeId }` | yes |
+| 25 | `cancelTrade` | `cancel_trade` (proposer) or `respond_trade { decision: 'declined' }` (anyone else) | `{ tradeId }`, finds the trade first | no |
+- The nine R6.4 moves are rows 8 to 13 and 15 to 17: same payload keys as the engine, all `report = true`, so `act` (always reports) behaves exactly like them.
+- Logic events (rows 1, 2, 25) stay on the server. Rows 1 and 2 are cut down in R6.5; R6.6 (the other 22 base events) is skipped on purpose.
+### Not run
+- Everything. Commands, one per line: `npx vitest run tests/socketAct.test.ts`, `npm run headers:write`, `npm run index`, `npm run typecheck`, `npm test`. `headers:write` adds the `DEPENDS ON` and `USED BY` lists to the new test header only if the script covers `tests/`; `npm run index` should not change the `src/` tables for this pass (no new imports in `socket.ts`).
+- Likely first failures: a `validate` that throws on a wrong-typed field (the junk test names the action type and payload, so the fix is in that action's `validate`, not in `socket.ts`); `end_turn` refused or throwing in the hand-built game (swap it for another cheap main-phase action); `createGame` or `buildTopology` arguments if `viewState.test.ts` changed since I copied its fixture.
+
+## 2026-10-31 (Pass 86: Modular rework R7a.6 and R7a.8: new viewState tests, VIEW_DATA docs, template view entry; written and NOT run; no shipped behavior change)
+### Changed
+- `tests/viewState.test.ts`: new inline-expect blocks (the snapshot file is untouched): a raised port with Tidebound off, the lobby state, tech gates, and each of seven addons off on its own.
+- `src/packs/_template/demo.ts`: `demoViewData` (`template.demo.view`, `player`: `beaconsLeft`, `beaconSpots`), registered in `register`; exported from `_template/index.ts`. `tests/template.test.ts`: one new case.
+- Docs: `ROUTER.md`, `RECIPES.md`, `EXTENSION POINTS.md` now describe `VIEW_DATA` and `PieceDef.available`; the D notes for `view.ts` are removed. Recipe 5 step 1 holds the three R7a.5 rules (null default at pack level, pack-level fields, per-player gates).
+### Checked
+- R7a.7: `server/view.ts` has no `../packs/tidebound` import.
+### Not run
+- (Superseded: the user ran `viewState`, `template`, `headers:write`, `index`, `typecheck` and `npm test` from the project folder, all clean. Pass 85 groups 5 to 12 are green too. R7a is done.)
+
+## 2026-10-31 (Pass 85: Modular rework R7a.5: the Tidebound view groups moved from `server/view.ts` into VIEW_DATA entries; groups 1 to 4 run and green, groups 5 to 12 written and NOT run; no behavior change intended)
+### Changed
+Each group is one entry (`api.define(VIEW_DATA, ...)`), so a failing snapshot can be traced to a group. `tests/view.snapshot.json` was not touched and `-u` was never used.
+- **Group 1, `fishIcons`**: `fishViewData` (`tidebound.fishing.view`, `shared`) in `fishing.ts`, registered in the fishing addon.
+- **Group 2, `portLevels`**: `portLevelsViewData` (`tidebound.port_levels`, `shared`) in `harbor.ts`, registered in `tideboundPack.register`, NOT in the harbor addon (see Deviations).
+- **Group 3, `wrecks`**: `wreckViewData` (`tidebound.wrecks.view`) in `wrecks.ts`, wrecks addon.
+- **Group 4, `pirates`**: `pirateViewData` (`tidebound.pirates.view`) in `pirates.ts`, pirates addon.
+- **Group 5, `tide` and `hexOverlays`**: `tideViewData` (`tidebound.tides.view`: `shared` returns `tide`, `overlays` returns the overlays or `undefined`) in `tides.ts`, tides addon. The legacy `?? tideView...` fallback and the `tideView` local are gone; `hexOverlays` is the merged overlays (`null` while no entry takes part, `{}` with Tides on and nothing marked).
+- **Group 6, `netsLeft`, `netSpots`**: `netViewData` (`tidebound.fishing.nets_view`, `player`) in `fishing.ts`.
+- **Group 7, `feedCost`, `feedSpots`**: `feedViewData` (`tidebound.fishing.feed_view`) in `fishing.ts`.
+- **Group 8, `harborCost`, `harborSpots`, `harborsLeft`, `harborTradesLeft`**: `harborViewData` (`tidebound.harbor.view`) in `harbor.ts`, harbor addon.
+- **Group 9, `pirateDrives`**: `pirateDriveViewData` (`tidebound.pirates.drive_view`) in `pirates.ts`.
+- **Group 10, `bridgeUpgradeCost` and `canDemolishBridge`**: two entries, one per owning addon: `ricketyViewData` (`tidebound.rickety_bridges.view`) in `ricketyBridges.ts` and `bridgesViewData` (`tidebound.bridges.view`) in `bridges.ts`.
+- **Group 11, `pieceCosts` filter**: `PieceDef.available` on `net` (`techGate(g, pid, TECH_FISHING_NETS)`, `fishing.ts`) and `rickety_bridge` (`techGate(g, pid, TECH_RICKETY_BRIDGES)`, `ricketyBridges.ts`). The two hard-coded lines in `view.ts` are gone; the filter is `!def.available || def.available(g, p.id)`.
+- **Group 12, Grand Causeway bonus**: `grandCausewayViewData` (`tidebound.grand_causeway.view`, `vpBonus`) in `tech.ts`, registered in the bridges addon next to `grandCausewayVpHook`. `view.ts` keeps the base `2`.
+- **Null when off (trap 1)**: `tideboundViewDefaults` (`tidebound.view_defaults`, priority -100) in `packs/tidebound/index.ts`, registered in `tideboundPack.register`, supplies `fishIcons`, `wrecks`, `pirates`, `tide` as `null`. Per-player fields need no default (`undefined` when off).
+- **Trap 2 (gates)**: each player entry recomputes the old `enginePlayerView` expressions unchanged (`netTechOk`, `feedTechOk`, `harborsOn`, `harborTechOk`, `who.self` where the old line had `self`; `netsLeft`, `harborsLeft` have no `self`, as before).
+- **`server/view.ts`**: no import from `../packs/tidebound` any more (R7a.7 in code), `hasTech` import dropped, locals `harborsOn`, `harborTechOk`, `netTechOk`, `ricketyTechOk`, `feedTechOk`, `canDemolish` removed.
+### Deviations from the handoff
+- **Lobby nulls**: with no game `view.ts` never calls the registry, so the moved public fields would be missing instead of `null` in the lobby state (the snapshot only covers games, so it would not catch it). A temporary `lobbyNulls` (`g ? {} : { fishIcons, portLevels, wrecks, pirates, tide: null }`) keeps the wire format. R8 removes it.
+- **`portLevels` is pack-level, not in the harbor addon**: `harborClientView` has no addon check and reads the base port-upgrade ladder (`g.ext.core.portUpgrades`, also written by the base Harbor charters tech), so the old output could be set with the harbor addon off. The entry is registered in `tideboundPack.register` and computes the real value; it has no `null` default.
+- **Group 10 is two entries** (the two fields belong to two addons). Group 12 returns a bonus only while `g.awards.longestRoad === pid`, the same guard `view.ts` had, so a bonus is never added for someone who does not hold Longest Road.
+- The tide view is built twice per player per broadcast (once for `tide`, once for `overlays`). It is pure; memoize only if it ever shows up in a profile.
+### Not verified
+- Groups 1 to 3: run by the user, green (`npx vitest run tests/viewState.test.ts`). Group 4: the user answered "done", taken as green. Groups 5 to 12 were written in one go (the user asked to finish the rest), so nothing was run after group 4: not `viewState`, not `headers:write`, `index`, `typecheck` or `npm test`.
+- No test covers: a raised port with Tidebound off (the reason `portLevels` is pack-level), the lobby state, or an addon switched off on its own. R7a.6 adds them.
+
+## 2026-10-31 (Pass 84: Modular rework R7a.1 to R7a.4: view data registry on the server, snapshot test; no behavior change intended; typecheck and tests not yet run on this pass)
+### Added
+- **`src/shared/viewData.ts`**: `VIEW_DATA` keyed registry (`api.define(VIEW_DATA, def)`, no `PackApi` change). `ViewDataDef { id, priority?, shared?, overlays?, player?, vpBonus? }`, plus `mergeViewShared`, `mergeViewOverlays` (one overlay per hex, higher priority wins, ties by lower id; `null` while no entry takes part), `mergeViewPlayer` (undefined values kept), `mergeViewVpBonus` (record keyed by breakdown key). Exported from `shared/index.ts`.
+- **`PieceDef.available?(g, pid)`** in `shared/registry.ts`: whether a piece is on offer to a player (shows in `pieceCosts`). Not read by the build action.
+- **`tests/viewState.test.ts`**: `makeStateBuilder(room)(viewerId)` for the player on turn, another player and a spectator, Tidebound fully on (net, fish icon, harbor, wreck, pirate, flood, warning, Grand causeway) and off, compared with `tests/view.snapshot.json` (written on the first run). Clock pinned, board summarized, keys sorted.
+### Changed
+- `server/view.ts` merges the registry into `shared`, `hexOverlays`, each player's view and `vpBreakdown`, and the `pieceCosts` filter honors `PieceDef.available`. Nothing is registered yet, so the output is the same as before. The Tidebound groups move in R7a.5.
+
+## 2026-10-31 (Pass 83: Modular rework R5: template addon, five recipes, CLAUDE.md; no behavior change; typecheck and tests not yet run on this pass)
+### Added
+- **`src/packs/_template/demo.ts`**: example addon `template.demo` to copy: a vertex piece (`template_beacon`, supply through `rules.pieceLimits`), an action (`template_tip_beacon`, registered in the `main` phase), a tech node (`template.demo_tech`), a client view function (`beaconSpotsView`), a bot goal stub. Registers everything inside `register`; no `g.rng` draws.
+- **`src/packs/_template/index.ts`**: `templatePack` (id `template`) that holds the addon so a test can load it. Not in `allPacks`, so it ships nothing.
+- **`tests/template.test.ts`**: the template passes `auditAddons`, registers nothing with its DLC or addon off, and builds, tips and reports spots when on.
+- **`RECIPES.md`**: five recipes (piece, action, addon, tech node, client overlay) with the files to touch in order, the real file to copy and where hand-written glue still is. The parts it did not open (`board.ts`, `icons.ts`, `client/types.ts`, `setup.ts`) say "search first".
+- **`CLAUDE.md`**: read `ROUTER.md` first, never read whole folders, search for a symbol before opening a file, layer rules, header rule, and the commands to run after a change.
+### Changed
+- `ROUTER.md`: pointers to `RECIPES.md` and the template. `INDEX.md` Docs and `tests/` rows. `README.md` links.
+
+## 2026-10-31 (Pass 82: Modular rework R2 index generator and R4 router docs; no behavior change; typecheck and tests passed: 46 test files, 627 tests)
+### Added
+- **`scripts/index.mjs`, npm scripts `index` and `index:check`**: rewrites the five `src/` tables in `INDEX.md` (shared, packs, server, server/bots, client) from the `// MODULE:` description of every file. Tables are found by heading; Root, Docs and `tests/` stay hand-written. `--check` exits 1 when `INDEX.md` is stale.
+- **`tests/index.test.ts`**: runs `scripts/index.mjs --check`. Fails when a src file is added, moved, deleted or re-described without `npm run index`; import changes never trigger it.
+- **`ROUTER.md`**: task kind to the files to open and the file to copy as a pattern, with the hand-written glue (`socket.ts`, `view.ts`, `icons.ts`, `board.ts`) marked.
+- **`EXTENSION POINTS.md`**: `AddonDef` fields, every `PackApi` method, the 11 hooks with signatures and call sites, and the 16 keyed registries with their def shapes.
+### Changed
+- `INDEX.md` intro, Root, Docs and tests rows; `README.md` quick start, folder table and header notes.
+
+## 2026-10-31 (Pass 81: Modular rework R1 to R3: file headers, header and architecture guards, Tidebound bridge cycle removed; no behavior change; typecheck and tests passed)
+### Added
+- **`scripts/headers.mjs` and npm scripts `headers`, `headers:write`, `headers:check`**: keeps a one-line `// MODULE: what | DEPENDS ON: a, b | USED BY: c, d` header on every `src/**/*.ts` file. The description is hand-written; the two lists are computed from the import graph. `--check` fails on a missing or TODO header, `--check --strict` also on stale lists.
+- **`tests/headers.test.ts`**: fails if any file has no header or a TODO description.
+- **`tests/architecture.test.ts`**: layer rules (`shared` imports only `shared`; `packs/<x>` imports `shared`, its own pack and `packs/base`; `server` imports `server`, `shared`, `packs`; `client` imports `client`, `shared`) and a cycle check that ignores type-only imports. `KNOWN_CYCLES` holds the two existing cycles (client `actions` with `render/*`, server `bots/scheduler` with `net` and `view`); a new cycle fails, and a fixed one must be deleted from the list.
+- **`src/packs/tidebound/bridgeConsts.ts`**: leaf module with `BRIDGE`, `BRIDGE_BASE_LIMIT`, `BRIDGE_COST`.
+- **`src/packs/tidebound/bridgeCore.ts`**: `isOceanEdge`, `canPlaceBridge`, `bridgePiece`, `bridgeBotGoal`, moved out of `bridges.ts` unchanged.
+- **Docs**: `Modular Rework Plan.md`, `Rework Progress.md`, `Handoff - Modular Rework.md`.
+### Fixed
+- **13 Tidebound test failures (rickety bridge supply was `undefined` / `NaN`)**: `bridges.ts` and `ricketyBridges.ts` imported each other, so `ricketyBridges.ts` read `BRIDGE_BASE_LIMIT` before `bridges.ts` had defined it. The constants moved to `bridgeConsts.ts`.
+### Changed
+- `ricketyBridges.ts` imports the bridge rule, piece and bot goal from `bridgeCore.ts`, and `tech.ts` imports the constants from `bridgeConsts.ts`, so `bridges`, `ricketyBridges` and `tech` no longer form an import cycle. `bridges.ts` re-exports the moved names, so existing imports are unchanged.
+- All 140 file headers rewritten to the new format (header comments only).
+- `INDEX.md` and `README.md` describe the new header format, scripts and tests.
+
 ## 2026-10-30 (Pass 80: Tidebound T11a tech tree fork layout & cost divisor, T11b techGate helper, T11c nodes 1–3, T11d nodes 4–6, T11e nodes 7–9, T11f demolish_bridge, Grand Causeway & Harbor Empire; typecheck and tests passed)
 ### Added
 - **T11a Tech tree fork layout, `path` field, and 25+ VP cost divisor (`src/shared/stage1.ts`, `src/client/types.ts`, `src/client/render/techpanel.ts`)**:

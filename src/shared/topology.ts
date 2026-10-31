@@ -1,4 +1,4 @@
-// MODULE: pure hex-grid topology (vertices, edges, ports, robber start) | USED BY: mapgen, map editor (later), tests
+// MODULE: pure hex-grid topology (vertices, edges, ports, robber start) | DEPENDS ON: shared/types | USED BY: packs/tidebound/seaData, shared/index, shared/mapgen, shared/mapoptions, shared/mapshape
 import type { Board, Edge, Hex, Vertex } from './types';
 
 export interface HexInit { q: number; r: number; type: string; number: number | null; ext?: Record<string, any> }

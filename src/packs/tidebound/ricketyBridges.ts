@@ -1,4 +1,4 @@
-// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) | USED BY: packs/tidebound, tests
+// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) | DEPENDS ON: packs/tidebound/bridgeConsts, packs/tidebound/bridgeCore, shared/index | USED BY: packs/tidebound/bridges, packs/tidebound/index, packs/tidebound/tech, packs/tidebound/wrecks
 import {
   BOT_GOALS,
   canAfford,
@@ -16,7 +16,8 @@ import {
   SEVEN_STEPS,
   techGate,
   totalCards,
-  updateAwards
+  updateAwards,
+  VIEW_DATA
 } from '../../shared';
 import type {
   ActionDef,
@@ -32,9 +33,11 @@ import type {
   PlayerState,
   Registry,
   Resources,
-  SevenStepDef
+  SevenStepDef,
+  ViewDataDef
 } from '../../shared';
-import { BRIDGE, BRIDGE_BASE_LIMIT, bridgeBotGoal, bridgePiece, canPlaceBridge } from './bridges';
+import { bridgeBotGoal, bridgePiece, canPlaceBridge } from './bridgeCore';
+import { BRIDGE, BRIDGE_BASE_LIMIT } from './bridgeConsts';
 
 export const RICKETY = 'rickety_bridge';
 export const RICKETY_COST: Resources = { wood: 1 };
@@ -117,6 +120,8 @@ export const ricketyPiece: PieceDef = {
   roadLike: true,
   scaleWithRadius: true,
   icon: '🪵',
+  // R7a.5 (group 11): shows in the client's `pieceCosts` only once the Rickety bridges tech is unlocked (was a hard-coded line in `server/view.ts`).
+  available: (g: GameState, pid: Id) => techGate(g, pid, TECH_RICKETY_BRIDGES),
   canPlace: canPlaceRicketyBridge
 };
 
@@ -162,6 +167,15 @@ export function bridgeUpgradeView(g: GameState, reg: Registry, p: PlayerState): 
   if (!techGate(g, p.id, TECH_RICKETY_BRIDGES)) return undefined;
   return upgradeBridgeCost(g, reg, p);
 }
+
+/**
+ * VIEW_DATA entry (R7a.5, group 10): `bridgeUpgradeCost`, your price to upgrade a rickety bridge (yourself only). `bridgeUpgradeView` returns `undefined`
+ * unless rickety bridges are in the game and unlocked, so the field is absent otherwise, as before.
+ */
+export const ricketyViewData: ViewDataDef = {
+  id: 'tidebound.rickety_bridges.view',
+  player: (g, reg, p, who) => ({ bridgeUpgradeCost: who.self ? bridgeUpgradeView(g, reg, p) : undefined })
+};
 
 /**
  * Upgrade: a rickety bridge you own becomes a full bridge in place. Payload `{ edgeId }`.
@@ -307,6 +321,7 @@ export const ricketyBridgesAddon: AddonDef = {
     api.define(SEVEN_STEPS, ricketyCollapseStep);
     api.action(upgradeBridgeAction);
     api.phaseAction('main', UPGRADE_BRIDGE);
+    api.define(VIEW_DATA, ricketyViewData);
     // Shared pool: after either kind is built, put both supplies right.
     api.hook('onBuild', (ctx: Ctx, def: PieceDef, pid: Id) => {
       if (def.id === BRIDGE || def.id === RICKETY) syncBridgePool(ctx.g, pid);

@@ -1,4 +1,4 @@
-// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, idle-port checks, invalid-ratio advice) | USED BY: packs/base/trading, DLC packs, client, bots
+// MODULE: trade ratio service (ratioFor with ordered modifier chain, 2:1 floor, gem-port floor exemption, harbor-only 1:1 pass, idle-port checks, invalid-ratio advice) | DEPENDS ON: shared/registry, shared/types | USED BY: shared/index
 import { defsOf } from './registry';
 import type { Registry } from './registry';
 import type { GameState, Id } from './types';

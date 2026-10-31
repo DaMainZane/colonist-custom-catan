@@ -1,4 +1,4 @@
-// MODULE: server entry (Express and Socket.io, /health, bot training log endpoints, serves the client) | USED BY: esbuild.config.mjs (bundles to dist/main.js)
+// MODULE: server entry (Express and Socket.io, /health, bot training log endpoints, serves the client) | DEPENDS ON: server/bots/scheduler, server/bots/sim, server/bots/trainingLog, server/net, server/persistence, server/socket | USED BY: none
 import express from 'express';
 import http from 'http';
 import path from 'path';

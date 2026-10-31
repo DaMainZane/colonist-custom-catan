@@ -1,4 +1,4 @@
-// MODULE: base hooks (game start state, S0.10 per-pack stats handler, round hooks, pick settling and trade pruning) | USED BY: packs/base/index
+// MODULE: base hooks (game start state, S0.10 per-pack stats handler, round hooks, pick settling and trade pruning) | DEPENDS ON: packs/base/picks, packs/base/trading, shared/index | USED BY: packs/base/index
 import {
   clearExpiredMercenaries,
   currentPlayer,

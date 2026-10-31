@@ -1,4 +1,4 @@
-// MODULE: base map shapes (continent, ring, islands, archipelago, continents; lake, river, satellites, ragged) | USED BY: packs/base/map
+// MODULE: base map shapes (continent, ring, islands, archipelago, continents; lake, river, satellites, ragged) | DEPENDS ON: shared/index, shared/mapshape | USED BY: packs/base/map/index
 import { rngInt, rngNext } from '../../../shared';
 import type { MapCtx, PackApi } from '../../../shared';
 // The land-field helpers are imported from their module directly (their names are generic and stay out of the shared index).

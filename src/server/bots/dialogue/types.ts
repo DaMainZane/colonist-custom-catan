@@ -1,4 +1,4 @@
-// MODULE: bot dialogue types (events, line data shape, public context) | USED BY: bots/dialogue/*, server/types
+// MODULE: bot dialogue types (events, line data shape, public context) | DEPENDS ON: server/bots/tiers | USED BY: server/bots/dialogue/context, server/bots/dialogue/engine, server/bots/dialogue/events, server/bots/dialogue/index, server/bots/dialogue/lines/awards, server/bots/dialogue/lines/build, +6 more
 import type { ChatStyle, Personality } from '../tiers';
 
 /** Host setting that scales how often bots talk. */

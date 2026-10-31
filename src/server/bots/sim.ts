@@ -1,4 +1,4 @@
-// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and S0.16 sim matrix) | USED BY: tests/sim.test.ts, tests/bots.test.ts, tests/simmatrix.test.ts
+// MODULE: bot-vs-bot simulator (runs whole games without sockets or timers, checks invariants, tier ladder and S0.16 sim matrix) | DEPENDS ON: server/bots/brain, server/bots/tiers, server/bots/trainingLog, server/runtime, shared/index | USED BY: server/main
 import { createGame, dispatch, generateMap, mergeRules } from '../../shared';
 import type { GameState } from '../../shared';
 import { gameRegistry } from '../runtime';

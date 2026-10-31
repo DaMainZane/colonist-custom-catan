@@ -1,4 +1,4 @@
-// MODULE: map recipe (seed + radius + picks + params), share code, per-stage RNG streams, GEN_VERSION | USED BY: mapgen, lobby settings (M2), tests
+// MODULE: map recipe (seed + radius + picks + params), share code, per-stage RNG streams, GEN_VERSION | DEPENDS ON: shared/rng | USED BY: shared/index, shared/mapcheck, shared/mapgen, shared/mapshape
 import { createRng, randomSeed } from './rng';
 import type { RngState } from './rng';
 

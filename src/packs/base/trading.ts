@@ -1,4 +1,4 @@
-// MODULE: trade helpers (bank ratios from ratioFor service, resource parsing, multi-offer stack, player trade execution) | USED BY: actions/bankTrade, actions/tradeOffers, hooks
+// MODULE: trade helpers (bank ratios from ratioFor service, resource parsing, multi-offer stack, player trade execution) | DEPENDS ON: shared/index | USED BY: packs/base/actions/bankTrade, packs/base/actions/owed, packs/base/actions/tradeOffers, packs/base/hooks, server/bots/brain, server/bots/scheduler, +2 more
 import { getPlayer, ratioFor, tradeRatiosFor } from '../../shared';
 import type { Ctx, GameState, Id, PlayerState, Registry, Resources, TradeState } from '../../shared';
 

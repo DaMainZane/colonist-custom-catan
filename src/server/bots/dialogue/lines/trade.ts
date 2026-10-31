@@ -1,4 +1,4 @@
-// MODULE: dialogue lines for trading and the bank | USED BY: bots/dialogue/lines/index
+// MODULE: dialogue lines for trading and the bank | DEPENDS ON: server/bots/dialogue/types | USED BY: server/bots/dialogue/lines/index
 import type { Line } from '../types';
 
 export const TRADE_LINES: Line[] = [

@@ -1,4 +1,4 @@
-// MODULE: actions "propose_trade", "respond_trade", "counter_trade", "confirm_trade", "cancel_trade" (player-to-player trading) | USED BY: packs/base/actions/index
+// MODULE: actions "propose_trade", "respond_trade", "counter_trade", "confirm_trade", "cancel_trade" (player-to-player trading) | DEPENDS ON: packs/base/trading, shared/index | USED BY: packs/base/actions/index
 import { currentPlayer, getPlayer, isWildTokenResource } from '../../../shared';
 import type { ActionDef, GameState, Id, Resources, TradeState } from '../../../shared';
 import { executeTrade, holds, openTrades, parseResources, pushTrade, removeTrade, sumResources, syncPrimaryTrade, tradeBlocker } from '../trading';

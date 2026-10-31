@@ -1,4 +1,4 @@
-// MODULE: board checks (landmasses, lakes, usable spots, fairness, MapReport) | USED BY: mapgen, bots/mapProfile, lobby report (later), tests
+// MODULE: board checks (landmasses, lakes, usable spots, fairness, MapReport) | DEPENDS ON: shared/maprecipe, shared/registry, shared/rng, shared/types | USED BY: shared/index, shared/mapgen, shared/mapshape
 import type { Registry } from './registry';
 import { createRng, rngShuffle } from './rng';
 import type { RngState } from './rng';

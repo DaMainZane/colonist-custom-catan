@@ -1,4 +1,4 @@
-// MODULE: base development cards (knight, victory point, road building, year of plenty, monopoly) | USED BY: packs/base/index
+// MODULE: base development cards (knight, victory point, road building, year of plenty, monopoly) | DEPENDS ON: packs/base/robbing, shared/index | USED BY: packs/base/index
 import { getPlayer, pushPhase } from '../../shared';
 import type { PackApi } from '../../shared';
 import { setStealSource } from './robbing';

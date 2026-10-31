@@ -1,4 +1,4 @@
-// MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | USED BY: server/main
+// MODULE: socket handlers (lobby editing + game actions; every game action goes through engine dispatch) | DEPENDS ON: packs/base/constants, packs/base/robbing, packs/tidebound/index, server/bots/dialogue, server/bots/tiers, server/game, +8 more | USED BY: server/main
 import type { Server } from 'socket.io';
 import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
@@ -720,24 +720,23 @@ export function registerSocketHandlers(io: Server): void {
 
     // ---- Turn actions ---------------------------------------------------------
 
+    // R6.2: the generic entry. `{ code, type, payload }` runs any registered action for this socket's player, so a new action needs no handler here.
+    // The client's object is untrusted: `type` must be a string and `payload` a plain object (anything else becomes `{}`). Unknown or illegal types are
+    // refused by `dispatch` (its reason goes back to the player), so there is no check against the registry. It always reports; the events that are
+    // silent on refusal (roll, end turn, ...) stay as they are below.
+    socket.on('act', (data: any) => {
+      try {
+        const { code, type, payload } = data !== null && typeof data === 'object' ? data : ({} as any);
+        if (typeof code !== 'string' || typeof type !== 'string') return;
+        const plain = payload !== null && typeof payload === 'object' && !Array.isArray(payload);
+        act(code, type, plain ? payload : {}, true);
+      } catch (err) { console.error('Socket handler error:', err); }
+    });
+
     socket.on('rollDice', safe(({ code }) => act(code, 'roll')));
     socket.on('endTurn', safe(({ code }) => act(code, 'end_turn')));
     socket.on('buyDevCard', safe(({ code }) => act(code, 'buy_dev')));
-    socket.on('researchTech', safe(({ code, techId }) => act(code, 'research_tech', { techId }, true)));
-    socket.on('upgradePort', safe(({ code, vertexId }) => act(code, 'upgrade_port', { vertexId }, true)));
-    // Tidebound T8a: upgrade one of your port cities to a 1:1 harbor (limit 1, max 4 1:1 trades/turn, works while flooded).
-    socket.on('upgradeHarbor', safe(({ code, vertexId }) => act(code, 'upgrade_harbor', { vertexId }, true)));
-    // Tidebound T4c / T11f: turn one of your rickety bridges into a full bridge, or demolish one of your bridges (Salvage Crew).
-    socket.on('upgradeBridge', safe(({ code, edgeId }) => act(code, 'upgrade_bridge', { edgeId }, true)));
-    socket.on('demolishBridge', safe(({ code, edgeId }) => act(code, 'demolish_bridge', { edgeId }, true)));
-    socket.on('convertTile', safe(({ code, hexId, resource }) => act(code, 'convert_tile', { hexId, resource }, true)));
     socket.on('pickGoldResource', safe(({ code, resource }) => act(code, 'pick', { resource }, true)));
-    // Tidebound T7a: spend one fish token as any 1 resource, and discard fish on a 7 (`wild` = `{ fish: n }` next to the resource cards).
-    socket.on('spendFish', safe(({ code, resource }) => act(code, 'spend_fish', { resource }, true)));
-    // Tidebound T7e: pay 1 wheat to fill the fish icon of a sea tile next to one of your nets.
-    socket.on('feedSea', safe(({ code, hexId }) => act(code, 'feed_sea', { hexId }, true)));
-    // Tidebound T10b: drive a pirate off its tile (needs played knights and a road, bridge or port touching it).
-    socket.on('drivePirate', safe(({ code, hexId }) => act(code, 'drive_off_pirate', { hexId }, true)));
     socket.on('discardCards', safe(({ code, discards, wild }) => act(code, 'discard', { cards: discards, wild })));
 
     socket.on('playDevCard', safe(({ code, cardType, monopolyResource }) => {

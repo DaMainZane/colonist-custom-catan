@@ -1,4 +1,4 @@
-// MODULE: tidebound.pirates addon (T10a: pirate marker, max 2, ocean tiles only, random move each round, event card + passive spawn cadence; T10b: strength grows slowly with the round, `drive_off_pirate` needs played knights and a road/bridge/port touching the tile, loot grows with strength; T10c: a pirate robs 2 cards from every settlement/city in contact; T10d: flee mode (flee chance climbs after every rob, runs at least 2 tiles from the robbed city), avoids tiles within 2 of a city of a player with more knights than its strength; client view and minimal bot goal) | USED BY: packs/tidebound, server/view, server/socket, client, tests
+// MODULE: tidebound.pirates addon (T10a: pirate marker, max 2, ocean tiles only, random move each round, event card + passive spawn cadence; T10b: strength grows slowly with the round, `drive_off_pirate` needs played knights and a road/bridge/port touching the tile, loot grows with strength; T10c: a pirate robs 2 cards from every settlement/city in contact; T10d: flee mode (flee chance climbs after every rob, runs at least 2 tiles from the robbed city), avoids tiles within 2 of a city of a player with more knights than its strength; client view and minimal bot goal) | DEPENDS ON: packs/base/constants, packs/tidebound/fishing, packs/tidebound/tech, packs/tidebound/wrecks, shared/index | USED BY: packs/tidebound/index
 import {
   addMarker,
   addonOn,
@@ -13,7 +13,8 @@ import {
   hexDistance,
   removeMarker,
   rngInt,
-  rngNext
+  rngNext,
+  VIEW_DATA
 } from '../../shared';
 import type {
   ActionDef,
@@ -27,7 +28,8 @@ import type {
   MarkerEntry,
   PlayerState,
   Registry,
-  RngState
+  RngState,
+  ViewDataDef
 } from '../../shared';
 import { CITY, SETTLEMENT } from '../base/constants';
 import { seaHexIdsAt } from './fishing';
@@ -597,6 +599,15 @@ export function pirateClientView(g: GameState, reg: Registry): PirateClientItem[
 }
 
 /**
+ * VIEW_DATA entry (R7a.5, group 4): the public `pirates` field of the client state. Registered inside the pirates addon, so it exists only while
+ * Pirates is on. While it is off the pack's always-on `tidebound.view_defaults` entry supplies `pirates: null` (a public field is null when off).
+ */
+export const pirateViewData: ViewDataDef = {
+  id: 'tidebound.pirates.view',
+  shared: (g: GameState, reg: Registry) => ({ pirates: pirateClientView(g, reg) })
+};
+
+/**
  * Tiles of the pirates `p` can drive off now, for the player's own view. `undefined` when the action is not in the game or it is not
  * `p`'s main-phase turn; `[]` when nothing can be driven off.
  */
@@ -605,6 +616,15 @@ export function pirateDriveView(g: GameState, reg: Registry, p: PlayerState): nu
   if (g.phase !== 'main' || g.players[g.turn]?.id !== p.id) return undefined;
   return drivablePirateHexIds(g, reg, p.id);
 }
+
+/**
+ * VIEW_DATA entry (R7a.5, group 9): `pirateDrives`, the tiles of the pirates you could drive off right now (yourself only). `pirateDriveView` returns
+ * `undefined` unless the action is in the game and it is your main-phase turn, so the field is absent otherwise, as before.
+ */
+export const pirateDriveViewData: ViewDataDef = {
+  id: 'tidebound.pirates.drive_view',
+  player: (g, reg, p, who) => ({ pirateDrives: who.self ? pirateDriveView(g, reg, p) : undefined })
+};
 
 // ---- Minimal bot support (`BOT_GOALS`) --------------------------------------------------------------------------
 
@@ -649,6 +669,9 @@ export const piratesAddon: AddonDef = {
     registerTideboundTechs(api);
     api.define(EVENT_CARDS, pirateRaidCard);
     api.define(BOT_GOALS, pirateBotGoal);
+    // R7a.5: the public pirate markers for the client state.
+    api.define(VIEW_DATA, pirateViewData);
+    api.define(VIEW_DATA, pirateDriveViewData);
     api.action(driveOffPirateAction);
     api.phaseAction('main', DRIVE_OFF_PIRATE);
     api.hook('onRoundStart', (ctx: Ctx) => {

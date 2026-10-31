@@ -1,0 +1,2860 @@
+{
+ "tideboundOff": {
+  "active": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "board": {
+    "buildings": [],
+    "edgePieces": [],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": null,
+   "hexOverlays": null,
+   "hostId": "host-viewstate",
+   "isSpectator": false,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    }
+   ],
+   "longestRoadOwner": null,
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": null,
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "newDevCards": [],
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    }
+   ],
+   "portLevels": null,
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {},
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": false,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": null,
+   "techTree": null,
+   "tide": null,
+   "tradeRatios": {
+    "brick": 4,
+    "ore": 4,
+    "sheep": 4,
+    "wheat": 4,
+    "wood": 4
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": null
+  },
+  "other": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "board": {
+    "buildings": [],
+    "edgePieces": [],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": null,
+   "hexOverlays": null,
+   "hostId": "host-viewstate",
+   "isSpectator": false,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    }
+   ],
+   "longestRoadOwner": null,
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": null,
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "newDevCards": [],
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    }
+   ],
+   "portLevels": null,
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {},
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": false,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": null,
+   "techTree": null,
+   "tide": null,
+   "tradeRatios": {
+    "brick": 4,
+    "ore": 4,
+    "sheep": 4,
+    "wheat": 4,
+    "wood": 4
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": null
+  },
+  "spectator": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "board": {
+    "buildings": [],
+    "edgePieces": [],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": null,
+   "hexOverlays": null,
+   "hostId": "host-viewstate",
+   "isSpectator": true,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    }
+   ],
+   "longestRoadOwner": null,
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": null,
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "newDevCards": [],
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgesLeft": 0,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "newDevCards": [],
+     "pieceCosts": {
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    }
+   ],
+   "portLevels": null,
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {},
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": false,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": null,
+   "techTree": null,
+   "tide": null,
+   "tradeRatios": {
+    "brick": 4,
+    "ore": 4,
+    "sheep": 4,
+    "wheat": 4,
+    "wood": 4
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": null
+  }
+ },
+ "tideboundOn": {
+  "active": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 24,
+    "ore": 24,
+    "sheep": 24,
+    "wheat": 24,
+    "wood": 24
+   },
+   "board": {
+    "buildings": [
+     {
+      "id": 28,
+      "owner": "b",
+      "port": null,
+      "type": "net"
+     },
+     {
+      "id": 53,
+      "owner": "b",
+      "port": "3:1",
+      "type": "city"
+     }
+    ],
+    "edgePieces": [
+     {
+      "id": 1,
+      "owner": "b",
+      "type": "road"
+     },
+     {
+      "id": 150,
+      "owner": "b",
+      "type": "bridge"
+     }
+    ],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": {
+    "60": 2
+   },
+   "hexOverlays": {
+    "38": {
+     "kind": "flood-warn"
+    },
+    "39": {
+     "kind": "flood"
+    },
+    "40": {
+     "kind": "flood"
+    },
+    "49": {
+     "kind": "flood-warn"
+    },
+    "52": {
+     "kind": "flood"
+    },
+    "61": {
+     "kind": "flood-warn"
+    },
+    "65": {
+     "kind": "flood"
+    },
+    "74": {
+     "kind": "flood-warn"
+    },
+    "77": {
+     "kind": "flood"
+    },
+    "86": {
+     "kind": "flood-warn"
+    },
+    "87": {
+     "kind": "flood"
+    },
+    "88": {
+     "kind": "flood"
+    }
+   },
+   "hostId": "host-viewstate",
+   "isSpectator": false,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    },
+    {
+     "color": null,
+     "text": "🌊 The tide rises over 7 coast tiles"
+    },
+    {
+     "color": null,
+     "text": "⛈️ Storm at Sea: a sea shipwreck washed up on tile #0!"
+    },
+    {
+     "color": null,
+     "text": "🏴‍☠️ A pirate ship appeared on tile #126 (strength 1, takes 1 played knight to drive off)!"
+    }
+   ],
+   "longestRoadOwner": "b",
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": [
+    {
+     "hexId": 126,
+     "id": "mk_2",
+     "mode": "roam",
+     "strength": 1
+    }
+   ],
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 10,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgeUpgradeCost": {
+      "brick": 1,
+      "ore": 1
+     },
+     "bridgesLeft": 10,
+     "canDemolishBridge": true,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "feedCost": {
+      "wheat": 1
+     },
+     "feedSpots": [
+      60,
+      73
+     ],
+     "freeRoads": 0,
+     "goldPending": 0,
+     "harborCost": {
+      "brick": 1,
+      "ore": 1,
+      "wood": 2
+     },
+     "harborSpots": [],
+     "harborTradesLeft": 4,
+     "harborsLeft": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "netSpots": [
+      2,
+      3
+     ],
+     "netsLeft": 3,
+     "newDevCards": [],
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "net": {
+       "sheep": 1,
+       "wood": 2
+      },
+      "rickety_bridge": {
+       "wood": 1
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "pirateDrives": [],
+     "playedDevCardThisTurn": false,
+     "publicVp": 18,
+     "resourceCount": 25,
+     "resources": {
+      "brick": 5,
+      "ore": 5,
+      "sheep": 5,
+      "wheat": 5,
+      "wood": 5
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 1,
+       "citiesOnBoard": 1,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 1,
+       "roadsOnBoard": 1,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 2,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 16,
+       "settlement": 0
+      }
+     },
+     "vp": 18
+    }
+   ],
+   "portLevels": {
+    "53": 2
+   },
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {
+     "tidebound": true
+    },
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": true,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": {
+    "groundWork": null,
+    "harbor": null
+   },
+   "techTree": [
+    {
+     "branch": "tidebound",
+     "canResearch": true,
+     "cost": 2,
+     "description": "Raise a city on a 3:1 port so every resource trades 2:1 there (2 wood, 1 brick, 1 ore).",
+     "id": "tidebound.harbor_charters",
+     "name": "Harbor charters",
+     "owned": false,
+     "payment": {
+      "sheep": 1,
+      "wood": 1
+     },
+     "prereqs": [],
+     "reason": null,
+     "tier": 1
+    },
+    {
+     "branch": "bulwark",
+     "canResearch": true,
+     "cost": 2,
+     "description": "Your discard limit is 2 higher.",
+     "id": "bulwark.stockpiling",
+     "name": "Stockpiling",
+     "owned": false,
+     "payment": {
+      "brick": 1,
+      "ore": 1
+     },
+     "prereqs": [],
+     "reason": null,
+     "tier": 1
+    },
+    {
+     "branch": "warlords",
+     "canResearch": true,
+     "cost": 3,
+     "description": "When you play a knight, the steal takes 1 extra card.",
+     "id": "warlords.plunder",
+     "name": "Plunder",
+     "owned": false,
+     "payment": {
+      "ore": 1,
+      "sheep": 1,
+      "wheat": 1
+     },
+     "prereqs": [],
+     "reason": null,
+     "tier": 1
+    },
+    {
+     "branch": "wildearth",
+     "canResearch": true,
+     "cost": 3,
+     "description": "Once: turn a land tile next to your settlement or city into a basic resource tile of your choice.",
+     "id": "wildearth.ground_work",
+     "name": "Ground work",
+     "owned": false,
+     "payment": {
+      "brick": 1,
+      "wheat": 1,
+      "wood": 1
+     },
+     "prereqs": [],
+     "reason": null,
+     "tier": 1
+    },
+    {
+     "branch": "guildhall",
+     "canResearch": true,
+     "cost": 2,
+     "description": "Roads past the road cap (2x price) cost 1 less brick or wood.",
+     "id": "guildhall.road_levy",
+     "name": "Road levy",
+     "owned": false,
+     "payment": {
+      "sheep": 1,
+      "wheat": 1
+     },
+     "prereqs": [],
+     "reason": null,
+     "tier": 1
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 6,
+     "description": "Unlocks Rickety Bridges (1 wood, 1 health, collapses on a 7; upgradeable to a full bridge) and raises your bridge cap by +4 before bridges cost 2x.",
+     "id": "tidebound.rickety_bridges",
+     "name": "Rickety bridges",
+     "owned": true,
+     "path": "expansion",
+     "payment": {
+      "ore": 2,
+      "sheep": 2,
+      "wood": 2
+     },
+     "prereqs": [
+      "tidebound.harbor_charters"
+     ],
+     "reason": null,
+     "tier": 2
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 6,
+     "description": "Unlocks Fishing Nets on coastal corners (catch wild fish tokens on dice rolls) and lets your Settlements on 3:1 ports be raised to 2:1.",
+     "id": "tidebound.fishing_nets",
+     "name": "Fishing nets",
+     "owned": true,
+     "path": "industrial",
+     "payment": {
+      "ore": 2,
+      "sheep": 2,
+      "wood": 2
+     },
+     "prereqs": [
+      "tidebound.harbor_charters"
+     ],
+     "reason": null,
+     "tier": 2
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 9,
+     "description": "+25% shipwreck salvage loot, higher dev-card chance on sea wrecks, and unlocks Demolish Bridge (remove a bridge for half its cards back).",
+     "id": "tidebound.salvage_crew",
+     "name": "Salvage crew",
+     "owned": true,
+     "path": "expansion",
+     "payment": {
+      "ore": 3,
+      "sheep": 3,
+      "wood": 3
+     },
+     "prereqs": [
+      "tidebound.rickety_bridges"
+     ],
+     "reason": null,
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": true,
+     "cost": 9,
+     "description": "Fishing Nets cost 1 less wood (1 wood + 1 sheep), base catch chance rises to 1 in 4 (1 in 2 when boosted), and boosted catches have a 1 in 3 chance to save the fish boost.",
+     "id": "tidebound.net_works",
+     "name": "Net works",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 3,
+      "sheep": 3,
+      "wood": 3
+     },
+     "prereqs": [
+      "tidebound.fishing_nets"
+     ],
+     "reason": null,
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": true,
+     "cost": 11,
+     "description": "Driving off a pirate requires 2 fewer played knights (minimum 1) and grants +50% pirate loot.",
+     "id": "tidebound.pirate_hunter",
+     "name": "Pirate hunter",
+     "owned": false,
+     "path": "expansion",
+     "payment": {
+      "ore": 3,
+      "sheep": 4,
+      "wood": 4
+     },
+     "prereqs": [
+      "tidebound.salvage_crew"
+     ],
+     "reason": null,
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 11,
+     "description": "Unlocks Harbors (upgrade a port city to 1:1 trade for up to 4 trades per turn, works while flooded) and Feed the Sea (1 wheat refills a fishing ground).",
+     "id": "tidebound.harbor_master",
+     "name": "Harbor master",
+     "owned": true,
+     "path": "industrial",
+     "payment": {
+      "ore": 3,
+      "sheep": 4,
+      "wood": 4
+     },
+     "prereqs": [
+      "tidebound.net_works"
+     ],
+     "reason": null,
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 15,
+     "description": "Longest Road is worth 16 VP instead of 2 (+14 VP) while you hold Longest Road and your road includes at least 1 bridge or rickety bridge.",
+     "id": "tidebound.grand_causeway",
+     "name": "Grand causeway",
+     "owned": true,
+     "path": "expansion",
+     "payment": {
+      "ore": 5,
+      "sheep": 5,
+      "wood": 5
+     },
+     "prereqs": [
+      "tidebound.pirate_hunter"
+     ],
+     "reason": null,
+     "tier": 4
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": true,
+     "cost": 15,
+     "description": "+1 Harbor limit (2 Harbors total) and immediately grants ceil(V / 2) random resource cards from the bank on unlock.",
+     "id": "tidebound.harbor_empire",
+     "name": "Harbor empire",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 5,
+      "sheep": 5,
+      "wood": 5
+     },
+     "prereqs": [
+      "tidebound.harbor_master"
+     ],
+     "reason": null,
+     "tier": 4
+    }
+   ],
+   "tide": {
+    "elevation": null,
+    "level": 3,
+    "levelName": "Medium",
+    "rose": null,
+    "round": 5,
+    "warning": {
+     "count": 5,
+     "round": 6,
+     "spring": false
+    }
+   },
+   "tradeRatios": {
+    "brick": 1,
+    "ore": 1,
+    "sheep": 1,
+    "wheat": 1,
+    "wood": 1
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": [
+    {
+     "countdown": 4,
+     "hexId": 0,
+     "id": "mk_1",
+     "shoreDir": null,
+     "site": "sea"
+    }
+   ]
+  },
+  "other": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 24,
+    "ore": 24,
+    "sheep": 24,
+    "wheat": 24,
+    "wood": 24
+   },
+   "board": {
+    "buildings": [
+     {
+      "id": 28,
+      "owner": "b",
+      "port": null,
+      "type": "net"
+     },
+     {
+      "id": 53,
+      "owner": "b",
+      "port": "3:1",
+      "type": "city"
+     }
+    ],
+    "edgePieces": [
+     {
+      "id": 1,
+      "owner": "b",
+      "type": "road"
+     },
+     {
+      "id": 150,
+      "owner": "b",
+      "type": "bridge"
+     }
+    ],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": {
+    "60": 2
+   },
+   "hexOverlays": {
+    "38": {
+     "kind": "flood-warn"
+    },
+    "39": {
+     "kind": "flood"
+    },
+    "40": {
+     "kind": "flood"
+    },
+    "49": {
+     "kind": "flood-warn"
+    },
+    "52": {
+     "kind": "flood"
+    },
+    "61": {
+     "kind": "flood-warn"
+    },
+    "65": {
+     "kind": "flood"
+    },
+    "74": {
+     "kind": "flood-warn"
+    },
+    "77": {
+     "kind": "flood"
+    },
+    "86": {
+     "kind": "flood-warn"
+    },
+    "87": {
+     "kind": "flood"
+    },
+    "88": {
+     "kind": "flood"
+    }
+   },
+   "hostId": "host-viewstate",
+   "isSpectator": false,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    },
+    {
+     "color": null,
+     "text": "🌊 The tide rises over 7 coast tiles"
+    },
+    {
+     "color": null,
+     "text": "⛈️ Storm at Sea: a sea shipwreck washed up on tile #0!"
+    },
+    {
+     "color": null,
+     "text": "🏴‍☠️ A pirate ship appeared on tile #126 (strength 1, takes 1 played knight to drive off)!"
+    }
+   ],
+   "longestRoadOwner": "b",
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": [
+    {
+     "hexId": 126,
+     "id": "mk_2",
+     "mode": "roam",
+     "strength": 1
+    }
+   ],
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 10,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "newDevCards": [],
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgesLeft": 10,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "harborsLeft": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "netsLeft": 3,
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "net": {
+       "sheep": 1,
+       "wood": 2
+      },
+      "rickety_bridge": {
+       "wood": 1
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 18,
+     "resourceCount": 25,
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 1,
+       "citiesOnBoard": 1,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 1,
+       "roadsOnBoard": 1,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 2,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 16,
+       "settlement": 0
+      }
+     },
+     "vp": 18
+    }
+   ],
+   "portLevels": {
+    "53": 2
+   },
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {
+     "tidebound": true
+    },
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": true,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": {
+    "groundWork": null,
+    "harbor": null
+   },
+   "techTree": [
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 2,
+     "description": "Raise a city on a 3:1 port so every resource trades 2:1 there (2 wood, 1 brick, 1 ore).",
+     "id": "tidebound.harbor_charters",
+     "name": "Harbor charters",
+     "owned": false,
+     "payment": {
+      "sheep": 1,
+      "wood": 1
+     },
+     "prereqs": [],
+     "reason": "Not enough resources to research this technology",
+     "tier": 1
+    },
+    {
+     "branch": "bulwark",
+     "canResearch": false,
+     "cost": 2,
+     "description": "Your discard limit is 2 higher.",
+     "id": "bulwark.stockpiling",
+     "name": "Stockpiling",
+     "owned": false,
+     "payment": {
+      "brick": 1,
+      "ore": 1
+     },
+     "prereqs": [],
+     "reason": "Not enough resources to research this technology",
+     "tier": 1
+    },
+    {
+     "branch": "warlords",
+     "canResearch": false,
+     "cost": 2,
+     "description": "When you play a knight, the steal takes 1 extra card.",
+     "id": "warlords.plunder",
+     "name": "Plunder",
+     "owned": false,
+     "payment": {
+      "ore": 1,
+      "wheat": 1
+     },
+     "prereqs": [],
+     "reason": "Not enough resources to research this technology",
+     "tier": 1
+    },
+    {
+     "branch": "wildearth",
+     "canResearch": false,
+     "cost": 2,
+     "description": "Once: turn a land tile next to your settlement or city into a basic resource tile of your choice.",
+     "id": "wildearth.ground_work",
+     "name": "Ground work",
+     "owned": false,
+     "payment": {
+      "brick": 1,
+      "wood": 1
+     },
+     "prereqs": [],
+     "reason": "Not enough resources to research this technology",
+     "tier": 1
+    },
+    {
+     "branch": "guildhall",
+     "canResearch": false,
+     "cost": 2,
+     "description": "Roads past the road cap (2x price) cost 1 less brick or wood.",
+     "id": "guildhall.road_levy",
+     "name": "Road levy",
+     "owned": false,
+     "payment": {
+      "sheep": 1,
+      "wheat": 1
+     },
+     "prereqs": [],
+     "reason": "Not enough resources to research this technology",
+     "tier": 1
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 5,
+     "description": "Unlocks Rickety Bridges (1 wood, 1 health, collapses on a 7; upgradeable to a full bridge) and raises your bridge cap by +4 before bridges cost 2x.",
+     "id": "tidebound.rickety_bridges",
+     "name": "Rickety bridges",
+     "owned": false,
+     "path": "expansion",
+     "payment": {
+      "ore": 1,
+      "sheep": 2,
+      "wood": 2
+     },
+     "prereqs": [
+      "tidebound.harbor_charters"
+     ],
+     "reason": "Requires Harbor charters first",
+     "tier": 2
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 5,
+     "description": "Unlocks Fishing Nets on coastal corners (catch wild fish tokens on dice rolls) and lets your Settlements on 3:1 ports be raised to 2:1.",
+     "id": "tidebound.fishing_nets",
+     "name": "Fishing nets",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 1,
+      "sheep": 2,
+      "wood": 2
+     },
+     "prereqs": [
+      "tidebound.harbor_charters"
+     ],
+     "reason": "Requires Harbor charters first",
+     "tier": 2
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 8,
+     "description": "+25% shipwreck salvage loot, higher dev-card chance on sea wrecks, and unlocks Demolish Bridge (remove a bridge for half its cards back).",
+     "id": "tidebound.salvage_crew",
+     "name": "Salvage crew",
+     "owned": false,
+     "path": "expansion",
+     "payment": {
+      "ore": 2,
+      "sheep": 3,
+      "wood": 3
+     },
+     "prereqs": [
+      "tidebound.rickety_bridges"
+     ],
+     "reason": "Requires Rickety bridges first",
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 8,
+     "description": "Fishing Nets cost 1 less wood (1 wood + 1 sheep), base catch chance rises to 1 in 4 (1 in 2 when boosted), and boosted catches have a 1 in 3 chance to save the fish boost.",
+     "id": "tidebound.net_works",
+     "name": "Net works",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 2,
+      "sheep": 3,
+      "wood": 3
+     },
+     "prereqs": [
+      "tidebound.fishing_nets"
+     ],
+     "reason": "Requires Fishing nets first",
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 10,
+     "description": "Driving off a pirate requires 2 fewer played knights (minimum 1) and grants +50% pirate loot.",
+     "id": "tidebound.pirate_hunter",
+     "name": "Pirate hunter",
+     "owned": false,
+     "path": "expansion",
+     "payment": {
+      "ore": 3,
+      "sheep": 3,
+      "wood": 4
+     },
+     "prereqs": [
+      "tidebound.salvage_crew"
+     ],
+     "reason": "Requires Salvage crew first",
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 10,
+     "description": "Unlocks Harbors (upgrade a port city to 1:1 trade for up to 4 trades per turn, works while flooded) and Feed the Sea (1 wheat refills a fishing ground).",
+     "id": "tidebound.harbor_master",
+     "name": "Harbor master",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 3,
+      "sheep": 3,
+      "wood": 4
+     },
+     "prereqs": [
+      "tidebound.net_works"
+     ],
+     "reason": "Requires Net works first",
+     "tier": 3
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 14,
+     "description": "Longest Road is worth 16 VP instead of 2 (+14 VP) while you hold Longest Road and your road includes at least 1 bridge or rickety bridge.",
+     "id": "tidebound.grand_causeway",
+     "name": "Grand causeway",
+     "owned": false,
+     "path": "expansion",
+     "payment": {
+      "ore": 4,
+      "sheep": 5,
+      "wood": 5
+     },
+     "prereqs": [
+      "tidebound.pirate_hunter"
+     ],
+     "reason": "Requires Pirate hunter first",
+     "tier": 4
+    },
+    {
+     "branch": "tidebound",
+     "canResearch": false,
+     "cost": 14,
+     "description": "+1 Harbor limit (2 Harbors total) and immediately grants ceil(V / 2) random resource cards from the bank on unlock.",
+     "id": "tidebound.harbor_empire",
+     "name": "Harbor empire",
+     "owned": false,
+     "path": "industrial",
+     "payment": {
+      "ore": 4,
+      "sheep": 5,
+      "wood": 5
+     },
+     "prereqs": [
+      "tidebound.harbor_master"
+     ],
+     "reason": "Requires Harbor master first",
+     "tier": 4
+    }
+   ],
+   "tide": {
+    "elevation": null,
+    "level": 3,
+    "levelName": "Medium",
+    "rose": null,
+    "round": 5,
+    "warning": {
+     "count": 5,
+     "round": 6,
+     "spring": false
+    }
+   },
+   "tradeRatios": {
+    "brick": 4,
+    "ore": 4,
+    "sheep": 4,
+    "wheat": 4,
+    "wood": 4
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": [
+    {
+     "countdown": 4,
+     "hexId": 0,
+     "id": "mk_1",
+     "shoreDir": null,
+     "site": "sea"
+    }
+   ]
+  },
+  "spectator": {
+   "activeTrade": null,
+   "activeTrades": [],
+   "bank": {
+    "brick": 19,
+    "ore": 19,
+    "sheep": 19,
+    "wheat": 19,
+    "wood": 19
+   },
+   "bankSupply": {
+    "brick": 24,
+    "ore": 24,
+    "sheep": 24,
+    "wheat": 24,
+    "wood": 24
+   },
+   "board": {
+    "buildings": [
+     {
+      "id": 28,
+      "owner": "b",
+      "port": null,
+      "type": "net"
+     },
+     {
+      "id": 53,
+      "owner": "b",
+      "port": "3:1",
+      "type": "city"
+     }
+    ],
+    "edgePieces": [
+     {
+      "id": 1,
+      "owner": "b",
+      "type": "road"
+     },
+     {
+      "id": 150,
+      "owner": "b",
+      "type": "bridge"
+     }
+    ],
+    "edges": 342,
+    "hexes": 127,
+    "robberHexId": 38,
+    "vertices": 294
+   },
+   "chats": [
+    {
+     "avatar": "🦊",
+     "color": "#e53935",
+     "sender": "Host",
+     "text": "Welcome! Customize the board or add bots to start."
+    }
+   ],
+   "code": "VIEW1",
+   "currentPlayerId": "b",
+   "devDeckCount": 25,
+   "diceStats": {
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0
+   },
+   "finishedAt": null,
+   "fishIcons": {
+    "60": 2
+   },
+   "hexOverlays": {
+    "38": {
+     "kind": "flood-warn"
+    },
+    "39": {
+     "kind": "flood"
+    },
+    "40": {
+     "kind": "flood"
+    },
+    "49": {
+     "kind": "flood-warn"
+    },
+    "52": {
+     "kind": "flood"
+    },
+    "61": {
+     "kind": "flood-warn"
+    },
+    "65": {
+     "kind": "flood"
+    },
+    "74": {
+     "kind": "flood-warn"
+    },
+    "77": {
+     "kind": "flood"
+    },
+    "86": {
+     "kind": "flood-warn"
+    },
+    "87": {
+     "kind": "flood"
+    },
+    "88": {
+     "kind": "flood"
+    }
+   },
+   "hostId": "host-viewstate",
+   "isSpectator": true,
+   "largestArmyOwner": null,
+   "lastDice": [
+    4,
+    3
+   ],
+   "lastRollHexIds": [],
+   "lastSetupVertexId": null,
+   "logs": [
+    {
+     "color": "#e53935",
+     "text": "🎲 Turn order randomized! 🦊 Alice goes first!"
+    },
+    {
+     "color": null,
+     "text": "🌊 The tide rises over 7 coast tiles"
+    },
+    {
+     "color": null,
+     "text": "⛈️ Storm at Sea: a sea shipwreck washed up on tile #0!"
+    },
+    {
+     "color": null,
+     "text": "🏴‍☠️ A pirate ship appeared on tile #126 (strength 1, takes 1 played knight to drive off)!"
+    }
+   ],
+   "longestRoadOwner": "b",
+   "mapMeta": null,
+   "phase": "MAIN",
+   "pirates": [
+    {
+     "hexId": 126,
+     "id": "mk_2",
+     "mode": "roam",
+     "strength": 1
+    }
+   ],
+   "players": [
+    {
+     "avatar": "🦊",
+     "bridgesLeft": 10,
+     "citiesLeft": 4,
+     "color": "#e53935",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "id": "a",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Alice",
+     "newDevCards": [],
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 0,
+     "resourceCount": 0,
+     "resources": {
+      "brick": 0,
+      "ore": 0,
+      "sheep": 0,
+      "wheat": 0,
+      "wood": 0
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 0,
+       "citiesOnBoard": 0,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 0,
+       "roadsOnBoard": 0,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 0,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 0,
+       "settlement": 0
+      }
+     },
+     "vp": 0
+    },
+    {
+     "avatar": "🐼",
+     "bridgesLeft": 10,
+     "citiesLeft": 4,
+     "color": "#1e88e5",
+     "devCardCount": 0,
+     "devCards": [],
+     "difficulty": null,
+     "discardLimit": 7,
+     "discardPending": 0,
+     "freeRoads": 0,
+     "goldPending": 0,
+     "harborsLeft": 0,
+     "id": "b",
+     "isBot": false,
+     "knightsPlayed": 0,
+     "longestRoadLength": 0,
+     "name": "Bob",
+     "netsLeft": 3,
+     "newDevCards": [],
+     "pieceCosts": {
+      "bridge": {
+       "brick": 1,
+       "ore": 1,
+       "wood": 1
+      },
+      "city": {
+       "ore": 3,
+       "wheat": 2
+      },
+      "net": {
+       "sheep": 1,
+       "wood": 2
+      },
+      "rickety_bridge": {
+       "wood": 1
+      },
+      "road": {
+       "brick": 1,
+       "wood": 1
+      },
+      "settlement": {
+       "brick": 1,
+       "sheep": 1,
+       "wheat": 1,
+       "wood": 1
+      }
+     },
+     "playedDevCardThisTurn": false,
+     "publicVp": 18,
+     "resourceCount": 25,
+     "resources": {
+      "brick": 5,
+      "ore": 5,
+      "sheep": 5,
+      "wheat": 5,
+      "wood": 5
+     },
+     "roadsLeft": 15,
+     "settlementsLeft": 5,
+     "stats": {
+      "activity": {
+       "bankTrades": 0,
+       "citiesBuilt": 1,
+       "citiesOnBoard": 1,
+       "knightsPlayed": 0,
+       "longestRoad": 0,
+       "playerTrades": 0,
+       "roadsBuilt": 1,
+       "roadsOnBoard": 1,
+       "robberMoves": 0,
+       "rolls": 0,
+       "settlementsBuilt": 0,
+       "settlementsOnBoard": 0,
+       "sevens": 0,
+       "tradesProposed": 0,
+       "turns": 1
+      },
+      "byResource": {
+       "brick": 0,
+       "ore": 0,
+       "sheep": 0,
+       "wheat": 0,
+       "wood": 0
+      },
+      "devCards": {
+       "bought": 0,
+       "knight": 0,
+       "monopoly": 0,
+       "played": 0,
+       "roadBuilding": 0,
+       "vp": 0,
+       "yearOfPlenty": 0
+      },
+      "resCards": {
+       "devGain": 0,
+       "discarded": 0,
+       "produced": 0,
+       "robbed": 0,
+       "stolen": 0,
+       "tradedIn": 0,
+       "tradedOut": 0
+      },
+      "resourcesEarned": 0,
+      "tradesMade": 0,
+      "vpBreakdown": {
+       "city": 2,
+       "devVp": 0,
+       "largestArmy": 0,
+       "longestRoad": 16,
+       "settlement": 0
+      }
+     },
+     "vp": 18
+    }
+   ],
+   "portLevels": {
+    "53": 2
+   },
+   "recentProductions": [],
+   "recentTransfers": [],
+   "robberVictims": [],
+   "round": 5,
+   "settings": {
+    "addons": {},
+    "bankResourcePerType": 19,
+    "boardRadius": 2,
+    "cardDiscardLimit": 7,
+    "desertTiles": 1,
+    "devKnights": 14,
+    "devMonopoly": 2,
+    "devRoadBuilding": 2,
+    "devVp": 5,
+    "devYearOfPlenty": 2,
+    "dlc": {
+     "tidebound": true
+    },
+    "eventsOn": false,
+    "fairDice": false,
+    "fateTokens": 2,
+    "fogTiles": 0,
+    "gameSpeed": 0.5,
+    "goldTiles": 0,
+    "mapParams": {},
+    "mapPicks": [],
+    "mapSeed": "VIEW001",
+    "mapSeedLocked": false,
+    "maxCities": 4,
+    "maxPlayers": 8,
+    "maxRoads": 15,
+    "maxSettlements": 5,
+    "techTreeOn": true,
+    "tideLevel": 3,
+    "tradeTimerSec": 20,
+    "turnIncrementSec": 0,
+    "turnTimerSec": 0,
+    "vpToWin": 10
+   },
+   "setup": false,
+   "spectators": [],
+   "startedAt": null,
+   "status": "PLAYING",
+   "techActions": null,
+   "techTree": null,
+   "tide": {
+    "elevation": null,
+    "level": 3,
+    "levelName": "Medium",
+    "rose": null,
+    "round": 5,
+    "warning": {
+     "count": 5,
+     "round": 6,
+     "spring": false
+    }
+   },
+   "tradeRatios": {
+    "brick": 4,
+    "ore": 4,
+    "sheep": 4,
+    "wheat": 4,
+    "wood": 4
+   },
+   "turnClock": null,
+   "turnCount": 6,
+   "turnHistory": [],
+   "turnIndex": 1,
+   "winner": null,
+   "wrecks": [
+    {
+     "countdown": 4,
+     "hexId": 0,
+     "id": "mk_1",
+     "shoreDir": null,
+     "site": "sea"
+    }
+   ]
+  }
+ }
+}

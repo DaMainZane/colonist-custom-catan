@@ -1,4 +1,4 @@
-// MODULE: right sidebar (log, chat, bank, player rows) | USED BY: render/index.ts, main.ts
+// MODULE: right sidebar (log, chat, bank, player rows) | DEPENDS ON: client/avatars, client/constants, client/icons, client/socket, client/store, client/types, +1 more | USED BY: client/main, client/render/board, client/render/index
 import { RESOURCES } from '../constants';
 import { getMiniSvg, uiIcon } from '../icons';
 import { socket } from '../socket';
@@ -271,7 +271,7 @@ export function renderSidebar(): void {
     const isTurn = idx === state.turnIndex && state.status !== 'LOBBY';
     const shownResCount = Math.max(0, p.resourceCount - (inFlightPlayerResCount[p.id] || 0));
     const shownDevCount = Math.max(0, p.devCardCount - (inFlightPlayerDevCount[p.id] || 0));
-    const overLimit = shownResCount > state.settings.cardDiscardLimit;
+    const overLimit = shownResCount > (p.discardLimit ?? state.settings.cardDiscardLimit);
     const tags = [
       p.isBot ? botTag(p) : '',
       isVictim ? '<span class="tag danger">Rob</span>' : '',
@@ -301,7 +301,7 @@ export function renderSidebar(): void {
       </div>
       <div class="p-vp">${vpHtml}<small>VP</small></div>
       <div class="p-stats">
-        <span class="stat ${overLimit ? 'warn' : ''}" title="Resource cards">${uiIcon('cards', 14)}${shownResCount}</span>
+        <span class="stat ${overLimit ? 'warn' : ''}" title="${overLimit ? `Over the discard limit (${p.discardLimit ?? state.settings.cardDiscardLimit}): a 7 makes them discard` : 'Resource cards'}">${uiIcon('cards', 14)}${shownResCount}</span>
         <span class="stat dev" title="Development cards">${uiIcon('devcard', 14)}${shownDevCount}</span>
         <span class="stat" title="Knights played">${uiIcon('sword', 14)}${p.knightsPlayed}</span>
         <span class="stat" title="Longest road">${uiIcon('road', 14)}${p.longestRoadLength}</span>

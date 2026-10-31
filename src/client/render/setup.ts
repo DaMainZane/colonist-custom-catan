@@ -1,4 +1,4 @@
-// MODULE: world setup page (host only, between the name page and the board): which screen shows, tile preview, roster, scenarios, DLC cards | USED BY: render/index.ts
+// MODULE: world setup page (host only, between the name page and the board): which screen shows, tile preview, roster, scenarios, DLC cards | DEPENDS ON: client/avatars, client/icons, client/socket, client/store, client/types, client/util | USED BY: client/render/index
 // The controls on the page (bots, presets, map menu, rules) keep their ids and handlers; this file decides what is visible
 // and draws the preview, player strip, scenario presets, live "what is on" summary, and DLC/addon cards from mapOptions.
 import { socket } from '../socket';

@@ -1,4 +1,4 @@
-// MODULE: Tidebound map data (elevation 1 to 3 on land, seeded fish icons on sea tiles), written by the wide_water perk | USED BY: tidebound/bridges, tests
+// MODULE: Tidebound map data (elevation 1 to 3 on land, seeded fish icons on sea tiles), written by the wide_water perk | DEPENDS ON: shared/mapoptions, shared/mapshape, shared/noise, shared/topology | USED BY: packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/tides
 import type { CellInfo, MapCtx } from '../../shared/mapoptions';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { cellPoint } from '../../shared/noise';

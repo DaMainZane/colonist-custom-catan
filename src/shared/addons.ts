@@ -1,4 +1,4 @@
-// MODULE: DLC and addon manifest (types, General service ids, enabled-set resolution, link audit) | USED BY: registry, lobby, tests
+// MODULE: DLC and addon manifest (types, General service ids, enabled-set resolution, link audit) | DEPENDS ON: shared/registry | USED BY: shared/index, shared/registry
 import { createRegistry } from './registry';
 import type { PackApi, Pack, Registry } from './registry';
 

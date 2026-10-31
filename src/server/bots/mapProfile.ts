@@ -1,4 +1,4 @@
-// MODULE: map profile (landmasses, fog and gold share, average pips, port count; built once per board, refreshed when fog is revealed) | USED BY: bots/brain
+// MODULE: map profile (landmasses, fog and gold share, average pips, port count; built once per board, refreshed when fog is revealed) | DEPENDS ON: server/util, shared/index | USED BY: server/bots/brain, server/bots/dialogue/context
 import { findLandmasses } from '../../shared';
 import type { GameState, Registry } from '../../shared';
 import { getPips } from '../util';

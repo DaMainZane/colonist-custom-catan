@@ -1,4 +1,4 @@
-// MODULE: base map content (hexagon shape, random terrain, standard numbers, Standard and Blank quick starts) | USED BY: packs/base/index
+// MODULE: base map content (hexagon shape, random terrain, standard numbers, Standard and Blank quick starts) | DEPENDS ON: packs/base/map/numbers, packs/base/map/shapes, packs/base/map/terrain, shared/index | USED BY: packs/base/index
 import { assignNumbers, rngShuffle } from '../../../shared';
 import type { PackApi } from '../../../shared';
 import { registerShapes } from './shapes';

@@ -1,4 +1,4 @@
-// MODULE: board generator (staged pipeline: shape, terrain, numbers, extras, ports; plus the old generateBoard) driven by the registry | USED BY: engine createGame, lobby preview, tests
+// MODULE: board generator (staged pipeline: shape, terrain, numbers, extras, ports; plus the old generateBoard) driven by the registry | DEPENDS ON: shared/mapcells, shared/mapcheck, shared/mapmix, shared/mapoptions, shared/maprecipe, shared/mapshape, +6 more | USED BY: shared/engine, shared/index
 import type { Registry } from './registry';
 import { createNoise } from './noise';
 import { assignNumbers, buildNumberPool } from './numbers';

@@ -1,34 +1,9 @@
-// MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | USED BY: server/net
-import { encodeRecipe, getPlayer, hasTech, isOtherVersion, publicVP, score, techPanelFor, totalCards, visibleWildCards, wildTokensOf } from '../shared';
+// MODULE: client state builder (engine state -> the `gameState` shape the current client renders) | DEPENDS ON: packs/base/building, packs/base/robbing, packs/base/techEffects, packs/base/trading, server/bots/scheduler, server/rooms, +4 more | USED BY: server/net
+import { effectiveDiscardLimit, encodeRecipe, getPlayer, isOtherVersion, mergeViewOverlays, mergeViewPlayer, mergeViewShared, mergeViewVpBonus, publicVP, score, techPanelFor, totalCards, visibleWildCards, wildTokensOf } from '../shared';
 import type { Board, GameState, PlayerState } from '../shared';
 import { pieceCost } from '../packs/base/building';
 import { victimsOnHex } from '../packs/base/robbing';
 import { techActionsFor } from '../packs/base/techEffects';
-import {
-  DEMOLISH_BRIDGE,
-  FEED_SEA_COST,
-  TECH_FISHING_NETS,
-  TECH_HARBOR_MASTER,
-  TECH_RICKETY_BRIDGES,
-  TECH_SALVAGE_CREW,
-  UPGRADE_HARBOR,
-  bridgeUpgradeView,
-  feedSpotsView,
-  fishClientView,
-  grandCausewayBonusVp,
-  harborClientView,
-  harborCount,
-  harborLimitFor,
-  harborSpotsView,
-  harborTradesLeft,
-  harborUpgradeCost,
-  netSpotsView,
-  pirateClientView,
-  pirateDriveView,
-  techGate,
-  tideClientView,
-  wreckClientView
-} from '../packs/tidebound';
 import { openTrades, tradeRatios } from '../packs/base/trading';
 import { ensureTradeTimers } from './bots/scheduler';
 import { roomStatus } from './rooms';
@@ -82,12 +57,6 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
   const self = p.id === viewerId;
   const reveal = self || over || isSpectator;
   const reg = gameRegistry(g.rules);
-  const harborsOn = reg.actions.has(UPGRADE_HARBOR);
-  const harborTechOk = harborsOn && techGate(g, p.id, TECH_HARBOR_MASTER);
-  const netTechOk = reg.pieces.has('net') && techGate(g, p.id, TECH_FISHING_NETS);
-  const ricketyTechOk = reg.pieces.has('rickety_bridge') && techGate(g, p.id, TECH_RICKETY_BRIDGES);
-  const feedTechOk = reg.actions.has('feed_sea') && techGate(g, p.id, TECH_HARBOR_MASTER);
-  const canDemolish = self && reg.actions.has(DEMOLISH_BRIDGE) && hasTech(g, p.id, TECH_SALVAGE_CREW);
 
   let settlementsOnBoard = 0;
   let citiesOnBoard = 0;
@@ -105,7 +74,21 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
   const heldCount = (cardId: string) => allHeldDevs.filter(c => c === cardId).length;
   const vpCards = reveal ? heldCount('vp') : 0;
 
+  // Public VP breakdown, plus whatever registered view data adds (VIEW_DATA `vpBonus`, keyed by the breakdown key it adds to).
+  const vpBreakdown: Record<string, number> = {
+    settlement: settlementsOnBoard,
+    city: citiesOnBoard * 2,
+    devVp: vpCards,
+    largestArmy: g.awards.largestArmy === p.id ? 2 : 0,
+    longestRoad: g.awards.longestRoad === p.id ? 2 : 0
+  };
+  for (const [key, n] of Object.entries(mergeViewVpBonus(g, reg, p.id))) vpBreakdown[key] = (vpBreakdown[key] ?? 0) + n;
+
+  // Fields registered through VIEW_DATA `player` (R7a). Spread first, so a registered field never hides one of the core fields below.
+  const viewData = mergeViewPlayer(g, reg, p, { self, over, spectator: isSpectator });
+
   return {
+    ...viewData,
     id: p.id,
     name: p.name,
     avatar: p.avatar,
@@ -123,6 +106,8 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     knightsPlayed: p.stats.knightsPlayed || 0,
     longestRoadLength: p.stats.longestRoad || 0,
     goldPending: p.pending.pick || 0,
+    // Safe hand size on a 7 for this player: base limit plus every discount/bonus modifier (techs, catch-up). The client shows this, never the lobby setting.
+    discardLimit: effectiveDiscardLimit(g, reg, p),
     discardPending: p.pending.discard || 0,
     freeRoads: p.pending.freeRoads || 0,
     playedDevCardThisTurn: !!p.flags.playedDev,
@@ -130,31 +115,10 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     citiesLeft: p.pieces.city ?? 0,
     roadsLeft: p.pieces.road ?? 0,
     bridgesLeft: p.pieces.bridge ?? 0,
-    // Fishing nets (T7b2): supply left, and (yourself, on your main-phase turn) the vertices a net could go. Both undefined unless nets are in the game and unlocked.
-    netsLeft: netTechOk ? p.pieces.net : undefined,
-    netSpots: self ? netSpotsView(g, reg, p) : undefined,
-    // Feed the sea (T7e): the price, and (yourself, on your main-phase turn) the sea tiles you could feed. Both undefined unless the action is in the game and unlocked.
-    feedCost: self && feedTechOk ? FEED_SEA_COST : undefined,
-    feedSpots: self ? feedSpotsView(g, reg, p) : undefined,
-    // Harbors (T8): upgrade price, legal port-city spots on your turn, harbors remaining in your limit, and 1:1 trades left this turn.
-    harborCost: self && harborTechOk ? harborUpgradeCost(g, reg, p) : undefined,
-    harborSpots: self ? harborSpotsView(g, reg, p) : undefined,
-    harborsLeft: harborTechOk ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
-    harborTradesLeft: self && harborsOn && harborCount(g, p.id) > 0 ? harborTradesLeft(g, p.id) : undefined,
-    // Salvage Crew (T11f): whether this player can demolish their own bridges on their turn.
-    canDemolishBridge: canDemolish ? true : undefined,
-    // Pirates (T10b): the tiles of the pirates you could drive off right now (yourself, on your main-phase turn). Undefined unless the action is in the game.
-    pirateDrives: self ? pirateDriveView(g, reg, p) : undefined,
     stats: {
       resourcesEarned: p.stats.earned || 0,
       tradesMade: p.stats.trades || 0,
-      vpBreakdown: {
-        settlement: settlementsOnBoard,
-        city: citiesOnBoard * 2,
-        devVp: vpCards,
-        largestArmy: g.awards.largestArmy === p.id ? 2 : 0,
-        longestRoad: g.awards.longestRoad === p.id ? 2 + grandCausewayBonusVp(g, reg, p.id) : 0
-      },
+      vpBreakdown,
       resCards: {
         produced: p.stats.resProduced || 0,
         tradedIn: p.stats.resTradedIn || 0,
@@ -203,15 +167,9 @@ function enginePlayerView(g: GameState, p: PlayerState, viewerId: string, over: 
     publicVp: over ? score(g, reg, p, true) : publicVP(g, reg, p),
     pieceCosts: Object.fromEntries(
       [...reg.pieces.entries()]
-        .filter(([id]) => {
-          if (id === 'rickety_bridge' && !ricketyTechOk) return false;
-          if (id === 'net' && !netTechOk) return false;
-          return true;
-        })
+        .filter(([, def]) => !def.available || def.available(g, p.id))
         .map(([id, def]) => [id, pieceCost(g, p, def, reg)])
-    ),
-    // Your price to upgrade a rickety bridge (T4c). Undefined unless rickety bridges are in this game and unlocked, and only sent to yourself.
-    bridgeUpgradeCost: self ? bridgeUpgradeView(g, reg, p) : undefined
+    )
   };
 }
 
@@ -231,6 +189,7 @@ function lobbyPlayerView(room: Room, p: Room['lobbyPlayers'][number]): any {
     knightsPlayed: 0,
     longestRoadLength: 0,
     goldPending: 0,
+    discardLimit: room.settings.cardDiscardLimit,
     discardPending: 0,
     freeRoads: 0,
     playedDevCardThisTurn: false,
@@ -301,25 +260,19 @@ export function makeStateBuilder(room: Room): (viewerId: string) => any {
   const current = g ? g.players[g.turn] : room.lobbyPlayers[0];
   const robberVictims = g && g.phase === 'robber_steal' && current ? victimsOnHex(g, g.board.robberHexId, current.id) : [];
   const defaultRatios = Object.fromEntries([...registry.resources.keys()].map(r => [r, 4]));
-  // Tidebound Tides (T6): flooded and warned tiles as hex overlays, plus the tide facts the title card and heat map need. Null when Tides is off.
-  const tideView = g ? tideClientView(g, gameRegistry(g.rules)) : null;
-
-  // Fish icons (T7c): sea tile id -> boosts left. Public. Null when Fishing is off or no tile has an icon.
-  const fishIcons = g ? fishClientView(g, gameRegistry(g.rules)) : null;
-  // Port upgrade levels (T1, T8): vertex id -> level (1 = raised 2:1 port, 2 = 1:1 harbor). Null when no port is upgraded.
-  const portLevels = g ? harborClientView(g) : null;
-  // Active shipwrecks (T9): public wreck markers on sea or shore tiles. Null when Wrecks is off or no wrecks are active.
-  const wrecks = g ? wreckClientView(g, gameRegistry(g.rules)) : null;
-  // Active pirates (T10): public markers with their strength and mode. Null when Pirates is off or none are out.
-  const pirates = g ? pirateClientView(g, gameRegistry(g.rules)) : null;
+  // Fields registered through VIEW_DATA (R7a): public fields and tile overlays. All Tidebound public fields have moved (R7a.5 groups 1 to 5); the player fields and the VP bonus are merged in `enginePlayerView`.
+  const viewReg = g ? gameRegistry(g.rules) : registry;
+  const viewShared = g ? mergeViewShared(g, viewReg) : {};
+  const viewOverlays = g ? mergeViewOverlays(g, viewReg) : null;
+  // No game yet (lobby): the registry is only read with a game, so a field that moved to VIEW_DATA is set to null here, as before. Temporary (R7a.5), removed in R8.
+  const lobbyNulls = g ? {} : { fishIcons: null, portLevels: null, wrecks: null, pirates: null, tide: null };
 
   const shared = {
-    fishIcons,
-    portLevels,
-    wrecks,
-    pirates,
-    hexOverlays: tideView ? tideView.overlays : null,
-    tide: tideView ? tideView.tide : null,
+    // Spread first, so a registered field never hides one of the core fields.
+    ...viewShared,
+    ...lobbyNulls,
+    // Tile overlays merged from VIEW_DATA `overlays()`. Null while no entry takes part (Tides off, or no game).
+    hexOverlays: viewOverlays,
     code: room.code,
     hostId: room.hostId,
     status,

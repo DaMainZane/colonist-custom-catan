@@ -1,4 +1,4 @@
-// MODULE: Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles | USED BY: render/board.ts, main.ts
+// MODULE: Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles | DEPENDS ON: client/audio, client/socket, client/store, client/util | USED BY: client/main, client/render/board
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { hasDraggedMap, state } from '../store';
@@ -84,5 +84,5 @@ export function renderPiratesMarkup(
 export function clickPirate(hexId: number): void {
   if (hasDraggedMap || !state) return;
   playTone(600, 0.1);
-  socket.emit('drivePirate', { code: state.code, hexId });
+  socket.emit('act', { code: state.code, type: 'drive_off_pirate', payload: { hexId } });
 }

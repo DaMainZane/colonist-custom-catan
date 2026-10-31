@@ -1,4 +1,4 @@
-// MODULE: base terrain styles (spread, clustered, realistic; `random` lives in index.ts) | USED BY: packs/base/map
+// MODULE: base terrain styles (spread, clustered, realistic; `random` lives in index.ts) | DEPENDS ON: shared/index | USED BY: packs/base/map/index
 import { habitatPlace, swapPlace } from '../../../shared';
 import type { PackApi } from '../../../shared';
 

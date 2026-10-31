@@ -1,4 +1,4 @@
-// MODULE: Turn history recorder & round summarizer | USED BY: server/game.ts, server/view.ts
+// MODULE: Turn history recorder & round summarizer | DEPENDS ON: server/types, shared/index | USED BY: server/game, server/types
 import type { GameEvent, GameState } from '../shared';
 import type { Room } from './types';
 

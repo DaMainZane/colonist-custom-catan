@@ -1,4 +1,4 @@
-// MODULE: action "build" (any registered piece, setup or paid, free roads) | USED BY: packs/base/actions/index
+// MODULE: action "build" (any registered piece, setup or paid, free roads) | DEPENDS ON: packs/base/building, packs/base/constants, packs/base/setup, shared/index | USED BY: packs/base/actions/index
 import { canAfford, getPlayer } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 import { buildMode, isFree, pieceCost, placePiece, validateBuild } from '../building';

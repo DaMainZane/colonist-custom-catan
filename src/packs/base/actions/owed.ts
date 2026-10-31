@@ -1,4 +1,4 @@
-// MODULE: actions "discard" and "pick" (resources owed after a seven / gold / Year of Plenty); a discard may also give up held wild tokens that count toward the hand (fish) | USED BY: packs/base/actions/index
+// MODULE: actions "discard" and "pick" (resources owed after a seven / gold / Year of Plenty); a discard may also give up held wild tokens that count toward the hand (fish) | DEPENDS ON: packs/base/trading, shared/index | USED BY: packs/base/actions/index
 import { bankGive, defsOf, getPlayer, getWildTokens, payToBank, popPhase, takeWildToken, WILD_TOKENS } from '../../../shared';
 import type { ActionDef, Ctx, Id, WildTokenDef } from '../../../shared';
 import { parseResources, sumResources } from '../trading';

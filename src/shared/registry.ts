@@ -1,4 +1,4 @@
-// MODULE: registry + pack loader (all game content is registered here) | USED BY: engine, packs, UI generation, bots
+// MODULE: registry + pack loader (all game content is registered here) | DEPENDS ON: shared/addons, shared/ctx, shared/mapoptions, shared/rng, shared/types | USED BY: shared/addons, shared/botGoals, shared/coreServices, shared/ctx, shared/engine, shared/eventDeck, +16 more
 import type { AddonDef, AddonInfo, DlcInfo } from './addons';
 import type { Ctx } from './ctx';
 import type { MapOptionBase, NumbersDef, PerkDef, QuickStartDef, ShapeOpDef, TerrainDef } from './mapoptions';
@@ -59,6 +59,11 @@ export interface PieceDef {
   /** Base defense strength of a vertex building (settlement 1, city 2, castle 3). See shared/coreServices.ts. */
   baseDefense?: number;
   icon?: string;
+  /**
+   * Is this piece on offer to this player right now (a tech unlocks it, say)? Decides whether it shows in the client's `pieceCosts`. Default: yes.
+   * It does not check placement or cost, and the build action does not read it.
+   */
+  available?(g: GameState, pid: Id): boolean;
   /** Placement rule only (geometry/ownership). Cost and supply are checked by the build action. */
   canPlace(ctx: Ctx, pid: Id, loc: number, mode: 'setup' | 'build'): boolean;
   replace?: boolean;

@@ -1,4 +1,4 @@
-// MODULE: per-cell data for terrain and number styles (height, moisture, coast distance, landmass) and neighbour lists | USED BY: mapgen, terrain and number styles, tests
+// MODULE: per-cell data for terrain and number styles (height, moisture, coast distance, landmass) and neighbour lists | DEPENDS ON: shared/mapoptions, shared/mapshape, shared/noise | USED BY: shared/index, shared/mapgen, shared/mapterrain
 import type { CellInfo } from './mapoptions';
 import { HEX_DIRS } from './mapshape';
 import { cellPoint } from './noise';

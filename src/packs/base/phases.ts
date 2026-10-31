@@ -1,4 +1,4 @@
-// MODULE: base phases (setup, roll, main, discard, robber, robber steal, pick, game over) | USED BY: packs/base/index
+// MODULE: base phases (setup, roll, main, discard, robber, robber steal, pick, game over) | DEPENDS ON: shared/index | USED BY: packs/base/index
 import { getPlayer } from '../../shared';
 import type { GameState, Id, PackApi } from '../../shared';
 

@@ -1,4 +1,4 @@
-// MODULE: pack list entry point | USED BY: server, sims, tests
+// MODULE: pack list entry point | DEPENDS ON: packs/base/index, packs/fog/index, packs/gold/index, packs/tidebound/index, shared/index | USED BY: server/runtime
 import type { Pack } from '../shared';
 import { basePack } from './base';
 import { fogPack } from './fog';

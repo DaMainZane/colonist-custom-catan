@@ -1,4 +1,4 @@
-// MODULE: S0.7 tile state layer (service 7), durability & repair (service 8), and wild token (service 12) | USED BY: shared/production, packs, bots
+// MODULE: S0.7 tile state layer (service 7), durability & repair (service 8), and wild token (service 12) | DEPENDS ON: shared/ctx, shared/registry, shared/state, shared/types | USED BY: packs/tidebound/tides, shared/eventDeck, shared/index, shared/production, shared/sevenResolver, shared/views
 import type { Ctx } from './ctx';
 import { defsOf } from './registry';
 import type { ActionDef, Registry } from './registry';

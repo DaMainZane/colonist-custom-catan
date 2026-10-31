@@ -1,4 +1,4 @@
-// MODULE: per-turn clock for human players (base time per turn, plus an increment for each completed action) | USED BY: server/game, server/rooms, server/view, bots/scheduler
+// MODULE: per-turn clock for human players (base time per turn, plus an increment for each completed action) | DEPENDS ON: server/types | USED BY: server/bots/scheduler, server/game, server/rooms, server/view
 import type { Room } from './types';
 
 /** Smallest time left after a forced action, so the next forced step is not instant. */

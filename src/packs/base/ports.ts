@@ -1,4 +1,4 @@
-// MODULE: base ports and map presets (standard, blank, archipelago) | USED BY: packs/base/index
+// MODULE: base ports and map presets (standard, blank, archipelago) | DEPENDS ON: packs/base/constants, shared/index | USED BY: packs/base/index
 import type { PackApi } from '../../shared';
 import { GENERIC_PORT } from './constants';
 

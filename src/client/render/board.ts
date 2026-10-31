@@ -1,4 +1,4 @@
-// MODULE: board SVG renderer, camera, board input and board animations | USED BY: render/index.ts, main.ts
+// MODULE: board SVG renderer, camera, board input and board animations | DEPENDS ON: client/audio, client/constants, client/icons, client/render/bridgepicker, client/render/hand, client/render/overlay, +5 more | USED BY: client/actions, client/main, client/render/bridgepicker, client/render/hand, client/render/index
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
@@ -1382,14 +1382,14 @@ export function clickNetSpot(vertexId: number): void {
 export function clickFeedSpot(hexId: number): void {
   setBuildModeValue(null);
   playTone(660, 0.08);
-  socket.emit('feedSea', { code: state.code, hexId });
+  socket.emit('act', { code: state.code, type: 'feed_sea', payload: { hexId } });
 }
 
 /** Tidebound T8a: upgrade your city on a port to a 1:1 harbor (only offered in harbor mode, from the server's `harborSpots`). */
 export function clickHarborSpot(vertexId: number): void {
   setBuildModeValue(null);
   playTone(680, 0.08);
-  socket.emit('upgradeHarbor', { code: state.code, vertexId });
+  socket.emit('act', { code: state.code, type: 'upgrade_harbor', payload: { vertexId } });
 }
 
 export function clickEdge(edgeId: number): void {

@@ -1,4 +1,4 @@
-// MODULE: engine helpers (players, bank, costs, phases, production, VP, turn start) | USED BY: engine, packs, bots
+// MODULE: engine helpers (players, bank, costs, phases, production, VP, turn start) | DEPENDS ON: shared/ctx, shared/registry, shared/types | USED BY: shared/coreServices, shared/engine, shared/eventDeck, shared/index, shared/production, shared/sevenResolver, +3 more
 import type { Ctx } from './ctx';
 import type { Registry } from './registry';
 import type { GameState, Hex, Id, PlayerState, Resources } from './types';

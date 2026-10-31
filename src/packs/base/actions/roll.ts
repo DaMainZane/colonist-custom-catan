@@ -1,4 +1,4 @@
-// MODULE: action "roll" (seeded dice, production, seven -> Seven Resolver pipeline) | USED BY: packs/base/actions/index
+// MODULE: action "roll" (seeded dice, production, seven -> Seven Resolver pipeline) | DEPENDS ON: shared/index | USED BY: packs/base/actions/index
 import { getPlayer, produceFromHex, resolveSeven, rngInt, setPhase } from '../../../shared';
 import type { ActionDef, Ctx, Hex } from '../../../shared';
 

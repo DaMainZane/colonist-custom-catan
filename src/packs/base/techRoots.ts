@@ -1,4 +1,4 @@
-// MODULE: the 5 root techs of the tech tree (one per DLC branch, base-tier so they never need their DLC) and their effects | USED BY: packs/base/index, tests
+// MODULE: the 5 root techs of the tech tree (one per DLC branch, base-tier so they never need their DLC) and their effects | DEPENDS ON: packs/base/techEffects, shared/index | USED BY: packs/base/index
 import { TECH_DEFS } from '../../shared';
 import type { PackApi, TechDef } from '../../shared';
 import { registerTechEffects } from './techEffects';

@@ -1,4 +1,4 @@
-// MODULE: per-player filtered view of the game state (hides other hands, hidden tiles, dev cards) | USED BY: server net adapter, bots
+// MODULE: per-player filtered view of the game state (hides other hands, hidden tiles, dev cards) | DEPENDS ON: shared/registry, shared/state, shared/tileState, shared/types | USED BY: shared/index
 import type { Registry } from './registry';
 import { computeVP, totalCards } from './state';
 import { visibleWildCards } from './tileState';

@@ -1,4 +1,4 @@
-// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | USED BY: client/render/index, client/main
+// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | DEPENDS ON: client/audio, client/icons, client/socket, client/store, client/types, client/util | USED BY: client/main, client/render/bridgepicker, client/render/index
 import { getMiniSvg, uiIcon } from '../icons';
 import { playTone } from '../audio';
 import { socket } from '../socket';
@@ -383,14 +383,14 @@ export function toggleTechPanel(force?: boolean): void {
 
 export function researchTechClick(techId: string): void {
   if (!state?.code) return;
-  socket.emit('researchTech', { code: state.code, techId });
+  socket.emit('act', { code: state.code, type: 'research_tech', payload: { techId } });
   playTone(600, 0.08);
 }
 
 /** Harbor charters: raise the port under the city on vertex `vertexId` from 3:1 to 2:1 for every resource. */
 export function upgradePortClick(vertexId: number): void {
   if (!state?.code) return;
-  socket.emit('upgradePort', { code: state.code, vertexId });
+  socket.emit('act', { code: state.code, type: 'upgrade_port', payload: { vertexId } });
   playTone(600, 0.08);
 }
 
@@ -404,7 +404,7 @@ export function pickGroundHex(hexId: number): void {
 /** Ground work, step 2: turn the picked tile into the basic tile `resource`. */
 export function convertTileClick(resource: string): void {
   if (!state?.code || pickedHex === null) return;
-  socket.emit('convertTile', { code: state.code, hexId: pickedHex, resource });
+  socket.emit('act', { code: state.code, type: 'convert_tile', payload: { hexId: pickedHex, resource } });
   pickedHex = null;
   playTone(600, 0.08);
 }

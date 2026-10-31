@@ -1,4 +1,4 @@
-// MODULE: piece cost and limit service (placed counts, base limit with doubled cost above it, registered cost modifiers) | USED BY: packs/base/building, DLC packs, bots
+// MODULE: piece cost and limit service (placed counts, base limit with doubled cost above it, registered cost modifiers) | DEPENDS ON: shared/registry, shared/types | USED BY: shared/engine, shared/index, shared/stage1
 import { defsOf } from './registry';
 import type { PieceDef, Registry } from './registry';
 import type { GameState, Id, PlayerState, Resources } from './types';

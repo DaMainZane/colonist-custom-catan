@@ -1,4 +1,4 @@
-// MODULE: public entry of the shared engine | USED BY: packs, server, client, tests
+// MODULE: public entry of the shared engine | DEPENDS ON: shared/addons, shared/botGoals, shared/coreServices, shared/ctx, shared/engine, shared/eventDeck, +25 more | USED BY: packs/_template/demo, packs/_template/index, packs/base/actions/bankTrade, packs/base/actions/build, packs/base/actions/devCards, packs/base/actions/endTurn, +60 more
 export * from './rng';
 export * from './types';
 export * from './palette';
@@ -23,6 +23,7 @@ export * from './mapgen';
 export * from './state';
 export * from './engine';
 export * from './views';
+export * from './viewData';
 export * from './botGoals';
 export * from './tradeRatio';
 export * from './tileState';

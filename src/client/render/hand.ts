@@ -1,4 +1,4 @@
-// MODULE: player hand (resource stacks + dev cards) and hand click handlers | USED BY: render/index.ts, main.ts
+// MODULE: player hand (resource stacks + dev cards) and hand click handlers | DEPENDS ON: client/audio, client/avatars, client/constants, client/icons, client/render/board, client/render/drawer, +4 more | USED BY: client/main, client/render/board, client/render/drawer, client/render/index, client/render/trade
 import { RESOURCES, RES_META, DEV_META } from '../constants';
 import { getMiniSvg, getDevSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';

@@ -11,7 +11,12 @@
     "dev": "node esbuild.config.mjs --watch",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "headers": "node scripts/headers.mjs",
+    "headers:write": "node scripts/headers.mjs --write",
+    "headers:check": "node scripts/headers.mjs --check",
+    "index": "node scripts/index.mjs",
+    "index:check": "node scripts/index.mjs --check"
   },
   "dependencies": {
     "express": "^4.19.2",

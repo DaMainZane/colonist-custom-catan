@@ -1,4 +1,4 @@
-// MODULE: bot goal registry (Service 18 — S0.14; lets addons publish bot goals, vertex/edge deltas, action scores, and threat deltas) | USED BY: packs, server/bots/brain, tests
+// MODULE: bot goal registry (Service 18 — S0.14; lets addons publish bot goals, vertex/edge deltas, action scores, and threat deltas) | DEPENDS ON: shared/ctx, shared/registry, shared/types | USED BY: shared/index
 import { defsOf } from './registry';
 import type { Registry } from './registry';
 import type { Ctx } from './ctx';

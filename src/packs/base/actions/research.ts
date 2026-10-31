@@ -1,4 +1,4 @@
-// MODULE: action "research_tech" (spend wheat + ore on a tech; the rules live in shared/stage1.ts) | USED BY: packs/base/actions/index
+// MODULE: action "research_tech" (spend wheat + ore on a tech; the rules live in shared/stage1.ts) | DEPENDS ON: shared/index | USED BY: packs/base/actions/index
 import { allTechDefs, researchTech, techResearchCheck } from '../../../shared';
 import type { ActionDef } from '../../../shared';
 

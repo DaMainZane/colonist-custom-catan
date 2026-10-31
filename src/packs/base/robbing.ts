@@ -1,4 +1,4 @@
-// MODULE: robber helpers (victims on a hex, random steal using the seeded RNG, steal-count modifiers, what set the robber off); a steal can also take a held wild token that is `stealable` (fish) | USED BY: actions/robber, devcards, techEffects
+// MODULE: robber helpers (victims on a hex, random steal using the seeded RNG, steal-count modifiers, what set the robber off); a steal can also take a held wild token that is `stealable` (fish) | DEPENDS ON: shared/index | USED BY: packs/base/actions/robber, packs/base/devcards, packs/base/techEffects, server/socket, server/view
 import { defsOf, getPlayer, getWildTokens, grantWildToken, rngInt, takeWildToken, WILD_TOKENS } from '../../shared';
 import type { Ctx, GameState, Id, Registry, WildTokenDef } from '../../shared';
 

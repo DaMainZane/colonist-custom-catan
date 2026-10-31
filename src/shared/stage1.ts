@@ -1,4 +1,4 @@
-// MODULE: Stage 1 General features (Taxes & Catch-up levers, Public Contract Board & Rarity Tiers, Spies & Intel Ladder, Tech Tree with Empire-Size Pricing, Local Nemesis & Round Recap, Proving-Ground Content & Sandbox Economy) | USED BY: packs, server, bots, tests
+// MODULE: Stage 1 General features (Taxes & Catch-up levers, Public Contract Board & Rarity Tiers, Spies & Intel Ladder, Tech Tree with Empire-Size Pricing, Local Nemesis & Round Recap, Proving-Ground Content & Sandbox Economy) | DEPENDS ON: shared/coreServices, shared/ctx, shared/eventDeck, shared/history, shared/pricing, shared/registry, +4 more | USED BY: shared/index
 import { addLedgerEntry, getMarkers, getRelation } from './coreServices';
 import type { Ctx } from './ctx';
 import { addFateTokens, EVENT_CARDS } from './eventDeck';

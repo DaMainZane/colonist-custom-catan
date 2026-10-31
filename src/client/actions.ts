@@ -1,3 +1,4 @@
+// MODULE: client UI actions (host-only edit guard, build mode and brush selection, affordability checks, requests sent to the server) | DEPENDS ON: client/audio, client/avatars, client/render/board, client/render/index, client/socket, client/store, +1 more | USED BY: client/main, client/render/index
 import { playTone } from './audio';
 import { socket } from './socket';
 import {

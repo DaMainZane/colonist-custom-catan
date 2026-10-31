@@ -1,3 +1,4 @@
+// MODULE: loose client-side view types (PlayerView, GameState, Resources) | DEPENDS ON: none | USED BY: client/mapmenu, client/render/index, client/render/setup, client/render/sidebar, client/render/techpanel, client/render/trade, +2 more
 // Loose client-side view types. Tightened when shared engine types arrive (Step 2).
 export type Resources = Record<string, number>;
 
@@ -18,6 +19,8 @@ export interface PlayerView {
   knightsPlayed: number;
   longestRoadLength: number;
   goldPending: number;
+  /** Safe hand size on a 7 for this player (base limit plus techs and other modifiers). Over this, a 7 makes them discard. */
+  discardLimit?: number;
   discardPending: number;
   freeRoads: number;
   playedDevCardThisTurn: boolean;

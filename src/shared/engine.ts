@@ -1,4 +1,4 @@
-// MODULE: game engine (createGame, dispatch pipeline, legal actions, awards, win check) | USED BY: server adapter, bots, sims, tests
+// MODULE: game engine (createGame, dispatch pipeline, legal actions, awards, win check) | DEPENDS ON: shared/ctx, shared/mapgen, shared/palette, shared/pricing, shared/registry, shared/rng, +2 more | USED BY: shared/index
 import { makeCtx } from './ctx';
 import type { Ctx, GameEvent } from './ctx';
 import { generateBoard } from './mapgen';

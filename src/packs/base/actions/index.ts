@@ -1,4 +1,4 @@
-// MODULE: registers every base action | USED BY: packs/base/index
+// MODULE: registers every base action | DEPENDS ON: packs/base/actions/bankTrade, packs/base/actions/build, packs/base/actions/devCards, packs/base/actions/endTurn, packs/base/actions/owed, packs/base/actions/research, +5 more | USED BY: packs/base/index
 import type { PackApi } from '../../../shared';
 import { bankTradeAction } from './bankTrade';
 import { buildAction } from './build';

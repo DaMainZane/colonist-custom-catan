@@ -1,4 +1,4 @@
-// MODULE: S0.9 Marker system (10), Ledger (13), Strength & defense model (9), Relations matrix (14) | USED BY: packs, stage1, bots
+// MODULE: S0.9 Marker system (10), Ledger (13), Strength & defense model (9), Relations matrix (14) | DEPENDS ON: shared/ctx, shared/registry, shared/state, shared/types | USED BY: shared/index, shared/stage1
 import type { Ctx } from './ctx';
 import type { Registry } from './registry';
 import { getPlayer } from './state';

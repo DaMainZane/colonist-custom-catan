@@ -1,4 +1,4 @@
-// MODULE: bottom-left sheet (trade, discard, gold, monopoly, robber victim picker) | USED BY: render/index.ts, hand.ts, main.ts
+// MODULE: bottom-left sheet (trade, discard, gold, monopoly, robber victim picker) | DEPENDS ON: client/audio, client/avatars, client/constants, client/icons, client/render/hand, client/render/index, +4 more | USED BY: client/main, client/render/hand, client/render/index
 // Flat sheet from "Design UI Philosophy.md": no emoji, pictogram icons, every color comes from a token class in styles.css.
 import { RESOURCES, RES_META } from '../constants';
 import { getMiniSvg, buildOverlappingStackHtml, uiIcon, robberMarkup } from '../icons';
@@ -271,7 +271,7 @@ export function renderInlineDrawer(me: any, isMyTurn: boolean): void {
         <span class="sheet-title danger">Discard ${me.discardPending} cards</span>
         <span class="sheet-sub">${picked} of ${me.discardPending} chosen</span>
       </div>
-      <div class="sheet-sub">A 7 was rolled and you hold more than ${state.settings.cardDiscardLimit} cards. Click cards in your hand to move them here.</div>
+      <div class="sheet-sub">A 7 was rolled and you hold more than ${me.discardLimit ?? state.settings.cardDiscardLimit} cards. Click cards in your hand to move them here.</div>
       <div class="tray">
         ${trayCardsHtml || '<span class="tray-hint">Nothing chosen yet</span>'}
       </div>
@@ -435,7 +435,7 @@ export function spendFishPick(resource: string): void {
     return;
   }
   playTone(700, 0.1);
-  socket.emit('spendFish', { code: state.code, resource });
+  socket.emit('act', { code: state.code, type: 'spend_fish', payload: { resource } });
   setDrawerMode(null);
   renderAll();
 }

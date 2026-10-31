@@ -1,4 +1,4 @@
-// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) | USED BY: packs/tidebound, server/view, client, tests
+// MODULE: tidebound.harbor addon (T8a: 1:1 port upgrade on a city, limit 1 per player or 2 with Harbor empire, works while flooded, minimal bot goal; T8b: max 4 1:1 trades per turn per harbor, falls back to 2:1 for the rest of the turn, invalid-ratio prompt explains harbors; T11e Harbor master tech gate) | DEPENDS ON: packs/base/constants, packs/base/techEffects, packs/tidebound/tech, shared/index | USED BY: packs/tidebound/index, packs/tidebound/tides
 import {
   addonOn,
   BOT_GOALS,
@@ -12,7 +12,8 @@ import {
   priceOfUpgrade,
   ratioWithoutHarbor,
   techGate,
-  totalCards
+  totalCards,
+  VIEW_DATA
 } from '../../shared';
 import type {
   ActionDef,
@@ -26,7 +27,8 @@ import type {
   PlayerState,
   PortIdleCheck,
   Registry,
-  Resources
+  Resources,
+  ViewDataDef
 } from '../../shared';
 import { CITY, GENERIC_PORT } from '../base/constants';
 import { HARBOR_UPGRADE_COST, portLevel, portUpgrades } from '../base/techEffects';
@@ -350,6 +352,36 @@ export function harborClientView(g: GameState): Record<number, number> | null {
   return any ? out : null;
 }
 
+/**
+ * VIEW_DATA entry (R7a.5, group 2): the public `portLevels` field of the client state.
+ * NOT registered in `harborAddon.register`, on purpose: `harborClientView` has no addon check. It reads the base port-upgrade ladder
+ * (`g.ext.core.portUpgrades`, which the base Harbor charters tech also writes), so `portLevels` could be set in a game where the Harbor addon is off.
+ * The pack's own `register` (`tideboundPack` in `index.ts`) adds this entry for every game, so the output stays exactly what it was.
+ */
+export const portLevelsViewData: ViewDataDef = {
+  id: 'tidebound.port_levels',
+  shared: (g: GameState) => ({ portLevels: harborClientView(g) })
+};
+
+/**
+ * VIEW_DATA entry (R7a.5, group 8): the player's harbor fields. `harborCost` and `harborSpots` are for yourself only (`harborSpots` also needs your
+ * main-phase turn, which `harborSpotsView` checks), `harborsLeft` is sent for every viewer once harbors are unlocked, and `harborTradesLeft` is for yourself
+ * while you own a harbor. Everything is `undefined` otherwise. The gates are the same expressions `server/view.ts` used (`harborsOn`, `harborTechOk`).
+ */
+export const harborViewData: ViewDataDef = {
+  id: 'tidebound.harbor.view',
+  player: (g, reg, p, who) => {
+    const harborsOn = reg.actions.has(UPGRADE_HARBOR);
+    const harborTechOk = harborsOn && techGate(g, p.id, TECH_HARBOR_MASTER);
+    return {
+      harborCost: who.self && harborTechOk ? harborUpgradeCost(g, reg, p) : undefined,
+      harborSpots: who.self ? harborSpotsView(g, reg, p) : undefined,
+      harborsLeft: harborTechOk ? Math.max(0, harborLimitFor(g, p.id) - harborCount(g, p.id)) : undefined,
+      harborTradesLeft: who.self && harborsOn && harborCount(g, p.id) > 0 ? harborTradesLeft(g, p.id) : undefined
+    };
+  }
+};
+
 // ---- Minimal bot support (T8a) ----------------------------------------------------------------------------------
 
 /**
@@ -419,6 +451,8 @@ export const harborAddon: AddonDef = {
     api.action(upgradeHarborAction);
     api.phaseAction('main', UPGRADE_HARBOR);
     api.define(BOT_GOALS, harborBotGoal);
+    // R7a.5: the player's harbor fields for the client state.
+    api.define(VIEW_DATA, harborViewData);
     api.hook('onTurnStart', (ctx: Ctx) => {
       resetHarborTrades(ctx.g);
     });
