@@ -30,7 +30,7 @@ import {
   toggleTradeDrawer, closeInlineDrawer, confirmInlineAction, executeBankTrade, proposePlayerTrade,
   confirmMonopoly, pickGold, spendFishPick, chooseRobberVictim, adjustDiscard, removeCardFromDiscard, removeWildFromDiscard, adjustTradeWant, adjustTradeGive, fixBankTrade
 } from './render/drawer';
-import { sendChat, toggleRoundCollapse, renderSidebar } from './render/sidebar';
+import { sendChat, toggleRoundCollapse, toggleLogFilter, renderSidebar } from './render/sidebar';
 import { toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick } from './render/techpanel';
 import { clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, confirmBridgeDemolish, closeBridgePicker } from './render/bridgepicker';
 import { clickPirate } from './render/pirates';
@@ -51,7 +51,7 @@ function toggleElevationView(): void {
   if (state) renderAll();
 }
 
-function onSetLogTab(tab: 'live' | 'history'): void {
+function onSetLogTab(tab: 'live' | 'chat' | 'history'): void {
   setLogTab(tab);
   renderSidebar();
 }
@@ -63,7 +63,7 @@ Object.assign(window as any, {
   switchVictoryTab, toggleVictoryMapInspect, setBrush, pushSettings,
   executeBankTrade, proposePlayerTrade, rollDice, confirmInlineAction, closeInlineDrawer,
   toggleTradeDrawer, buyDevCard, setBuildMode, mainTurnButton, sendChat,
-  setLogTab: onSetLogTab, toggleRoundCollapse, toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick,
+  setLogTab: onSetLogTab, toggleRoundCollapse, toggleLogFilter, toggleTechPanel, researchTechClick, upgradePortClick, pickGroundHex, convertTileClick,
   clickPlacedBridge, chooseBridgeType, confirmBridgeUpgrade, confirmBridgeDemolish, closeBridgePicker, clickPirate,
   confirmTradeWith, cancelTrade, respondToTrade, onClickHandResource, onClickHandWild, onClickDevCard,
   startCounter, adjustCounter, sendCounter, cancelCounter, toggleTradesCollapsed, cycleAvatar, cycleBotTier, setSetupOpen,

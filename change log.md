@@ -1,5 +1,14 @@
 # Change Log
 
+## 2026-10-31 (Pass 88: Merged Live Log & Turn History with RS card icons and click-to-filter, Chat leaf at combined height, and top-right ocean Game Timer & Round HUD)
+### Changed
+- `src/server/turnHistory.ts` & `src/client/types.ts`: added `TurnActionResource` (`res`, `count`, `dir`) and optional structured fields (`resources`, `piece`, `devCard`, `diceSum`) to `TurnActionItem`; replaced resource emoji strings across productions (all players), discards, bank trades, player trades, monopoly, gold/fish picks, pirate loot, bridge demolition, and sea feeding with structured resource card entries.
+- `src/client/render/sidebar.ts`, `src/client/store.ts`, `src/client/main.ts`, `public/index.html`, `src/client/styles.css`:
+  - Replaced emoji resource indicators in Turn History & Live Log with mini RS cards (`card-wood`, `card-brick`, `card-sheep`, `card-wheat`, `card-ore`, `card-gold`, `card-fish`, `card-dev`) using SVG glyphs (`th-rs-card`, `th-rs-pill`, `th-inline-rs-word`).
+  - Added click-to-filter (`toggleLogFilter`) across resource cards, dice roll badges, piece/action badges, category icons, player avatars/names, and round badges, plus a top filter bar (`#logFilterBar`) with one-click clear.
+  - Merged Live Log and Turn History into the **Live Log** leaf (tab 1) and moved **Chat** into the second leaf (tab 2) with an unread message badge, extending `#logSection` to the full combined height of Live Log/Turn History + Chat.
+- `src/client/render/turnclock.ts`, `public/index.html`, `src/client/styles.css`: added `#gameClockHud` in the top-right ocean of `.board-stage` (next to the Live Log sidebar, outside on the ocean) showing the current round (`Round N`, incremented when all players finish their turn in a cycle) and live elapsed game timer (`MM:SS` / `H:MM:SS`) with no borders and clean light text.
+
 ## 2026-10-31 (Pass 87: Modular rework R6.1 to R6.3: the generic `act` socket event and its test; written and NOT run; nothing moved yet, no shipped behavior change)
 ### Changed
 - `src/server/socket.ts`: one new handler under "Turn actions": `socket.on('act', ({ code, type, payload }) => ...)`. `type` and `code` must be strings (else ignored); `payload` must be a plain object (else `{}`); it calls `act(code, type, payload, true)`, so `dispatch` refuses unknown or illegal types and the reason goes back to the player. No registry pre-check. A malformed envelope (`null`, string, array, missing fields) is dropped silently, and nothing reaches `console.error`. All 25 legacy events are still there.

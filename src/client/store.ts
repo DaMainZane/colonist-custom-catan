@@ -13,12 +13,17 @@ export let drawerMode: string | null = null;
 export let victoryTab = 'overview';
 export let hideVictoryOverlay = false;
 export let spectateTargetId: string | null = null;
-export let logTab: 'live' | 'history' = 'live';
+export let logTab: 'live' | 'chat' = 'live';
+export let logFilter: string | null = null;
 /** Tidebound T6d: draw the elevation heat map instead of the tide overlays (a view toggle, never sent to the server). */
 export let elevationView = false;
 
-export function setLogTab(tab: 'live' | 'history'): void {
-  logTab = tab;
+export function setLogTab(tab: 'live' | 'chat' | 'history'): void {
+  logTab = tab === 'chat' ? 'chat' : 'live';
+}
+
+export function setLogFilter(filter: string | null): void {
+  logFilter = filter && logFilter === filter ? null : filter;
 }
 
 export let camZoom = 1;

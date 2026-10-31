@@ -348,10 +348,24 @@ svg#boardSvg.is-panning * {
   box-shadow: var(--shadow); display: none; max-width: 80vw; text-align: center;
 }
 
+/* ---------- Game Timer & Round HUD (top right ocean, borderless) ---------- */
+.game-clock-hud {
+  position: absolute; top: 14px; right: 18px; z-index: 42;
+  display: flex; align-items: center; gap: 7px;
+  background: transparent; border: none; box-shadow: none; padding: 0;
+  color: rgba(244, 247, 251, 0.92);
+  font-size: 13.5px; font-weight: 700; letter-spacing: 0.3px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+  pointer-events: none; user-select: none;
+}
+.game-round-text { font-weight: 800; color: #f4f7fb; }
+.game-clock-sep { opacity: 0.6; font-weight: 600; }
+.game-timer-text { font-variant-numeric: tabular-nums; font-weight: 700; color: rgba(235, 242, 250, 0.9); }
+
 /* ---------- Active trade offer stack (top right) ---------- */
 #activeTradeModal {
-  position: absolute; top: 12px; right: 16px; width: 440px; max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 120px); display: none; flex-direction: column; gap: 6px; z-index: 50;
+  position: absolute; top: 42px; right: 16px; width: 440px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 150px); display: none; flex-direction: column; gap: 6px; z-index: 50;
 }
 .trade-top-avatars {
   position: relative; background: var(--surface); border-radius: var(--r-lg); padding: 7px 46px; box-shadow: var(--shadow);
@@ -815,35 +829,75 @@ svg#boardSvg.is-panning * {
 .bank-chip { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
 .bank-chip svg.glyph { width: 22px; height: 22px; }
 
-#logSection, #chatSection { background: var(--surface); border-radius: var(--r); display: flex; flex-direction: column; overflow: hidden; }
-#logSection { flex: 1 1 0; min-height: 90px; padding: 0; display: flex; flex-direction: column; }
+#logSection {
+  background: var(--surface); border-radius: var(--r); display: flex; flex-direction: column; overflow: hidden;
+  flex: 1 1 0; min-height: 180px; padding: 0;
+}
 .log-head-tabs {
   display: flex; gap: 4px; padding: 4px 6px; background: var(--surface-2); border-bottom: 1px solid var(--line); flex-shrink: 0;
 }
 .log-tab-btn {
   flex: 1; border: 0; background: transparent; color: var(--ink-dim); font-size: 11px; font-weight: 700;
   padding: 4px 6px; border-radius: var(--r-sm); cursor: pointer; transition: all 0.12s; text-align: center;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
 }
 .log-tab-btn:hover { background: var(--surface-3); color: var(--ink); }
 .log-tab-btn.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); font-weight: 800; }
-
-.log-feed {
-  flex: 1 1 0; min-height: 0; padding: 6px 8px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 3px;
+.chat-unread-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px;
+  padding: 0 4px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 9.5px; font-weight: 800; line-height: 1;
 }
-.log-line { padding: 2px 0; border-bottom: 1px solid var(--line); font-weight: 500; }
 
-/* Turn History in Right Sidebar */
-.turn-history-feed {
+/* Filter bar inside merged Live Log */
+.log-filter-bar {
+  display: flex; flex-direction: column; gap: 4px; padding: 5px 6px; background: var(--surface-2);
+  border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.lf-row {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.lf-hint {
+  font-size: 9.5px; color: var(--ink-dim); font-weight: 600; margin-left: auto; white-space: nowrap;
+}
+.lf-rs-btn {
+  border: 0; background: transparent; padding: 1px; border-radius: 4px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; transition: transform 0.1s, box-shadow 0.12s, opacity 0.12s;
+  opacity: 0.85;
+}
+.lf-rs-btn:hover { opacity: 1; transform: translateY(-1px); }
+.lf-rs-btn.active { opacity: 1; box-shadow: 0 0 0 2px var(--accent); transform: translateY(-1px); }
+.lf-val-btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-dim);
+  font-size: 9.5px; font-weight: 700; padding: 2px 5px; border-radius: 4px; cursor: pointer;
+  transition: all 0.12s; line-height: 1.1;
+}
+.lf-val-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+.lf-val-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lf-clear-btn {
+  border: 1px solid rgba(230, 126, 34, 0.45); background: rgba(230, 126, 34, 0.15); color: var(--accent);
+  font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; margin-left: auto; line-height: 1.1;
+}
+.lf-clear-btn:hover { background: rgba(230, 126, 34, 0.25); }
+.lf-clear-x { font-weight: 800; font-size: 10px; }
+
+/* Merged Live Log + Turn History Feed */
+.log-feed, .turn-history-feed {
   flex: 1 1 0; min-height: 0; padding: 6px; overflow-y: auto; font-size: 11.5px; display: flex; flex-direction: column; gap: 6px;
 }
+.log-line {
+  padding: 3px 5px; border-bottom: 1px solid var(--line); font-weight: 500; font-size: 11px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px; line-height: 1.35;
+}
+.th-setup-Feed-group .th-round-turns { gap: 2px; }
+
 .turn-history-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   padding: 20px 10px; gap: 6px; color: var(--ink-dim); margin: auto;
 }
-.th-empty-icon { font-size: 24px; }
+.th-empty-icon { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .th-empty-title { font-weight: 700; font-size: 13px; color: var(--ink); }
-.th-empty-desc { font-size: 11px; line-height: 1.4; max-width: 200px; }
+.th-empty-desc { font-size: 11px; line-height: 1.4; max-width: 210px; }
 
 .th-round-group {
   background: var(--surface-2); border-radius: var(--r-sm); border: 1px solid var(--line); overflow: hidden;
@@ -858,8 +912,9 @@ svg#boardSvg.is-panning * {
 .th-round-title-wrap { display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 11.5px; }
 .th-round-badge {
   font-size: 9.5px; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: var(--surface);
-  color: var(--ink); border: 1px solid var(--line); line-height: 1.2;
+  color: var(--ink); border: 1px solid var(--line); line-height: 1.2; cursor: pointer;
 }
+.th-round-badge:hover, .th-round-badge.active-filter { border-color: var(--accent); color: var(--accent); }
 .th-round-title { font-weight: 700; }
 .th-round-right { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--ink-dim); font-weight: 600; }
 .th-chevron { font-size: 10px; color: var(--ink-dim); transition: transform 0.12s; }
@@ -870,22 +925,67 @@ svg#boardSvg.is-panning * {
   display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .th-turn-head { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; }
+.th-player-filter-btn {
+  border: 0; background: transparent; padding: 1px 3px; border-radius: 4px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px; color: inherit; font: inherit;
+  transition: background 0.12s;
+}
+.th-player-filter-btn:hover, .th-player-filter-btn.active-filter { background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
 .th-avatar { width: 18px; height: 18px; font-size: 10.5px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .th-player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; font-weight: 700; }
 .th-turn-num { font-size: 9.5px; color: var(--ink-dim); margin-left: auto; font-weight: 600; }
 
 .th-turn-actions {
-  display: flex; flex-direction: column; gap: 2.5px; padding-left: 4px; border-left: 1px dashed var(--line); margin-left: 7px;
+  display: flex; flex-direction: column; gap: 3px; padding-left: 4px; border-left: 1px dashed var(--line); margin-left: 7px;
 }
 .th-action-row {
-  display: flex; align-items: center; gap: 4px; font-size: 10.5px; line-height: 1.3; color: var(--ink);
+  display: flex; align-items: center; gap: 4px; font-size: 10.5px; line-height: 1.35; color: var(--ink);
 }
-.th-act-icon { font-size: 11px; flex-shrink: 0; width: 14px; text-align: center; }
-.th-act-text { flex: 1; word-break: break-word; }
+.th-act-icon-btn {
+  border: 0; background: transparent; padding: 1px; border-radius: 3px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  color: var(--ink-dim); flex-shrink: 0; transition: all 0.12s;
+}
+.th-act-icon-btn:hover, .th-act-icon-btn.active-filter { color: var(--accent); background: var(--surface-2); }
+.th-act-icon-btn svg { width: 13px; height: 13px; }
+.th-act-text {
+  flex: 1; word-break: break-word; display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+}
+.th-act-label { margin-right: 1px; }
+.th-rs-Strip { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+
+/* Mini RS card icons & clickable resource pills in Turn History / Live Log */
+.th-rs-card {
+  width: 16px; height: 21px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28); flex-shrink: 0; vertical-align: middle; position: relative;
+}
+.th-rs-card svg.glyph { width: 12px; height: 12px; }
+.th-rs-pill {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  padding: 1px 4px 1px 2px; border-radius: 4px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700;
+  line-height: 1; transition: all 0.12s; vertical-align: middle;
+}
+.th-rs-pill:hover, .th-rs-pill.active-filter { border-color: var(--accent); background: var(--surface-3); box-shadow: 0 0 0 1px var(--accent); }
+.th-rs-pill.dir-gain .th-rs-cnt { color: #2ecc71; }
+.th-rs-pill.dir-loss .th-rs-cnt { color: var(--danger); }
+.th-rs-cnt { font-weight: 800; font-size: 10px; }
+
+.th-inline-rs-word {
+  border: 0; background: transparent; padding: 0 2px; border-radius: 3px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 2px; color: inherit; font: inherit; font-weight: 700;
+  vertical-align: baseline; transition: background 0.12s;
+}
+.th-inline-rs-word:hover, .th-inline-rs-word.active-filter { background: var(--surface-2); box-shadow: 0 0 0 1px var(--accent); }
+.th-inline-rs-word .th-rs-card { width: 14px; height: 18px; }
+.th-inline-rs-word .th-rs-card svg.glyph { width: 10px; height: 10px; }
+
 .th-act-badge {
-  font-size: 9px; font-weight: 700; padding: 0.5px 3.5px; border-radius: 3px; background: var(--surface-2);
-  color: var(--ink-dim); border: 1px solid var(--line); flex-shrink: 0; line-height: 1.2;
+  font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; background: var(--surface-2);
+  color: var(--ink-dim); border: 1px solid var(--line); flex-shrink: 0; line-height: 1.2; cursor: pointer;
+  transition: all 0.12s;
 }
+.th-act-badge:hover, .th-act-badge.active-filter { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .th-action-row.th-act-empty { color: var(--ink-dim); font-style: italic; }
 .th-action-row.cat-roll .th-act-badge { background: rgba(230, 126, 34, 0.18); color: var(--accent); border-color: rgba(230, 126, 34, 0.4); }
 .th-action-row.cat-build .th-act-badge { background: rgba(46, 204, 113, 0.18); color: #2ecc71; border-color: rgba(46, 204, 113, 0.4); }
@@ -893,7 +993,10 @@ svg#boardSvg.is-panning * {
 .th-action-row.cat-dev .th-act-badge { background: rgba(155, 89, 182, 0.18); color: var(--dev); border-color: rgba(155, 89, 182, 0.4); }
 .th-action-row.cat-award .th-act-badge { background: rgba(241, 196, 15, 0.2); color: #f1c40f; border-color: rgba(241, 196, 15, 0.5); }
 
-#chatSection { flex: 1.1 1 0; min-height: 90px; }
+#chatSection {
+  background: var(--surface); display: flex; flex-direction: column; overflow: hidden;
+  flex: 1 1 0; min-height: 0; border-radius: 0;
+}
 #chatFeed { flex: 1; padding: 8px 10px; overflow-y: auto; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; cursor: text; }
 .msg { line-height: 1.35; word-break: break-word; }
 .msg .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }

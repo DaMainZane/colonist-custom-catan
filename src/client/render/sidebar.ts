@@ -1,23 +1,38 @@
-// MODULE: right sidebar (log, chat, bank, player rows) | DEPENDS ON: client/avatars, client/constants, client/icons, client/socket, client/store, client/types, +1 more | USED BY: client/main, client/render/board, client/render/index
+// MODULE: right sidebar (merged live log & turn history with RS card icons and click-to-filter, chat leaf, bank, player rows) | DEPENDS ON: client/avatars, client/constants, client/icons, client/socket, client/store, client/types, +1 more | USED BY: client/main, client/render/board, client/render/index
 import { RESOURCES } from '../constants';
-import { getMiniSvg, uiIcon } from '../icons';
+import { dieFaceSvg, getDevSvg, getMiniSvg, uiIcon } from '../icons';
 import { socket } from '../socket';
-import { state, inFlightPlayerResCount, inFlightPlayerDevCount, logTab } from '../store';
-import type { RoundSummary } from '../types';
+import {
+  state,
+  inFlightPlayerResCount,
+  inFlightPlayerDevCount,
+  logTab,
+  logFilter,
+  setLogFilter
+} from '../store';
+import type { PlayerTurnSummary, RoundSummary, TurnActionItem, TurnActionResource } from '../types';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 
 // Log and chat are text the player may select and copy. Re-writing innerHTML on every game update
 // would wipe the selection, so each feed only re-renders when its content actually changed.
-let lastLogSig = '';
+let lastMergedLogSig = '';
+let lastFilterBarSig = '';
 let lastChatSig = '';
-let lastHistorySig = '';
+let seenChatCount = 0;
 const collapsedRounds = new Set<number>();
 
 export function toggleRoundCollapse(roundNum: number): void {
   if (collapsedRounds.has(roundNum)) collapsedRounds.delete(roundNum);
   else collapsedRounds.add(roundNum);
-  lastHistorySig = '';
+  lastMergedLogSig = '';
+  renderSidebar();
+}
+
+export function toggleLogFilter(filter: string | null): void {
+  setLogFilter(filter || null);
+  lastMergedLogSig = '';
+  lastFilterBarSig = '';
   renderSidebar();
 }
 
@@ -33,7 +48,6 @@ function isNearBottom(el: HTMLElement): boolean {
 
 function renderFeed(el: HTMLElement, sig: string, lastSig: string, html: () => string): boolean {
   if (sig === lastSig) return false;
-  // Never replace text the player is in the middle of selecting; the next update will catch up.
   if (hasSelectionIn(el)) return false;
   const stick = isNearBottom(el);
   el.innerHTML = html();
@@ -58,14 +72,11 @@ function botTag(p: any): string {
 }
 
 // ---- Player list: fixed size (CSS), scrolls to follow the turn ----------------------------------------------------
-// The list always shows 4 rows. With more players it scrolls, and every new turn scrolls the current player into view with the
-// smallest move that shows the whole row (turn goes to player 5: one row down; back to player 1: up to the top).
 let lastTurnKey = '';
 let lastRobKey = '';
 let followRaf = 0;
 let stackGuardsBound = false;
 
-// Grabbing the list (wheel, drag, touch) stops the automatic scroll so it never fights the hand.
 function bindStackGuards(el: HTMLElement): void {
   if (stackGuardsBound) return;
   stackGuardsBound = true;
@@ -112,10 +123,6 @@ function revealRow(stackEl: HTMLElement, row: HTMLElement | null): void {
   scrollStackTo(stackEl, target);
 }
 
-/**
- * Screen rect of an element for the card-flight animations. A player row that is scrolled out of the list would send the cards
- * flying over the chat or off screen, so its rect is pulled to the nearest edge of the visible list (the card lands on the edge row).
- */
 export function visibleRect(el: HTMLElement): { left: number; top: number; width: number; height: number } {
   const r = el.getBoundingClientRect();
   const stack = document.getElementById('playersStack');
@@ -125,115 +132,410 @@ export function visibleRect(el: HTMLElement): { left: number; top: number; width
   return { left: r.left, top, width: r.width, height: r.height };
 }
 
-function renderTurnHistory(el: HTMLElement): void {
+// ---- RS Card Icons & Click-to-Filter Helpers ----------------------------------------------------------------------
+
+const RES_LABELS: Record<string, string> = {
+  wood: 'Wood',
+  brick: 'Brick',
+  sheep: 'Sheep',
+  wheat: 'Wheat',
+  ore: 'Ore',
+  gold: 'Gold',
+  fish: 'Fish',
+  mystery: 'Card'
+};
+
+const CAT_LABELS: Record<string, string> = {
+  roll: 'Roll',
+  produce: 'Produce',
+  build: 'Build',
+  trade: 'Trade',
+  dev: 'Dev',
+  rob: 'Rob',
+  discard: 'Discard',
+  award: 'Award',
+  event: 'Event'
+};
+
+function rsCardIconHtml(res: string): string {
+  const r = res.toLowerCase();
+  if (r === 'dev') {
+    return `<span class="th-rs-card card-dev">${getDevSvg('back')}</span>`;
+  }
+  if (r === 'mystery') {
+    return `<span class="th-rs-card card-mystery">?</span>`;
+  }
+  const svg = getMiniSvg(r);
+  if (svg) {
+    return `<span class="th-rs-card card-${esc(r)}">${svg}</span>`;
+  }
+  return `<span class="th-rs-card card-wood">${getMiniSvg('wood')}</span>`;
+}
+
+function rsChipHtml(item: TurnActionResource): string {
+  const r = item.resource.toLowerCase();
+  const filterKey = `res:${r}`;
+  const active = logFilter === filterKey;
+  const sign = item.sign ?? '+';
+  const toneCls = sign === '-' ? 'is-neg' : 'is-pos';
+  return `<button type="button" class="th-rs-pill ${toneCls} ${active ? 'is-active' : ''}" onclick="toggleLogFilter('${esc(filterKey)}')" title="Click to filter by ${esc(RES_LABELS[r] || r)}">${rsCardIconHtml(r)}<span class="th-rs-amt">${esc(sign)}${item.amount}</span></button>`;
+}
+
+function pieceUiIconName(piece?: string): string {
+  if (piece === 'settlement') return 'house';
+  if (piece === 'city') return 'city';
+  if (piece === 'road') return 'road';
+  if (piece === 'bridge' || piece === 'rickety_bridge') return 'bridge';
+  if (piece === 'net') return 'net';
+  if (piece === 'harbor') return 'harbor';
+  return 'house';
+}
+
+function actionIconHtml(act: TurnActionItem): string {
+  if (act.resources && act.resources.length > 0) {
+    return rsCardIconHtml(act.resources[0].resource);
+  }
+  if (act.category === 'produce' || act.category === 'discard') {
+    const r = act.icon && RES_LABELS[act.icon] ? act.icon : 'wheat';
+    return rsCardIconHtml(r);
+  }
+  if (act.category === 'dev') {
+    return `<span class="th-rs-card card-dev">${getDevSvg(act.devCard || 'back')}</span>`;
+  }
+  if (act.category === 'roll') {
+    if (act.icon === 'pass' || act.badge === 'Pass') {
+      return `<span class="th-svg-ico">${uiIcon('pass', 14)}</span>`;
+    }
+    const face = act.diceSum ? Math.min(6, Math.max(1, ((act.diceSum - 1) % 6) + 1)) : 6;
+    return `<span class="th-svg-ico th-die-ico">${dieFaceSvg(face)}</span>`;
+  }
+  if (act.category === 'build') {
+    return `<span class="th-svg-ico">${uiIcon(pieceUiIconName(act.piece || act.icon), 14)}</span>`;
+  }
+  if (act.category === 'trade') {
+    return `<span class="th-svg-ico">${uiIcon(act.badge === 'Bank' ? 'bank' : 'swap', 14)}</span>`;
+  }
+  if (act.category === 'rob') {
+    return rsCardIconHtml('mystery');
+  }
+  if (act.category === 'award') {
+    return `<span class="th-svg-ico">${uiIcon(act.badge === 'Winner' ? 'crown' : 'trophy', 14)}</span>`;
+  }
+  return `<span class="th-svg-ico">${uiIcon('waves', 14)}</span>`;
+}
+
+/** Replaces emoji resource symbols and resource keywords in raw log text with clickable mini RS card icons. */
+function formatLogTextWithRsCards(rawText: string): string {
+  // Strip leading decorative action emojis while keeping text clean
+  const cleaned = String(rawText || '').replace(
+    /^[\s🎲🌲🧱🐑🌾⛰️🪙🐟🏠🏰🛣️🌉🃏⚔️🥷🏦🤝🏆👑🌊⚓🪓🏴‍☠️⛵📜💥⏭️🔄]+/u,
+    ''
+  );
+  // Escape HTML first
+  let safe = esc(cleaned);
+  // Replace inline emoji resource symbols if any remain
+  const emojiMap: Record<string, string> = {
+    '🌲': 'wood',
+    '🧱': 'brick',
+    '🐑': 'sheep',
+    '🌾': 'wheat',
+    '⛰️': 'ore',
+    '🪙': 'gold',
+    '🐟': 'fish'
+  };
+  for (const [emo, res] of Object.entries(emojiMap)) {
+    if (safe.includes(emo)) {
+      safe = safe.split(emo).join(
+        `<button type="button" class="th-inline-rs ${logFilter === `res:${res}` ? 'is-active' : ''}" onclick="toggleLogFilter('res:${res}')" title="Filter by ${RES_LABELS[res]}">${rsCardIconHtml(res)}</button>`
+      );
+    }
+  }
+  // Replace standalone resource words (WOOD, BRICK, SHEEP, WHEAT, ORE, wood, brick, sheep, wheat, ore) with inline RS card + word
+  safe = safe.replace(/\b(wood|brick|sheep|wheat|ore|gold|fish)\b/gi, match => {
+    const r = match.toLowerCase();
+    const active = logFilter === `res:${r}`;
+    return `<button type="button" class="th-inline-rs-word ${active ? 'is-active' : ''}" onclick="toggleLogFilter('res:${r}')" title="Click to filter by ${RES_LABELS[r] || r}">${rsCardIconHtml(r)}<span>${esc(match)}</span></button>`;
+  });
+  return safe;
+}
+
+function describeActiveFilter(filter: string): string {
+  const [kind, val] = filter.split(':');
+  if (kind === 'res') return RES_LABELS[val] || val;
+  if (kind === 'cat') return CAT_LABELS[val] || val;
+  if (kind === 'player') return val;
+  if (kind === 'round') return val === '0' ? 'Setup' : `Round ${val}`;
+  if (kind === 'val') return val;
+  return filter;
+}
+
+function actionMatchesFilter(act: TurnActionItem, turn: PlayerTurnSummary, round: RoundSummary, filter: string | null): boolean {
+  if (!filter) return true;
+  const [kind, val] = filter.split(':');
+  const vLow = (val || '').toLowerCase();
+  if (kind === 'player') {
+    return (
+      turn.playerName.toLowerCase() === vLow ||
+      act.text.toLowerCase().includes(vLow)
+    );
+  }
+  if (kind === 'round') {
+    return String(round.round) === val;
+  }
+  if (kind === 'cat') {
+    return act.category === vLow;
+  }
+  if (kind === 'res') {
+    if (act.resources?.some(r => r.resource.toLowerCase() === vLow)) return true;
+    return act.text.toLowerCase().includes(vLow);
+  }
+  if (kind === 'val') {
+    return (
+      (act.badge || '').toLowerCase() === vLow ||
+      act.text.toLowerCase().includes(vLow)
+    );
+  }
+  return true;
+}
+
+function logLineMatchesFilter(lineText: string, filter: string | null): boolean {
+  if (!filter) return true;
+  const [kind, val] = filter.split(':');
+  const low = String(lineText || '').toLowerCase();
+  const vLow = (val || '').toLowerCase();
+  if (kind === 'res' || kind === 'player' || kind === 'val') {
+    return low.includes(vLow);
+  }
+  if (kind === 'cat') {
+    if (vLow === 'roll') return low.includes('rolled') || low.includes('dice');
+    if (vLow === 'produce') return low.includes('produced') || low.includes('collected') || low.includes('caught');
+    if (vLow === 'build') return low.includes('built') || low.includes('placed') || low.includes('upgraded') || low.includes('raised');
+    if (vLow === 'trade') return low.includes('traded') || low.includes('trade');
+    if (vLow === 'dev') return low.includes('dev') || low.includes('knight') || low.includes('monopoly') || low.includes('plenty') || low.includes('researched');
+    if (vLow === 'rob') return low.includes('rob') || low.includes('stole') || low.includes('pirate');
+  }
+  return true;
+}
+
+function renderFilterBar(): void {
+  const bar = document.getElementById('logFilterBar');
+  if (!bar) return;
+  if (logTab !== 'live') {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  const sig = `${logFilter || ''}`;
+  if (sig === lastFilterBarSig && bar.innerHTML.length > 0) return;
+  lastFilterBarSig = sig;
+
+  const resBtns = RESOURCES.map(r => {
+    const key = `res:${r}`;
+    const active = logFilter === key;
+    return `<button type="button" class="lf-rs-btn ${active ? 'active' : ''}" onclick="toggleLogFilter('${key}')" title="Filter by ${RES_LABELS[r]}">${rsCardIconHtml(r)}</button>`;
+  }).join('');
+
+  const catKeys: ('roll' | 'build' | 'trade' | 'dev' | 'rob')[] = ['roll', 'build', 'trade', 'dev', 'rob'];
+  const catBtns = catKeys.map(c => {
+    const key = `cat:${c}`;
+    const active = logFilter === key;
+    return `<button type="button" class="lf-val-btn ${active ? 'active' : ''}" onclick="toggleLogFilter('${key}')" title="Filter by ${CAT_LABELS[c]}">${CAT_LABELS[c]}</button>`;
+  }).join('');
+
+  const statusHtml = logFilter
+    ? `<button type="button" class="lf-clear-btn" onclick="toggleLogFilter(null)" title="Clear filter"><span>${esc(describeActiveFilter(logFilter))}</span><span class="lf-x">✕</span></button>`
+    : `<span class="lf-hint">Click a value to filter</span>`;
+
+  bar.innerHTML = `
+    <div class="lf-top-row">
+      <div class="lf-rs-group">${resBtns}</div>
+      ${statusHtml}
+    </div>
+    <div class="lf-cat-row">${catBtns}</div>
+  `;
+}
+
+function renderMergedLiveLog(el: HTMLElement): void {
   const history: RoundSummary[] = state.turnHistory || [];
+  const logs: { text: string; color: string | null }[] = state.logs || [];
   const currentRoundNum = state.status === 'PLAYING' ? (state.round || 1) : -1;
-  const sig = `${state.round || 0}|${history.length}|${Array.from(collapsedRounds).sort().join(',')}|${history.map(r => `${r.round}:${r.turns.length}:${r.turns.reduce((s, t) => s + t.actions.length, 0)}`).join(';')}`;
+  const sig = `${state.status}|${state.round || 0}|${ logFilter || '' }|${history.length}|${Array.from(collapsedRounds).sort().join(',')}|${history.map(r => `${r.round}:${r.turns.length}:${r.turns.reduce((s, t) => s + t.actions.length, 0)}`).join(';')}|${logs.length}:${logs.length ? logs[logs.length - 1].text : ''}`;
 
-  if (sig === lastHistorySig && el.innerHTML.trim().length > 0) return;
-  lastHistorySig = sig;
+  if (sig === lastMergedLogSig && el.innerHTML.trim().length > 0) return;
+  if (hasSelectionIn(el)) return;
+  lastMergedLogSig = sig;
 
+  // In LOBBY (or before any turns are recorded), show the live log lines with clickable RS card icons
   if (state.status === 'LOBBY' || history.length === 0) {
-    el.innerHTML = `
-      <div class="turn-history-empty">
-        <div class="th-empty-icon">⏳</div>
-        <div class="th-empty-title">Turn History</div>
-        <div class="th-empty-desc">Key player actions (dice rolls, productions, buildings, trades, dev cards) will be summarized round-by-round here once the game begins.</div>
-      </div>
-    `;
+    const filteredLogs = logs.filter(l => logLineMatchesFilter(l.text, logFilter));
+    if (filteredLogs.length === 0) {
+      el.innerHTML = `
+        <div class="turn-history-empty">
+          <div class="th-empty-title">${logFilter ? 'No matching log entries' : 'Live Log & Turn History'}</div>
+          <div class="th-empty-desc">${logFilter ? 'Click the active filter above to show all entries.' : 'Rolls, resource cards, builds, trades, and round summaries appear here.'}</div>
+        </div>
+      `;
+      return;
+    }
+    el.innerHTML = `<div class="th-live-lines">${filteredLogs.map(l => `
+      <div class="log-line" ${l.color ? `style="color:${esc(l.color)}"` : ''}>${formatLogTextWithRsCards(l.text)}</div>
+    `).join('')}</div>`;
     return;
   }
 
   // Display newest round first for instant visibility of recent play
   const reversedRounds = [...history].reverse();
 
-  const html = reversedRounds.map(rnd => {
+  const roundBlocks: string[] = [];
+  for (const rnd of reversedRounds) {
     const isCurrent = rnd.round === currentRoundNum && rnd.round > 0;
-    const isCollapsed = collapsedRounds.has(rnd.round);
-    const totalActions = rnd.turns.reduce((s, t) => s + t.actions.length, 0);
+    const isCollapsed = !logFilter && collapsedRounds.has(rnd.round);
 
-    const turnsHtml = rnd.turns.map(turn => {
-      const actionsHtml = turn.actions.length > 0
-        ? turn.actions.map(act => `
-            <div class="th-action-row cat-${esc(act.category)}">
-              <span class="th-act-icon">${act.icon}</span>
-              <span class="th-act-text">${esc(act.text)}</span>
-              ${act.badge ? `<span class="th-act-badge">${esc(act.badge)}</span>` : ''}
-            </div>
-          `).join('')
-        : `<div class="th-action-row th-act-empty"><span>⏭️</span><span>Passed turn</span></div>`;
+    const matchingTurnsHtml: string[] = [];
+    let matchingActionsCount = 0;
 
-      return `
+    // Show newest turn first within the current round so live actions appear right at the top of the round
+    const orderedTurns = [...rnd.turns].reverse();
+    for (const turn of orderedTurns) {
+      const filteredActions = turn.actions.filter(act => actionMatchesFilter(act, turn, rnd, logFilter));
+      if (logFilter && filteredActions.length === 0) continue;
+      matchingActionsCount += filteredActions.length;
+
+      const actionsHtml = filteredActions.length > 0
+        ? filteredActions.map(act => {
+            const catKey = `cat:${act.category}`;
+            const catActive = logFilter === catKey;
+            const rsListHtml = act.resources && act.resources.length > 0
+              ? `<span class="th-rs-list">${act.resources.map(rsChipHtml).join('')}</span>`
+              : '';
+            const badgeKey = act.badge ? `val:${act.badge}` : '';
+            const badgeActive = badgeKey && logFilter === badgeKey;
+            return `
+              <div class="th-action-row cat-${esc(act.category)}">
+                <button type="button" class="th-act-icon-btn ${catActive ? 'is-active' : ''}" onclick="toggleLogFilter('${esc(catKey)}')" title="Click to filter by ${esc(CAT_LABELS[act.category] || act.category)}">${actionIconHtml(act)}</button>
+                <span class="th-act-text">${formatLogTextWithRsCards(act.text)}${rsListHtml ? ` ${rsListHtml}` : ''}</span>
+                ${act.badge ? `<button type="button" class="th-act-badge ${badgeActive ? 'is-active' : ''}" onclick="toggleLogFilter('${esc(badgeKey)}')" title="Click to filter by ${esc(act.badge)}">${esc(act.badge)}</button>` : ''}
+              </div>
+            `;
+          }).join('')
+        : `<div class="th-action-row th-act-empty"><span class="th-svg-ico">${uiIcon('pass', 13)}</span><span>Passed turn</span></div>`;
+
+      const playerKey = `player:${turn.playerName}`;
+      const playerActive = logFilter === playerKey;
+
+      matchingTurnsHtml.push(`
         <div class="th-turn-card" style="border-left-color: ${esc(turn.playerColor)}">
           <div class="th-turn-head">
-            <span class="avatar th-avatar" style="background:${esc(turn.playerColor)}">${avatarFace(turn.playerAvatar, turn.playerName)}</span>
-            <span class="th-player-name" style="color:${esc(turn.playerColor)}">${esc(turn.playerName)}</span>
+            <button type="button" class="th-player-filter-btn ${playerActive ? 'is-active' : ''}" onclick="toggleLogFilter('${esc(playerKey)}')" title="Click to filter by ${esc(turn.playerName)}">
+              <span class="avatar th-avatar" style="background:${esc(turn.playerColor)}">${avatarFace(turn.playerAvatar, turn.playerName)}</span>
+              <span class="th-player-name" style="color:${esc(turn.playerColor)}">${esc(turn.playerName)}</span>
+            </button>
             ${turn.isBot ? `<span class="tag">Bot</span>` : ''}
-            ${turn.turnCount > 0 ? `<span class="th-turn-num">Turn #${turn.turnCount}</span>` : ''}
+            ${turn.turnCount > 0 ? `<span class="th-turn-num">#${turn.turnCount}</span>` : ''}
           </div>
           <div class="th-turn-actions">
             ${actionsHtml}
           </div>
         </div>
-      `;
-    }).join('');
+      `);
+    }
 
-    return `
+    if (logFilter && matchingTurnsHtml.length === 0) continue;
+
+    const roundKey = `round:${rnd.round}`;
+    const roundBadgeActive = logFilter === roundKey;
+
+    roundBlocks.push(`
       <div class="th-round-group ${isCurrent ? 'is-current-round' : ''} ${isCollapsed ? 'is-collapsed' : ''}">
         <div class="th-round-header" onclick="toggleRoundCollapse(${rnd.round})" title="Click to collapse/expand">
           <div class="th-round-title-wrap">
-            <span class="th-round-badge">${rnd.round === 0 ? 'Draft' : `R${rnd.round}`}</span>
+            <button type="button" class="th-round-badge ${roundBadgeActive ? 'is-active' : ''}" onclick="event.stopPropagation(); toggleLogFilter('${roundKey}')" title="Click to filter to ${esc(rnd.title)}">${rnd.round === 0 ? 'Setup' : `R${rnd.round}`}</button>
             <span class="th-round-title">${esc(rnd.title)}</span>
             ${isCurrent ? `<span class="tag accent">Current</span>` : ''}
           </div>
           <div class="th-round-right">
-            <span class="th-round-summary-count">${rnd.turns.length} turn${rnd.turns.length !== 1 ? 's' : ''} · ${totalActions} act</span>
+            <span class="th-round-summary-count">${matchingTurnsHtml.length} turn${matchingTurnsHtml.length !== 1 ? 's' : ''} · ${matchingActionsCount} act</span>
             <span class="th-chevron">${isCollapsed ? '▸' : '▾'}</span>
           </div>
         </div>
-        ${!isCollapsed ? `<div class="th-round-turns">${turnsHtml}</div>` : ''}
+        ${!isCollapsed ? `<div class="th-round-turns">${matchingTurnsHtml.join('')}</div>` : ''}
+      </div>
+    `);
+  }
+
+  // Also include recent raw live log lines at the bottom so any non-turn announcements (tides, nemesis, etc.) are visible and filterable
+  const recentRawLogs = logs.slice(-25).filter(l => logLineMatchesFilter(l.text, logFilter));
+  const rawLogsBlock = recentRawLogs.length > 0
+    ? `
+      <div class="th-round-group th-raw-stream">
+        <div class="th-round-header" onclick="toggleRoundCollapse(-1)" title="Click to collapse/expand live stream">
+          <div class="th-round-title-wrap">
+            <span class="th-round-badge">Stream</span>
+            <span class="th-round-title">Recent Feed (${recentRawLogs.length})</span>
+          </div>
+          <div class="th-round-right">
+            <span class="th-chevron">${collapsedRounds.has(-1) ? '▸' : '▾'}</span>
+          </div>
+        </div>
+        ${!collapsedRounds.has(-1) ? `<div class="th-live-lines">${[...recentRawLogs].reverse().map(l => `
+          <div class="log-line" ${l.color ? `style="color:${esc(l.color)}"` : ''}>${formatLogTextWithRsCards(l.text)}</div>
+        `).join('')}</div>` : ''}
+      </div>
+    `
+    : '';
+
+  if (roundBlocks.length === 0 && !rawLogsBlock) {
+    el.innerHTML = `
+      <div class="turn-history-empty">
+        <div class="th-empty-title">No matching actions</div>
+        <div class="th-empty-desc">Click another value or clear the filter above to see all turns.</div>
       </div>
     `;
-  }).join('');
+    return;
+  }
 
-  el.innerHTML = html;
+  el.innerHTML = roundBlocks.join('') + rawLogsBlock;
 }
 
 export function renderSidebar(): void {
   const logSectionEl = document.getElementById('logSection')!;
   const feedEl = document.getElementById('logFeed') || logSectionEl;
   const historyEl = document.getElementById('turnHistoryFeed');
+  const chatSectionEl = document.getElementById('chatSection');
   const btnLive = document.getElementById('tabBtnLogLive');
-  const btnHist = document.getElementById('tabBtnLogHistory');
+  const btnChat = document.getElementById('tabBtnLogChat') || document.getElementById('tabBtnLogHistory');
 
-  if (btnLive && btnHist) {
-    if (logTab === 'history') {
+  const chats: any[] = state.chats || [];
+  if (logTab === 'chat') {
+    seenChatCount = chats.length;
+  } else if (chats.length < seenChatCount) {
+    seenChatCount = chats.length;
+  }
+  const unreadChats = Math.max(0, chats.length - seenChatCount);
+
+  if (btnLive && btnChat) {
+    if (logTab === 'chat') {
       btnLive.classList.remove('active');
-      btnHist.classList.add('active');
+      btnChat.classList.add('active');
       if (feedEl && feedEl !== logSectionEl) feedEl.style.display = 'none';
-      if (historyEl) historyEl.style.display = 'flex';
+      if (historyEl) historyEl.style.display = 'none';
+      if (chatSectionEl) chatSectionEl.style.display = 'flex';
     } else {
       btnLive.classList.add('active');
-      btnHist.classList.remove('active');
-      if (feedEl && feedEl !== logSectionEl) feedEl.style.display = 'block';
+      btnChat.classList.remove('active');
+      if (feedEl && feedEl !== logSectionEl) feedEl.style.display = 'flex';
       if (historyEl) historyEl.style.display = 'none';
+      if (chatSectionEl) chatSectionEl.style.display = 'none';
     }
+    btnChat.innerHTML = unreadChats > 0
+      ? `Chat <span class="chat-unread-badge">${unreadChats}</span>`
+      : 'Chat';
   }
 
-  const logs: any[] = state.logs || [];
-  const logSig = `${logs.length}|${logs.length ? logs[logs.length - 1].text : ''}`;
-  if (renderFeed(feedEl, logSig, lastLogSig, () => logs.map(l => `
-    <div class="log-line" ${l.color ? `style="color:${esc(l.color)}"` : ''}>${l.text}</div>
-  `).join(''))) {
-    lastLogSig = logSig;
-  }
-
-  if (historyEl) {
-    renderTurnHistory(historyEl);
-  }
+  renderFilterBar();
+  renderMergedLiveLog(feedEl);
 
   const chatEl = document.getElementById('chatFeed')!;
-  const chats: any[] = state.chats || [];
   const chatSig = `${chats.length}|${chats.length ? chats[chats.length - 1].text : ''}`;
   if (renderFeed(chatEl, chatSig, lastChatSig, () => chats.map(c => `
     <div class="msg"><span class="dot" style="background:${esc(c.color)}"></span><strong>${esc(c.sender)}</strong>${esc(c.text)}</div>
@@ -259,7 +561,6 @@ export function renderSidebar(): void {
   const canPickVictim = state.phase === 'ROBBER_STEAL' && state.currentPlayerId === socket.id;
   const victimSet = new Set<string>(state.robberVictims || []);
 
-  // innerHTML rebuilds reset the scroll position, which made the list jump. Keep it.
   const stackEl = document.getElementById('playersStack')!;
   const stackTop = stackEl.scrollTop;
   bindStackGuards(stackEl);
@@ -331,7 +632,6 @@ export function renderSidebar(): void {
   stackEl.innerHTML = playerRowsHtml + specRowsHtml;
   stackEl.scrollTop = stackTop;
 
-  // Follow the turn: when the current player changes, scroll them into view. Lobby and game over reset to the top.
   const turnKey = state.status === 'LOBBY' || state.status === 'GAMEOVER' ? '' : String(state.currentPlayerId ?? state.turnIndex);
   if (turnKey !== lastTurnKey) {
     const hadTurn = lastTurnKey !== '';
@@ -339,7 +639,6 @@ export function renderSidebar(): void {
     if (turnKey) revealRow(stackEl, document.getElementById(`playerRow_${state.currentPlayerId ?? state.players[state.turnIndex]?.id}`));
     else if (hadTurn) scrollStackTo(stackEl, 0);
   }
-  // The player you have to rob must be reachable: scroll to the first victim when the choice opens.
   const robKey = canPickVictim ? [...victimSet].join(',') : '';
   if (robKey !== lastRobKey) {
     lastRobKey = robKey;
