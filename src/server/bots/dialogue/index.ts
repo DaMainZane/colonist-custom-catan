@@ -138,7 +138,60 @@ export function emitBotDialogue(room: Room, actorId: string, actionType: string,
             if (countVertices(g, bot.id, SETTLEMENT) + countVertices(g, bot.id, CITY) >= 3) say(bot, 'settlement');
           } else if (d.piece === ROAD && countEdges(g, bot.id, ROAD) >= 3) {
             say(bot, 'road');
+          } else if (d.piece === 'net') {
+            say(bot, 'netBuilt');
           }
+          break;
+        }
+
+        case 'portUpgraded': {
+          if (d.level === 2) say(botById(d.playerId), 'harborBuilt');
+          break;
+        }
+
+        case 'pieceBroken': {
+          if (d.piece === 'rickety_bridge') say(botById(d.playerId), 'bridgeCollapsed');
+          break;
+        }
+
+        case 'tideChanged': {
+          const risen: number[] = Array.isArray(d.risen) ? d.risen : [];
+          if (risen.length === 0) break;
+          const hitOwners = new Set<string>();
+          for (const hexId of risen) {
+            const hex = g.board.hexes[hexId];
+            if (!hex) continue;
+            for (const o of ownersOnHex(g, hex)) hitOwners.add(o);
+          }
+          const hitBots = bots.filter(b => hitOwners.has(b.id));
+          if (hitBots.length > 0) say(pickOf(hitBots), 'tideFlood');
+          break;
+        }
+
+        case 'risingSeaDrowned': {
+          const hex = g.board.hexes[d.hexId];
+          if (!hex) break;
+          const hitOwners = new Set(ownersOnHex(g, hex));
+          const hitBots = bots.filter(b => hitOwners.has(b.id));
+          if (hitBots.length > 0) say(pickOf(hitBots), 'tideFlood');
+          break;
+        }
+
+        case 'wreckClaimed': {
+          // Only the claiming player is read; d.resource and d.bonus are deliberately ignored.
+          say(botById(d.playerId), 'wreckClaimed');
+          break;
+        }
+
+        case 'pirateRobbed': {
+          // Only the raided player is read; stolen resources are never read.
+          say(botById(d.playerId), 'pirateRaid');
+          break;
+        }
+
+        case 'pirateDriven': {
+          // Only the player who drove the pirate off is read; d.resource is deliberately ignored.
+          say(botById(d.playerId), 'pirateDriven');
           break;
         }
 

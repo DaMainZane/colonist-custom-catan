@@ -39,7 +39,7 @@ import { validateBuild } from '../base/building';
 import { BRIDGE } from './bridges';
 import { FISH, isSeaHex, seaHexIdsAt } from './fishing';
 import { RICKETY } from './ricketyBridges';
-import { registerTideboundTechs } from './tech';
+import { registerTideboundTechs, TECH_RICKETY_BRIDGES, techGate } from './tech';
 
 /** Marker kind stored in `g.ext.core.markers` for shipwrecks. */
 export const WRECK_MARKER_KIND = 'wreck';
@@ -713,7 +713,7 @@ export const wreckViewData: ViewDataDef = {
   shared: (g: GameState, reg: Registry) => ({ wrecks: wreckClientView(g, reg) })
 };
 
-// ---- Minimal bot support (`BOT_GOALS`) -------------------------------------------------------------------------
+// ---- T13b: Salvage bot goal (`BOT_GOALS`) ---------------------------------------------------------------------
 
 /** Does placing an edge at `edgeId` touch the wreck on `hexId`? */
 function edgeTouchesWreck(g: GameState, reg: Registry, edgeId: number, hexId: number): boolean {
@@ -724,11 +724,79 @@ function edgeTouchesWreck(g: GameState, reg: Registry, edgeId: number, hexId: nu
   return vSet.has(e.v1) || vSet.has(e.v2);
 }
 
-/** Minimal bot salvage goal: values building a road, bridge, or rickety bridge that claims or steps toward an active wreck. */
+/** Does an empty edge at `edgeId` connect in 1 more empty edge to a wreck on `hexId`? */
+function edgeStepsTowardWreck(g: GameState, reg: Registry, pid: Id, edgeId: number, hexId: number): boolean {
+  const e = g.board.edges[edgeId];
+  if (!e || e.piece) return false;
+  for (const vId of [e.v1, e.v2]) {
+    const v = g.board.vertices[vId];
+    if (!v || (v.piece && v.piece.owner !== pid)) continue;
+    for (const nextEdgeId of v.edgeIds) {
+      if (nextEdgeId === edgeId) continue;
+      const nextEdge = g.board.edges[nextEdgeId];
+      if (!nextEdge || nextEdge.piece) continue;
+      if (edgeTouchesWreck(g, reg, nextEdgeId, hexId)) return true;
+    }
+  }
+  return false;
+}
+
+/** Expected salvage card value of a wreck (using public site, turn scaling, Salvage crew, and 2x-cost floor). */
+export function expectedWreckLootValue(
+  g: GameState,
+  pid: Id,
+  site: WreckSite,
+  builtCostCards = 2
+): number {
+  const baseMean = site === 'sea' ? 4 : 1.5;
+  const mult = wreckTimeMultiplier(g.turnCount || 0) * (hasTech(g, pid, TECH_SALVAGE_CREW) ? SALVAGE_CREW_LOOT_MULT : 1);
+  const expectedCards = Math.max(builtCostCards + 1, baseMean * mult);
+  const bonusCards = site === 'sea' ? (hasTech(g, pid, TECH_SALVAGE_CREW) ? 0.55 : 0.4) : 0.15;
+  return expectedCards + bonusCards;
+}
+
+/** True when `edgeId` is a dead-end bridge of `pid` (one endpoint has no other piece or road/bridge of `pid`). */
+function isDeadEndBridge(g: GameState, pid: Id, edgeId: number): boolean {
+  const e = g.board.edges[edgeId];
+  if (!e || e.piece?.owner !== pid) return false;
+  for (const vId of [e.v1, e.v2]) {
+    const v = g.board.vertices[vId];
+    if (!v) continue;
+    if (v.piece?.owner === pid) continue;
+    const otherOwnEdges = v.edgeIds.filter(id => id !== edgeId && g.board.edges[id]?.piece?.owner === pid);
+    if (otherOwnEdges.length === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * T13b salvage bot goal:
+ * - `vertexDelta`: rewards port vertices that immediately claim an active wreck when settled.
+ * - `edgeDelta`: scores 1-step claiming edges and 2-step approach edges weighted by expected loot and countdown urgency.
+ * - `goals`: emits salvage build goals (1-step claim even when trading is needed, or 2-step approach when affordable).
+ * - `actionScore`: scores `demolish_bridge` (`TECH_SALVAGE_CREW`) only on safe dead-end bridges when cards or cap slots are needed.
+ */
 export const wreckBotGoal: BotGoalDef = {
   id: 'tidebound.wrecks',
   goalClass: 'generic',
-  edgeDelta(ctx: Ctx, _pid: Id, edgeId: number): number {
+  vertexDelta(ctx: Ctx, pid: Id, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.wrecks')) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v || !v.port) return 0;
+    const wrecks = activeWrecks(g);
+    if (wrecks.length === 0) return 0;
+
+    let bonus = 0;
+    for (const m of wrecks) {
+      const hexId = Number(m.loc);
+      if (!verticesOfHex(g, reg, hexId).includes(vertexId)) continue;
+      const site: WreckSite = (m.payload as Partial<WreckPayload> | undefined)?.site === 'shore' ? 'shore' : 'sea';
+      bonus += expectedWreckLootValue(g, pid, site, 4) * 1.1;
+    }
+    return bonus;
+  },
+  edgeDelta(ctx: Ctx, pid: Id, edgeId: number): number {
     const { g, reg } = ctx;
     if (!addonOn(reg, 'tidebound.wrecks')) return 0;
     const wrecks = activeWrecks(g);
@@ -739,9 +807,14 @@ export const wreckBotGoal: BotGoalDef = {
     let bonus = 0;
     for (const m of wrecks) {
       const hexId = Number(m.loc);
-      const site = (m.payload as Partial<WreckPayload> | undefined)?.site === 'shore' ? 'shore' : 'sea';
+      const site: WreckSite = (m.payload as Partial<WreckPayload> | undefined)?.site === 'shore' ? 'shore' : 'sea';
+      const countdown = typeof m.countdown === 'number' ? m.countdown : WRECK_COUNTDOWN_ROUNDS;
+      const expected = expectedWreckLootValue(g, pid, site, e.hexIds.length === 0 ? 1 : 2);
+      const urgency = countdown <= 2 ? 4 : 0;
       if (edgeTouchesWreck(g, reg, edgeId, hexId)) {
-        bonus += site === 'sea' ? 26 : 16;
+        bonus += Math.round(expected * 5.5) + urgency;
+      } else if (countdown >= 2 && edgeStepsTowardWreck(g, reg, pid, edgeId, hexId)) {
+        bonus += Math.round(expected * 2.2);
       }
     }
     return bonus;
@@ -754,29 +827,93 @@ export const wreckBotGoal: BotGoalDef = {
     const p = getPlayer(g, pid);
     if (!p) return [];
 
-    const edgePieces = [RICKETY, ROAD, BRIDGE].filter(id => reg.pieces.has(id));
+    const edgePieces = [RICKETY, ROAD, BRIDGE].filter(
+      id => reg.pieces.has(id) && (p.pieces[id] ?? 0) > 0 && (id !== RICKETY || techGate(g, pid, TECH_RICKETY_BRIDGES))
+    );
+    if (edgePieces.length === 0) return [];
+
+    const claimCandidates: { item: BotGoalItem; score: number }[] = [];
+    const stepCandidates: { item: BotGoalItem; score: number }[] = [];
+
     for (const m of wrecks) {
       const hexId = Number(m.loc);
-      const site = (m.payload as Partial<WreckPayload> | undefined)?.site === 'shore' ? 'shore' : 'sea';
+      const site: WreckSite = (m.payload as Partial<WreckPayload> | undefined)?.site === 'shore' ? 'shore' : 'sea';
+      const countdown = typeof m.countdown === 'number' ? m.countdown : WRECK_COUNTDOWN_ROUNDS;
+      const urgency = countdown <= 2 ? 5 : 0;
+
       for (const pieceId of edgePieces) {
         const def = reg.pieces.get(pieceId)!;
+        const cost = priceOf(g, reg, p, def);
+        const costCards = Object.values(cost).reduce((s, n) => s + (Number(n) || 0), 0);
+        const affordable = validateBuild(ctx, pid, { piece: pieceId, loc: g.board.edges[0]?.id ?? 0 }) !== 'Not enough resources';
+        const expected = expectedWreckLootValue(g, pid, site, costCards);
+        const netGain = expected - costCards;
+
         for (const e of g.board.edges) {
-          if (e.piece || !edgeTouchesWreck(g, reg, e.id, hexId)) continue;
-          if (validateBuild(ctx, pid, { piece: pieceId, loc: e.id }) === null) {
-            return [
-              {
+          if (e.piece) continue;
+          if (!def.canPlace(ctx, pid, e.id, 'build')) continue;
+
+          if (edgeTouchesWreck(g, reg, e.id, hexId)) {
+            const canBuildNow = validateBuild(ctx, pid, { piece: pieceId, loc: e.id }) === null;
+            const priority = Math.round((site === 'sea' ? 76 : 62) + netGain * 3 + urgency + (canBuildNow ? 6 : 0));
+            claimCandidates.push({
+              score: priority + (canBuildNow ? 100 : 0),
+              item: {
                 id: 'tidebound.wrecks.salvage',
-                priority: site === 'sea' ? 82 : 68,
-                cost: priceOf(g, reg, p, def),
+                priority,
+                cost,
                 action: { type: 'build', payload: { piece: pieceId, loc: e.id } },
                 needsTags: ['sea', 'economy']
               }
-            ];
+            });
+          } else if (countdown >= 2 && affordable && edgeStepsTowardWreck(g, reg, pid, e.id, hexId)) {
+            const canBuildNow = validateBuild(ctx, pid, { piece: pieceId, loc: e.id }) === null;
+            if (!canBuildNow) continue;
+            const priority = Math.round((site === 'sea' ? 48 : 38) + netGain * 2);
+            stepCandidates.push({
+              score: priority,
+              item: {
+                id: `tidebound.wrecks.approach:${hexId}`,
+                priority,
+                cost,
+                action: { type: 'build', payload: { piece: pieceId, loc: e.id } },
+                needsTags: ['sea', 'economy']
+              }
+            });
           }
         }
       }
     }
+
+    if (claimCandidates.length > 0) {
+      claimCandidates.sort((a, b) => b.score - a.score);
+      return [claimCandidates[0].item];
+    }
+    if (stepCandidates.length > 0) {
+      stepCandidates.sort((a, b) => b.score - a.score);
+      return [stepCandidates[0].item];
+    }
     return [];
+  },
+  actionScore(ctx: Ctx, pid: Id, action: { type: string; payload: any }): number {
+    if (action.type !== 'demolish_bridge') return 0;
+    const { g, reg } = ctx;
+    if (!hasTech(g, pid, TECH_SALVAGE_CREW)) return 0;
+    const edgeId = Number(action.payload?.edgeId);
+    if (!Number.isInteger(edgeId)) return 0;
+    const e = g.board.edges[edgeId];
+    if (!e || e.piece?.owner !== pid || (e.piece.type !== BRIDGE && e.piece.type !== RICKETY)) return 0;
+
+    // Never demolish a bridge that is part of a Longest Road contender or touches an active wreck.
+    const p = getPlayer(g, pid);
+    if (!p) return 0;
+    if (g.awards.longestRoad === pid || (p.stats.longestRoad || 0) >= 4) return 0;
+    if (!isDeadEndBridge(g, pid, edgeId)) return 0;
+    if (activeWrecks(g).some(m => edgeTouchesWreck(g, reg, edgeId, Number(m.loc)))) return 0;
+
+    const hand = Object.values(p.resources).reduce((s, n) => s + (n || 0), 0);
+    if (e.piece.type === BRIDGE && hand <= 3) return 22;
+    return 0;
   }
 };
 

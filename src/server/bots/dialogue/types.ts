@@ -1,4 +1,4 @@
-// MODULE: bot dialogue types (events, line data shape, public context) | DEPENDS ON: server/bots/tiers | USED BY: server/bots/dialogue/context, server/bots/dialogue/engine, server/bots/dialogue/events, server/bots/dialogue/index, server/bots/dialogue/lines/awards, server/bots/dialogue/lines/build, +6 more
+// MODULE: bot dialogue types (events, line data shape, public context) | DEPENDS ON: server/bots/tiers | USED BY: server/bots/dialogue/context, server/bots/dialogue/engine, server/bots/dialogue/events, server/bots/dialogue/index, server/bots/dialogue/lines/awards, server/bots/dialogue/lines/build, +7 more
 import type { ChatStyle, Personality } from '../tiers';
 
 /** Host setting that scales how often bots talk. */
@@ -16,10 +16,12 @@ export type DialogueEvent =
   | 'tradeOffer' | 'tradeDecline' | 'tradeDeclineLeader' | 'tradeAccept' | 'tradeCounter' | 'tradeNoTakers' | 'bankEmpty'
   // map and table
   | 'gameStart' | 'largeMap' | 'islands' | 'fogReveal' | 'otherWins' | 'botWins'
+  // Tidebound DLC (T13f)
+  | 'tideFlood' | 'bridgeCollapsed' | 'harborBuilt' | 'netBuilt' | 'wreckClaimed' | 'pirateRaid' | 'pirateDriven'
   // replies to human chat
   | 'chatHello' | 'chatGg' | 'chatThanks' | 'chatLol' | 'chatName';
 
-export type MapTrait = 'large' | 'islands' | 'fog' | 'gold';
+export type MapTrait = 'large' | 'islands' | 'fog' | 'gold' | 'tidebound';
 
 /** Plain-data conditions: a line is only eligible when all of them hold. */
 export interface LineWhen {

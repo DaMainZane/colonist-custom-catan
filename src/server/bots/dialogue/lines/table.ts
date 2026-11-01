@@ -17,12 +17,20 @@ export const TABLE_LINES: Line[] = [
     text: ["Fog everywhere... this will be a surprise."]
   },
   {
+    id: 'gameStart.main.tidebound', event: 'gameStart', style: ['friendly'], when: { map: 'tidebound' },
+    text: ["Mind the tides out there, everyone!", "Open seas and rising tides! Watch your shores."]
+  },
+  {
     id: 'gameStart.secondary', event: 'gameStart', style: ['neutral'],
     text: ["Good luck.", "Begin.", "Let's play."]
   },
   {
     id: 'gameStart.secondary.fog', event: 'gameStart', style: ['neutral'], when: { map: 'fog' },
     text: ["Fog on the map. Careful."]
+  },
+  {
+    id: 'gameStart.secondary.tidebound', event: 'gameStart', style: ['neutral'], when: { map: 'tidebound' },
+    text: ["Tidebound rules active. Watch the coast."]
   },
   {
     id: 'gameStart.overload', event: 'gameStart', style: ['cold'],

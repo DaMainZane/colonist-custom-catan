@@ -1,6 +1,6 @@
-// MODULE: tidebound.rising_sea addon (T12a: coast-inward drowning of the lowest elevation land tiles first using a derived RNG stream, `drowned` tile state blocking production and robber, and idle checks for submerged non-harbor ports; T12b: works standalone or alongside Tides, `risingSeaLevel` 1-5 rate settings, and drowned tile client overlays) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/tides, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/addons.generated, packs/tidebound/index
-import { addonOn, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
-import type { AddonDef, Ctx, GameState, Hex, Registry, RngState, ViewDataDef, ViewOverlay } from '../../shared';
+// MODULE: tidebound.rising_sea addon (T12a: coast-inward drowning of the lowest elevation land tiles first using a derived RNG stream, `drowned` tile state blocking production and robber, and idle checks for submerged non-harbor ports; T12b: works standalone or alongside Tides, `risingSeaLevel` 1-5 rate settings, and drowned tile client overlays; T13a: rising-sea drowning exposure in scoreVertex) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/tides, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/addons.generated, packs/tidebound/index
+import { addonOn, BOT_GOALS, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
+import type { AddonDef, BotGoalDef, Ctx, GameState, Hex, Registry, RngState, ViewDataDef, ViewOverlay } from '../../shared';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { createRng, rngInt } from '../../shared/rng';
 import { getTileState, setTileState } from '../../shared/tileState';
@@ -244,6 +244,61 @@ export const risingSeaViewData: ViewDataDef = {
   overlays: (g: GameState, reg: Registry) => risingSeaOverlays(g, reg)
 };
 
+// ---- T13a: Rising sea exposure in scoreVertex ----------------------------------------------------------------
+
+const RISING_SEA_PIP_COUNT: Record<number, number> = {
+  2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1
+};
+
+/**
+ * Bot goal (T13a): adjusts `scoreVertex` (`vertexDelta`) for permanent rising-sea drowning exposure.
+ * Already-drowned tiles lose their base production score, lowest-elevation frontier tiles are discounted by the
+ * rising-sea rate, and higher-elevation or inland tiles receive a safety bonus.
+ */
+export const risingSeaBotGoal: BotGoalDef = {
+  id: 'tidebound.rising_sea',
+  goalClass: 'generic',
+  vertexDelta(ctx: Ctx, _pid: string, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.rising_sea')) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v) return 0;
+
+    const frontier = new Set(risingSeaFrontierHexIds(g, reg));
+    const lowest = new Set(lowestElevationFrontierHexIds(g, reg));
+    const level = risingSeaLevelOf(g);
+    const rateWeight = 0.35 + level * 0.1;
+
+    let delta = 0;
+    for (const hId of v.hexIds) {
+      const hex = g.board.hexes[hId];
+      if (!hex || hex.ext?.hidden || !reg.tiles.get(hex.type)?.land) continue;
+      const pips = RISING_SEA_PIP_COUNT[hex.number || 0] || 0;
+      if (isDrownedHex(hex)) {
+        delta -= pips * 1.5 + 1.5;
+        continue;
+      }
+      const elev = hexElevation(hex);
+      if (lowest.has(hId)) {
+        delta -= (pips || 1) * rateWeight;
+      } else if (frontier.has(hId)) {
+        delta -= (pips || 1) * (rateWeight * 0.45) / elev;
+      } else {
+        delta += 0.35;
+      }
+      if (elev >= 2) {
+        delta += 0.45 * (elev - 1);
+      }
+    }
+
+    if (v.port && isPortDrowned(g, reg, vertexId)) {
+      delta -= 1.5;
+    }
+
+    return delta;
+  }
+};
+
 export const risingSeaAddon: AddonDef = {
   id: 'tidebound.rising_sea',
   name: 'Rising sea',
@@ -251,6 +306,7 @@ export const risingSeaAddon: AddonDef = {
   links: [
     { target: 'tile-state', kind: 'mechanic' },
     { target: 'round-clock', kind: 'mechanic' },
+    { target: 'bot-goals', kind: 'bot' },
     { target: 'tidebound.tides', kind: 'content' }
   ],
   register(api) {
@@ -262,5 +318,7 @@ export const risingSeaAddon: AddonDef = {
       applyRisingSea(ctx);
     });
     api.define(VIEW_DATA, risingSeaViewData);
+    api.define(BOT_GOALS, risingSeaBotGoal);
   }
 };
+

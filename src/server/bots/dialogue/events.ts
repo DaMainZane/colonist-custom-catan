@@ -8,6 +8,7 @@ export const ALL_EVENTS: DialogueEvent[] = [
   'awardWon', 'awardLost', 'oneVpLeft', 'humanClose',
   'tradeOffer', 'tradeDecline', 'tradeDeclineLeader', 'tradeAccept', 'tradeCounter', 'tradeNoTakers', 'bankEmpty',
   'gameStart', 'largeMap', 'islands', 'fogReveal', 'otherWins', 'botWins',
+  'tideFlood', 'bridgeCollapsed', 'harborBuilt', 'netBuilt', 'wreckClaimed', 'pirateRaid', 'pirateDriven',
   'chatHello', 'chatGg', 'chatThanks', 'chatLol', 'chatName'
 ];
 
@@ -54,6 +55,13 @@ export const EVENT_META: Record<DialogueEvent, EventMeta> = {
   fogReveal: { chance: 0.35 },
   otherWins: { chance: 0.8, major: true },
   botWins: { chance: 1, major: true },
+  tideFlood: { chance: 0.4 },
+  bridgeCollapsed: { chance: 0.55 },
+  harborBuilt: { chance: 0.5 },
+  netBuilt: { chance: 0.35 },
+  wreckClaimed: { chance: 0.5 },
+  pirateRaid: { chance: 0.6 },
+  pirateDriven: { chance: 0.65 },
   chatHello: { chance: 0.45 },
   chatGg: { chance: 0.45 },
   chatThanks: { chance: 0.45 },
@@ -93,7 +101,10 @@ export function allowedSlots(event: DialogueEvent): string[] {
 }
 
 /** Events that can be triggered by hidden information. Their lines are tested for resource words. */
-export const PRIVATE_EVENTS: DialogueEvent[] = ['discard', 'steal', 'robbed', 'devBought', 'oneVpLeft'];
+export const PRIVATE_EVENTS: DialogueEvent[] = [
+  'discard', 'steal', 'robbed', 'devBought', 'oneVpLeft',
+  'wreckClaimed', 'pirateRaid', 'pirateDriven'
+];
 
 /** The busiest events: Main needs a bigger pool here. */
 export const FREQUENT_EVENTS: DialogueEvent[] = ['rollSeven', 'tradeDecline', 'city', 'steal', 'robbed'];

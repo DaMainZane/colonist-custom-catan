@@ -111,7 +111,7 @@ export const FEED_BOT_SPARE = 4;
  * price than it pays, and the hand keeps `FEED_BOT_SPARE` cards after paying. A ground that still has boosts is never fed (it would waste the price).
  */
 function feedSeaScore(ctx: Ctx, pid: Id, hexId: unknown): number {
-  const { g } = ctx;
+  const { g, reg } = ctx;
   if (!techGate(g, pid, TECH_HARBOR_MASTER)) return 0;
   const p = getPlayer(g, pid);
   const hex = typeof hexId === 'number' ? g.board.hexes[hexId] : undefined;
@@ -121,13 +121,20 @@ function feedSeaScore(ctx: Ctx, pid: Id, hexId: unknown): number {
   if (!Object.entries(FEED_SEA_COST).every(([r, n]) => (p.resources[r] || 0) >= n + 1)) return 0;
   const price = Object.values(FEED_SEA_COST).reduce((a, n) => a + (n || 0), 0);
   if (totalCards(p) < price + FEED_BOT_SPARE) return 0;
-  return left === 0 ? 12 : 10;
+  let ownNetsAtHex = 0;
+  for (const v of g.board.vertices) {
+    if (v.piece?.owner === pid && v.piece.type === NET && seaHexIdsAt(g, reg, v.id).includes(hex.id)) {
+      ownNetsAtHex++;
+    }
+  }
+  const extraNetsBonus = Math.max(0, ownNetsAtHex - 1) * 3;
+  return (left === 0 ? 12 : 10) + extraNetsBonus;
 }
 
 /**
- * A bot spends a fish only when that one card finishes its next city, settlement or development card, so fish are kept for the build
- * and never spent for nothing. Holding fish is not punished (they count toward the discard limit like any card). T7e: it also feeds an empty
- * fishing ground next to its nets when it has cards to spare (`feedSeaScore`). Tuning is T13.
+ * A bot spends a fish only when that one card finishes its next city, settlement, harbor, net or development card, so fish are kept for a
+ * build and never spent for nothing. Holding fish is not punished (they count toward the discard limit like any card). T7e/T13c: it also
+ * feeds an empty fishing ground next to its nets when it has cards to spare (`feedSeaScore`).
  */
 export const fishBotGoal: BotGoalDef = {
   id: 'tidebound.fishing',
@@ -144,6 +151,17 @@ export const fishBotGoal: BotGoalDef = {
     const hasSettlement = g.board.vertices.some(v => v.piece?.owner === pid && v.piece.type === SETTLEMENT);
     if (city && hasSettlement && (p.pieces[CITY] || 0) > 0 && oneCardShort(p, priceOf(g, reg, p, city)) === r) return 40;
     if (settlement && (p.pieces[SETTLEMENT] || 0) > 0 && oneCardShort(p, priceOf(g, reg, p, settlement)) === r) return 35;
+    if (
+      reg.pieces.has(NET) &&
+      techGate(g, pid, TECH_FISHING_NETS) &&
+      (p.pieces[NET] || 0) > 0 &&
+      placedCount(g, pid, NET) < NET_BOT_MAX &&
+      totalCards(p) >= 5 &&
+      g.board.vertices.some(v => canPlaceNet(ctx, pid, v.id, 'build')) &&
+      oneCardShort(p, priceOf(g, reg, p, netPiece)) === r
+    ) {
+      return 28;
+    }
     if (g.deck.length > 0 && oneCardShort(p, g.rules.devCost) === r) return 25;
     return 0;
   }
@@ -615,6 +633,29 @@ export const NET_BOT_MAX = 3;
 export const netBotGoal: BotGoalDef = {
   id: 'tidebound.nets',
   goalClass: 'generic',
+  vertexDelta(ctx: Ctx, pid: Id, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!reg.pieces.has(NET)) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v || v.hexIds.length === 0) return 0;
+
+    // A coastal settlement whose adjacent vertices can host nets on fish-boosted sea tiles gets a placement bonus.
+    let boostedAdjSpots = 0;
+    let coastalAdjSpots = 0;
+    for (const adjId of v.adjacentVertices) {
+      const adj = g.board.vertices[adjId];
+      if (!adj || adj.piece || adj.port || adj.hexIds.length === 0) continue;
+      const sea = seaHexIdsAt(g, reg, adjId);
+      if (sea.length === 0) continue;
+      coastalAdjSpots++;
+      if (sea.some(id => (fishLeft(g.board.hexes[id]) ?? 0) > 0)) {
+        boostedAdjSpots++;
+      }
+    }
+    if (coastalAdjSpots === 0) return 0;
+    const netTechBonus = hasTech(g, pid, TECH_NET_WORKS) ? 0.2 : 0;
+    return Math.min(0.9, boostedAdjSpots * 0.3 + coastalAdjSpots * 0.1 + netTechBonus);
+  },
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
     const { g, reg } = ctx;
     if (!techGate(g, pid, TECH_FISHING_NETS)) return [];
@@ -632,13 +673,17 @@ export const netBotGoal: BotGoalDef = {
       candidates.add(e.v2);
     }
     const settle = reg.pieces.get(SETTLEMENT);
+    const hasNetWorks = hasTech(g, pid, TECH_NET_WORKS);
     let bestLoc = -1;
     let bestScore = -Infinity;
     for (const vId of candidates) {
       if (!canPlaceNet(ctx, pid, vId, 'build')) continue;
       const sea = seaHexIdsAt(g, reg, vId);
-      let s = sea.length * 2;
-      for (const id of sea) if ((g.board.hexes[id]?.ext?.fish ?? 0) > 0) s += 6;
+      let s = sea.length * 2 + (hasNetWorks ? 3 : 0);
+      for (const id of sea) {
+        const boosts = fishLeft(g.board.hexes[id]) ?? 0;
+        if (boosts > 0) s += 4 + boosts;
+      }
       if (settle && settle.canPlace(ctx, pid, vId, 'setup')) s -= 8;
       if (s > bestScore) {
         bestScore = s;

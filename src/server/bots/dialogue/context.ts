@@ -61,6 +61,7 @@ export function mapTraits(g: GameState): MapTrait[] {
   if (profile.landmassSize.filter(size => size >= 2).length >= 2) out.push('islands');
   if (profile.hiddenCount > 0) out.push('fog');
   if (profile.goldShare >= 0.15) out.push('gold');
+  if (g.rules?.dlc?.tidebound) out.push('tidebound');
   return out;
 }
 

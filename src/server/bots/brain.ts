@@ -9,6 +9,7 @@ import {
   defaultTechPayment,
   effectiveDiscardLimit,
   evaluateBotGoals,
+  getMarkers,
   getPlayer,
   hasBotGoals,
   hasTech,
@@ -17,6 +18,7 @@ import {
   priceOfUpgrade,
   ratioFor,
   score,
+  techBuildingValue,
   techCostCards,
   techPrereqs,
   techResearchCheck,
@@ -907,7 +909,7 @@ function planList(dc: Dc): Plan[] {
         action: { type: 'research_tech', payload: { techId: bestTech.id } }
       });
     }
-    if (dc.tier.id !== 'main' && hasTech(g, p.id, TECH_HARBOR_CHARTERS)) {
+    if ((dc.tier.id !== 'main' || Boolean(g.rules?.dlc?.tidebound)) && hasTech(g, p.id, TECH_HARBOR_CHARTERS)) {
       const upgrades = portUpgrades(g);
       const allowSettlement = hasTech(g, p.id, 'tidebound.fishing_nets');
       const portCity = g.board.vertices.find(
@@ -1138,22 +1140,24 @@ function leaderPressing(dc: Dc, frac: number): boolean {
   return dc.leaderId !== null && dc.leaderVp >= Math.ceil(dc.win * frac);
 }
 
-/** Knight in the roll phase (before the dice): to get off a blocked tile, take Largest Army, or (Overload) hit the leader first. */
+/** Knight in the roll phase (before the dice): to get off a blocked tile, take Largest Army, arm against pirates, or (Overload) hit the leader first. */
 function knightBeforeRoll(dc: Dc): boolean {
   if (robberOnMe(dc)) return true;
   if (dc.tier.devTiming === 0) return false;
   if (awardChase(dc).armyWin) return true;
+  if (dc.g.rules?.dlc?.tidebound && getMarkers(dc.g, { kind: 'pirate', target: 'hex' }).length > 0) return true;
   if (dc.g.rules?.techTreeOn && dc.tier.id !== 'main' && hasTech(dc.g, dc.p.id, TECH_PLUNDER)) {
     if (leaderPressing(dc, 0.45) || dc.g.players.some(o => o.id !== dc.p.id && totalCards(o) >= 2)) return true;
   }
   return dc.tier.devTiming === 2 && leaderPressing(dc, 0.6);
 }
 
-/** Knight in the main phase: Main plays it at once, the others wait for a reason. */
+/** Knight in the main phase: Main plays it at once, the others wait for a reason (robber, Largest Army, active pirates, Plunder, or pressing leader). */
 function shouldPlayKnight(dc: Dc): boolean {
   if (dc.tier.devTiming === 0) return true;
   if (robberOnMe(dc) || awardChase(dc).armyWin) return true;
   if (dc.p.devCards.filter(c => c === 'knight').length >= 2) return true;
+  if (dc.g.rules?.dlc?.tidebound && getMarkers(dc.g, { kind: 'pirate', target: 'hex' }).length > 0) return true;
   if (dc.g.rules?.techTreeOn && dc.tier.id !== 'main' && hasTech(dc.g, dc.p.id, TECH_PLUNDER)) {
     if (dc.g.players.some(o => o.id !== dc.p.id && totalCards(o) >= 1)) return true;
   }
@@ -1260,11 +1264,14 @@ function techValue(dc: Dc, techId: string): number {
     case TECH_PLUNDER:
       return 15 + (p.devCards.includes('knight') ? 8 : 0) + (dc.personality === 'devRusher' ? 5 : 0) + (tier.id === 'overload' ? 4 : 0);
     case TECH_HARBOR_CHARTERS: {
-      if (tier.id === 'main') return 0;
+      const tideboundOn = Boolean(g.rules?.dlc?.tidebound);
+      if (tier.id === 'main' && !tideboundOn) return 0;
       const hasGenericPort = g.board.vertices.some(
         v => v.piece?.owner === p.id && v.port && reg.ports.get(v.port)?.resource === null
       );
-      return (hasGenericPort ? 18 : 8) + (dc.personality === 'portTrader' ? 6 : 0);
+      const hasAnyPort = g.board.vertices.some(v => v.piece?.owner === p.id && Boolean(v.port));
+      const base = hasGenericPort ? 18 : tideboundOn ? (hasAnyPort ? 16 : 14) : 8;
+      return base + (dc.personality === 'portTrader' ? 6 : 0);
     }
     case TECH_GROUND_WORK: {
       let touchesDesert = false;
@@ -1282,22 +1289,60 @@ function techValue(dc: Dc, techId: string): number {
       if (touchesWeakLand) return 12;
       return 6;
     }
-    case 'tidebound.rickety_bridges':
-      return reg.pieces.has('bridge') ? 16 + (dc.personality === 'roadHog' ? 5 : 0) : 0;
-    case 'tidebound.fishing_nets':
-      return reg.pieces.has('net') ? 16 + (dc.personality === 'portTrader' ? 4 : 0) : 12;
-    case 'tidebound.salvage_crew':
-      return 14 + ((g.ext?.wrecks?.list?.length || 0) > 0 ? 6 : 0);
-    case 'tidebound.net_works':
-      return reg.pieces.has('net') ? 16 : 0;
-    case 'tidebound.pirate_hunter':
-      return (g.ext?.pirates?.list?.length || 0) > 0 ? 18 : 11;
-    case 'tidebound.harbor_master':
-      return reg.actions.has('upgrade_harbor') || reg.actions.has('feed_sea') ? 17 : 0;
-    case 'tidebound.grand_causeway':
-      return reg.pieces.has('bridge') ? 22 + ((p.stats.longestRoad || 0) >= 5 ? 8 : 0) : 0;
-    case 'tidebound.harbor_empire':
-      return 20;
+    case 'tidebound.rickety_bridges': {
+      if (!reg.pieces.has('bridge')) return 0;
+      const myBridges = g.board.edges.filter(
+        e => e.piece?.owner === p.id && (e.piece.type === 'bridge' || e.piece.type === 'rickety_bridge')
+      ).length;
+      return 16 + Math.min(4, myBridges * 2) + (dc.personality === 'roadHog' ? 5 : 0);
+    }
+    case 'tidebound.fishing_nets': {
+      const hasPortSettlement = g.board.vertices.some(
+        v => v.piece?.owner === p.id && v.piece.type === SETTLEMENT && v.port && reg.ports.get(v.port)?.resource === null
+      );
+      const netBonus = reg.pieces.has('net') ? 16 + (dc.personality === 'portTrader' ? 4 : 0) : 12;
+      return netBonus + (hasPortSettlement ? 4 : 0);
+    }
+    case 'tidebound.salvage_crew': {
+      const wrecksOut = getMarkers(g, { kind: 'wreck', target: 'hex' }).length;
+      const myBridges = g.board.edges.filter(
+        e => e.piece?.owner === p.id && (e.piece.type === 'bridge' || e.piece.type === 'rickety_bridge')
+      ).length;
+      return 14 + (wrecksOut > 0 ? 6 : 0) + (myBridges > 0 ? 2 : 0);
+    }
+    case 'tidebound.net_works': {
+      if (!reg.pieces.has('net')) return 0;
+      const myNets = g.board.vertices.filter(v => v.piece?.owner === p.id && v.piece.type === 'net').length;
+      return 16 + Math.min(6, myNets * 3);
+    }
+    case 'tidebound.pirate_hunter': {
+      const piratesOut = getMarkers(g, { kind: 'pirate', target: 'hex' }).length;
+      const knights = (p.stats.knightsPlayed || 0) + p.devCards.filter(c => c === 'knight').length;
+      return (piratesOut > 0 ? 18 : 11) + Math.min(4, knights * 2);
+    }
+    case 'tidebound.harbor_master': {
+      if (!reg.actions.has('upgrade_harbor') && !reg.actions.has('feed_sea')) return 0;
+      const portCities = g.board.vertices.filter(
+        v => v.piece?.owner === p.id && v.piece.type === CITY && Boolean(v.port)
+      ).length;
+      return 17 + Math.min(6, portCities * 3) + (dc.personality === 'portTrader' ? 3 : 0);
+    }
+    case 'tidebound.grand_causeway': {
+      if (!reg.pieces.has('bridge')) return 0;
+      const hasBridge = g.board.edges.some(
+        e => e.piece?.owner === p.id && (e.piece.type === 'bridge' || e.piece.type === 'rickety_bridge')
+      );
+      const holdingRoad = g.awards.longestRoad === p.id;
+      return (
+        22 +
+        ((p.stats.longestRoad || 0) >= 5 ? 8 : 0) +
+        (holdingRoad && hasBridge ? 6 : 0)
+      );
+    }
+    case 'tidebound.harbor_empire': {
+      const buildingVal = techBuildingValue(g, p.id);
+      return 20 + Math.min(8, buildingVal);
+    }
     default:
       return 10;
   }
@@ -1345,7 +1390,7 @@ function pickGroundWorkMove(dc: Dc, options: Legal[]): BotMove | null {
 }
 
 function pickUpgradePortMove(dc: Dc, options: Legal[]): BotMove | null {
-  if (options.length === 0 || dc.tier.id === 'main') return null;
+  if (options.length === 0 || (dc.tier.id === 'main' && !dc.g.rules?.dlc?.tidebound)) return null;
   const { g, reg, p } = dc;
   // Every raised port gets the same 3:1 -> 2:1 on all resources, so any legal port will do; the question is only whether it pays off.
   const worthIt = resIds(reg).some(

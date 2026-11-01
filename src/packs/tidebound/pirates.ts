@@ -1,4 +1,4 @@
-// MODULE: tidebound.pirates addon (T10a: pirate marker, max 2, ocean tiles only, random move each round, event card + passive spawn cadence; T10b: strength grows slowly with the round, `drive_off_pirate` needs played knights and a road/bridge/port touching the tile, loot grows with strength; T10c: a pirate robs 2 cards from every settlement/city in contact; T10d: flee mode (flee chance climbs after every rob, runs at least 2 tiles from the robbed city), avoids tiles within 2 of a city of a player with more knights than its strength; client view and minimal bot goal) | DEPENDS ON: packs/base/constants, packs/tidebound/fishing, packs/tidebound/tech, packs/tidebound/wrecks, shared/index | USED BY: packs/tidebound/addons.generated, packs/tidebound/index
+// MODULE: tidebound.pirates addon (T10a: pirate marker, max 2, ocean tiles only, random move each round, event card + passive spawn cadence; T10b: strength grows slowly with the round, `drive_off_pirate` needs played knights and a road/bridge/port touching the tile, loot grows with strength; T10c: a pirate robs 2 cards from every settlement/city in contact; T10d: flee mode (flee chance climbs after every rob, runs at least 2 tiles from the robbed city), avoids tiles within 2 of a city of a player with more knights than its strength; client view and minimal bot goal) | DEPENDS ON: packs/base/constants, packs/tidebound/bridgeConsts, packs/tidebound/fishing, packs/tidebound/ricketyBridges, packs/tidebound/tech, packs/tidebound/wrecks, +1 more | USED BY: packs/tidebound/addons.generated, packs/tidebound/index
 import {
   addMarker,
   addonOn,
@@ -11,6 +11,7 @@ import {
   getPlayer,
   hasTech,
   hexDistance,
+  priceOf,
   removeMarker,
   rngInt,
   rngNext,
@@ -31,11 +32,14 @@ import type {
   RngState,
   ViewDataDef
 } from '../../shared';
-import { CITY, SETTLEMENT } from '../base/constants';
+import { CITY, ROAD, SETTLEMENT } from '../base/constants';
+import { BRIDGE } from './bridgeConsts';
 import { seaHexIdsAt } from './fishing';
-import { registerTideboundTechs, TECH_PIRATE_HUNTER } from './tech';
+import { RICKETY } from './ricketyBridges';
+import { registerTideboundTechs, TECH_PIRATE_HUNTER, TECH_RICKETY_BRIDGES, techGate } from './tech';
 import {
   WRECK_MAX_PLAYER_DIST,
+  edgesOfHex,
   isWreckSeaHex,
   minPlayerDistanceToHex,
   playerTouchesWreck,
@@ -626,32 +630,132 @@ export const pirateDriveViewData: ViewDataDef = {
   player: (g, reg, p, who) => ({ pirateDrives: who.self ? pirateDriveView(g, reg, p) : undefined })
 };
 
-// ---- Minimal bot support (`BOT_GOALS`) --------------------------------------------------------------------------
+// ---- T13d: Pirate avoidance & hunting (`BOT_GOALS`) -------------------------------------------------------------
 
 /**
- * A bot drives off a pirate whenever it can (it has the played knights and a piece touching the tile): the loot is bigger than a wreck and costs nothing.
- * Building toward a pirate, playing knights for it and keeping clear of one are part of the T13 tuning pass.
+ * T13d:
+ * - `vertexDelta`: Unprotected bots (`knightsPlayed < needed` and `knightsPlayed <= strength`) avoid settling on or right beside an active pirate's
+ *   ocean tile, while armed bots (`knightsPlayed >= needed`) get a bonus for port vertices that immediately touch a pirate they can drive off.
+ * - `edgeDelta` & `goals`: Drives off a pirate at once when touching (`tidebound.pirates.drive:${hexId}`, priority 78), or builds a road/bridge to
+ *   touch an active pirate when already armed (`tidebound.pirates.intercept:${hexId}`, priority 72).
  */
 export const pirateBotGoal: BotGoalDef = {
   id: 'tidebound.pirates',
   goalClass: 'generic',
+  vertexDelta(ctx: Ctx, pid: Id, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.pirates')) return 0;
+    const pirates = activePirates(g);
+    if (pirates.length === 0) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v) return 0;
+
+    const knights = pirateKnights(g, pid);
+    let delta = 0;
+    for (const m of pirates) {
+      const seaHexId = Number(m.loc);
+      const pl = readPayload(m, g);
+      const needed = pirateKnightsNeeded(g, pid, pl.strength);
+      const dist = hexVertexDistance(g, reg, seaHexId, vertexId);
+      if (knights >= needed) {
+        if (dist === 0 && Boolean(v.port)) {
+          delta += 2.5 + pirateLootCards(pl.strength, hasTech(g, pid, TECH_PIRATE_HUNTER)) * 0.4;
+        }
+        continue;
+      }
+      if (knights > pl.strength) continue;
+      if (dist === 0) {
+        delta -= pl.mode === 'flee' ? 1.8 : 4.5;
+      } else if (dist === 1 && pl.mode === 'roam') {
+        delta -= 2.0;
+      } else if (dist === 2 && pl.mode === 'roam') {
+        delta -= 0.75;
+      }
+    }
+    return delta;
+  },
+  edgeDelta(ctx: Ctx, pid: Id, edgeId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.pirates')) return 0;
+    const pirates = activePirates(g);
+    if (pirates.length === 0) return 0;
+    const e = g.board.edges[edgeId];
+    if (!e) return 0;
+
+    const knights = pirateKnights(g, pid);
+    let delta = 0;
+    for (const m of pirates) {
+      const seaHexId = Number(m.loc);
+      const pl = readPayload(m, g);
+      const needed = pirateKnightsNeeded(g, pid, pl.strength);
+      const hexEdges = edgesOfHex(g, reg, seaHexId);
+      const hexVerts = new Set(verticesOfHex(g, reg, seaHexId));
+      const touches = hexEdges.includes(edgeId) || hexVerts.has(e.v1) || hexVerts.has(e.v2);
+      if (!touches) continue;
+      if (knights >= needed && !playerTouchesWreck(g, reg, pid, seaHexId)) {
+        delta += 24;
+      } else if (knights < needed && knights <= pl.strength) {
+        delta -= 3;
+      }
+    }
+    return delta;
+  },
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
     const { g, reg } = ctx;
     if (!addonOn(reg, 'tidebound.pirates') || g.phase !== 'main') return [];
     const hexId = drivablePirateHexIds(g, reg, pid)[0];
-    if (hexId === undefined) return [];
-    return [
-      {
-        id: `tidebound.pirates.drive:${hexId}`,
-        priority: 78,
-        cost: {},
-        action: { type: DRIVE_OFF_PIRATE, payload: { hexId } }
+    if (hexId !== undefined) {
+      return [
+        {
+          id: `tidebound.pirates.drive:${hexId}`,
+          priority: 78,
+          cost: {},
+          action: { type: DRIVE_OFF_PIRATE, payload: { hexId } }
+        }
+      ];
+    }
+
+    const p = getPlayer(g, pid);
+    if (!p) return [];
+    const knights = pirateKnights(g, pid);
+    for (const m of activePirates(g)) {
+      const seaHexId = Number(m.loc);
+      const pl = readPayload(m, g);
+      if (knights < pirateKnightsNeeded(g, pid, pl.strength)) continue;
+      if (playerTouchesWreck(g, reg, pid, seaHexId)) continue;
+
+      const edgeSet = new Set<number>(edgesOfHex(g, reg, seaHexId));
+      const vSet = new Set<number>(verticesOfHex(g, reg, seaHexId));
+      for (const pieceId of [RICKETY, ROAD, BRIDGE]) {
+        const def = reg.pieces.get(pieceId);
+        if (!def || def.target !== 'edge' || (p.pieces[pieceId] || 0) <= 0) continue;
+        if (pieceId === RICKETY && !techGate(g, pid, TECH_RICKETY_BRIDGES)) continue;
+        for (const e of g.board.edges) {
+          const touches = edgeSet.has(e.id) || vSet.has(e.v1) || vSet.has(e.v2);
+          if (!touches) continue;
+          if (def.canPlace(ctx, pid, e.id, 'build')) {
+            return [
+              {
+                id: `tidebound.pirates.intercept:${seaHexId}`,
+                priority: 72,
+                cost: priceOf(g, reg, p, def),
+                action: { type: 'build', payload: { piece: pieceId, loc: e.id } },
+                needsTags: ['sea', 'combat']
+              }
+            ];
+          }
+        }
       }
-    ];
+    }
+    return [];
   },
   actionScore(ctx: Ctx, pid: Id, action: { type: string; payload: any }): number {
     if (action.type !== DRIVE_OFF_PIRATE) return 0;
-    return canDrivePirate(ctx.g, ctx.reg, pid, Number(action.payload?.hexId)) === null ? 70 : 0;
+    const hexId = Number(action.payload?.hexId);
+    if (canDrivePirate(ctx.g, ctx.reg, pid, hexId) !== null) return 0;
+    const m = pirateAt(ctx.g, hexId);
+    const strength = m ? readPayload(m, ctx.g).strength : PIRATE_BASE_STRENGTH;
+    return 68 + pirateLootCards(strength, hasTech(ctx.g, pid, TECH_PIRATE_HUNTER));
   }
 };
 

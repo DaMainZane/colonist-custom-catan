@@ -382,17 +382,36 @@ export const harborViewData: ViewDataDef = {
   }
 };
 
-// ---- Minimal bot support (T8a) ----------------------------------------------------------------------------------
+// ---- T8a & T13c: Harbor bot goal (port placement & harbor upgrade) ----------------------------------------------
 
 /**
- * Minimal bot goal for building a harbor:
- * - Only considers upgrading when the bot has an eligible port city (`harborCandidateVertices`) and will still hold at least
- *   `HARBOR_BOT_SPARE` cards after paying `harborUpgradeCost`, so it keeps cards to trade at 1:1.
- * - Prefers a `3:1` generic port (1:1 on all resources) over a `2:1` resource port, breaking ties by held resource count and lowest vertex id.
+ * Bot goal for port placement and upgrading a port city to a 1:1 harbor (T8a, T13c):
+ * - `vertexDelta`: values settling on port vertices higher when Harbors are enabled (especially `3:1` generic ports and
+ *   flood-exposed ports that a Harbor keeps active while flooded).
+ * - `goals` / `actionScore`: upgrades an eligible port city when the bot will still hold at least `HARBOR_BOT_SPARE` cards
+ *   afterwards, preferring `3:1` generic ports and flooded/drowned ports that a Harbor immediately restores to 1:1.
  */
 export const harborBotGoal: BotGoalDef = {
   id: 'tidebound.harbor',
   goalClass: 'generic',
+  vertexDelta(ctx: Ctx, pid: Id, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.harbor')) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v || !v.port || !reg.ports.has(v.port)) return 0;
+    if (harborCount(g, pid) >= harborLimitFor(g, pid)) return 0;
+
+    const port = reg.ports.get(v.port);
+    let bonus = port?.resource === null ? 0.85 : 0.5;
+    const touchesFlooded = v.hexIds.some(hId => {
+      const st = g.board.hexes[hId]?.ext?.state?.id;
+      return st === 'flooded' || st === 'drowned';
+    });
+    if (touchesFlooded && techGate(g, pid, TECH_HARBOR_MASTER)) {
+      bonus += 0.4;
+    }
+    return bonus;
+  },
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
     const { g, reg } = ctx;
     const p = getPlayer(g, pid);
@@ -405,19 +424,26 @@ export const harborBotGoal: BotGoalDef = {
 
     let bestVid = spots[0];
     let bestScore = -Infinity;
+    let bestFlooded = false;
     for (const vid of spots) {
-      const portId = g.board.vertices[vid]?.port;
+      const v = g.board.vertices[vid];
+      const portId = v?.port;
       const port = portId ? reg.ports.get(portId) : undefined;
-      const s = port?.resource === null ? 20 : 10 + (p.resources[port?.resource || ''] || 0);
+      const floodedLand = (v?.hexIds ?? []).some(hId => {
+        const st = g.board.hexes[hId]?.ext?.state?.id;
+        return st === 'flooded' || st === 'drowned';
+      });
+      const s = (port?.resource === null ? 20 : 10 + (p.resources[port?.resource || ''] || 0)) + (floodedLand ? 8 : 0);
       if (s > bestScore) {
         bestScore = s;
         bestVid = vid;
+        bestFlooded = floodedLand;
       }
     }
     return [
       {
         id: `harbor:${bestVid}`,
-        priority: 52,
+        priority: bestFlooded ? 82 : 52,
         cost,
         action: { type: UPGRADE_HARBOR, payload: { vertexId: bestVid } }
       }
@@ -430,7 +456,15 @@ export const harborBotGoal: BotGoalDef = {
     if (!p) return 0;
     const cost = harborUpgradeCost(ctx.g, ctx.reg, p);
     const price = Object.values(cost).reduce((a, n) => a + (n || 0), 0);
-    return totalCards(p) - price >= HARBOR_BOT_SPARE ? 35 : 0;
+    if (totalCards(p) - price < HARBOR_BOT_SPARE) return 0;
+    const vid = Number(action.payload?.vertexId);
+    const v = Number.isInteger(vid) ? ctx.g.board.vertices[vid] : undefined;
+    const port = v?.port ? ctx.reg.ports.get(v.port) : undefined;
+    const floodedLand = (v?.hexIds ?? []).some(hId => {
+      const st = ctx.g.board.hexes[hId]?.ext?.state?.id;
+      return st === 'flooded' || st === 'drowned';
+    });
+    return 35 + (port?.resource === null ? 4 : 0) + (floodedLand ? 6 : 0);
   }
 };
 

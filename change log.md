@@ -1,5 +1,29 @@
 # Change Log
 
+## 2026-10-31 (Pass 97: Tidebound T13 — T13a flood/rising-sea vertex scoring, T13b salvage & bridge goals, T13c port/net/fish goals, T13d pirate avoidance & hunting, T13e 9-node tech research, and T13f public-info-only dialogue; typecheck and tests passed)
+### Added & Changed
+- **T13a Flood & rising-sea exposure in vertex scoring (`src/packs/tidebound/tides.ts`, `src/packs/tidebound/risingSea.ts`, `src/packs/tidebound/index.ts`)**:
+  - `tideFloodShareForHex(g, reg, hexId)` computes expected flood fraction (`0..1`) from `tideLevelOf(g)`, coast vs inner cluster reach, and `hexElevation` resistance.
+  - `tidesBotGoal` (`BOT_GOALS`: `tidebound.tides`) discounts flood-exposed vertices, penalizes currently `flooded` tiles and flood-idle non-harbor ports, and rewards elevated (`>= 2`) coastal ground.
+  - `risingSeaBotGoal` (`BOT_GOALS`: `tidebound.rising_sea`) subtracts production from permanently `drowned` tiles, discounts `lowestElevationFrontierHexIds` and `risingSeaFrontierHexIds` scaled by `risingSeaLevelOf(g)`, and rewards elevated/inland ground.
+- **T13b Salvage goal (`src/packs/tidebound/wrecks.ts`, `src/packs/tidebound/ricketyBridges.ts`, `src/packs/tidebound/index.ts`)**:
+  - `expectedWreckLootValue(g, pid, site, builtCostCards)` evaluates expected salvage payout using site mean, `wreckTimeMultiplier`, `Salvage crew`, bonus drop odds, and the `builtCostCards + 1` floor rule.
+  - `wreckBotGoal` adds `vertexDelta` (port settlements that immediately claim a wreck), 1-step claim and 2-step approach `edgeDelta` & `goals`, and `actionScore` for `demolish_bridge` (only on safe dead-end bridges when `hasTech(g, pid, TECH_SALVAGE_CREW)` and the bot is not a Longest Road contender and needs cards).
+  - `ricketyBotGoal.actionScore` prioritizes `upgrade_bridge` when the rickety bridge sits inside a Longest Road contender (`g.awards.longestRoad === pid` or `longestRoad >= 5` or `tidebound.grand_causeway`) or links two parts of the player's network.
+- **T13c Port and net placement (`src/packs/tidebound/harbor.ts`, `src/packs/tidebound/fishing.ts`)**:
+  - `harborBotGoal` adds `vertexDelta` for port vertices when Harbors are enabled and raises `upgrade_harbor` priority (`82` vs `52`) when the port's adjacent land is currently `flooded` or `drowned`.
+  - `netBotGoal` adds `vertexDelta` for coastal vertices with adjacent non-port net spots on fish-boosted sea tiles and weights actual `fishLeft` boosts and `TECH_NET_WORKS`; `fishBotGoal.actionScore` scales `feed_sea` with multiple own nets on the sea tile and allows `spend_fish` to finish a `net` build.
+- **T13d Pirate avoidance & hunting (`src/packs/tidebound/pirates.ts`, `src/server/bots/brain.ts`)**:
+  - `pirateBotGoal` adds `vertexDelta` (unprotected bots with `knightsPlayed < needed` and `knightsPlayed <= strength` avoid settling within distance 0–2 of a roaming pirate, while armed bots get a bonus on port vertices touching a pirate), `edgeDelta` (+24 for edges touching a pirate the bot is armed to drive off, -3 when unprotected), and `tidebound.pirates.intercept:${hexId}` goals (priority 72) to build a road/bridge to touch an active pirate.
+  - `knightBeforeRoll` and `shouldPlayKnight` in `src/server/bots/brain.ts` play a `knight` dev card when an active pirate is on the board so the bot arms up to scare away or drive off pirates.
+- **T13e Tech research (`src/server/bots/brain.ts`)**:
+  - Updated `techValue` and `pickUpgradePortMove` for all 9 Tidebound tech nodes across the Expansion and Industrial lanes, fixing `salvage_crew` and `pirate_hunter` to inspect active `wreck` and `pirate` markers via `getMarkers`, scaling `rickety_bridges`, `fishing_nets`, `net_works`, `harbor_master`, `grand_causeway`, and `harbor_empire` (`techBuildingValue`) with board state, and enabling `tidebound.harbor_charters` and `upgrade_port` for all bot tiers when Tidebound is active.
+- **T13f Public-info-only dialogue lines (`src/server/bots/dialogue/{types,events,context,index}.ts`, `src/server/bots/dialogue/lines/{tidebound,index,table}.ts`)**:
+  - Added `'tidebound'` to `MapTrait` (`mapTraits` in `context.ts`) and 7 Tidebound dialogue events (`tideFlood`, `bridgeCollapsed`, `harborBuilt`, `netBuilt`, `wreckClaimed`, `pirateRaid`, `pirateDriven`), with `wreckClaimed`, `pirateRaid`, and `pirateDriven` in `PRIVATE_EVENTS` (`risk: 'private'`).
+  - Added `TIDEBOUND_LINES` in `src/server/bots/dialogue/lines/tidebound.ts` (plus `when: { map: 'tidebound' }` start lines in `table.ts`) and wired `emitBotDialogue` in `src/server/bots/dialogue/index.ts` without reading any salvaged or stolen resource fields.
+### Tests
+- `tests/tideboundbots.test.ts` (new): 12 tests covering T13a (`tideFloodShareForHex`, `tidesBotGoal`, `risingSeaBotGoal`), T13b (`expectedWreckLootValue`, 1-step & 2-step wreck salvage goals, dead-end `demolish_bridge`, `ricketyBotGoal` Longest Road upgrade priority), T13c (port & net `vertexDelta`, flooded port `harborBotGoal` priority, multi-net `feed_sea` scoring), T13d (pirate avoidance `vertexDelta`, pirate intercept `edgeDelta`/goals, `drive_off_pirate`, knight play vs pirates), T13e (bot research across all 9 Tidebound tech nodes), T13f (public-info-only Tidebound dialogue lines and `emitBotDialogue` triggers), and DLC-off zero-effect invariants.
+
 ## 2026-10-31 (Pass 96: Tidebound T12 — T12a lowest-elevation-first drowning & T12b optional with Tides, rate settings, and drowned overlays; typecheck and tests passed)
 ### Added
 - **T12a Coast-inward lowest-elevation-first drowning (`src/packs/tidebound/risingSea.ts`, `src/packs/tidebound/index.ts`)**:

@@ -1,6 +1,6 @@
-// MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/seaData, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/addons.generated, packs/tidebound/fishing, packs/tidebound/index, packs/tidebound/risingSea
-import { addonOn, OVERLAY_KINDS, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
-import type { AddonDef, Ctx, GameState, Hex, OverlayKindVisual, Registry, ViewDataDef } from '../../shared';
+// MODULE: tidebound.tides addon (T5a: `flooded` tile state, coast clusters, seeded per-cluster tide schedule applied at round start; T5b: spring tide; T5c: tide level 1 to 5 from the host's slider; T5d: elevation resistance; T5e: ports idle while their land is flooded; T6: warning a turn ahead, overlays and elevation data for the client; T13a: flood exposure in scoreVertex) | DEPENDS ON: packs/tidebound/harbor, packs/tidebound/seaData, shared/index, shared/mapshape, shared/rng, shared/tileState | USED BY: packs/tidebound/addons.generated, packs/tidebound/fishing, packs/tidebound/index, packs/tidebound/risingSea
+import { addonOn, BOT_GOALS, OVERLAY_KINDS, PORT_IDLE_CHECKS, VIEW_DATA } from '../../shared';
+import type { AddonDef, BotGoalDef, Ctx, GameState, Hex, OverlayKindVisual, Registry, ViewDataDef } from '../../shared';
 import { HEX_DIRS } from '../../shared/mapshape';
 import { createRng, rngInt, rngShuffle } from '../../shared/rng';
 import type { RngState } from '../../shared/rng';
@@ -494,6 +494,101 @@ export const floodWarnOverlayKind: OverlayKindVisual = {
   pulse: true
 };
 
+// ---- T13a: Flood exposure in scoreVertex ---------------------------------------------------------------------
+
+const TIDE_PIP_COUNT: Record<number, number> = {
+  2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1
+};
+
+/**
+ * Expected fraction of rounds (0..1) in which `hexId` is flooded by Tides at the game's current `tideLevel`,
+ * accounting for coast vs inner ring and `hexElevation` resistance. Pure: never mutates `g.ext`.
+ */
+export function tideFloodShareForHex(g: GameState, reg: Registry, hexId: number): number {
+  if (!addonOn(reg, 'tidebound.tides')) return 0;
+  const hex = g.board.hexes[hexId];
+  if (!hex || hex.ext?.hidden || !reg.tiles.get(hex.type)?.land) return 0;
+  const clusters: TideCluster[] = (g.ext?.tidebound?.tides as TideState | undefined)?.clusters ?? buildTideClusters(g, reg);
+  let inCoast = false;
+  let inInner = false;
+  for (const c of clusters) {
+    if (c.hexIds.includes(hexId)) {
+      inCoast = true;
+      break;
+    }
+    if ((c.inner ?? []).includes(hexId)) {
+      inInner = true;
+      break;
+    }
+  }
+  if (!inCoast && !inInner) return 0;
+
+  const level = tideLevelOf(g);
+  const def = tideLevelDef(level);
+  const elev = hexElevation(hex);
+  const normalReaches = inCoast || (inInner && def.reach >= 2);
+  const normalFloods = normalReaches && def.strength >= elev;
+  const springFloods = (inCoast || inInner) && def.springStrength >= elev;
+
+  const normalShare = normalFloods ? def.duration / def.period : 0;
+  const springShare = springFloods ? (1 - normalShare) * (1 / def.springEvery) : 0;
+  return Math.min(1, normalShare + springShare);
+}
+
+/**
+ * Bot goal (T13a): adjusts `scoreVertex` (`vertexDelta`) for flood exposure on coastal and inner-ring tiles.
+ * Low-elevation tiles that flood frequently are discounted by their expected flood downtime, while high-elevation
+ * coastal ground that resists normal tides receives a resilience bonus. Non-harbor ports whose land tiles flood
+ * also receive a port-downtime discount.
+ */
+export const tidesBotGoal: BotGoalDef = {
+  id: 'tidebound.tides',
+  goalClass: 'generic',
+  vertexDelta(ctx: Ctx, _pid: string, vertexId: number): number {
+    const { g, reg } = ctx;
+    if (!addonOn(reg, 'tidebound.tides')) return 0;
+    const v = g.board.vertices[vertexId];
+    if (!v) return 0;
+
+    const clusters: TideCluster[] = (g.ext?.tidebound?.tides as TideState | undefined)?.clusters ?? buildTideClusters(g, reg);
+    const tideZone = new Set<number>();
+    for (const c of clusters) {
+      for (const id of c.hexIds) tideZone.add(id);
+      for (const id of c.inner ?? []) tideZone.add(id);
+    }
+
+    let delta = 0;
+    let landCount = 0;
+    let minPortFloodShare = 1;
+
+    for (const hId of v.hexIds) {
+      const hex = g.board.hexes[hId];
+      if (!hex || hex.ext?.hidden || !reg.tiles.get(hex.type)?.land) continue;
+      landCount++;
+      const pips = TIDE_PIP_COUNT[hex.number || 0] || 0;
+      const share = tideFloodShareForHex(g, reg, hId);
+      minPortFloodShare = Math.min(minPortFloodShare, share);
+
+      if (pips > 0 && share > 0) {
+        delta -= pips * share * 0.85;
+      }
+      if (pips > 0 && getTileState(hex)?.id === FLOODED) {
+        delta -= pips * 0.2;
+      }
+      const elev = hexElevation(hex);
+      if (tideZone.has(hId) && elev >= 2 && share < 0.35) {
+        delta += 0.4 * (elev - 1);
+      }
+    }
+
+    if (v.port && landCount > 0 && minPortFloodShare > 0 && !(addonOn(reg, 'tidebound.harbor') && isHarbor(g, vertexId))) {
+      delta -= 0.6 * minPortFloodShare;
+    }
+
+    return delta;
+  }
+};
+
 export const tidesAddon: AddonDef = {
   id: 'tidebound.tides',
   name: 'Tides',
@@ -502,11 +597,12 @@ export const tidesAddon: AddonDef = {
     { target: 'round-clock', kind: 'mechanic' },
     { target: 'tile-state', kind: 'mechanic' },
     { target: 'production', kind: 'mechanic' },
-    { target: 'overlay', kind: 'ui' }
+    { target: 'overlay', kind: 'ui' },
+    { target: 'bot-goals', kind: 'bot' }
   ],
   // T5a flooded state and per-cluster schedule, T5b spring tide, T5c tide level (`rules.tideLevel`, the host's slider; on or off is the addon
   // toggle), T5d elevation resistance, T5e ports idle while flooded (the production stage already skips flooded tiles through the tile state
-  // layer), T6 warning, title card, flooded tint and heat map (data from `tideClientView`, drawn by the client overlay kit).
+  // layer), T6 warning, title card, flooded tint and heat map (data from `tideClientView`, drawn by the client overlay kit), T13a flood exposure in scoreVertex.
   register(api) {
     api.define(PORT_IDLE_CHECKS, {
       id: 'tidebound.tides.flooded',
@@ -523,5 +619,8 @@ export const tidesAddon: AddonDef = {
     // R8.8: the `flood` and `flood-warn` overlay visuals for the manifest.
     api.define(OVERLAY_KINDS, floodOverlayKind);
     api.define(OVERLAY_KINDS, floodWarnOverlayKind);
+    // T13a: flood exposure in scoreVertex.
+    api.define(BOT_GOALS, tidesBotGoal);
   }
 };
+

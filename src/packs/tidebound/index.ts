@@ -24,6 +24,7 @@ export {
   lowestElevationFrontierHexIds,
   pickRisingSeaHex,
   risingSeaAddon,
+  risingSeaBotGoal,
   risingSeaConfigOf,
   risingSeaFrontierHexIds,
   risingSeaLevelDef,
@@ -190,11 +191,13 @@ export {
   isPortFlooded,
   isSpringTide,
   tideClientView,
+  tideFloodShareForHex,
   tideLevelDef,
   tideLevelOf,
   tideStrengthAt,
   tideWarning,
-  tidesAddon
+  tidesAddon,
+  tidesBotGoal
 } from './tides';
 export type { TideClientView, TideCluster, TideLevelDef, TideState, TideWarning } from './tides';
 
@@ -273,6 +276,7 @@ export {
   deriveWreckRng,
   edgesOfHex,
   ensureWreckRng,
+  expectedWreckLootValue,
   isWreckSeaHex,
   isWreckShoreHex,
   minPlayerDistanceToHex,

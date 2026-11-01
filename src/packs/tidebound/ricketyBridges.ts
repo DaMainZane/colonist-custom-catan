@@ -1,4 +1,4 @@
-// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) | DEPENDS ON: packs/tidebound/bridgeConsts, packs/tidebound/bridgeCore, shared/index | USED BY: packs/tidebound/addons.generated, packs/tidebound/bridges, packs/tidebound/index, packs/tidebound/tech, packs/tidebound/wrecks
+// MODULE: tidebound.rickety_bridges addon (T4a rickety bridge piece: 1 wood, health 1, shared pool and shared 2x cost with bridges, bot goal; T4b upgrade to a full bridge; T4d collapse on a 7 in Seven Resolver; T4e Longest Road recalc; T11c tech gate + +4 bridge cap bonus) | DEPENDS ON: packs/tidebound/bridgeConsts, packs/tidebound/bridgeCore, shared/index | USED BY: packs/tidebound/addons.generated, packs/tidebound/bridges, packs/tidebound/index, packs/tidebound/pirates, packs/tidebound/tech, packs/tidebound/wrecks
 import {
   BOT_GOALS,
   canAfford,
@@ -215,12 +215,13 @@ export const upgradeBridgeAction: ActionDef = {
   }
 };
 
-// ---- Minimal bot support (T4a build, T4b upgrade) -------------------------------------------------------------
+// ---- Bot support (T4a build, T4b upgrade, T13b risk/reward tuning) --------------------------------------------
 
 /**
  * Build: when a bot has a bridge spot in mind (the bridge goal's best edge) but cannot pay for a full bridge, it offers the cheap
- * version of the same edge a little below the bridge's priority. Upgrade: a bot upgrades when the hand still holds 3+ cards afterwards.
- * Tuning (Main builds blindly, Secondary prices the expected lifetime) is T13.
+ * version of the same edge a little below the bridge's priority.
+ * Upgrade: upgrades when the hand still holds 3+ cards afterwards, or immediately (even with fewer spare cards) when the rickety
+ * bridge sits inside a Longest Road contender or connects two endpoints of the player's network.
  */
 export const ricketyBotGoal: BotGoalDef = {
   id: 'tidebound.rickety_bridges',
@@ -244,11 +245,24 @@ export const ricketyBotGoal: BotGoalDef = {
   actionScore(ctx: Ctx, pid: Id, action: { type: string; payload: any }): number {
     if (action.type !== UPGRADE_BRIDGE) return 0;
     if (!techGate(ctx.g, pid, TECH_RICKETY_BRIDGES)) return 0;
-    const p = getPlayer(ctx.g, pid);
+    const { g } = ctx;
+    const p = getPlayer(g, pid);
     if (!p) return 0;
-    const cost = upgradeBridgeCost(ctx.g, ctx.reg, p);
+    const cost = upgradeBridgeCost(g, ctx.reg, p);
     const paid = Object.values(cost).reduce((a, n) => a + (n || 0), 0);
-    return totalCards(p) - paid >= 3 ? 30 : 0;
+    const rem = totalCards(p) - paid;
+    const edgeId = Number(action.payload?.edgeId);
+    const e = Number.isInteger(edgeId) ? g.board.edges[edgeId] : undefined;
+    const internalLink =
+      !!e &&
+      [e.v1, e.v2].every(vId => {
+        const v = g.board.vertices[vId];
+        return !!v && (v.piece?.owner === pid || v.edgeIds.some(id => id !== edgeId && g.board.edges[id]?.piece?.owner === pid));
+      });
+    const roadContender = g.awards.longestRoad === pid || (p.stats.longestRoad || 0) >= 5 || hasTech(g, pid, 'tidebound.grand_causeway');
+    if (roadContender && rem >= 1) return 45 + (internalLink ? 6 : 0);
+    if (rem >= 3) return 30 + (internalLink ? 5 : 0);
+    return 0;
   }
 };
 
