@@ -48,3 +48,9 @@ Severity:   Annoying
 Error text: none
 Screenshot: none
 ```
+
+tech tree UI fix and cost rebalancing
+harbor cannot be interact to build (it should work like upgrading settlement to city) (also update description)
+heat map changes (tint)
+Click to filter by player exist but does work
+Fishing net icon rework
