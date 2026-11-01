@@ -861,8 +861,11 @@ svg#boardSvg.is-panning * {
   display: flex; flex-direction: column; gap: 4px; padding: 5px 6px; background: var(--surface-2);
   border-bottom: 1px solid var(--line); flex-shrink: 0;
 }
-.lf-row {
+.lf-row, .lf-top-row, .lf-cat-row {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.lf-rs-group {
+  display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
 }
 .lf-hint {
   font-size: 9.5px; color: var(--ink-dim); font-weight: 600; margin-left: auto; white-space: nowrap;
@@ -887,7 +890,7 @@ svg#boardSvg.is-panning * {
   display: inline-flex; align-items: center; gap: 4px; margin-left: auto; line-height: 1.1;
 }
 .lf-clear-btn:hover { background: rgba(230, 126, 34, 0.25); }
-.lf-clear-x { font-weight: 800; font-size: 10px; }
+.lf-clear-x, .lf-x { font-weight: 800; font-size: 10px; pointer-events: none; }
 
 /* Merged Live Log + Turn History Feed */
 .log-feed, .turn-history-feed {

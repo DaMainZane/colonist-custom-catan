@@ -249,6 +249,9 @@ function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): stri
         ? 'Research on your turn'
         : r.reason || 'Not available yet';
   const click = mode === 'can' ? `onclick="researchTechClick('${esc(r.id)}')"` : '';
+  const descText = r.id === 'tidebound.fishing_nets'
+    ? `${r.description} (Requires a Settlement or City first, connected by road/bridge; acts as a coastal tile modification.)`
+    : r.description;
   return `
     <div class="tp-node st-${mode}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%;--bc:var(${tile})" tabindex="0" role="button"
          aria-label="${esc(r.name)}${r.owned ? ', researched' : `, ${r.cost} cards`}" ${click}>
@@ -256,7 +259,7 @@ function nodeHtml(p: Placed, canAct: boolean, hand: Resources | undefined): stri
       <div class="tp-cap"><span class="tp-name">${esc(r.name)}</span>${r.owned ? '' : costStripHtml(r.payment, hand)}</div>
       <div class="tp-tip ${tipPos}">
         <div class="tp-tip-head"><span class="tp-tip-name">${esc(r.name)}</span><span class="tp-tip-tier">${esc(tierLabel)}</span></div>
-        <div class="tp-tip-desc">${esc(r.description)}</div>
+        <div class="tp-tip-desc">${esc(descText)}</div>
         <div class="tp-tip-foot ${r.owned ? 'owned' : mode === 'can' ? 'can' : ''}">${esc(foot)}</div>
       </div>
     </div>`;

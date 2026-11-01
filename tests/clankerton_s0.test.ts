@@ -178,11 +178,12 @@ describe('S0.6 Production pipeline & S0.7 Tile state, durability, wild token', (
     expect(g.players[0].resources.wheat).toBe(startP1Wheat + 3);
     expect(g.players[1].resources.wheat).toBe(startP2Wheat + 1);
 
-    // 2. Flooded tile state blocks production completely and blocks robber placement
+    // 2. Flooded tile state halves base yield rounded up (city 2 -> 1, plus stage 40 +1 = 2, taxed 1 to p2 -> p1 gets +1, p2 gets +1) and blocks robber placement
     setTileState(g, hex0.id, { id: 'flooded', until: 1 });
     expect(isHexRobberBlocked(g, ctx.reg, hex0.id)).toBe(true);
     runProductionPipeline(ctx, [hex0], 6);
-    expect(g.players[0].resources.wheat).toBe(startP1Wheat + 3);
+    expect(g.players[0].resources.wheat).toBe(startP1Wheat + 4);
+    expect(g.players[1].resources.wheat).toBe(startP2Wheat + 2);
 
     // 3. tickTileStates transitions `flooded` (until: 1) -> `silt` (+1 yield) at round 1
     g.round = 1;

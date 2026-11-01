@@ -51,12 +51,12 @@ export const WRECK_COUNTDOWN_ROUNDS = 4;
 export const WRECK_SEA_CHANCE = 0.65;
 /** Maximum hex distance from at least one player's pieces for a legal wreck spawn (T9b). */
 export const WRECK_MAX_PLAYER_DIST = 4;
-/** Sea wreck base card range (3 to 5 cards of one resource). */
-export const WRECK_SEA_MIN_CARDS = 3;
-export const WRECK_SEA_MAX_CARDS = 5;
-/** Shore wreck base card range (1 to 2 cards of one resource). */
-export const WRECK_SHORE_MIN_CARDS = 1;
-export const WRECK_SHORE_MAX_CARDS = 2;
+/** Sea wreck base card range (6 to 10 cards, doubled per Bug 12). */
+export const WRECK_SEA_MIN_CARDS = 6;
+export const WRECK_SEA_MAX_CARDS = 10;
+/** Shore wreck base card range (2 to 4 cards, doubled per Bug 12). */
+export const WRECK_SHORE_MIN_CARDS = 2;
+export const WRECK_SHORE_MAX_CARDS = 4;
 /** Turns over which wreck loot scales up to `WRECK_MAX_TIME_BOOST` (+40% after 50 turns, T9d). */
 export const WRECK_SCALE_TURNS = 50;
 export const WRECK_MAX_TIME_BOOST = 0.4;
@@ -82,6 +82,7 @@ export interface WreckPayload {
   spawnRound: number;
   spawnTurn: number;
   resource: string;
+  forcedResource?: boolean;
   baseCards: number;
   bonus: WreckBonus;
   /** For shore wrecks: axial direction `(dq, dr)` toward an adjacent sea tile so the icon beaches on the ocean side. */
@@ -89,6 +90,7 @@ export interface WreckPayload {
   claimed?: {
     playerId: Id;
     resource: string;
+    resources?: Record<string, number>;
     amount: number;
     bonus: WreckBonus;
   };
@@ -100,6 +102,7 @@ export interface WreckClaimResult {
   playerId: Id;
   site: WreckSite;
   resource: string;
+  resources?: Record<string, number>;
   wantedCards: number;
   amount: number;
   bonus: WreckBonus;
@@ -420,18 +423,25 @@ export function wreckTimeMultiplier(turnCount: number): number {
   return 1 + frac * WRECK_MAX_TIME_BOOST;
 }
 
+/** Round bonus added to wreck resource limit: `floor(0.7 * round)` (round 1 -> 0, 2 -> 1, 3 -> 2, 4 -> 2, 5 -> 3). */
+export function wreckRoundBonus(round: number): number {
+  const r = Math.max(1, Math.floor(Number(round) || 1));
+  return Math.floor(0.7 * r);
+}
+
 /**
  * Effective resource card count paid out when a wreck is salvaged:
- * - Scales `baseCards` by `wreckTimeMultiplier(turnCount)` (up to +40% at 50 turns) and `SALVAGE_CREW_LOOT_MULT` (1.25x with `tidebound.salvage_crew`).
+ * - Adds `wreckRoundBonus(round)` (`floor(0.7 * round)`) to `baseCards`, then scales by `wreckTimeMultiplier(turnCount)` (up to +40% at 50 turns) and `SALVAGE_CREW_LOOT_MULT` (1.25x with `tidebound.salvage_crew`).
  * - Enforces the floor rule: payout is never less than `builtCostCards + 1`, so even a doubled-cost bridge built to claim a wreck nets at least +1 card.
  */
 export function computeWreckLootCount(opts: {
   baseCards: number;
   turnCount: number;
+  round?: number;
   builtCostCards?: number;
   hasSalvageCrew?: boolean;
 }): number {
-  const base = Math.max(1, Math.round(Number(opts.baseCards) || 1));
+  const base = Math.max(1, Math.round(Number(opts.baseCards) || 1)) + wreckRoundBonus(opts.round ?? 1);
   const timeMult = wreckTimeMultiplier(opts.turnCount);
   const techMult = opts.hasSalvageCrew ? SALVAGE_CREW_LOOT_MULT : 1;
   const scaled = Math.round(base * timeMult * techMult);
@@ -468,15 +478,36 @@ export function claimWreck(
   const wantedCards = computeWreckLootCount({
     baseCards,
     turnCount: g.turnCount || 0,
+    round: g.round || payload.spawnRound || 1,
     builtCostCards,
     hasSalvageCrew: hasSalvage
   });
 
-  // Pay from the bank; if the bank has fewer cards than `wantedCards`, pay whatever is left in that pile.
-  const avail = Math.max(0, g.bank[resource] || 0);
-  const paid = Math.min(wantedCards, avail);
-  if (paid > 0) {
-    bankGive(ctx, pid, resource, paid);
+  // Pay from the bank: if a single resource was explicitly forced at spawn, pay from that resource pile;
+  // otherwise fill `wantedCards` with random picks across the basic resources in the bank using the derived wreck RNG.
+  const byRes: Record<string, number> = {};
+  let paid = 0;
+  if (payload.forcedResource) {
+    const avail = Math.max(0, g.bank[resource] || 0);
+    paid = Math.min(wantedCards, avail);
+    if (paid > 0) {
+      bankGive(ctx, pid, resource, paid);
+      byRes[resource] = paid;
+    }
+  } else {
+    const rng = ensureWreckRng(g);
+    for (let i = 0; i < wantedCards; i++) {
+      const stocked = resources.filter(r => (g.bank[r] || 0) - (byRes[r] || 0) > 0);
+      if (stocked.length === 0) break;
+      const pick = stocked[rngInt(rng, stocked.length)];
+      byRes[pick] = (byRes[pick] || 0) + 1;
+    }
+    for (const [r, cnt] of Object.entries(byRes)) {
+      if (cnt > 0) {
+        bankGive(ctx, pid, r, cnt);
+        paid += cnt;
+      }
+    }
   }
 
   // Sea wrecks can also grant a bonus fish token or dev card (Salvage crew boosts the dev card chance on sea wrecks).
@@ -504,18 +535,25 @@ export function claimWreck(
 
   removeMarker(g, marker.id);
   marker.ownerId = pid;
-  payload.claimed = { playerId: pid, resource, amount: paid, bonus: bonusGiven };
+  payload.claimed = { playerId: pid, resource, resources: byRes, amount: paid, bonus: bonusGiven };
   marker.payload = payload;
   p.stats.wrecksClaimed = (p.stats.wrecksClaimed || 0) + 1;
 
   const bonusText =
     bonusGiven === 'fish' ? ' + 1 fish' : bonusGiven === 'dev' ? ' + 1 dev card' : '';
+  const resEntries = Object.entries(byRes).filter(([, n]) => n > 0);
+  const lootSummary =
+    resEntries.length > 1
+      ? resEntries.map(([r, n]) => `${n} ${r}`).join(', ')
+      : `${paid} ${resEntries[0]?.[0] || resource}`;
+
   ctx.emit('wreckClaimed', {
     id: marker.id,
     hexId,
     playerId: pid,
     site,
     resource,
+    resources: byRes,
     wantedCards,
     amount: paid,
     bonus: bonusGiven,
@@ -525,11 +563,11 @@ export function claimWreck(
     type: 'wreckClaimed',
     actorId: pid,
     targetId: null,
-    summary: `${p.name} salvaged a ${site} wreck (${paid} ${resource}${bonusText})`,
-    data: { hexId, site, amount: paid, bonus: bonusGiven }
+    summary: `${p.name} salvaged a ${site} wreck (${lootSummary}${bonusText})`,
+    data: { hexId, site, amount: paid, resources: byRes, bonus: bonusGiven }
   });
   ctx.log(
-    `⚓ ${p.avatar} ${p.name} salvaged the ${site} shipwreck on tile #${hexId} for ${paid} ${resource}${bonusText}!`,
+    `⚓ ${p.avatar} ${p.name} salvaged the ${site} shipwreck on tile #${hexId} for ${lootSummary}${bonusText}!`,
     p.color
   );
 
@@ -539,6 +577,7 @@ export function claimWreck(
     playerId: pid,
     site,
     resource,
+    resources: byRes,
     wantedCards,
     amount: paid,
     bonus: bonusGiven,
@@ -565,10 +604,10 @@ export function spawnWreckAt(
   const rng = ensureWreckRng(g);
   const site: WreckSite = opts?.site ?? (isWreckSeaHex(reg, hex) ? 'sea' : 'shore');
   const resources = [...reg.resources.keys()];
-  const resource =
-    opts?.resource && reg.resources.has(opts.resource)
-      ? opts.resource
-      : resources[rngInt(rng, Math.max(1, resources.length))] || 'wood';
+  const forcedResource = !!(opts?.resource && reg.resources.has(opts.resource));
+  const resource = forcedResource
+    ? opts!.resource!
+    : resources[rngInt(rng, Math.max(1, resources.length))] || 'wood';
 
   const baseCards =
     typeof opts?.baseCards === 'number'
@@ -592,6 +631,7 @@ export function spawnWreckAt(
     spawnRound: g.round || 1,
     spawnTurn: g.turnCount || 1,
     resource,
+    forcedResource,
     baseCards,
     bonus,
     shoreDir

@@ -1,5 +1,6 @@
-// MODULE: Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles | DEPENDS ON: client/audio, client/socket, client/store, client/util | USED BY: client/main, client/render/board
+// MODULE: Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles | DEPENDS ON: client/audio, client/icons, client/socket, client/store, client/util | USED BY: client/main, client/render/board
 import { playTone } from '../audio';
+import { hexIconLayout } from '../icons';
 import { socket } from '../socket';
 import { hasDraggedMap, state } from '../store';
 import { esc } from '../util';
@@ -55,7 +56,9 @@ export function pirateMarkup(strength: number, fleeing: boolean): string {
 export function renderPiratesMarkup(
   pirates: { id: string; hexId: number; strength: number; mode: string }[],
   hexes: any[],
-  drives: number[]
+  drives: number[],
+  crowdedFishHexes?: Set<number>,
+  crowdedWreckHexes?: Set<number>
 ): string {
   if (!pirates || pirates.length === 0) return '';
   ensurePirateStyles();
@@ -64,13 +67,20 @@ export function renderPiratesMarkup(
   for (const p of pirates) {
     const h = hexes[p.hexId];
     if (!h || h.fog) continue;
+    const { pirateOffset } = hexIconLayout({
+      hasFish: crowdedFishHexes?.has(p.hexId) ?? false,
+      hasSeaWreck: crowdedWreckHexes?.has(p.hexId) ?? false,
+      hasPirate: true
+    });
+    const px = Number(h.x) + pirateOffset.dx;
+    const py = Number(h.y) + pirateOffset.dy;
     const fleeing = p.mode === 'flee';
     const clickable = canDrive.has(p.hexId);
     const title = `Pirate ship, strength ${p.strength}${fleeing ? ' (fleeing)' : ''}: ${
       clickable ? 'click to drive it off' : `driving it off takes ${p.strength} played knight${p.strength === 1 ? '' : 's'} and a road, bridge or port touching this tile`
     }`;
     html += `
-      <g transform="translate(${Number(h.x).toFixed(1)}, ${(Number(h.y) - 4).toFixed(1)}) scale(1.2)" data-pirate-id="${esc(p.id)}"
+      <g transform="translate(${px.toFixed(1)}, ${py.toFixed(1)}) scale(1.2)" data-pirate-id="${esc(p.id)}"
          ${clickable ? `onclick="clickPirate(${p.hexId})" style="cursor:pointer"` : 'style="pointer-events:none"'}>
         <title>${esc(title)}</title>
         ${clickable ? '<circle class="pirate-ring" r="27" />' : ''}

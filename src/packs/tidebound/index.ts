@@ -292,6 +292,7 @@ export {
   wreckBotGoal,
   wreckCandidates,
   wreckClientView,
+  wreckRoundBonus,
   wreckTimeMultiplier,
   wrecksAddon
 } from './wrecks';

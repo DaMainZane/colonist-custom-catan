@@ -145,7 +145,7 @@ export function groundWorkSourceError(g: GameState, reg: Registry, pid: Id, hexI
   if (!reg.tiles.get(hex.type)?.land) return 'Only land tiles can be converted';
   const touches = hex.vertexIds.some(id => {
     const pc = g.board.vertices[id]?.piece;
-    return !!pc && pc.owner === pid && reg.pieces.get(pc.type)?.target === 'vertex';
+    return !!pc && pc.owner === pid && (reg.pieces.get(pc.type)?.produces || 0) > 0;
   });
   return touches ? null : 'The tile must touch your own settlement or city';
 }

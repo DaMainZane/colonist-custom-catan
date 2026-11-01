@@ -1,25 +1,6 @@
 // MODULE: action "roll" (seeded dice, production, seven -> Seven Resolver pipeline) | DEPENDS ON: shared/index | USED BY: packs/base/actions/index
-import { getPlayer, produceFromHex, resolveSeven, rngInt, setPhase } from '../../../shared';
-import type { ActionDef, Ctx, Hex } from '../../../shared';
-
-function matchingHexes(ctx: Ctx, sum: number): Hex[] {
-  const { g, reg } = ctx;
-  return g.board.hexes.filter(
-    h => !h.ext.hidden && h.number === sum && h.id !== g.board.robberHexId && reg.tiles.get(h.type)?.land
-  );
-}
-
-function produce(ctx: Ctx, hexes: Hex[]): void {
-  const { g, reg } = ctx;
-  for (const hex of hexes) {
-    for (const vId of hex.vertexIds) {
-      const piece = g.board.vertices[vId]?.piece;
-      if (!piece) continue;
-      const amount = reg.pieces.get(piece.type)?.produces || 0;
-      if (amount > 0) produceFromHex(ctx, hex, piece.owner, amount);
-    }
-  }
-}
+import { getPlayer, matchingHexesForRoll, resolveSeven, rngInt, runProductionPipeline, setPhase } from '../../../shared';
+import type { ActionDef, Ctx } from '../../../shared';
 
 function handleSeven(ctx: Ctx): void {
   resolveSeven(ctx);
@@ -61,13 +42,13 @@ export const rollAction: ActionDef = {
     ctx.log(`${p.avatar} ${p.name} rolled ${sum} (${d1} + ${d2})`, p.color);
     for (const hook of ctx.reg.hooks.onRoll) hook(ctx, sum);
 
-    const hexes = sum === 7 ? [] : matchingHexes(ctx, sum);
+    const hexes = sum === 7 ? [] : matchingHexesForRoll(ctx, sum);
     ctx.emit('rolled', { playerId: pid, dice: [d1, d2], sum, hexIds: hexes.map(h => h.id) });
 
     if (sum === 7) {
       handleSeven(ctx);
     } else {
-      produce(ctx, hexes);
+      runProductionPipeline(ctx, hexes, sum);
       setPhase(ctx, 'main');
     }
   },

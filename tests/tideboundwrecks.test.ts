@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { wreckMarkup } from '../src/client/icons';
+import { hexIconLayout, wreckMarkup } from '../src/client/icons';
+import { renderPiratesMarkup } from '../src/client/render/pirates';
 import { allPacks } from '../src/packs';
 import { GENERIC_PORT, ROAD, SETTLEMENT } from '../src/packs/base/constants';
 import {
@@ -36,6 +37,7 @@ import {
   wreckBotGoal,
   wreckCandidates,
   wreckClientView,
+  wreckRoundBonus,
   wreckTimeMultiplier
 } from '../src/packs/tidebound';
 import {
@@ -294,9 +296,10 @@ describe('Tidebound T9c: First connecting road, bridge, or port claims the wreck
 });
 
 describe('Tidebound T9d: Loot with floor rule and slow scaling', () => {
-  it('scales sea (3-5) and shore (1-2) loot with time up to +40% at 50 turns, +25% with Salvage crew, and enforces the 2x-cost floor rule', () => {
-    expect([WRECK_SEA_MIN_CARDS, WRECK_SEA_MAX_CARDS]).toEqual([3, 5]);
-    expect([WRECK_SHORE_MIN_CARDS, WRECK_SHORE_MAX_CARDS]).toEqual([1, 2]);
+  it('scales sea (6-10) and shore (2-4) loot with round bonus floor(0.7 * round), time up to +40% at 50 turns, +25% with Salvage crew, and enforces the 2x-cost floor rule', () => {
+    expect([WRECK_SEA_MIN_CARDS, WRECK_SEA_MAX_CARDS]).toEqual([6, 10]);
+    expect([WRECK_SHORE_MIN_CARDS, WRECK_SHORE_MAX_CARDS]).toEqual([2, 4]);
+    expect([1, 2, 3, 4, 5].map(r => wreckRoundBonus(r))).toEqual([0, 1, 2, 2, 3]);
 
     // Slow time scaling: 1.0 at turn 0, 1.2 at turn 25, 1.4 at turn 50+
     expect(wreckTimeMultiplier(0)).toBeCloseTo(1.0, 5);
@@ -304,14 +307,36 @@ describe('Tidebound T9d: Loot with floor rule and slow scaling', () => {
     expect(wreckTimeMultiplier(50)).toBeCloseTo(1.4, 5);
     expect(wreckTimeMultiplier(100)).toBeCloseTo(1.4, 5);
 
-    // 5-card sea wreck at turn 50 -> 7 cards; with Salvage crew (+25%) -> 9 cards
-    expect(computeWreckLootCount({ baseCards: 5, turnCount: 50 })).toBe(7);
-    expect(computeWreckLootCount({ baseCards: 5, turnCount: 50, hasSalvageCrew: true })).toBe(9);
+    // 5-card wreck at round 1 (+0), turn 50 -> 7 cards; with Salvage crew (+25%) -> 9 cards
+    expect(computeWreckLootCount({ baseCards: 5, turnCount: 50, round: 1 })).toBe(7);
+    expect(computeWreckLootCount({ baseCards: 5, turnCount: 50, round: 1, hasSalvageCrew: true })).toBe(9);
+    // At round 5 (+3 round bonus): base 5 + 3 = 8 cards at turn 0
+    expect(computeWreckLootCount({ baseCards: 5, turnCount: 0, round: 5 })).toBe(8);
 
     // Floor rule: a doubled-cost bridge (6 cards) claiming a 3-card wreck always yields 6 + 1 = 7 cards
-    expect(computeWreckLootCount({ baseCards: 3, turnCount: 0, builtCostCards: 6 })).toBe(7);
+    expect(computeWreckLootCount({ baseCards: 3, turnCount: 0, round: 1, builtCostCards: 6 })).toBe(7);
     // Normal bridge (3 cards) claiming a 1-card shore wreck yields 3 + 1 = 4 cards
-    expect(computeWreckLootCount({ baseCards: 1, turnCount: 0, builtCostCards: 3 })).toBe(4);
+    expect(computeWreckLootCount({ baseCards: 1, turnCount: 0, round: 1, builtCostCards: 3 })).toBe(4);
+  });
+
+  it('fills an unforced storm wreck with random picks across the 5 basic resources using the derived wreck RNG', () => {
+    const { g, reg, ctx } = makeGame(on, 609);
+    g.round = 3; // round bonus = floor(0.7 * 3) = 2
+    const p = g.players[0];
+    p.resources = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    const rngBefore = g.rng.s;
+
+    const seaHexId = wreckCandidates(g, reg, 'sea')[0];
+    // Spawn without forcing `resource`: baseCards = 8, round = 3 (+2) -> 10 cards picked across the 5 basic resources
+    const marker = spawnWreckAt(ctx, seaHexId, { site: 'sea', baseCards: 8, bonus: null })!;
+    const res = claimWreck(ctx, marker, 'a', { builtCostCards: 0 })!;
+    expect(res.wantedCards).toBe(10);
+    expect(res.amount).toBe(10);
+    const totalInHand = Object.values(p.resources).reduce((a, b) => a + (b || 0), 0);
+    expect(totalInHand).toBe(10);
+    const distinctTypes = Object.values(res.resources || {}).filter(n => n > 0).length;
+    expect(distinctTypes).toBeGreaterThan(1);
+    expect(g.rng.s).toBe(rngBefore);
   });
 
   it('enforces the 2x-cost floor rule when claiming a wreck with an over-cap bridge, and handles a low bank', () => {
@@ -405,5 +430,54 @@ describe('Tidebound T9e: Client view, two spawn animations, and bot salvage goal
     const goals = wreckBotGoal.goals!(ctx, 'a');
     expect(goals.length).toBeGreaterThan(0);
     expect(goals[0].id).toBe('tidebound.wrecks.salvage');
+  });
+
+  it('separates fish, pirate, and sea wreck into non-overlapping slots, keeps shore wrecks off the number token, and renders the 1-round indicator (Bugs 5, 9, 17)', () => {
+    // Bug 5: alone, fish sits at (0, 0); when sharing a tile with a pirate or sea wreck, each gets a distinct slot
+    const alone = hexIconLayout({ hasFish: true });
+    expect(alone.fishOffset).toEqual({ dx: 0, dy: 0 });
+
+    const crowded = hexIconLayout({ hasFish: true, hasSeaWreck: true, hasPirate: true });
+    expect(crowded.fishOffset).toEqual({ dx: -24, dy: -16 });
+    expect(crowded.wreckOffset).toEqual({ dx: 22, dy: -16 });
+    expect(crowded.pirateOffset).toEqual({ dx: 20, dy: 10 });
+    expect(
+      Math.hypot(crowded.fishOffset.dx - crowded.pirateOffset.dx, crowded.fishOffset.dy - crowded.pirateOffset.dy)
+    ).toBeGreaterThan(35);
+
+    const pirateSvg = renderPiratesMarkup(
+      [{ id: 'p1', hexId: 0, strength: 2, mode: 'roam' }],
+      [{ id: 0, x: 100, y: 200 }],
+      [],
+      new Set([0])
+    );
+    expect(pirateSvg).toContain('translate(120.0, 210.0)');
+
+    // Bug 9: across all 6 axial shore directions, shore wrecks stay >= 35px clear of the number token at (0, 22) and glyph at (0, -24)
+    const dirs = [
+      { dq: 1, dr: 0 },
+      { dq: 0, dr: 1 },
+      { dq: -1, dr: 1 },
+      { dq: -1, dr: 0 },
+      { dq: 0, dr: -1 },
+      { dq: 1, dr: -1 }
+    ];
+    for (const shoreDir of dirs) {
+      const { wreckOffset } = hexIconLayout({ shoreDir, hasNumber: true });
+      const distToNumber = Math.hypot(wreckOffset.dx - 0, wreckOffset.dy - 22);
+      const distToGlyph = Math.hypot(wreckOffset.dx - 0, wreckOffset.dy - -24);
+      expect(distToNumber).toBeGreaterThanOrEqual(35);
+      expect(distToGlyph).toBeGreaterThanOrEqual(35);
+    }
+
+    // Bug 17: 1-round countdown indicator on shipwrecks
+    const svg4 = wreckMarkup('sea', 4);
+    expect(svg4).toContain('>4R</text>');
+    expect(svg4).not.toContain('wreck-countdown-urgent');
+
+    const svg1 = wreckMarkup('shore', 1);
+    expect(svg1).toContain('>1R</text>');
+    expect(svg1).toContain('wreck-countdown-urgent');
+    expect(svg1).toContain('wreck-urgent-ring');
   });
 });

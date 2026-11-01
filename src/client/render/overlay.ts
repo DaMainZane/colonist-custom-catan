@@ -108,8 +108,8 @@ function overlayPatternDefsInnerMarkup(overlays: readonly OverlayKindVisual[] = 
     .filter(isSafeOverlayKind)
     .map(
       o => `
-      <pattern id="ov-pat-${o.id}" width="24" height="14" patternUnits="userSpaceOnUse" style="color:var(--ov-${o.id}-line);stroke:var(--ov-${o.id}-line)">
-        <rect width="24" height="14" style="fill:var(--ov-${o.id}-tint)" />
+      <pattern id="ov-pat-${o.id}" width="24" height="14" patternUnits="userSpaceOnUse" style="color:var(--ov-${o.id}-line)">
+        <rect width="24" height="14" stroke="none" style="fill:var(--ov-${o.id}-tint);stroke:none" />
         ${o.pattern}
       </pattern>`
     )

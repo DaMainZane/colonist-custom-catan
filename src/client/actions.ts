@@ -482,7 +482,7 @@ export function setBuildMode(mode: string): void {
     const me = state.players.find(p => p.id === socket.id);
     if (me && !(me.netsLeft ?? 0)) showToast('You have no nets left.');
     else if (me && !canClientAffordPiece(me, 'net')) showToast('Not enough resources for a net.');
-    else if (me && !me.netSpots?.length) showToast('A net goes on a coast vertex next to your own road or bridge (not on a port).');
+    else if (me && !me.netSpots?.length) showToast('A fishing net is a coastal tile modification: build a settlement or city on the coastal tile and connect a road or bridge first (not on a port).');
   }
   // Feed mode draws only the sea tiles the server listed (next to one of your nets, not full).
   if (turningOn && mode === 'feed' && state) {

@@ -256,9 +256,18 @@ export function seaHexIdsAt(g: GameState, reg: Registry, vertexId: number): numb
   return [...out].sort((a, b) => a - b);
 }
 
+/** True when `pid` owns at least one settlement or city (`produces > 0`) on the board. */
+export function hasBuildingForNet(ctx: Ctx, pid: Id): boolean {
+  const { g, reg } = ctx;
+  return g.board.vertices.some(vx => {
+    const piece = vx.piece;
+    return piece?.owner === pid && (reg.pieces.get(piece.type)?.produces || 0) > 0;
+  });
+}
+
 /**
  * Placement: build phase only, gated by `techGate(ctx.g, pid, TECH_FISHING_NETS)`, an empty coast vertex (touches land and at least one sea tile)
- * next to a road, bridge or rickety bridge you own. There is no distance rule between nets and other pieces. Never on a port vertex (T7b2):
+ * next to a road, bridge or rickety bridge you own, once you have a settlement or city on the board. Never on a port vertex (T7b2):
  * `ratioFor` gives a port to ANY piece of yours on its vertex, so a 3-card net there would be a port without a settlement.
  */
 export function canPlaceNet(ctx: Ctx, pid: Id, vertexId: number, mode: 'setup' | 'build'): boolean {
@@ -267,6 +276,11 @@ export function canPlaceNet(ctx: Ctx, pid: Id, vertexId: number, mode: 'setup' |
   const v = ctx.g.board.vertices[vertexId];
   if (!v || v.piece || v.port || v.hexIds.length === 0) return false;
   if (!v.edgeIds.some(eId => ownsRoadAt(ctx, pid, eId))) return false;
+  const anyBuildingOnBoard = ctx.g.board.vertices.some(vx => {
+    const piece = vx.piece;
+    return !!piece && (ctx.reg.pieces.get(piece.type)?.produces || 0) > 0;
+  });
+  if (anyBuildingOnBoard && !hasBuildingForNet(ctx, pid)) return false;
   return seaHexIdsAt(ctx.g, ctx.reg, vertexId).length > 0;
 }
 

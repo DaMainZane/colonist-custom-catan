@@ -480,16 +480,16 @@ export const tideViewData: ViewDataDef = {
 export const floodOverlayKind: OverlayKindVisual = {
   id: 'flood',
   label: 'Flooded',
-  tint: { light: 'rgba(59, 126, 161, 0.34)', dark: 'rgba(118, 190, 222, 0.30)' },
-  line: { light: 'rgba(33, 92, 140, 0.85)', dark: 'rgba(168, 222, 245, 0.9)' },
+  tint: { light: 'rgba(21, 62, 112, 0.56)', dark: 'rgba(18, 54, 102, 0.62)' },
+  line: { light: 'rgba(186, 230, 253, 0.92)', dark: 'rgba(186, 230, 253, 0.95)' },
   pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.4" />'
 };
 
 export const floodWarnOverlayKind: OverlayKindVisual = {
   id: 'flood-warn',
   label: 'Flood warning',
-  tint: { light: 'rgba(59, 126, 161, 0.14)', dark: 'rgba(118, 190, 222, 0.13)' },
-  line: { light: 'rgba(33, 92, 140, 0.8)', dark: 'rgba(168, 222, 245, 0.85)' },
+  tint: { light: 'rgba(29, 78, 137, 0.30)', dark: 'rgba(29, 78, 137, 0.34)' },
+  line: { light: 'rgba(33, 92, 140, 0.85)', dark: 'rgba(168, 222, 245, 0.9)' },
   pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />',
   pulse: true
 };

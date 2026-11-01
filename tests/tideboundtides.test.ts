@@ -106,7 +106,8 @@ describe('registration', () => {
     expect(reg.enabled.has('tidebound.tides')).toBe(true);
     expect(g.ext.tidebound.tides.clusters.length).toBeGreaterThan(0);
     const def = resolveTileStateDef(reg, FLOODED)!;
-    expect(def.blocksProduction).toBe(true);
+    expect(def.yieldMultiplier).toBe(0.5);
+    expect(def.yieldRound).toBe('ceil');
     expect(def.blocksRobber).toBe(true);
     const hexId = ringOf(g, 3)[0];
     setTileState(g, hexId, { id: FLOODED });
@@ -338,29 +339,45 @@ describe('spring tide (T5b)', () => {
 });
 
 describe('what flooding does', () => {
-  it('a flooded tile produces nothing and a dry one still does', () => {
+  it('a flooded tile yields half resources rounded up per building (settlement 1->1, city 2->1, castle 3->2) and a dry one yields full', () => {
     const { g, reg, ctx } = makeGame(on);
     const clusters = ensureTides(g, reg).clusters;
     const wet = g.board.hexes[clusters.find(c => isFloodedAt(c, 2))!.hexIds[0]];
     const dry = g.board.hexes[clusters.find(c => !isFloodedAt(c, 2))!.hexIds[0]];
-    // A corner that touches only this tile, so a neighbouring cluster's tile cannot also pay out to the same settlement.
+    // A corner that touches only this tile, so a neighbouring cluster's tile cannot also pay out to the same building.
     const ownCorner = (h: typeof wet) => h.vertexIds.find(v => g.board.vertices[v].hexIds.length === 1)!;
-    g.board.vertices[ownCorner(wet)].piece = { type: 'settlement', owner: 'a' };
-    g.board.vertices[ownCorner(dry)].piece = { type: 'settlement', owner: 'b' };
+    const wetV = ownCorner(wet);
+    const dryV = ownCorner(dry);
+    g.board.vertices[wetV].piece = { type: 'city', owner: 'a' };
+    g.board.vertices[dryV].piece = { type: 'city', owner: 'b' };
     const woodOf = (id: string) => g.players.find(p => p.id === id)!.resources.wood || 0;
 
+    // Round 1 (dry): both cities produce 2 wood
     runProductionPipeline(ctx, [wet, dry], 6);
-    expect([woodOf('a'), woodOf('b')]).toEqual([1, 1]);
+    expect([woodOf('a'), woodOf('b')]).toEqual([2, 2]);
 
+    // Round 2 (wet is flooded): city on flooded tile yields ceil(2 * 0.5) = 1; city on dry tile yields 2
     g.round = 2;
     applyTides(ctx);
     runProductionPipeline(ctx, [wet, dry], 6);
-    expect([woodOf('a'), woodOf('b')]).toEqual([1, 2]);
+    expect([woodOf('a'), woodOf('b')]).toEqual([3, 4]);
 
+    // Settlement on flooded tile yields ceil(1 * 0.5) = 1
+    g.board.vertices[wetV].piece = { type: 'settlement', owner: 'a' };
+    runProductionPipeline(ctx, [wet], 6);
+    expect(woodOf('a')).toBe(4);
+
+    // Castle (produces: 3) on flooded tile yields ceil(3 * 0.5) = 2
+    reg.pieces.set('castle', { id: 'castle', name: 'Castle', target: 'vertex', cost: {}, vp: 3, produces: 3, canPlace: () => false });
+    g.board.vertices[wetV].piece = { type: 'castle', owner: 'a' };
+    runProductionPipeline(ctx, [wet], 6);
+    expect(woodOf('a')).toBe(6);
+
+    // Round 3 (wet dries out): castle yields full 3
     g.round = 3;
     applyTides(ctx);
-    runProductionPipeline(ctx, [wet, dry], 6);
-    expect([woodOf('a'), woodOf('b')]).toEqual([2, 2]);
+    runProductionPipeline(ctx, [wet], 6);
+    expect(woodOf('a')).toBe(9);
   });
 
   it('the robber stays on a tile that floods (it is not moved, only blocked from being moved onto)', () => {
@@ -641,13 +658,13 @@ describe('elevation resistance (T5d)', () => {
     const low = g.board.hexes[wet.hexIds[1]];
     high.ext.elevation = 2;
     const ownCorner = (h: typeof high) => h.vertexIds.find(v => g.board.vertices[v].hexIds.length === 1)!;
-    g.board.vertices[ownCorner(high)].piece = { type: 'settlement', owner: 'a' };
-    g.board.vertices[ownCorner(low)].piece = { type: 'settlement', owner: 'b' };
+    g.board.vertices[ownCorner(high)].piece = { type: 'city', owner: 'a' };
+    g.board.vertices[ownCorner(low)].piece = { type: 'city', owner: 'b' };
     g.round = 2;
     applyTides(ctx);
     runProductionPipeline(ctx, [high, low], 6);
     const woodOf = (id: string) => g.players.find(p => p.id === id)!.resources.wood || 0;
-    expect([woodOf('a'), woodOf('b')]).toEqual([1, 0]);
+    expect([woodOf('a'), woodOf('b')]).toEqual([2, 1]);
   });
 
   it('elevation never moves a die roll or the seeded clusters', () => {
@@ -936,16 +953,18 @@ describe('manifest overlay kinds flood and flood-warn (R8.8 step 1)', () => {
       // After the Tidebound manifest arrives: theme tokens, patterns, labels and pulse are rendered from the manifest.
       setManifest(buildVisualManifest(reg));
       const css = overlayVarsCss();
-      expect(css).toContain('--ov-flood-tint:rgba(59, 126, 161, 0.34)');
-      expect(css).toContain('--ov-flood-line:rgba(33, 92, 140, 0.85)');
+      expect(css).toContain('--ov-flood-tint:rgba(21, 62, 112, 0.56)');
+      expect(css).toContain('--ov-flood-line:rgba(186, 230, 253, 0.92)');
       expect(css).toContain(':root[data-theme="dark"]');
-      expect(css).toContain('--ov-flood-warn-tint:rgba(118, 190, 222, 0.13)');
+      expect(css).toContain('--ov-flood-warn-tint:rgba(29, 78, 137, 0.34)');
 
       const defsAfter = overlayPatternDefsMarkup();
       expect(defsAfter).toContain('id="ov-pat-flood"');
       expect(defsAfter).toContain('id="ov-pat-flood-warn"');
       expect(defsAfter).toContain('var(--ov-flood-tint)');
       expect(defsAfter).toContain('var(--ov-flood-warn-line)');
+      expect(defsAfter).toContain('style="fill:var(--ov-flood-tint);stroke:none"');
+      expect(defsAfter).not.toContain('stroke:var(--ov-flood-line)');
 
       const htmlAfter = renderHexOverlaysMarkup(hexes, poly, {
         0: { kind: 'flood' },

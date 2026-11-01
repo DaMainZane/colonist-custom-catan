@@ -37,6 +37,7 @@ export interface TileStateDef {
   blocksProduction?: boolean;
   yieldDelta?: number;
   yieldMultiplier?: number;
+  yieldRound?: 'floor' | 'ceil' | 'round';
   blocksRobber?: boolean;
   /** Automatic transition when `until` expires (e.g. `ash` -> `fertile` for 2 rounds, `flooded` -> `silt` for 1 round). */
   nextState?: { id: TileStateId; duration?: number };
@@ -44,7 +45,7 @@ export interface TileStateDef {
 }
 
 const DEFAULT_TILE_STATES: Record<string, TileStateDef> = {
-  flooded: { id: 'flooded', name: 'Flooded', blocksProduction: true, blocksRobber: true, nextState: { id: 'silt', duration: 1 } },
+  flooded: { id: 'flooded', name: 'Flooded', yieldMultiplier: 0.5, yieldRound: 'ceil', blocksRobber: true, nextState: { id: 'silt', duration: 1 } },
   drowned: { id: 'drowned', name: 'Drowned', blocksProduction: true, blocksRobber: true },
   silt: { id: 'silt', name: 'Silt', yieldDelta: 1 },
   ash: { id: 'ash', name: 'Volcanic Ash', blocksProduction: true, nextState: { id: 'fertile', duration: 2 } },
@@ -97,7 +98,14 @@ export function applyTileStateToYield(g: GameState, reg: Registry, hex: Hex, bas
   if (def.blocksProduction) return 0;
   let out = baseAmount;
   if (typeof def.yieldMultiplier === 'number') {
-    out = Math.max(0, Math.floor(out * def.yieldMultiplier));
+    const raw = out * def.yieldMultiplier;
+    const rounded =
+      def.yieldRound === 'ceil'
+        ? Math.ceil(raw)
+        : def.yieldRound === 'round'
+          ? Math.round(raw)
+          : Math.floor(raw);
+    out = Math.max(0, rounded);
   }
   if (typeof def.yieldDelta === 'number') {
     out = Math.max(0, out + def.yieldDelta);

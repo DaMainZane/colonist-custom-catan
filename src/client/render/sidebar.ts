@@ -16,8 +16,8 @@ import { avatarFace } from '../avatars';
 
 // Log and chat are text the player may select and copy. Re-writing innerHTML on every game update
 // would wipe the selection, so each feed only re-renders when its content actually changed.
-let lastMergedLogSig = '';
-let lastFilterBarSig = '';
+let lastMergedLogSig = '__dirty__';
+let lastFilterBarSig = '__dirty__';
 let lastChatSig = '';
 let seenChatCount = 0;
 const collapsedRounds = new Set<number>();
@@ -25,18 +25,19 @@ const collapsedRounds = new Set<number>();
 export function toggleRoundCollapse(roundNum: number): void {
   if (collapsedRounds.has(roundNum)) collapsedRounds.delete(roundNum);
   else collapsedRounds.add(roundNum);
-  lastMergedLogSig = '';
+  lastMergedLogSig = '__dirty__';
   renderSidebar();
 }
 
 export function toggleLogFilter(filter: string | null): void {
   setLogFilter(filter || null);
-  lastMergedLogSig = '';
-  lastFilterBarSig = '';
+  lastMergedLogSig = '__dirty__';
+  lastFilterBarSig = '__dirty__';
   renderSidebar();
 }
 
 function hasSelectionIn(el: HTMLElement): boolean {
+  if (typeof window === 'undefined' || typeof window.getSelection !== 'function') return false;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
   return el.contains(sel.anchorNode) || el.contains(sel.focusNode);
@@ -259,8 +260,13 @@ function formatLogTextWithRsCards(rawText: string): string {
   return safe;
 }
 
-function describeActiveFilter(filter: string): string {
-  const [kind, val] = filter.split(':');
+function splitFilterKey(filter: string): [string, string] {
+  const idx = filter.indexOf(':');
+  return idx < 0 ? [filter, ''] : [filter.slice(0, idx), filter.slice(idx + 1)];
+}
+
+export function describeActiveFilter(filter: string): string {
+  const [kind, val] = splitFilterKey(filter);
   if (kind === 'res') return RES_LABELS[val] || val;
   if (kind === 'cat') return CAT_LABELS[val] || val;
   if (kind === 'player') return val;
@@ -271,7 +277,7 @@ function describeActiveFilter(filter: string): string {
 
 function actionMatchesFilter(act: TurnActionItem, turn: PlayerTurnSummary, round: RoundSummary, filter: string | null): boolean {
   if (!filter) return true;
-  const [kind, val] = filter.split(':');
+  const [kind, val] = splitFilterKey(filter);
   const vLow = (val || '').toLowerCase();
   if (kind === 'player') {
     return (
@@ -300,7 +306,7 @@ function actionMatchesFilter(act: TurnActionItem, turn: PlayerTurnSummary, round
 
 function logLineMatchesFilter(lineText: string, filter: string | null): boolean {
   if (!filter) return true;
-  const [kind, val] = filter.split(':');
+  const [kind, val] = splitFilterKey(filter);
   const low = String(lineText || '').toLowerCase();
   const vLow = (val || '').toLowerCase();
   if (kind === 'res' || kind === 'player' || kind === 'val') {
@@ -317,7 +323,8 @@ function logLineMatchesFilter(lineText: string, filter: string | null): boolean 
   return true;
 }
 
-function renderFilterBar(): void {
+export function renderFilterBar(): void {
+  if (typeof document === 'undefined') return;
   const bar = document.getElementById('logFilterBar');
   if (!bar) return;
   if (logTab !== 'live') {
@@ -325,7 +332,7 @@ function renderFilterBar(): void {
     return;
   }
   bar.style.display = 'flex';
-  const sig = `${logFilter || ''}`;
+  const sig = logFilter ? `active:${logFilter}` : 'none';
   if (sig === lastFilterBarSig && bar.innerHTML.length > 0) return;
   lastFilterBarSig = sig;
 
@@ -355,14 +362,15 @@ function renderFilterBar(): void {
   `;
 }
 
-function renderMergedLiveLog(el: HTMLElement): void {
+export function renderMergedLiveLog(el: HTMLElement): void {
   const history: RoundSummary[] = state.turnHistory || [];
   const logs: { text: string; color: string | null }[] = state.logs || [];
   const currentRoundNum = state.status === 'PLAYING' ? (state.round || 1) : -1;
   const sig = `${state.status}|${state.round || 0}|${ logFilter || '' }|${history.length}|${Array.from(collapsedRounds).sort().join(',')}|${history.map(r => `${r.round}:${r.turns.length}:${r.turns.reduce((s, t) => s + t.actions.length, 0)}`).join(';')}|${logs.length}:${logs.length ? logs[logs.length - 1].text : ''}`;
 
-  if (sig === lastMergedLogSig && el.innerHTML.trim().length > 0) return;
-  if (hasSelectionIn(el)) return;
+  const forceRender = lastMergedLogSig === '__dirty__';
+  if (!forceRender && sig === lastMergedLogSig && el.innerHTML.trim().length > 0) return;
+  if (!forceRender && hasSelectionIn(el)) return;
   lastMergedLogSig = sig;
 
   // In LOBBY (or before any turns are recorded), show the live log lines with clickable RS card icons
@@ -480,7 +488,8 @@ function renderMergedLiveLog(el: HTMLElement): void {
 }
 
 export function renderSidebar(): void {
-  const logSectionEl = document.getElementById('logSection')!;
+  if (typeof document === 'undefined' || !state) return;
+  const logSectionEl = document.getElementById('logSection');
   const feedEl = document.getElementById('logFeed') || logSectionEl;
   const historyEl = document.getElementById('turnHistoryFeed');
   const chatSectionEl = document.getElementById('chatSection');
@@ -515,18 +524,20 @@ export function renderSidebar(): void {
   }
 
   renderFilterBar();
-  renderMergedLiveLog(feedEl);
+  if (feedEl) renderMergedLiveLog(feedEl);
 
-  const chatEl = document.getElementById('chatFeed')!;
+  const chatEl = document.getElementById('chatFeed');
   const chatSig = `${chats.length}|${chats.length ? chats[chats.length - 1].text : ''}`;
-  if (renderFeed(chatEl, chatSig, lastChatSig, () => chats.map(c => `
+  if (chatEl && renderFeed(chatEl, chatSig, lastChatSig, () => chats.map(c => `
     <div class="msg"><span class="dot" style="background:${esc(c.color)}"></span><strong>${esc(c.sender)}</strong>${esc(c.text)}</div>
   `).join(''))) {
     lastChatSig = chatSig;
   }
 
+  const bankBarEl = document.getElementById('bankBar');
+  if (!bankBarEl) return;
   const b = state.bank || { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 };
-  document.getElementById('bankBar')!.innerHTML = `
+  bankBarEl.innerHTML = `
     <span class="bank-ico" title="Bank">${uiIcon('bank', 22)}</span>
     ${RESOURCES.map(r => `
       <div class="bank-item" id="bankRes_${r}">

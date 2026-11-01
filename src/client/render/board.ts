@@ -2,7 +2,7 @@
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
-import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup, wreckMarkup } from '../icons';
+import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup, wreckMarkup, hexIconLayout } from '../icons';
 import {
   playTone,
   playPlaceRoadSound,
@@ -621,14 +621,20 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.overlayLayer.innerHTML = overlayHtml;
   }
 
-  // Fishing grounds (T7c, T7e): a fish with boost pips on every sea tile that has an icon. In feed mode the grounds you could pay to fill
-  // (the server's `feedSpots`) get a clickable ring, and a spot with no icon yet shows an empty fish waiting to be fed.
+  // Fishing grounds (T7c, T7e) & shared hex icon slot layout (Bugs 5, 9, 17):
+  // When a fish icon shares a sea tile with a pirate or sea wreck, each icon shifts into its predetermined slot so they never overlap.
   const fishIcons: Record<number, number> = state.fishIcons ?? {};
   const feedSpotSet = isMyTurn && buildMode === 'feed' && state.phase === 'MAIN' && me && canClientAffordFeed(me)
     ? new Set<number>(me.feedSpots ?? [])
     : null;
   const fishIds = new Set<number>(Object.keys(fishIcons).map(Number));
   if (feedSpotSet) for (const id of feedSpotSet) fishIds.add(id);
+
+  const wrecks = state.wrecks || [];
+  const pirates = state.pirates || [];
+  const seaWreckHexIds = new Set<number>(wrecks.filter(w => w.site === 'sea').map(w => w.hexId));
+  const pirateHexIds = new Set<number>(pirates.map(p => p.hexId));
+
   let fishHtml = '';
   for (const id of [...fishIds].sort((a, b) => a - b)) {
     const h = hexes[id];
@@ -636,14 +642,21 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     const hasIcon = fishIcons[id] !== undefined;
     const left = hasIcon ? fishIcons[id] : 0;
     const inner = fishGroundMarkup(left);
+    const { fishOffset } = hexIconLayout({
+      hasFish: true,
+      hasSeaWreck: seaWreckHexIds.has(id),
+      hasPirate: pirateHexIds.has(id)
+    });
+    const fx = Number(h.x) + fishOffset.dx;
+    const fy = Number(h.y) + fishOffset.dy;
     if (feedSpotSet?.has(id)) {
       fishHtml += `
-        <g transform="translate(${h.x}, ${h.y})" class="fish-spot" onclick="clickFeedSpot(${id})" style="cursor:pointer">
+        <g transform="translate(${fx.toFixed(1)}, ${fy.toFixed(1)})" class="fish-spot" onclick="clickFeedSpot(${id})" style="cursor:pointer">
           <circle class="fish-ring" r="30" />
           <g transform="scale(1.25)" class="${hasIcon ? '' : 'fish-new'}">${inner}</g>
         </g>`;
     } else {
-      fishHtml += `<g transform="translate(${h.x}, ${h.y}) scale(1.25)" style="pointer-events:none"><title>Fishing ground: ${Math.max(0, left)} of 4 boosts left</title>${inner}</g>`;
+      fishHtml += `<g transform="translate(${fx.toFixed(1)}, ${fy.toFixed(1)}) scale(1.25)" style="pointer-events:none"><title>Fishing ground: ${Math.max(0, left)} of 4 boosts left</title>${inner}</g>`;
     }
   }
   if (fishHtml !== lastFishHtml) {
@@ -651,8 +664,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     layers.fishLayer.innerHTML = fishHtml;
   }
 
-  // Shipwrecks (T9): sea wrecks sit on the ocean tile (with a whirlpool spawn animation); shore wrecks beach toward the ocean side of a coastal tile (with a surf-wash spawn animation).
-  const wrecks = state.wrecks || [];
+  // Shipwrecks (T9, Bugs 5, 9, 17): sea wrecks sit on the ocean tile (or top-right slot when sharing with fish/pirate);
+  // shore wrecks beach in a coastal flank slot away from the tile's number token.
   const currentWreckIds = new Set<string>();
   let playedWreckSfx = false;
   for (const w of wrecks) {
@@ -680,17 +693,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     const isAnimating = elapsed < WRECK_ANIM_MS;
     const delayStyle = isAnimating ? `animation-delay: -${Math.max(0, Math.round(elapsed))}ms;` : '';
 
-    let wx = h.x;
-    let wy = h.y;
-    if (w.site === 'shore' && w.shoreDir) {
-      const dx = Math.sqrt(3) * (w.shoreDir.dq + w.shoreDir.dr / 2);
-      const dy = 1.5 * w.shoreDir.dr;
-      const len = Math.hypot(dx, dy) || 1;
-      wx += (dx / len) * 28;
-      wy += (dy / len) * 28;
-    } else if (w.site === 'sea' && fishIcons[w.hexId] !== undefined) {
-      wy -= 20;
-    }
+    const { wreckOffset } = hexIconLayout({
+      hasFish: fishIds.has(w.hexId),
+      hasSeaWreck: w.site === 'sea',
+      hasPirate: pirateHexIds.has(w.hexId),
+      shoreDir: w.site === 'shore' ? w.shoreDir : null,
+      hasNumber: !!h.number
+    });
+    const wx = Number(h.x) + wreckOffset.dx;
+    const wy = Number(h.y) + wreckOffset.dy;
 
     const animClass = isAnimating
       ? w.site === 'sea'
@@ -719,9 +730,11 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
 
   // Pirates (T10): one ship per pirate on its sea tile with a strength badge. On your main-phase turn the ones you can drive off (the server's `pirateDrives`) get a ring and a click.
   const piratesHtml = renderPiratesMarkup(
-    state.pirates || [],
+    pirates,
     hexes,
-    isMyTurn && state.phase === 'MAIN' && me ? (me.pirateDrives ?? []) : []
+    isMyTurn && state.phase === 'MAIN' && me ? (me.pirateDrives ?? []) : [],
+    fishIds,
+    seaWreckHexIds
   );
   if (piratesHtml !== lastPiratesHtml) {
     lastPiratesHtml = piratesHtml;

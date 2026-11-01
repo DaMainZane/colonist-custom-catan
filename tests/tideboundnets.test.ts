@@ -187,6 +187,23 @@ describe('placement', () => {
     m.g.board.edges[open.edgeIds[0]].piece = { type: 'bridge', owner: 'a' };
     expect(canPlaceNet(m.ctx, 'a', open.id, 'build')).toBe(false);
   });
+
+  it('requires a settlement or city of yours first before placing a net, and a net does not count as a settlement for Ground Work tile modification (Bug 16)', () => {
+    const m = makeGame();
+    const coasts = coastIds(m);
+    const coastA = coasts[0];
+    const coastB = coasts[1];
+
+    // Bob has a settlement on the board, while Alice has only a road (no settlement or city yet)
+    m.g.board.vertices[coastB].piece = { type: 'settlement', owner: 'b' };
+    giveRoadAt(m.g, coastA, 'a');
+    expect(canPlaceNet(m.ctx, 'a', coastA, 'build')).toBe(false);
+
+    // Once Alice builds a settlement first, she can place her fishing net at coastA
+    const settleV = m.g.board.hexes[m.g.board.vertices[coastA].hexIds[0]].vertexIds.find(vId => vId !== coastA)!;
+    m.g.board.vertices[settleV].piece = { type: 'settlement', owner: 'a' };
+    expect(canPlaceNet(m.ctx, 'a', coastA, 'build')).toBe(true);
+  });
 });
 
 describe('build', () => {

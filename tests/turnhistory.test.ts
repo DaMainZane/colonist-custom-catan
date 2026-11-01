@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recordTurnHistory, takeNewLogLines } from '../src/server/turnHistory';
+import { describeActiveFilter, toggleLogFilter } from '../src/client/render/sidebar';
+import { logFilter, setState } from '../src/client/store';
 import { createGame, currentPlayer } from '../src/shared';
 import { defaultSettings, rulesFromSettings, gameRegistry } from '../src/server/runtime';
 import type { Room } from '../src/server/types';
@@ -95,8 +97,8 @@ describe('Turn History recorder & round summarizer', () => {
 
     const aliceTurn = r1.turns[0];
     expect(aliceTurn.playerId).toBe('p1');
-    // Expected actions: Roll 8, Consolidated Production (+2 Wheat, +1 Wood), Built Road, Played Knight, Moved Robber, Stole resource
-    expect(aliceTurn.actions).toHaveLength(6);
+    // Expected actions: Roll 8, Consolidated Production (+2 Wheat, +1 Wood), Built Road, Played Knight, Stole resource (no Moved Robber line)
+    expect(aliceTurn.actions).toHaveLength(5);
 
     expect(aliceTurn.actions[0].category).toBe('roll');
     expect(aliceTurn.actions[0].text).toBe('Rolled 8 (4 + 4)');
@@ -115,10 +117,8 @@ describe('Turn History recorder & round summarizer', () => {
     expect(aliceTurn.actions[3].badge).toBe('Knight');
 
     expect(aliceTurn.actions[4].category).toBe('rob');
-    expect(aliceTurn.actions[4].text).toContain('hex #5');
-
-    expect(aliceTurn.actions[5].category).toBe('rob');
-    expect(aliceTurn.actions[5].text).toContain('Bob');
+    expect(aliceTurn.actions[4].text).toContain('Bob');
+    expect(aliceTurn.actions.some(a => a.text.includes('Moved Robber') || a.text.includes('undefined'))).toBe(false);
   });
 
   it('records trades, discards on 7, and advances across multiple rounds', () => {
@@ -230,20 +230,20 @@ describe('Turn History recorder & round summarizer', () => {
     expect(room.turnHistory![0].turns[0].actions[0].text).toBe('Played Monopoly on Ore (nothing taken)');
   });
 
-  it('names the victim of a Knight steal, and the robber move, as the Knight\'s', () => {
+  it('names the victim of a Knight steal as the Knight\'s without logging a moved-robber hex line', () => {
     const room = makeMockRoom();
     room.game!.phase = 'main';
     room.game!.round = 1;
     room.game!.turnCount = 1;
 
     recordTurnHistory(room, 'p1', 'play_dev', { card: 'knight' }, [{ type: 'devPlayed', data: { card: 'knight', playerId: 'p1' } }]);
-    recordTurnHistory(room, 'p1', 'move_robber', { hexId: 5 }, [{ type: 'robberMoved', data: { hexId: 5, playerId: 'p1' } }]);
+    recordTurnHistory(room, 'p1', 'move_robber', { hexId: 5 }, [{ type: 'robberMoved', data: { from: 0, to: 5, playerId: 'p1' } }]);
     recordTurnHistory(room, 'p1', 'steal', { victimId: 'p2' }, [
       { type: 'transferred', data: { kind: 'steal', from: 'p2', to: 'p1', amount: 1, secret: true } }
     ]);
 
     const texts = room.turnHistory![0].turns[0].actions.map(a => a.text);
-    expect(texts).toEqual(['Played Knight', 'Knight moved Robber to hex #5', 'Knight stole from Bob']);
+    expect(texts).toEqual(['Played Knight', 'Knight stole from Bob']);
   });
 
   it('does not call a robber steal after a roll a Knight steal', () => {
@@ -305,5 +305,45 @@ describe('Turn History recorder & round summarizer', () => {
     expect(takeNewLogLines(room)).toEqual([]);
     room.game!.log.push({ text: 'two', color: null });
     expect(takeNewLogLines(room).map(l => l.text)).toEqual(['two']);
+  });
+
+  // BUG 1: clicking the X on the active live-log filter tag must unselect the filter and re-render #logFilterBar.
+  it('clears the active live-log filter tag and updates #logFilterBar when toggleLogFilter(null) is clicked', () => {
+    const barEl = { style: { display: '' }, innerHTML: '' };
+    const feedEl = { style: { display: '' }, innerHTML: '' };
+    const prevDoc = (globalThis as any).document;
+    (globalThis as any).document = {
+      getElementById(id: string) {
+        if (id === 'logFilterBar') return barEl;
+        if (id === 'logFeed' || id === 'logSection') return feedEl;
+        return null;
+      }
+    };
+    try {
+      setState({
+        status: 'PLAYING',
+        round: 1,
+        turnHistory: [],
+        logs: [{ text: 'Alice collected 1 wheat', color: null }],
+        chats: []
+      } as any);
+
+      toggleLogFilter('res:wheat');
+      expect(logFilter).toBe('res:wheat');
+      expect(barEl.innerHTML).toContain('lf-clear-btn');
+      expect(barEl.innerHTML).toContain('Wheat');
+
+      // Clicking the X button calls toggleLogFilter(null)
+      toggleLogFilter(null);
+      expect(logFilter).toBeNull();
+      expect(barEl.innerHTML).not.toContain('lf-clear-btn');
+      expect(barEl.innerHTML).toContain('Click a value to filter');
+
+      // Values containing colons (e.g. "val:3:1") preserve the full value
+      expect(describeActiveFilter('val:3:1')).toBe('3:1');
+    } finally {
+      toggleLogFilter(null);
+      (globalThis as any).document = prevDoc;
+    }
   });
 });

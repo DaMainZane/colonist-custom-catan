@@ -259,13 +259,7 @@ export function recordTurnHistory(
       }
 
       case 'robberMoved': {
-        turnSummary.actions.push({
-          category: 'rob',
-          icon: 'robber',
-          badge: `Hex #${d.hexId}`,
-          text: knightOpen() ? `Knight moved Robber to hex #${d.hexId}` : `Moved Robber to hex #${d.hexId}`,
-          timestamp: now
-        });
+        // Bug 15: do not log "Moved Robber to hex #..." in the live log; only log who robbed who on steal.
         break;
       }
 
@@ -664,8 +658,12 @@ export function recordTurnHistory(
   }
 
   // Announcements with no event of their own (turn order, tides, a bot taking a seat) join the same stream.
-  // When the action recorded something, its lines say the same thing, so they are dropped. Trade chatter stays out.
-  if (recordedHere === 0 && !TRADE_ACTIONS.has(actionType)) {
+  // When the action recorded something, its lines say the same thing, so they are dropped. Trade chatter and robber moves stay out.
+  const isRobberMove =
+    actionType === 'move_robber' ||
+    actionType === 'moveRobber' ||
+    events.some(e => e?.type === 'robberMoved');
+  if (recordedHere === 0 && !TRADE_ACTIONS.has(actionType) && !isRobberMove) {
     for (const n of notes) {
       const text = String(n?.text ?? '').trim();
       if (!text) continue;
