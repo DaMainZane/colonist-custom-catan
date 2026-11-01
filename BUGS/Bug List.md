@@ -38,7 +38,10 @@ Screenshot: image 2 in Coding Project/colonist-custom-catan/BUGS/Image
 BUG 4
 Saw:        event (spawning mechanic)
 Expected:   Fish token should either spawn single next to shore, or in cluster in the ocean (need a classification for what is ocean, maybe middle tiles between landmass). Cluster fish zone boost fish yield in net (compounding with other means to increase fish from net). More fish in cluster (4 tiles of fish together field higher chance to get fish than 3 tiles)
-Actual:     Fish token spawn randomly, all over the place. Lacking mechanic 
+Actual:     Fish token spawn randomly, all over the place. Lacking mechanic
+Decided:    (2026-11-01) Ocean = water tiles that are not next to land. A cluster of 3 fish tiles gives a net the same chance as a settlement on a 4-2-3 spot (6 dots: token 4 = 3, token 2 = 1, token 3 = 2); each extra connected fish tile adds +2 dots (4 tiles = 4-4-3 = 8 dots). It stacks with the other ways to raise net fish.
+Rules:      (2026-11-01) The spawn uses a derived random stream, not g.rng. CLAUDE.md already allows that, so it needs no change, and the golden snapshot should stay untouched with Tidebound off. Not checked yet; confirm when coding.
+Open:       Yield of a cluster of 1 or 2, and of a single fish next to shore. If the +2 rule runs downward: 2 tiles = 4 dots, 1 tile = 2 dots. Confirm. 
 Before it:  none
 Repro:      dlc - tidebound
 Severity:   wrong rule
@@ -87,6 +90,7 @@ BUG 8
 Saw:        game mechanic
 Expected:   Flooded tile should not yield full resources when roll, but it should halves resources roll, rounded up
 Actual:     Flooded tile yield full resources when roll
+Decided:    (2026-11-01) Halve each building's yield, rounded up: settlement 1 -> 1, city 2 -> 1, castle (3, if that is its yield) -> 2. Applied per building, not on the player's total.
 Before it:  none
 Repro:      dlc - tidebound
 Severity:   gameplay
@@ -135,6 +139,8 @@ BUG 12
 Saw:        gameplay
 Expected:   Shipwreck should gives more resources across the board. universal for shipwreck shore and ocean.
 Actual:     shipwreck giving barely any resources
+Decided:    (2026-11-01) The shipwreck's resource limit is doubled, then filled with random picks from the 5 basic resources. A round bonus is added to the limit: floor(0.7 x round) = round 1: 0, 2: 1, 3: 2, 4: 2, 5: 3, and so on. Same for shore and ocean shipwrecks.
+Open:       Assumed the round bonus is added on top of the doubled limit (not doubled with it), and that "round" counts game rounds from 1. The current limit value is not checked yet. Confirm.
 Before it:  none
 Repro:      dlc - tidebound
 Severity:   wrong UI
@@ -190,7 +196,17 @@ Error text: none
 Screenshot: image 12 and 13 in Coding Project/colonist-custom-catan/BUGS/Image
 ```
 
-
+```
+BUG 17
+Saw:        UI
+Expected:   Shipwreck when spawn should have an indicator to show it exist for 1 round. 
+Actual:     no indicator exist 
+Before it:  none
+Repro:      dlc - tidebound
+Severity:   wrong rule
+Error text: none
+Screenshot: none
+```
 
 
 
