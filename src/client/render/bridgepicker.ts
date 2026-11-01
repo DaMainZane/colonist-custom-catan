@@ -71,7 +71,7 @@ function optionHtml(piece: 'bridge' | 'rickety_bridge', me: any): string {
   const note = piece === 'bridge' ? 'Sturdy' : 'Cheap, breaks on a 7';
   return `
     <button class="bp-opt" type="button" ${why ? 'disabled' : ''} title="${esc(why || name)}" onclick="chooseBridgeType('${piece}')">
-      <span class="bp-name">${uiIcon('bridge', 18)}${esc(name)}</span>
+      <span class="bp-name">${uiIcon(piece === 'bridge' ? 'bridge' : 'rickety_bridge', 18)}${esc(name)}</span>
       <span class="bp-note">${esc(why || note)}</span>
       ${costStripHtml(cost, me.resources)}
     </button>`;

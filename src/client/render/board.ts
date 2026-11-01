@@ -2,7 +2,7 @@
 // Flat style from "Design UI Philosophy.md": matte tiles with a small gap, pictogram glyph + circle number token,
 // pieces with a light rim, quiet highlights (accent color) for anything the player can click.
 import { RES_META } from '../constants';
-import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, robberMarkup, fishGroundMarkup, wreckMarkup, hexIconLayout } from '../icons';
+import { getBoardIconSvg, getMiniSvg, getDevSvg, uiIcon, settlementMarkup, cityMarkup, netMarkup, bridgeEdgeMarkup, robberMarkup, fishGroundMarkup, wreckMarkup, hexIconLayout } from '../icons';
 import {
   playTone,
   playPlaceRoadSound,
@@ -73,6 +73,9 @@ let lastWrecksHtml = '';
 let lastPiratesHtml = '';
 // R8.7: the generic spot layer for manifest pieces is only rewritten when its markup changes.
 let lastPieceSpotsHtml = '';
+let lastHexDynamicHtml = '';
+let lastRoadSpotsHtml = '';
+let lastVerticesHtml = '';
 
 interface HexGeomCache {
   rawPts: string;
@@ -142,19 +145,24 @@ export function updateCameraViewBox(): void {
   const baseY = (centerY0 - camPanY) - baseH / 2;
   svg.setAttribute('viewBox', `${baseX.toFixed(1)} ${baseY.toFixed(1)} ${baseW.toFixed(1)} ${baseH.toFixed(1)}`);
 
-  // Scale settlements, cities, and roads up as the camera zooms out (or on larger boards), only touching style when scale changes.
+  // Scale settlements, cities, and roads up as the camera zooms out (or on larger boards).
+  // Scoped to the vertex/spot and road layers (never set on #boardSvg) so zooming does not invalidate styles on #boardTerrainLayer (Bug 14).
   const zoomFactor = Math.max(camZoom, Math.max(baseW, baseH) / 720);
   const buildingScale = Math.min(2.8, BUILDING_BASE_SCALE * Math.pow(Math.max(1, zoomFactor), 0.62));
   const roadScale = Math.min(2.45, ROAD_BASE_SCALE * Math.pow(Math.max(1, zoomFactor), 0.58));
   if (Math.abs(buildingScale - lastBuildingScale) >= 0.015) {
     lastBuildingScale = buildingScale;
-    svg.style.setProperty('--building-scale', buildingScale.toFixed(3));
-    const vLayer = document.getElementById('boardVerticesLayer');
-    if (vLayer) vLayer.style.setProperty('--building-scale', buildingScale.toFixed(3));
+    const bs = buildingScale.toFixed(3);
+    for (const id of ['boardVerticesLayer', 'boardPieceSpotsLayer']) {
+      document.getElementById(id)?.style.setProperty('--building-scale', bs);
+    }
   }
   if (Math.abs(roadScale - lastRoadScale) >= 0.015) {
     lastRoadScale = roadScale;
-    svg.style.setProperty('--road-scale', roadScale.toFixed(3));
+    const rs = roadScale.toFixed(3);
+    for (const id of ['roadHighlightLayer', 'roadRimsLayer', 'roadBodiesLayer', 'roadHitsLayer', 'roadSpotsLayer']) {
+      document.getElementById(id)?.style.setProperty('--road-scale', rs);
+    }
   }
 }
 
@@ -242,6 +250,9 @@ function ensureBoardLayers(svg: HTMLElement): {
     lastWrecksHtml = '';
     lastPiratesHtml = '';
     lastPieceSpotsHtml = '';
+    lastHexDynamicHtml = '';
+    lastRoadSpotsHtml = '';
+    lastVerticesHtml = '';
     lastBuildingScale = -1;
     lastRoadScale = -1;
     terrainLayer = document.getElementById('boardTerrainLayer')!;
@@ -524,10 +535,15 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   if (terrainKey !== lastTerrainKey) {
     lastTerrainKey = terrainKey;
     let landPathD = '';
+    let waterPathD = '';
     for (const h of hexes) {
-      if (h.type === 'water') continue;
       const g = hexGeomCache.get(h.id);
-      if (g) landPathD += g.pathSub;
+      if (!g) continue;
+      if (h.type === 'water') {
+        if (state.status === 'LOBBY' && !canPaintHex) waterPathD += g.pathSub;
+        continue;
+      }
+      landPathD += g.pathSub;
     }
 
     let terrainHtml = '';
@@ -536,13 +552,17 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       terrainHtml += `<path d="${landPathD}" style="fill:var(--sea-shallow);stroke:var(--sea-shallow);stroke-width:46;stroke-linejoin:round" />`;
       terrainHtml += `<path d="${landPathD}" style="fill:var(--sand);stroke:var(--sand);stroke-width:16;stroke-linejoin:round" />`;
     }
+    if (waterPathD) {
+      // Single combined <path> for non-paintable lobby water cells instead of ratusan dashed polygons (Bug 14).
+      terrainHtml += `<path d="${waterPathD}" style="fill:rgba(255,255,255,0.06);stroke:rgba(255,255,255,0.24);stroke-width:1.6;stroke-linejoin:round;pointer-events:none" />`;
+    }
 
     for (const h of hexes) {
       const geom = hexGeomCache.get(h.id)!;
       if (h.type === 'water') {
-        if (state.status === 'LOBBY') {
+        if (state.status === 'LOBBY' && canPaintHex) {
           terrainHtml += `
-            <polygon data-paintable="${canPaintHex ? '1' : ''}" points="${geom.rawPts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;stroke-dasharray:6 4;cursor:${canPaintHex ? 'pointer' : 'grab'}"
+            <polygon data-paintable="1" points="${geom.rawPts}" style="fill:rgba(255,255,255,0.07);stroke:rgba(255,255,255,0.32);stroke-width:2;cursor:pointer"
               onmousedown="onHexInteract(${h.id}, event)" onmouseenter="onHexEnter(${h.id}, event)" />
           `;
         }
@@ -555,13 +575,12 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const hasNumber = !isFog && !!h.number;
       const fogAnim = getPieceAnimAttrs(`fog_${h.id}`, now);
       const glyph = hasNumber ? getBoardIconSvg(tileType, 0, -24, 1.45) : getBoardIconSvg(tileType, 0, 0, 1.9);
+      const paintAttrs = canPaintHex
+        ? `data-paintable="1" style="cursor:pointer" onmousedown="onHexInteract(${h.id}, event)" onclick="onHexClick(${h.id}, event)" onmouseenter="onHexEnter(${h.id}, event)"`
+        : '';
 
       terrainHtml += `
-        <g data-paintable="${canPaintHex ? '1' : ''}"
-           style="${canPaintHex ? 'cursor:pointer' : ''}"
-           onmousedown="onHexInteract(${h.id}, event)"
-           onclick="onHexClick(${h.id}, event)"
-           onmouseenter="onHexEnter(${h.id}, event)">
+        <g ${paintAttrs}>
           <polygon points="${geom.tilePoly}" style="fill:${meta.color};stroke:${meta.border};stroke-width:4;stroke-linejoin:round" />
           <g transform="translate(${h.x}, ${h.y})">
             <g class="${fogAnim.isAnimating ? 'fog-reveal-anim' : ''}" style="${fogAnim.delayStyle}">
@@ -572,6 +591,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         </g>
       `;
     }
+    layers.terrainLayer.style.pointerEvents = canPaintHex ? 'auto' : 'none';
     layers.terrainLayer.innerHTML = terrainHtml;
   }
 
@@ -610,7 +630,10 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         </g>`;
     }
   }
-  layers.hexDynamicLayer.innerHTML = hexDynHtml;
+  if (hexDynHtml !== lastHexDynamicHtml) {
+    lastHexDynamicHtml = hexDynHtml;
+    layers.hexDynamicLayer.innerHTML = hexDynHtml;
+  }
   // Tide overlays (flooded tint, warning a turn ahead), or the elevation heat map when the player switched it on (T6).
   const elevation = state.tide?.elevation ?? null;
   const overlayHtml = elevationView && elevation
@@ -818,37 +841,32 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const my = (v1.y + v2.y) / 2;
       const delayStyle = `animation-delay: -${Math.max(0, Math.round(now - c.start))}ms;`;
 
-      let bridgePlanksHtml = '';
       if (isBridge) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        const halfW = 7.5;
-        for (const f of (isRickety ? [0.3, 0.7] : [0.22, 0.5, 0.78])) {
-          const px = x1 + dx * f - mx;
-          const py = y1 + dy * f - my;
-          bridgePlanksHtml += `<line x1="${(px - nx * halfW).toFixed(1)}" y1="${(py - ny * halfW).toFixed(1)}" x2="${(px + nx * halfW).toFixed(1)}" y2="${(py + ny * halfW).toFixed(1)}" style="stroke:var(--piece-rim);stroke-width:2.8;stroke-linecap:round" />`;
-        }
+        const bridge = bridgeEdgeMarkup(isRickety ? 'rickety_bridge' : 'bridge', col, x1, y1, x2, y2);
+        roadRimsHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <circle cx="0" cy="0" r="22" class="bridge-collapse-ring" style="${delayStyle}" />
+            <g class="bridge-collapse-anim" style="${delayStyle}">${bridge.rim}</g>
+          </g>`;
+        roadBodiesHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <g class="bridge-collapse-anim" style="${delayStyle}">${bridge.body}</g>
+          </g>`;
+      } else {
+        roadRimsHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <circle cx="0" cy="0" r="22" class="bridge-collapse-ring" style="${delayStyle}" />
+            <g class="bridge-collapse-anim" style="${delayStyle}">
+              <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
+            </g>
+          </g>`;
+        roadBodiesHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <g class="bridge-collapse-anim" style="${delayStyle}">
+              <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" style="stroke:${col}" />
+            </g>
+          </g>`;
       }
-
-      roadRimsHtml += `
-        <g transform="translate(${mx}, ${my})">
-          <circle cx="0" cy="0" r="22" class="bridge-collapse-ring" style="${delayStyle}" />
-          <g class="bridge-collapse-anim" style="${delayStyle}">
-            <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
-          </g>
-        </g>`;
-
-      roadBodiesHtml += `
-        <g transform="translate(${mx}, ${my})">
-          <g class="bridge-collapse-anim" style="${delayStyle}">
-            <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
-              style="stroke:${col}${isRickety ? ';stroke-dasharray:9 5;stroke-linecap:butt' : ''}" />
-            ${bridgePlanksHtml}
-          </g>
-        </g>`;
     }
 
     for (const e of edges) {
@@ -899,38 +917,37 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
         continue;
       }
 
-      let bridgePlanksHtml = '';
       if (isBridge) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        const halfW = 7.5;
-        // A rickety bridge has fewer planks and a broken (dashed) body, so it reads as the weak one at a glance.
-        for (const f of (isRickety ? [0.3, 0.7] : [0.22, 0.5, 0.78])) {
-          const px = x1 + dx * f - mx;
-          const py = y1 + dy * f - my;
-          bridgePlanksHtml += `<line x1="${(px - nx * halfW).toFixed(1)}" y1="${(py - ny * halfW).toFixed(1)}" x2="${(px + nx * halfW).toFixed(1)}" y2="${(py + ny * halfW).toFixed(1)}" style="stroke:var(--piece-rim);stroke-width:2.8;stroke-linecap:round" />`;
-        }
+        const bx1 = v1.x + (v2.x - v1.x) * 0.06;
+        const by1 = v1.y + (v2.y - v1.y) * 0.06;
+        const bx2 = v1.x + (v2.x - v1.x) * 0.94;
+        const by2 = v1.y + (v2.y - v1.y) * 0.94;
+        const bridge = bridgeEdgeMarkup(isRickety ? 'rickety_bridge' : 'bridge', col, bx1, by1, bx2, by2);
+        roadRimsHtml += `
+          <g transform="translate(${mx}, ${my})">
+            ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">${bridge.rim}</g>
+          </g>`;
+        roadBodiesHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">${bridge.body}</g>
+          </g>`;
+      } else {
+        roadRimsHtml += `
+          <g transform="translate(${mx}, ${my})">
+            ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+              <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
+            </g>
+          </g>`;
+
+        roadBodiesHtml += `
+          <g transform="translate(${mx}, ${my})">
+            <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
+              <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" style="stroke:${col}" />
+            </g>
+          </g>`;
       }
-
-      roadRimsHtml += `
-        <g transform="translate(${mx}, ${my})">
-          ${anim.isAnimating ? `<circle cx="0" cy="0" r="20" class="piece-impact-ring" style="${anim.delayStyle}" />` : ''}
-          <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            <line class="road-rim-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}" />
-          </g>
-        </g>`;
-
-      roadBodiesHtml += `
-        <g transform="translate(${mx}, ${my})">
-          <g class="${anim.isAnimating ? 'piece-drop-anim' : ''}" style="${anim.delayStyle}">
-            <line class="road-body-line" x1="${(x1 - mx).toFixed(1)}" y1="${(y1 - my).toFixed(1)}" x2="${(x2 - mx).toFixed(1)}" y2="${(y2 - my).toFixed(1)}"
-              style="stroke:${col}${isRickety ? ';stroke-dasharray:9 5;stroke-linecap:butt' : ''}" />
-            ${bridgePlanksHtml}
-          </g>
-        </g>`;
 
       roadHitsHtml += `
         <line class="road-hit" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
@@ -945,6 +962,7 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
   }
 
   // 5. Road & Bridge Spots Layer (buildable edges)
+  const staticSpots = vertices.length > 120;
   let roadSpotsHtml = '';
   for (const e of edges) {
     if (e.road) continue;
@@ -956,8 +974,8 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
       roadSpotsHtml += `
         <g onclick="clickEdge(${e.id})" style="cursor:pointer">
-          <line class="road-spot-line" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
-          <circle class="road-spot-dot" cx="${mx}" cy="${my}" r="8" />
+          <line class="road-spot-line${staticSpots ? ' spot-static' : ''}" x1="${v1.x}" y1="${v1.y}" x2="${v2.x}" y2="${v2.y}" />
+          <circle class="road-spot-dot${staticSpots ? ' spot-static' : ''}" cx="${mx}" cy="${my}" r="8" />
         </g>
       `;
     }
@@ -976,12 +994,14 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
       `;
     }
   }
-  layers.roadSpotsLayer.innerHTML = roadSpotsHtml;
+  if (roadSpotsHtml !== lastRoadSpotsHtml) {
+    lastRoadSpotsHtml = roadSpotsHtml;
+    layers.roadSpotsLayer.innerHTML = roadSpotsHtml;
+  }
 
   // 6. Vertices Layer: settlements, cities, and settlement spots
   const robberVictimSet = new Set<string>(state.robberVictims || []);
   let verticesHtml = '';
-  const staticSpots = vertices.length > 120;
   const canAffordCity = me ? canClientAffordPiece(me, 'city') : false;
   // Fishing nets (T7b2): in net mode the server's list of legal vertices is drawn instead of the settlement spots.
   const netSpotSet = isMyTurn && buildMode === 'net' && state.phase === 'MAIN' && me && (me.netsLeft ?? 0) > 0 && canClientAffordPiece(me, 'net')
@@ -1045,7 +1065,10 @@ export function renderBoard(me: any, isMyTurn: boolean): void {
     }
   }
 
-  layers.verticesLayer.innerHTML = verticesHtml;
+  if (verticesHtml !== lastVerticesHtml) {
+    lastVerticesHtml = verticesHtml;
+    layers.verticesLayer.innerHTML = verticesHtml;
+  }
 
   // 7. Generic spots of manifest pieces and actions (R8.7): the spots of the active build mode, from the server's `pieces[id].spots`. Empty until a piece has a visual.
   const pieceSpotsHtml = pieceSpotsMarkup(me, isMyTurn);

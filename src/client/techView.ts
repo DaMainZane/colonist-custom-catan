@@ -8,8 +8,8 @@ export interface TechView {
 
 export const MIN_SCALE = 0.4;
 export const MAX_SCALE = 3;
-/** Costs show from this zoom up (a judgement call: 1 is the opening view, so costs show there and hide once the player zooms out). */
-export const COST_MIN_SCALE = 0.85;
+/** Costs only show once the player zooms in to at least this scale (at scale 1 the whole tree is in view and costs stay hidden to avoid clutter). */
+export const COST_MIN_SCALE = 1.25;
 export const DEFAULT_VIEW: TechView = { scale: 1, x: 0, y: 0 };
 
 /** `-0` and `NaN` become `0`, so a clamped view compares cleanly. */

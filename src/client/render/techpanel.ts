@@ -67,6 +67,7 @@ const CSS = `
 #techPanel .tp-stage.tp-dragging .tp-tip{display:none!important}
 #techPanel .tp-world{position:absolute;inset:0;transform-origin:0 0}
 #techPanel .tp-stage.tp-far .tp-cap .recipe-cards-strip{display:none}
+#techPanel .tp-stage.tp-far .tp-node:hover .tp-cap .recipe-cards-strip,#techPanel .tp-stage.tp-far .tp-node:focus-visible .tp-cap .recipe-cards-strip{display:flex}
 #techPanel .tp-zoom{display:flex;align-items:center;gap:6px}
 #techPanel .tp-stage.tp-deep{--tp-node:48px;--tp-hub:62px}
 #techPanel .tp-stage.tp-deep .tp-disc svg.ui-icon{width:22px;height:22px}
@@ -94,7 +95,7 @@ const CSS = `
 #techPanel .tp-check{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)}
 #techPanel .tp-check svg.ui-icon{width:14px;height:14px}
 
-#techPanel .tp-cap{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);width:112px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+#techPanel .tp-cap{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%) scale(var(--tp-inv,1));transform-origin:50% 0;width:112px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
 #techPanel .tp-name{font-size:11px;font-weight:700;line-height:1.15;text-align:center}
 #techPanel .tp-cap .recipe-mini-card{width:22px;height:30px;border-width:1px}
 #techPanel .tp-cap .recipe-mini-card svg.glyph{width:15px;height:15px}
@@ -289,10 +290,10 @@ interface Placed {
   ring: number;
 }
 
-/** Angular lane offset (degrees) for forked branch paths (~17° between expansion and industrial lanes). */
+/** Angular lane offset (degrees) for forked branch paths (~23° between expansion and industrial lanes). */
 const PATH_ANGLE_DEG: Record<string, number> = {
-  expansion: -8.5,
-  industrial: 8.5
+  expansion: -11.5,
+  industrial: 11.5
 };
 
 /**

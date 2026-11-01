@@ -2,7 +2,7 @@
 // Cursor positions are sent in board (SVG) coordinates, so they line up for everyone whatever their pan and zoom.
 // Hold Shift while moving the mouse to leave a short glowing laser trail.
 import { socket } from './socket';
-import { state } from './store';
+import { isPanning, state } from './store';
 
 interface TrailPoint { x: number; y: number; t: number }
 interface RemoteCursor { x: number; y: number; laser: boolean; seen: number; trail: TrailPoint[] }
@@ -193,7 +193,7 @@ export function initCursors(): void {
   if (!stage) return;
 
   stage.addEventListener('mousemove', (e: MouseEvent) => {
-    if (!state || state.status !== 'LOBBY') return;
+    if (isPanning || !state || state.status !== 'LOBBY') return;
     const w = clientToWorld(e.clientX, e.clientY);
     if (!w) return;
     const laser = e.shiftKey;

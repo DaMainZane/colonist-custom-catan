@@ -134,7 +134,8 @@ const UI_ICONS: Record<string, string> = {
   devcard: `<rect x="6" y="3" width="12" height="18" rx="2.2" ${FILL}/>`,
   devbuy: `<rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M12 9.5v5M9.5 12h5"/>`,
   road: `<path d="M6 18L18 6" stroke-width="5" stroke="currentColor" stroke-linecap="round" fill="none"/>`,
-  bridge: `<path d="M3 16h18M5 16v4M19 16v4M5 16a7 6 0 0 1 14 0M9 12v4M12 10v6M15 12v4"/>`,
+  bridge: `<path d="M2.5 15.5h19M2.5 18.5h19M4.5 15.5a7.5 6.5 0 0 1 15 0M4.5 15.5v5M19.5 15.5v5M8.5 10.5v5M12 9v6.5M15.5 10.5v5"/>`,
+  rickety_bridge: `<path d="M2.5 16c6 2.2 13 2.2 19 0M4 13v6.5M20 13v6.5M8 14.2l-.6 4.2M12 14.8l.6 4.2M16 14.2l-.6 4.2"/>`,
   // Tidebound fishing net: a mesh diamond.
   net: `<path d="M12 3.5L20.5 12 12 20.5 3.5 12z"/><path d="M7.75 7.75l8.5 8.5M16.25 7.75l-8.5 8.5"/>`,
   // Tidebound feed the sea: a fish.
@@ -255,6 +256,86 @@ export function netMarkup(col: string): string {
     { d: 'M-1.6,-3 H1.6 V11 H-1.6 Z', fill: shade(col, 0.7) },
     { d: 'M0,-13 L10.5,-3 L0,7 L-10.5,-3 Z', fill: col }
   ], 3.4) + mesh;
+}
+
+/**
+ * Tidebound bridge and rickety bridge edge pieces drawn around the edge midpoint `(0, 0)` (Bug 13):
+ * - `bridge` (sturdy): a bold player-colored outer frame (`col`) with a light silhouette rim (`var(--piece-rim)`), a recessed dark timber bed (`var(--pier-dark)`),
+ *   5 uniform flat timber planks (`var(--pier)`) inset cleanly inside the side rails, and 4 corner bollard posts.
+ * - `rickety_bridge`: twin player-colored side ropes (`col`) over a water gap with 4 uniform wooden stepping slats (`var(--pier)` outlined in `col`) and end knots.
+ */
+export function bridgeEdgeMarkup(
+  pieceType: 'bridge' | 'rickety_bridge',
+  col: string,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): { rim: string; body: string } {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const span = Math.max(20, Math.hypot(dx, dy) || 36);
+  const half = span / 2;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const rot = angle.toFixed(2);
+  const darkCol = shade(col, 0.72);
+
+  if (pieceType === 'rickety_bridge') {
+    const rim = `<g class="bridge-piece bridge-rickety" transform="rotate(${rot})"><g class="bridge-cross-scale"><rect class="bridge-rim-casing rickety" x="${(-half - 1.2).toFixed(1)}" y="-6.8" width="${(span + 2.4).toFixed(1)}" height="13.6" rx="4.2" /></g></g>`;
+    const slatCount = 4;
+    const innerSpan = Math.max(14, span - 8);
+    const step = innerSpan / slatCount;
+    const slatW = Math.max(3.6, Math.min(6.4, step * 0.62));
+    const tilts = [-5, 4, -4, 5];
+    let slats = '';
+    for (let i = 0; i < slatCount; i++) {
+      const cx = -innerSpan / 2 + step * (i + 0.5);
+      const tilt = tilts[i % tilts.length];
+      slats += `<g transform="translate(${cx.toFixed(1)}, 0) rotate(${tilt})"><rect class="bridge-plank rickety" x="${(-slatW / 2).toFixed(1)}" y="-5.0" width="${slatW.toFixed(1)}" height="10.0" rx="1.3" style="fill:var(--pier);stroke:${col};stroke-width:1.35" /></g>`;
+    }
+    const postX = (half - 2.0).toFixed(1);
+    const posts = [
+      `-${postX},-4.5`,
+      `${postX},-4.5`,
+      `-${postX},4.5`,
+      `${postX},4.5`
+    ]
+      .map(pt => {
+        const [px, py] = pt.split(',');
+        return `<circle class="bridge-post rickety" cx="${px}" cy="${py}" r="1.9" style="fill:${col};stroke:var(--piece-rim);stroke-width:1" />`;
+      })
+      .join('');
+    const body = `<g class="bridge-piece bridge-rickety" transform="rotate(${rot})"><g class="bridge-cross-scale"><rect class="bridge-gap" x="${(-half + 1.5).toFixed(1)}" y="-4.5" width="${(span - 3).toFixed(1)}" height="9.0" rx="2.2" /><line class="bridge-rope" x1="${(-half + 1.2).toFixed(1)}" y1="-4.5" x2="${(half - 1.2).toFixed(1)}" y2="-4.5" style="stroke:${col}" /><line class="bridge-rope" x1="${(-half + 1.2).toFixed(1)}" y1="4.5" x2="${(half - 1.2).toFixed(1)}" y2="4.5" style="stroke:${col}" />${slats}${posts}</g></g>`;
+    return { rim, body };
+  }
+
+  const rim = `<g class="bridge-piece bridge-sturdy" transform="rotate(${rot})"><g class="bridge-cross-scale"><rect class="bridge-rim-casing" x="${(-half - 1.5).toFixed(1)}" y="-7.8" width="${(span + 3.0).toFixed(1)}" height="15.6" rx="4.8" /></g></g>`;
+  const innerSpan = Math.max(14, span - 6.4);
+  const innerHalf = innerSpan / 2;
+  const plankCount = 5;
+  const gap = 1.6;
+  const totalPlanksSpan = Math.max(10, innerSpan - 2.8);
+  const plankW = Math.max(2.6, (totalPlanksSpan - gap * (plankCount - 1)) / plankCount);
+  const startX = -totalPlanksSpan / 2;
+  let planks = '';
+  for (let i = 0; i < plankCount; i++) {
+    const px = startX + i * (plankW + gap);
+    planks += `<rect class="bridge-plank" x="${px.toFixed(1)}" y="-3.5" width="${plankW.toFixed(1)}" height="7.0" rx="0.9" />`;
+  }
+  const postX = (half - 2.8).toFixed(1);
+  const posts = [
+    `-${postX},-5.2`,
+    `${postX},-5.2`,
+    `-${postX},5.2`,
+    `${postX},5.2`
+  ]
+    .map(pt => {
+      const [px, py] = pt.split(',');
+      return `<circle class="bridge-post" cx="${px}" cy="${py}" r="2.1" style="fill:${col};stroke:var(--piece-rim);stroke-width:1.1" />`;
+    })
+    .join('');
+  const body = `<g class="bridge-piece bridge-sturdy" transform="rotate(${rot})"><g class="bridge-cross-scale"><rect class="bridge-frame" x="${(-half).toFixed(1)}" y="-6.4" width="${span.toFixed(1)}" height="12.8" rx="3.8" style="fill:${col};stroke:${darkCol};stroke-width:1" /><rect class="bridge-bed" x="${(-innerHalf).toFixed(1)}" y="-4.1" width="${innerSpan.toFixed(1)}" height="8.2" rx="2.0" />${planks}${posts}</g></g>`;
+  return { rim, body };
 }
 
 /**

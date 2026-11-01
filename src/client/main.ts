@@ -245,6 +245,12 @@ function init(): void {
   const stage = document.getElementById('boardStage')!;
   const panOrigin = { x: 0, y: 0 };
   let panSvgRect: DOMRect | null = null;
+  let cachedWheelRect: DOMRect | null = null;
+  let cachedWheelRectTime = 0;
+  window.addEventListener('resize', () => {
+    panSvgRect = null;
+    cachedWheelRect = null;
+  });
 
   stage.addEventListener('wheel', (e: WheelEvent) => {
     const target = e.target as Element | null;
@@ -318,9 +324,14 @@ function init(): void {
 
     e.preventDefault();
     if (!state || !state.board) return;
-    const svg = document.getElementById('boardSvg')!;
-    const rect = svg.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
+    const now = performance.now();
+    if (!cachedWheelRect || now - cachedWheelRectTime > 250) {
+      const svg = document.getElementById('boardSvg');
+      cachedWheelRect = svg ? svg.getBoundingClientRect() : null;
+      cachedWheelRectTime = now;
+    }
+    const rect = cachedWheelRect;
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
 
     const { contentW, contentH } = getBoardBounds();
     const baseUnitPerPx = Math.max(contentW / rect.width, contentH / rect.height);
@@ -367,6 +378,8 @@ function init(): void {
       panStart.y = e.clientY;
       const svg = document.getElementById('boardSvg');
       panSvgRect = svg ? svg.getBoundingClientRect() : null;
+      cachedWheelRect = panSvgRect;
+      cachedWheelRectTime = performance.now();
     } else {
       setIsMouseDown(true);
     }
@@ -379,7 +392,7 @@ function init(): void {
         if (svg) svg.classList.add('is-panning');
         onRoadLeave();
       }
-      const rect = panSvgRect || document.getElementById('boardSvg')?.getBoundingClientRect();
+      const rect = panSvgRect || cachedWheelRect;
       if (!rect) return;
       const { contentW, contentH } = getBoardBounds();
       const worldPerPx = camZoom * Math.max(contentW / (rect.width || 1), contentH / (rect.height || 1));

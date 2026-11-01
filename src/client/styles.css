@@ -215,12 +215,12 @@ input[type=range] { accent-color: var(--accent); cursor: pointer; }
   flex: 1; height: 100vh; position: relative; display: flex;
   align-items: center; justify-content: center; background: var(--sea); overflow: hidden;
 }
-svg#boardSvg { width: 100%; height: 100%; cursor: grab; }
+svg#boardSvg { width: 100%; height: 100%; cursor: grab; contain: layout paint; }
 svg#boardSvg:active { cursor: grabbing; }
-svg#boardSvg.is-panning,
-svg#boardSvg.is-panning * {
-  pointer-events: none !important;
-  animation-play-state: paused !important;
+svg#boardSvg.is-panning {
+  pointer-events: none;
+  shape-rendering: optimizeSpeed;
+  text-rendering: optimizeSpeed;
 }
 
 /* ---------- Navigation (left column) ---------- */
@@ -1058,15 +1058,43 @@ svg#boardSvg.is-panning * {
   stroke-width: calc(8px * var(--road-scale, 1));
   stroke-linecap: round;
 }
+.bridge-cross-scale {
+  transform: scaleY(var(--road-scale, 1));
+  transform-origin: 0 0;
+}
+.bridge-rim-casing {
+  fill: var(--piece-rim);
+  stroke: var(--piece-rim);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.bridge-rim-casing.rickety {
+  fill-opacity: 0.92;
+}
+.bridge-bed {
+  fill: var(--pier-dark);
+}
+.bridge-plank {
+  fill: var(--pier);
+}
+.bridge-gap {
+  fill: rgba(20, 38, 52, 0.52);
+}
+.bridge-rope {
+  stroke-width: 2.8;
+  stroke-linecap: round;
+}
 .road-spot-line {
   stroke: var(--accent); stroke-opacity: 0.35;
   stroke-width: calc(12px * var(--road-scale, 1));
   stroke-linecap: round; animation: roadGlow 1.6s ease-in-out infinite;
 }
+.road-spot-line.spot-static { animation: none; stroke-opacity: 0.42; }
 .road-spot-dot {
   fill: var(--accent); stroke: var(--piece-rim); stroke-width: calc(2.8px * var(--road-scale, 1));
   transform-box: fill-box; transform-origin: center; animation: spotPulse 1.6s ease-in-out infinite;
 }
+.road-spot-dot.spot-static { animation: none; }
 @keyframes roadGlow { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.55; } }
 .road-hit {
   stroke: transparent;

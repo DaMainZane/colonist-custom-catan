@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { bridgeEdgeMarkup, uiIcon } from '../src/client/icons';
 import { allPacks } from '../src/packs';
 import { ROAD, SETTLEMENT } from '../src/packs/base/constants';
 import { isRoadPiece } from '../src/packs/base/placement';
@@ -641,3 +643,49 @@ describe('T4e Longest Road recalculation through the change log', () => {
     });
   });
 });
+
+describe('Tidebound Bug 13 & Bug 14: bridge Edge SVG markup (sturdy vs rickety with player-color outline) and big-map pan/zoom optimizations', () => {
+  it('draws a sturdy bridge with a player-color outer frame, dark timber bed, 5 uniform planks, and 4 corner bollard posts (Bug 13)', () => {
+    const { rim, body } = bridgeEdgeMarkup('bridge', '#e0483a', 100, 100, 140, 100);
+    expect(rim).toContain('class="bridge-rim-casing"');
+    expect(body).toContain('class="bridge-frame"');
+    expect(body).toContain('fill:#e0483a');
+    expect(body).toContain('class="bridge-bed"');
+    expect(body.match(/class="bridge-plank"/g)).toHaveLength(5);
+    expect(body.match(/class="bridge-post"/g)).toHaveLength(4);
+    // No old white cross-lines or dashed strokes
+    expect(body).not.toContain('stroke-dasharray');
+    expect(body).not.toContain('stroke:var(--piece-rim);stroke-width:2.8');
+  });
+
+  it('draws a rickety bridge with twin player-colored side ropes, 4 wooden stepping slats outlined in the player color, and distinct UI icons (Bug 13)', () => {
+    const { rim, body } = bridgeEdgeMarkup('rickety_bridge', '#3a7bd5', 100, 100, 130, 130);
+    expect(rim).toContain('class="bridge-rim-casing rickety"');
+    expect(body.match(/class="bridge-rope"/g)).toHaveLength(2);
+    expect(body).toContain('stroke:#3a7bd5');
+    expect(body.match(/class="bridge-plank rickety"/g)).toHaveLength(4);
+    expect(body.match(/class="bridge-post rickety"/g)).toHaveLength(4);
+    expect(body).not.toContain('stroke-dasharray:9 5');
+
+    const bridgeSvg = uiIcon('bridge', 18);
+    const ricketySvg = uiIcon('rickety_bridge', 18);
+    expect(bridgeSvg).toContain('<svg');
+    expect(ricketySvg).toContain('<svg');
+    expect(ricketySvg).not.toBe(bridgeSvg);
+  });
+
+  it('avoids universal .is-panning * selector and scopes scale CSS properties to vertex/road layers for big-map performance (Bug 14)', () => {
+    const css = readFileSync('src/client/styles.css', 'utf8');
+    expect(css).not.toContain('svg#boardSvg.is-panning *');
+    expect(css).toContain('shape-rendering: optimizeSpeed');
+    expect(css).toContain('.road-spot-line.spot-static');
+    expect(css).toContain('.road-spot-dot.spot-static');
+
+    const boardTs = readFileSync('src/client/render/board.ts', 'utf8');
+    expect(boardTs).not.toContain("svg.style.setProperty('--building-scale'");
+    expect(boardTs).not.toContain("svg.style.setProperty('--road-scale'");
+    expect(boardTs).toContain("lastVerticesHtml");
+    expect(boardTs).toContain("lastRoadSpotsHtml");
+  });
+});
+

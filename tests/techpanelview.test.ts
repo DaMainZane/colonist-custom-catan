@@ -75,19 +75,19 @@ describe('tech tree zoom and pan (Bug 2)', () => {
 });
 
 describe('tech tree costs only when zoomed in (Bug 3)', () => {
-  it('shows costs at the default zoom and closer', () => {
-    expect(costsVisible(1)).toBe(true);
-    expect(costsVisible(MAX_SCALE)).toBe(true);
-    expect(costsVisible(COST_MIN_SCALE)).toBe(true);
-  });
-
-  it('hides costs once the tree is zoomed out past the threshold', () => {
+  it('hides costs at the default overview zoom (scale 1) and further out so the tree is not cluttered', () => {
+    expect(costsVisible(1)).toBe(false);
     expect(costsVisible(COST_MIN_SCALE - 0.01)).toBe(false);
     expect(costsVisible(MIN_SCALE)).toBe(false);
   });
 
-  it('the threshold sits between the smallest scale and the default', () => {
-    expect(COST_MIN_SCALE).toBeGreaterThan(MIN_SCALE);
-    expect(COST_MIN_SCALE).toBeLessThanOrEqual(1);
+  it('shows costs once the player zooms in to COST_MIN_SCALE or closer', () => {
+    expect(costsVisible(COST_MIN_SCALE)).toBe(true);
+    expect(costsVisible(MAX_SCALE)).toBe(true);
+  });
+
+  it('the threshold sits above the opening overview (scale 1) and within MAX_SCALE', () => {
+    expect(COST_MIN_SCALE).toBeGreaterThan(1);
+    expect(COST_MIN_SCALE).toBeLessThanOrEqual(MAX_SCALE);
   });
 });
