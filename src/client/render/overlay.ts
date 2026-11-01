@@ -106,8 +106,14 @@ export function overlayVarsCss(overlays: readonly OverlayKindVisual[] = getManif
 function overlayPatternDefsInnerMarkup(overlays: readonly OverlayKindVisual[] = getManifest().overlays): string {
   const dynamic = overlays
     .filter(isSafeOverlayKind)
-    .map(
-      o => `
+    .map(o =>
+      o.motif
+        ? `
+      <pattern id="ov-pat-${o.id}" x="0" y="0" width="1" height="1" patternUnits="objectBoundingBox" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="color:var(--ov-${o.id}-line)">
+        <rect x="-200" y="-200" width="500" height="500" stroke="none" style="fill:var(--ov-${o.id}-tint);stroke:none" />
+        ${o.pattern}
+      </pattern>`
+        : `
       <pattern id="ov-pat-${o.id}" width="24" height="14" patternUnits="userSpaceOnUse" style="color:var(--ov-${o.id}-line)">
         <rect width="24" height="14" stroke="none" style="fill:var(--ov-${o.id}-tint);stroke:none" />
         ${o.pattern}

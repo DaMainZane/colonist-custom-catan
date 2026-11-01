@@ -476,21 +476,43 @@ export const tideViewData: ViewDataDef = {
   overlays: (g: GameState, reg: Registry) => tideClientView(g, reg)?.overlays
 };
 
-/** R8.8: plain-data look of a flooded tile and of the one-turn-ahead warning (`OVERLAY_KINDS`). Sent in the visual manifest only while Tides is on. */
+/**
+ * R8.8: plain-data look of a flooded tile and of the one-turn-ahead warning (`OVERLAY_KINDS`). Sent in the visual manifest only while Tides is on.
+ * Both are a `motif`: one drawing per hex, centred and mirror-symmetric (calm when zoomed out, no board-wide tiling). Flat layers, no gradients, per
+ * "Design UI Philosophy.md" (Bad North calm sea, flat facets): two stacked translucent discs for depth, then three wave lines (crests on both sides of
+ * a centre trough). Colour is never the only signal: the wave lines are the pattern, "Flooded" is the label.
+ */
+const FLOOD_WAVES = (extra: string): string =>
+  [
+    'M 24 40 Q 37 30 50 40 Q 63 30 76 40',
+    'M 16 54 Q 33 42 50 54 Q 67 42 84 54',
+    'M 24 68 Q 37 58 50 68 Q 63 58 76 68'
+  ]
+    .map(d => `<path d="${d}" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" ${extra} />`)
+    .join('');
+
 export const floodOverlayKind: OverlayKindVisual = {
   id: 'flood',
   label: 'Flooded',
   tint: { light: 'rgba(21, 62, 112, 0.56)', dark: 'rgba(18, 54, 102, 0.62)' },
   line: { light: 'rgba(186, 230, 253, 0.92)', dark: 'rgba(186, 230, 253, 0.95)' },
-  pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.4" />'
+  pattern:
+    '<circle cx="50" cy="50" r="40" fill="currentColor" fill-opacity="0.12" />' +
+    '<circle cx="50" cy="50" r="24" fill="currentColor" fill-opacity="0.14" />' +
+    FLOOD_WAVES('stroke-width="3.4"'),
+  motif: true
 };
 
+/** The warning is the same motif drawn as dashes: `pathLength="100"` with `12 10` gives five dashes with both ends dashed, so it stays symmetric. */
 export const floodWarnOverlayKind: OverlayKindVisual = {
   id: 'flood-warn',
   label: 'Flood warning',
   tint: { light: 'rgba(29, 78, 137, 0.30)', dark: 'rgba(29, 78, 137, 0.34)' },
   line: { light: 'rgba(33, 92, 140, 0.85)', dark: 'rgba(168, 222, 245, 0.9)' },
-  pattern: '<path d="M 0 7 Q 6 2, 12 7 T 24 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round" />',
+  pattern:
+    '<circle cx="50" cy="50" r="40" fill="currentColor" fill-opacity="0.08" />' +
+    FLOOD_WAVES('pathLength="100" stroke-width="3" stroke-dasharray="12 10"'),
+  motif: true,
   pulse: true
 };
 

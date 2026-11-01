@@ -197,6 +197,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `mapmenu.ts` | lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) |
 | `pieceModel.ts` | generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips with their stacked cost cards, spots and shapes; no DOM, no socket, no store) |
 | `pieceui.ts` | generic piece UI (R8.7: draws the build-bar buttons, the spot layer and the placed shapes of manifest pieces and actions, shows their hints and sends their clicks; the logic is in client/pieceModel) |
+| `pirateIcon.ts` | Pirate icon: a sail with a head glyph, picked by a hash of the pirate id; pure markup, no game state |
 | `presets.ts` | custom map presets (list saved in this browser, preset row in the lobby dock) |
 | `render/index.ts` | renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state |
 | `render/board.ts` | board SVG renderer, camera, board input and board animations |
@@ -204,7 +205,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `render/drawer.ts` | bottom-left sheet (trade, discard, gold, monopoly, robber victim picker) |
 | `render/hand.ts` | player hand (resource stacks + dev cards) and hand click handlers |
 | `render/overlay.ts` | S0.13 overlay and popup kit (Service 11: hex tint/pattern layer, timer-bar popups, dramatic event title card, round-end recap card; T6: theme-aware flood and flood-warning patterns, elevation heat map) |
-| `render/pirates.ts` | Tidebound T10 pirates on the board (ship markup, the SVG layer markup, click to drive one off); draws its own styles |
+| `render/pirates.ts` | Tidebound T10 pirates on the board (pirate icon markup, the SVG layer markup, click to drive one off); draws its own styles |
 | `render/setup.ts` | world setup page (host only, between the name page and the board): which screen shows, tile preview, roster, scenarios, DLC cards |
 | `render/sidebar.ts` | right sidebar (merged live log & turn history with RS card icons and click-to-filter, chat leaf, bank, player rows) |
 | `render/techpanel.ts` | tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar |
@@ -212,6 +213,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `render/turnclock.ts` | turn clock readout and countdown bar in the turn pill, plus the top-right ocean game timer & round number HUD |
 | `socket.ts` | the single socket.io connection shared by all client modules |
 | `store.ts` | shared mutable client UI state (game state, build and drawer modes, camera, selections) with setters |
+| `techView.ts` | tech tree pan and zoom (pure view maths: clamp, zoom about a point, pan, and when the costs show) |
 | `types.ts` | loose client-side view types (PlayerView, GameState, Resources) |
 | `ui.ts` | small UI actions (theme switch, toast, victory confetti overlay) |
 | `util.ts` | small client helpers (HTML escaping, initials) |
@@ -280,4 +282,6 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `visualsEvent.test.ts` | R8.4 `visuals` socket event: sent to every player and spectator before `gameState`, once per addon-set key, resent on reconnect or a new spectator, a lobby toggle changes the key, real content when a def has a visual |
 | `turnhistory.test.ts` | Turn history recorder (`recordTurnHistory`): setup placements under round 0, rolls, consolidated production, builds, dev cards, robber and steals, bank trades, discards on a 7, rounds advance; trade replies make no empty turn and log on the current player's turn, Monopoly / Knight / Year of Plenty detail, engine log lines folded in once (`takeNewLogLines`) |
 | `tideboundmapdefaults.test.ts` | Turning Tidebound on in the lobby (`applyTideboundMapDefaults`): islands + wide water picks, radius raised to `TIDEBOUND_MAP_RADIUS`, a bigger host radius kept |
+| `techpanelview.test.ts` | Tech tree pan and zoom maths (`client/techView.ts`, Bugs 2 and 3): default view, scale limits, zoom keeps the point under the cursor, zoom out and back, pan clamped to the world edges (none at scale 1, a smaller world stays inside), `viewCss`, and `costsVisible` (costs show from `COST_MIN_SCALE` up, hidden when zoomed out) |
+| `pirateicon.test.ts` | Pirate icon (`client/pirateIcon.ts`, Bug 6): same id gives the same look, the head only from the head list, every head gets used, the sail plus exactly one unmirrored glyph, no black background square, size about 1.5x the old ship, and the board layer (`renderPiratesMarkup`) drawing the new icon, keeping the strength badge and ringing the bigger badge |
 

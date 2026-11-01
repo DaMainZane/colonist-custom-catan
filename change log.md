@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-11-01 (Pass 102: Bug 6 new pirate icon built from glyph parts; NOT run, no shell)
+### Fixed
+- **Bug 6 (`src/client/pirateIcon.ts` new, `src/client/render/pirates.ts`)**: the pirate was a flat off-white sailboat. It is now a wine-crimson badge (`.pirate-face`, dark glyphs) built from the supplied SVGs: head slot (`pirate-skull`, `blade-bite`), bottom slot (`crossed-sabres`, `crossed-bones`), and a left and a right side decorator (`blunderbuss`, `cannon-ball`, `cannon-shot`, `curled-tentacle`, `sail`, `sparky-bomb`) rolled independently, so both sides may match. The left glyph is mirrored so directional parts face outward. The roll is `pirateLook(id)`, a pure hash of the pirate id (FNV-1a plus a seeded stream): UI only, no game state, no `g.rng`, nothing in `server/` or `shared/`, golden snapshot untouched. The badge is 54 units wide (old ship 34, so about 1.5x); the strength badge stays underneath, moved down to clear it; the drive-off ring grew to fit. `pirateMarkup(strength, fleeing, id)` takes the id as a new last argument. Glyph paths are inlined with the black background square of each file removed.
+### Tests
+- `tests/pirateicon.test.ts` (new): 9 tests (same id same look, parts from the lists, every part used, sides independent, badge face plus four glyphs with the left mirrored, no background square, board layer markup and strength badge, ring size, size ratio).
+### Not verified
+- Nothing was run in the repo (no shell). The new test file was run against a copy of `pirateIcon.ts` and `pirates.ts` with stubbed browser imports, and the two files typechecked on their own; `npm run headers:write`, `npm run index`, `npm run typecheck` and `npm test` have not been run. Not seen in the game: legibility at real zoom, and crowded sea tiles (fish or wreck sharing the tile with a pirate): `hexIconLayout` slots were left as they are (a test pins them) and the bigger icon may touch a neighbour there.
+
+## 2026-11-01 (Pass 101: Bug List 2 and 3, tech tree pan and zoom, costs only when zoomed in; NOT run, no shell)
+### Fixed
+- **Bug 2 (`src/client/render/techpanel.ts`, new `src/client/techView.ts`)**: the tree could not be zoomed or moved. The stage is now a clipped viewport (`.tp-stage`) around a `.tp-world` that takes a CSS transform. Drag to pan (a press that moves under 5px is still a click, and the click that ends a drag is swallowed so it does not research a tech), wheel to zoom about the cursor, two-finger pinch, and `-`, `+` and `Reset view` buttons in the panel head. The view lives in a module variable and is written to the DOM by `applyView` after each redraw, so a redraw does not reset it; opening the panel resets it. Listeners sit on the panel (never replaced), so `main.ts` needs no new global. `techView.ts` holds the pure maths: `clampScale` (0.4 to 3), `clampView` (a bigger world cannot be dragged past its edges, a smaller one stays inside), `zoomAt` (the point under the cursor stays put), `panBy`, `viewCss`.
+- **Bug 3 (`src/client/render/techpanel.ts`, `src/client/techView.ts`)**: costs under the techs now hide when zoomed out. `costsVisible(scale)` is true from `COST_MIN_SCALE` (0.85, a judgement call; the opening view is 1, so costs show there). `applyView` toggles a `tp-far` class on the stage and CSS hides `.recipe-cards-strip` inside `.tp-cap` while it is set. Names stay visible.
+- Tooltips: counter-scaled with `scale: var(--tp-inv)` (set to `1 / scale`, with a transform origin per tooltip position) so a description stays the same size at any zoom. They are hidden while dragging.
+### Tests
+- `tests/techpanelview.test.ts` (new): 13 tests for the pure maths (default view, scale limits, zoom keeps the cursor point, zoom out and back, no pan at scale 1, pan clamped to the edges, smaller world stays inside, no size yet, `viewCss`) and the Bug 3 threshold (`costsVisible` at the default, at the threshold, below it, and the threshold sits between the smallest scale and 1).
+### Not verified
+- Nothing was run (no shell). The DOM half (drag, wheel, pinch, buttons, click swallow, the `tp-far` class, tooltip scale) has no automated test and has not been tried in a browser. A tooltip near the edge of the stage is clipped by the viewport.
+
 ## 2026-11-01 (Pass 100: Bug List fixes — Bugs 15, 10, 11, 1, 12, 8, 16, 17, 9, and 5; headers, index, typecheck and all tests passed)
 ### Fixed
 - **Bug 15 (`src/server/turnHistory.ts`)**: removed the `robberMoved` live-log action push (which read `d.hexId` instead of `d.to`, producing `"Hex undefined"` and redundant `"Moved Robber to hex #..."` lines) and suppressed the engine-note fallback on `move_robber` / `robberMoved` so the live log only records who robbed who on `steal`.

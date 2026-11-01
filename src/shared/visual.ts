@@ -64,9 +64,14 @@ export interface OverlayKindVisual {
   label: string;
   tint: { light: string; dark: string };
   line: { light: string; dark: string };
-  /** Inner SVG of a 10x10 tile that repeats over the hex. */
+  /** Inner SVG of a 10x10 tile that repeats over the hex. With `motif` it is a single 100x100 drawing instead (see `motif`). */
   pattern: string;
   icon?: string;
+  /**
+   * Draw `pattern` once per hex, centred, in a 100x100 box (scaled to the hex, aspect kept) instead of repeating it over the board.
+   * A motif is symmetric about the hex centre, so it stays calm and readable when the board is zoomed out. The tint should be a full-box rect or none (the tint is added for you).
+   */
+  motif?: boolean;
   /** Slow pulse (a warning tile). */
   pulse?: boolean;
   replace?: boolean;

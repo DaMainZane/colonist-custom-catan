@@ -1,10 +1,12 @@
-// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | DEPENDS ON: client/audio, client/icons, client/pieceModel, client/socket, client/store, client/types, +1 more | USED BY: client/main, client/render/bridgepicker, client/render/index
+// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | DEPENDS ON: client/audio, client/icons, client/pieceModel, client/socket, client/store, client/techView, +2 more | USED BY: client/main, client/render/bridgepicker, client/render/index
 import { uiIcon } from '../icons';
 import { costStackHtml } from '../pieceModel';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { state } from '../store';
 import type { Resources, TechActionsView, TechRowView } from '../types';
+import { DEFAULT_VIEW, clampView, costsVisible, panBy, viewCss, zoomAt } from '../techView';
+import type { TechView } from '../techView';
 import { esc } from '../util';
 
 /** Icon (from `icons.ts`) per tech. A tech added later by a DLC falls back to its branch icon, then to the hub icon. */
@@ -44,6 +46,10 @@ let built = false;
 let lastHtml = '';
 /** The tile picked in the Ground work list, waiting for the resource choice. */
 let pickedHex: number | null = null;
+/** Pan and zoom of the tree. Kept here, not in the markup, so a redraw does not reset it; `applyView` writes it to the DOM. */
+let view: TechView = DEFAULT_VIEW;
+/** True while the player drags the tree (the tooltips hide meanwhile). */
+let dragging = false;
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -56,7 +62,12 @@ const CSS = `
 #techPanel .tp-head h3{margin:0;font-size:15px;font-weight:700}
 #techPanel .tp-sub{margin:2px 0 4px;font-size:12px;font-weight:500;color:var(--ink-dim)}
 
-#techPanel .tp-stage{position:relative;aspect-ratio:1;margin:0 auto;width:max(300px,min(640px,100%,calc(100vh - 180px)))}
+#techPanel .tp-stage{position:relative;aspect-ratio:1;margin:0 auto;width:max(300px,min(640px,100%,calc(100vh - 180px)));overflow:hidden;overflow:clip;border-radius:var(--r);background:var(--surface-2);touch-action:none;user-select:none;cursor:grab}
+#techPanel .tp-stage.tp-dragging{cursor:grabbing}
+#techPanel .tp-stage.tp-dragging .tp-tip{display:none!important}
+#techPanel .tp-world{position:absolute;inset:0;transform-origin:0 0}
+#techPanel .tp-stage.tp-far .tp-cap .recipe-cards-strip{display:none}
+#techPanel .tp-zoom{display:flex;align-items:center;gap:6px}
 #techPanel .tp-stage.tp-deep{--tp-node:48px;--tp-hub:62px}
 #techPanel .tp-stage.tp-deep .tp-disc svg.ui-icon{width:22px;height:22px}
 #techPanel .tp-stage.tp-deep .tp-cap{width:96px;top:calc(100% + 4px);gap:2px}
@@ -89,13 +100,13 @@ const CSS = `
 #techPanel .tp-cap .recipe-mini-card svg.glyph{width:15px;height:15px}
 #techPanel .tp-cap .recipe-stack{--cw:22px;--ch:30px;--dx:4px;--dy:3px}
 
-#techPanel .tp-tip{position:absolute;display:none;width:220px;padding:10px 12px;border-radius:var(--r);background:#2b2d30;color:#f4f1ea;box-shadow:0 6px 18px rgba(0,0,0,.38);pointer-events:none;z-index:8;animation:tpTipIn .12s ease-out}
+#techPanel .tp-tip{position:absolute;display:none;width:220px;padding:10px 12px;border-radius:var(--r);background:#2b2d30;color:#f4f1ea;box-shadow:0 6px 18px rgba(0,0,0,.38);pointer-events:none;z-index:8;animation:tpTipIn .12s ease-out;scale:var(--tp-inv,1);transform-origin:var(--ox,50%) var(--oy,100%)}
 #techPanel .tp-node:hover .tp-tip,#techPanel .tp-node:focus-visible .tp-tip{display:block}
-#techPanel .tp-tip.tip-t{bottom:calc(100% + 8px)}
-#techPanel .tp-tip.tip-b{top:calc(100% + 68px)}
-#techPanel .tp-tip.tip-c{left:50%;margin-left:-110px}
-#techPanel .tp-tip.tip-l{left:0}
-#techPanel .tp-tip.tip-r{right:0}
+#techPanel .tp-tip.tip-t{bottom:calc(100% + 8px);--oy:100%}
+#techPanel .tp-tip.tip-b{top:calc(100% + 68px);--oy:0%}
+#techPanel .tp-tip.tip-c{left:50%;margin-left:-110px;--ox:50%}
+#techPanel .tp-tip.tip-l{left:0;--ox:0%}
+#techPanel .tp-tip.tip-r{right:0;--ox:100%}
 #techPanel .tp-tip-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 #techPanel .tp-tip-name{font-size:13px;font-weight:700}
 #techPanel .tp-tip-tier{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#b8b3a8;white-space:nowrap}
@@ -147,8 +158,122 @@ function ensureDom(): void {
 
   const panel = document.createElement('div');
   panel.id = 'techPanel';
-  panel.addEventListener('click', e => { if (e.target === panel) toggleTechPanel(false); });
+  panel.addEventListener('click', e => {
+    const zoomBtn = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-tz]') : null;
+    if (zoomBtn) { zoomButton(zoomBtn.dataset.tz ?? ''); return; }
+    if (e.target === panel) toggleTechPanel(false);
+  });
+  bindPanZoom(panel);
   document.body.appendChild(panel);
+}
+
+/** Writes `view` to the stage: the world transform, the tooltip counter-scale (so a tooltip stays readable at any zoom) and the far class that hides the costs. */
+function applyView(): void {
+  const stage = document.querySelector<HTMLElement>('#techPanel .tp-stage');
+  const world = stage?.querySelector<HTMLElement>('.tp-world');
+  if (!stage || !world) return;
+  view = clampView(view, stage.clientWidth, stage.clientHeight);
+  world.style.transform = viewCss(view);
+  stage.style.setProperty('--tp-inv', (1 / view.scale).toFixed(3));
+  stage.classList.toggle('tp-far', !costsVisible(view.scale));
+  stage.classList.toggle('tp-dragging', dragging);
+}
+
+/** The +, - and Reset view buttons: zoom about the middle of the stage. */
+function zoomButton(kind: string): void {
+  const stage = document.querySelector<HTMLElement>('#techPanel .tp-stage');
+  if (!stage) return;
+  if (kind === 'reset') view = DEFAULT_VIEW;
+  else view = zoomAt(view, kind === 'in' ? 1.25 : 0.8, stage.clientWidth / 2, stage.clientHeight / 2, stage.clientWidth, stage.clientHeight);
+  applyView();
+  playTone(520, 0.04);
+}
+
+/**
+ * Drag to pan, wheel to zoom about the cursor, two fingers to pinch. The listeners sit on the panel, which is never replaced,
+ * because the stage inside it is redrawn. A press that does not move 5px is still a click on a tech.
+ */
+function bindPanZoom(panel: HTMLElement): void {
+  const pointers = new Map<number, { x: number; y: number; sx: number; sy: number }>();
+  let moved = false;
+  let pinch = 0;
+  let swallowClick = false;
+  const stageOf = (t: EventTarget | null): HTMLElement | null => (t instanceof Element ? t.closest<HTMLElement>('.tp-stage') : null);
+  const stage = (): HTMLElement | null => panel.querySelector<HTMLElement>('.tp-stage');
+  const spread = (): number => {
+    const [a, b] = [...pointers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+
+  panel.addEventListener('wheel', e => {
+    const st = stageOf(e.target);
+    if (!st) return;
+    e.preventDefault();
+    const r = st.getBoundingClientRect();
+    const unit = e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 0.5 : 0.0015;
+    view = zoomAt(view, Math.exp(-e.deltaY * unit), e.clientX - r.left, e.clientY - r.top, st.clientWidth, st.clientHeight);
+    applyView();
+  }, { passive: false });
+
+  panel.addEventListener('pointerdown', e => {
+    if (!stageOf(e.target) || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+    if (pointers.size === 1) moved = false;
+    if (pointers.size === 2) pinch = spread();
+  });
+
+  panel.addEventListener('pointermove', e => {
+    const p = pointers.get(e.pointerId);
+    const st = stage();
+    if (!p || !st) return;
+    const w = st.clientWidth;
+    const h = st.clientHeight;
+    if (pointers.size >= 2) {
+      p.x = e.clientX;
+      p.y = e.clientY;
+      const now = spread();
+      const [a, b] = [...pointers.values()];
+      if (pinch > 0 && now > 0 && a && b) {
+        const r = st.getBoundingClientRect();
+        view = zoomAt(view, now / pinch, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, w, h);
+      }
+      pinch = now;
+      moved = true;
+      applyView();
+      return;
+    }
+    if (!moved) {
+      if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 5) return;
+      moved = true;
+      dragging = true;
+      try { st.setPointerCapture(e.pointerId); } catch { /* the pointer is already gone */ }
+    }
+    view = panBy(view, e.clientX - p.x, e.clientY - p.y, w, h);
+    p.x = e.clientX;
+    p.y = e.clientY;
+    applyView();
+  });
+
+  const release = (e: PointerEvent): void => {
+    if (!pointers.delete(e.pointerId)) return;
+    pinch = 0;
+    if (pointers.size > 0) return;
+    dragging = false;
+    applyView();
+    if (moved) {
+      // The click that ends a drag must not research the tech under the cursor.
+      swallowClick = true;
+      setTimeout(() => { swallowClick = false; }, 0);
+    }
+  };
+  panel.addEventListener('pointerup', release);
+  panel.addEventListener('pointercancel', release);
+  panel.addEventListener('click', e => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
 }
 
 /** A cost as mini resource cards: one overlapped stack per resource (a bigger count continues in another stack), dimmed when the hand cannot cover it, like the build recipes. */
@@ -350,12 +475,14 @@ export function renderTechPanel(isMyTurn: boolean): void {
 
   const html = `
     <div class="tp-card">
-      <div class="tp-head"><h3>Tech tree</h3><button class="btn sm" type="button" onclick="toggleTechPanel(false)">Close</button></div>
+      <div class="tp-head"><h3>Tech tree</h3><div class="tp-zoom"><button class="btn sm" type="button" data-tz="out" title="Zoom out" aria-label="Zoom out">-</button><button class="btn sm" type="button" data-tz="in" title="Zoom in" aria-label="Zoom in">+</button><button class="btn sm" type="button" data-tz="reset" title="Scroll to zoom, drag to pan">Reset view</button><button class="btn sm" type="button" onclick="toggleTechPanel(false)">Close</button></div></div>
       <div class="tp-sub">${esc(hint)}</div>
       <div class="tp-stage${maxRing >= 4 ? ' tp-deep' : ''}">
-        <svg class="tp-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rings}${lines}</svg>
-        <div class="tp-hub">${uiIcon('tech', 26)}<span>Tech</span></div>
-        ${nodes}
+        <div class="tp-world">
+          <svg class="tp-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${rings}${lines}</svg>
+          <div class="tp-hub">${uiIcon('tech', 26)}<span>Tech</span></div>
+          ${nodes}
+        </div>
       </div>
       ${extras ? `<div class="tp-actions">${extras}</div>` : ''}
     </div>`;
@@ -363,6 +490,7 @@ export function renderTechPanel(isMyTurn: boolean): void {
   if (html !== lastHtml) {
     panel.innerHTML = html;
     lastHtml = html;
+    applyView();
   }
 }
 
@@ -374,7 +502,9 @@ function myTurnNow(): boolean {
 }
 
 export function toggleTechPanel(force?: boolean): void {
+  const wasOpen = open;
   open = typeof force === 'boolean' ? force : !open;
+  if (open && !wasOpen) view = DEFAULT_VIEW;
   playTone(open ? 560 : 460, 0.05);
   if (!state) return;
   renderTechPanel(myTurnNow());
