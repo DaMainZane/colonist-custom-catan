@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   badgeFor, buttonHtml, buttonModels, buttonVisible, canPay, edgeShapeMarkup, entriesAtSpot, fillShape, iconHtml, isSafeCss, isSafeFragment, modeHint, modeOf,
-  modelForMode, offeredEntries, placedEntry, recipeCostFor, recipeStripHtml, spotMarkup, spotsForMode, vertexShapeMarkup, withRim
+  COST_STACK_MAX, costStackHtml, modelForMode, offeredEntries, placedEntry, recipeCostFor, recipeStripHtml, spotMarkup, spotsForMode, stackSizes, vertexShapeMarkup, withRim
 } from '../src/client/pieceModel';
 import type { BoardGeom, PieceViewer } from '../src/client/pieceModel';
 import type { ManifestEntry } from '../src/shared';
@@ -142,6 +142,81 @@ describe('recipe strip (R8.7)', () => {
     expect(canPay(viewer({}), undefined)).toBe(true);
     expect(canPay({ pieces: {} }, { wood: 1 })).toBe(false);
     expect(canPay(null, {})).toBe(false);
+  });
+});
+
+describe('stacked costs (BUG 5)', () => {
+  const cards = (html: string): number => html.match(/class="recipe-mini-card /g)?.length ?? 0;
+  const stacks = (html: string): number => html.match(/class="recipe-stack"/g)?.length ?? 0;
+
+  it('stackSizes splits a count into stacks of at most four, like a tally', () => {
+    expect(COST_STACK_MAX).toBe(4);
+    expect(stackSizes(1)).toEqual([1]);
+    expect(stackSizes(3)).toEqual([3]);
+    expect(stackSizes(4)).toEqual([4]);
+    expect(stackSizes(5)).toEqual([4, 1]);
+    expect(stackSizes(6)).toEqual([4, 2]);
+    expect(stackSizes(12)).toEqual([4, 4, 4]);
+  });
+
+  it('stackSizes gives nothing for zero, a negative count or a non-number', () => {
+    expect(stackSizes(0)).toEqual([]);
+    expect(stackSizes(-3)).toEqual([]);
+    expect(stackSizes(Number.NaN)).toEqual([]);
+  });
+
+  it('N cards of one resource are one stack of N overlapped layers, not N boxes in a row', () => {
+    const html = costStackHtml('wood', 3, 0);
+    expect(stacks(html)).toBe(1);
+    expect(cards(html)).toBe(3);
+    expect(html).toContain('--n:3');
+    expect(html).toContain('--i:0');
+    expect(html).toContain('--i:2');
+    expect(html).not.toContain('--i:3');
+  });
+
+  it('a count past four continues in another stack: 6 is 4 + 2, 12 is three stacks of 4', () => {
+    const six = costStackHtml('brick', 6, 0);
+    expect(stacks(six)).toBe(2);
+    expect(cards(six)).toBe(6);
+    expect(six).toContain('--n:4');
+    expect(six).toContain('--n:2');
+    const twelve = costStackHtml('wood', 12, 0);
+    expect(stacks(twelve)).toBe(3);
+    expect(cards(twelve)).toBe(12);
+    expect(twelve.match(/--n:4/g)).toHaveLength(3);
+  });
+
+  it('the first units you own are lit and the rest are dim, counted across stacks', () => {
+    const html = costStackHtml('wood', 5, 4);
+    expect(html.match(/has-res/g)).toHaveLength(4);
+    expect(html.match(/lacks-res/g)).toHaveLength(1);
+    // the dim one is the last card, the lone card of the second stack
+    expect(html.lastIndexOf('lacks-res')).toBeGreaterThan(html.lastIndexOf('has-res'));
+    expect(costStackHtml('wood', 2, 9).match(/lacks-res/g)).toBeNull();
+    expect(costStackHtml('wood', 2, 0).match(/has-res/g)).toBeNull();
+  });
+
+  it('is empty for a zero count or a resource name that is not plain', () => {
+    expect(costStackHtml('wood', 0, 5)).toBe('');
+    expect(costStackHtml('wood"><x', 2, 5)).toBe('');
+  });
+
+  it('a recipe strip holds one group of stacks per resource type, never mixing two resources in one stack', () => {
+    const html = recipeStripHtml({ wood: 2, sheep: 2 }, hand);
+    expect(html.startsWith('<div class="recipe-cards-strip">')).toBe(true);
+    expect(stacks(html)).toBe(2);
+    const parts = html.split('class="recipe-stack"');
+    expect(parts[1]).toContain('card-wood');
+    expect(parts[1]).not.toContain('card-sheep');
+    expect(parts[2]).toContain('card-sheep');
+    expect(parts[2]).not.toContain('card-wood');
+  });
+
+  it('a big cost in a recipe strip tallies: 12 wood and 1 sheep is four stacks and 13 cards', () => {
+    const html = recipeStripHtml({ wood: 12, sheep: 1 }, hand);
+    expect(stacks(html)).toBe(4);
+    expect(cards(html)).toBe(13);
   });
 });
 

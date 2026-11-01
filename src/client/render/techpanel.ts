@@ -1,5 +1,6 @@
-// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | DEPENDS ON: client/audio, client/icons, client/socket, client/store, client/types, client/util | USED BY: client/main, client/render/bridgepicker, client/render/index
-import { getMiniSvg, uiIcon } from '../icons';
+// MODULE: tech panel (hub-and-spoke tree: a hub, one ring of techs per tier, one spoke per branch, all generated from the server's `techTree` rows; costs as mini resource cards; hover for the description; plus the Harbor charters (raise a whole port to 2:1) and Ground work controls) and the Tech button in the action bar | DEPENDS ON: client/audio, client/icons, client/pieceModel, client/socket, client/store, client/types, +1 more | USED BY: client/main, client/render/bridgepicker, client/render/index
+import { uiIcon } from '../icons';
+import { costStackHtml } from '../pieceModel';
 import { playTone } from '../audio';
 import { socket } from '../socket';
 import { state } from '../store';
@@ -62,6 +63,7 @@ const CSS = `
 #techPanel .tp-stage.tp-deep .tp-name{font-size:10px}
 #techPanel .tp-stage.tp-deep .tp-cap .recipe-mini-card{width:18px;height:24px}
 #techPanel .tp-stage.tp-deep .tp-cap .recipe-mini-card svg.glyph{width:12px;height:12px}
+#techPanel .tp-stage.tp-deep .tp-cap .recipe-stack{--cw:18px;--ch:24px;--dx:3px;--dy:3px}
 #techPanel .tp-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 #techPanel .tp-ring{fill:none;stroke:var(--line);stroke-width:1.5px;stroke-dasharray:3 5;vector-effect:non-scaling-stroke}
 #techPanel .tp-line{stroke:var(--surface-3);stroke-width:4px;stroke-linecap:round;vector-effect:non-scaling-stroke}
@@ -85,6 +87,7 @@ const CSS = `
 #techPanel .tp-name{font-size:11px;font-weight:700;line-height:1.15;text-align:center}
 #techPanel .tp-cap .recipe-mini-card{width:22px;height:30px;border-width:1px}
 #techPanel .tp-cap .recipe-mini-card svg.glyph{width:15px;height:15px}
+#techPanel .tp-cap .recipe-stack{--cw:22px;--ch:30px;--dx:4px;--dy:3px}
 
 #techPanel .tp-tip{position:absolute;display:none;width:220px;padding:10px 12px;border-radius:var(--r);background:#2b2d30;color:#f4f1ea;box-shadow:0 6px 18px rgba(0,0,0,.38);pointer-events:none;z-index:8;animation:tpTipIn .12s ease-out}
 #techPanel .tp-node:hover .tp-tip,#techPanel .tp-node:focus-visible .tp-tip{display:block}
@@ -108,6 +111,7 @@ const CSS = `
 #techPanel .tp-extra .recipe-cards-strip{align-self:flex-start}
 #techPanel .tp-extra .recipe-mini-card{width:22px;height:30px;border-width:1px}
 #techPanel .tp-extra .recipe-mini-card svg.glyph{width:15px;height:15px}
+#techPanel .tp-extra .recipe-stack{--cw:22px;--ch:30px;--dx:4px;--dy:3px}
 #techPanel .tp-port{font-size:12px;font-weight:600}
 #techPanel .tp-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 #techPanel .tp-mini{border:0;border-radius:var(--r-sm);padding:5px 10px;min-height:28px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--ink)}
@@ -147,18 +151,10 @@ function ensureDom(): void {
   document.body.appendChild(panel);
 }
 
-/** A cost as mini resource cards (one card per unit, dimmed when the hand cannot cover it), like the build recipes. */
+/** A cost as mini resource cards: one overlapped stack per resource (a bigger count continues in another stack), dimmed when the hand cannot cover it, like the build recipes. */
 export function costStripHtml(cost: Resources, hand: Resources | undefined): string {
-  const seen: Record<string, number> = {};
-  const units: string[] = [];
-  for (const [r, n] of Object.entries(cost)) for (let i = 0; i < Math.max(0, Number(n) || 0); i++) units.push(r);
-  if (units.length === 0) return '';
-  const cards = units.map(r => {
-    seen[r] = (seen[r] || 0) + 1;
-    const has = (hand?.[r] || 0) >= seen[r];
-    return `<div class="recipe-mini-card card-${esc(r)} ${has ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
-  }).join('');
-  return `<div class="recipe-cards-strip">${cards}</div>`;
+  const stacks = Object.entries(cost).map(([r, n]) => costStackHtml(r, Number(n) || 0, hand?.[r] || 0)).join('');
+  return stacks ? `<div class="recipe-cards-strip">${stacks}</div>` : '';
 }
 
 interface Placed {

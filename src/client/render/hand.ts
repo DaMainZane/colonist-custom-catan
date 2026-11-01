@@ -1,4 +1,4 @@
-// MODULE: player hand (resource stacks + dev cards) and hand click handlers | DEPENDS ON: client/audio, client/avatars, client/constants, client/icons, client/render/board, client/render/drawer, +4 more | USED BY: client/main, client/render/board, client/render/drawer, client/render/index, client/render/trade
+// MODULE: player hand (resource stacks + dev cards) and hand click handlers | DEPENDS ON: client/audio, client/avatars, client/constants, client/icons, client/pieceModel, client/render/board, +5 more | USED BY: client/main, client/render/board, client/render/drawer, client/render/index, client/render/trade
 import { RESOURCES, RES_META, DEV_META } from '../constants';
 import { getMiniSvg, getDevSvg, buildOverlappingStackHtml, uiIcon } from '../icons';
 import { playTone } from '../audio';
@@ -9,6 +9,7 @@ import { adjustCounter } from './trade';
 import { esc } from '../util';
 import { avatarFace } from '../avatars';
 import { isClientPieceDoubleCost } from './board';
+import { costStackHtml } from '../pieceModel';
 
 export type RecipeKey = 'dev' | 'road' | 'bridge' | 'net' | 'feed' | 'harbor' | 'settlement' | 'city';
 
@@ -39,24 +40,18 @@ export function renderRecipeStripHtml(recipeKey: RecipeKey, me: any): string {
         : recipeKey !== 'dev'
           ? me?.pieceCosts?.[recipeKey]
           : null;
-  let list: string[];
+  const counts: Record<string, number> = {};
+  const add = (r: string, n: number): void => {
+    counts[r] = (counts[r] || 0) + n;
+  };
   if (customCost && typeof customCost === 'object') {
-    list = [];
-    for (const [r, n] of Object.entries(customCost)) {
-      const cnt = Math.max(0, Number(n) || 0);
-      for (let i = 0; i < cnt; i++) list.push(r);
-    }
+    for (const [r, n] of Object.entries(customCost)) add(r, Math.max(0, Number(n) || 0));
   } else {
-    list = isDouble ? baseList.flatMap(r => [r, r]) : baseList;
+    for (const r of baseList) add(r, isDouble ? 2 : 1);
   }
-  const seen: Record<string, number> = {};
   const hand = me?.resources || {};
-  const cardsHtml = list.map(r => {
-    seen[r] = (seen[r] || 0) + 1;
-    const avail = Math.max(0, hand[r] || 0);
-    const hasIt = avail >= seen[r];
-    return `<div class="recipe-mini-card card-${r} ${hasIt ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
-  }).join('');
+  // One stack per resource, at most 4 cards each (a bigger count continues in another stack): the visible edges show how many are needed.
+  const cardsHtml = Object.entries(counts).map(([r, n]) => costStackHtml(r, n, hand[r] || 0)).join('');
   const badgeHtml = isDouble ? `<span class="recipe-double-badge" title="Above base piece limit: costs 2× resources">2×</span>` : '';
   return `<div class="recipe-cards-strip">${badgeHtml}${cardsHtml}</div>`;
 }

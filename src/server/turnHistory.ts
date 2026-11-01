@@ -1,4 +1,5 @@
 // MODULE: Turn history recorder & round summarizer | DEPENDS ON: server/types, shared/index | USED BY: server/game, server/types
+import { currentPlayer } from '../shared';
 import type { GameEvent } from '../shared';
 import type { Room } from './types';
 
@@ -46,19 +47,46 @@ const RESOURCE_NAMES: Record<string, string> = {
   fish: 'Fish'
 };
 
+const TRADE_ACTIONS = new Set(['propose_trade', 'respond_trade', 'counter_trade', 'confirm_trade', 'cancel_trade']);
+
+/** One engine log line (`g.log`): an announcement that may have no engine event of its own. */
+export interface LogNote {
+  text: string;
+  color?: string | null;
+}
+
+// Per room: the last engine log line already folded into the turn history.
+const seenLogLine = new WeakMap<Room, LogNote>();
+
+/** Engine log lines added since the last call (all of them the first time), so the one merged Live Log can carry them. */
+export function takeNewLogLines(room: Room): LogNote[] {
+  const log = (room.game?.log ?? []) as LogNote[];
+  const last = seenLogLine.get(room);
+  const from = last ? log.lastIndexOf(last) + 1 : 0;
+  if (log.length > 0) seenLogLine.set(room, log[log.length - 1]);
+  return log.slice(from);
+}
+
 /**
  * Records key player actions, resource card changes, and engine events into structured round/turn summaries
  * for the unified Live Log & Turn History view.
+ * `notes` are the engine log lines this action produced. A line is kept only when the action recorded nothing else,
+ * because otherwise the recorded actions already say the same thing (this is what keeps the log one stream, not two).
  */
 export function recordTurnHistory(
   room: Room,
-  playerId: string,
+  actingId: string,
   actionType: string,
   payload: any,
-  events: GameEvent[]
+  events: GameEvent[],
+  notes: LogNote[] = []
 ): void {
   const g = room.game;
   if (!g) return;
+
+  // Answering or countering a trade is done by the other players, but the trade belongs to the turn of the player whose turn it is.
+  const playerId =
+    actionType === 'respond_trade' || actionType === 'counter_trade' ? (currentPlayer(g)?.id ?? actingId) : actingId;
 
   room.turnHistory = room.turnHistory || [];
 
@@ -80,6 +108,7 @@ export function recordTurnHistory(
   const turnCount = g.turnCount || 0;
 
   let turnSummary: PlayerTurnSummary | undefined;
+  let createdTurn = false;
   if (isSetup) {
     const existing = roundSummary.turns.filter(t => t.playerId === playerId);
     const latest = existing[existing.length - 1];
@@ -96,6 +125,7 @@ export function recordTurnHistory(
         actions: []
       };
       roundSummary.turns.push(turnSummary);
+      createdTurn = true;
     } else {
       turnSummary = latest;
     }
@@ -112,10 +142,35 @@ export function recordTurnHistory(
         actions: []
       };
       roundSummary.turns.push(turnSummary);
+      createdTurn = true;
     }
   }
 
   const now = Date.now();
+  const turn: PlayerTurnSummary = turnSummary;
+  const actionsBefore = turn.actions.length;
+
+  // A Knight is "open" from the moment it is played until the next roll: its robber move and steal belong to it.
+  const knightOpen = (): boolean => {
+    for (let i = turn.actions.length - 1; i >= 0; i--) {
+      const a = turn.actions[i];
+      if (a.category === 'roll' && a.icon === 'roll') return false;
+      if (a.devCard === 'knight') return true;
+    }
+    return false;
+  };
+  // Year of Plenty is "open" for the two picks that follow it.
+  const plentyOpen = (): boolean => {
+    let picked = 0;
+    for (let i = turn.actions.length - 1; i >= 0; i--) {
+      const a = turn.actions[i];
+      if (a.category === 'roll' && a.icon === 'roll') return false;
+      if (a.devCard === 'yearOfPlenty') return picked < 2;
+      if (a.text.startsWith('Year of Plenty: picked')) picked++;
+    }
+    return false;
+  };
+  let monopolyLogged = false;
 
   // Aggregate productions per player so every player's resource gains show with RS card icons
   const productionsByPlayer = new Map<string, Record<string, number>>();
@@ -208,7 +263,7 @@ export function recordTurnHistory(
           category: 'rob',
           icon: 'robber',
           badge: `Hex #${d.hexId}`,
-          text: `Moved Robber to hex #${d.hexId}`,
+          text: knightOpen() ? `Knight moved Robber to hex #${d.hexId}` : `Moved Robber to hex #${d.hexId}`,
           timestamp: now
         });
         break;
@@ -225,7 +280,7 @@ export function recordTurnHistory(
             icon: 'steal',
             badge: 'Rob',
             resources: [{ resource: 'mystery', amount: amt, sign: '+' }],
-            text: `Robbed from ${victimName}`,
+            text: knightOpen() ? `Knight stole from ${victimName}` : `Robbed from ${victimName}`,
             timestamp: now
           });
         } else if (d.kind === 'discard') {
@@ -256,7 +311,9 @@ export function recordTurnHistory(
               icon: res,
               badge: `+${amt}`,
               resources: [{ resource: res, amount: amt, sign: '+' }],
-              text: 'Picked resource',
+              text: plentyOpen()
+                ? `Year of Plenty: picked ${RESOURCE_NAMES[res] || res}`
+                : `Picked ${RESOURCE_NAMES[res] || res}`,
               timestamp: now
             });
           }
@@ -283,12 +340,28 @@ export function recordTurnHistory(
         else if (card === 'roadBuilding') cardTitle = 'Road Building';
         else if (card === 'yearOfPlenty') cardTitle = 'Year of Plenty';
         else if (card === 'monopoly') cardTitle = 'Monopoly';
+        let text = `Played ${cardTitle}`;
+        let resources: TurnActionResource[] | undefined;
+        if (card === 'monopoly') {
+          // Which resource, and how many cards came in, are known from this action's own transfers.
+          const grabs = events.filter(e => e.type === 'transferred' && e.data?.kind === 'monopoly');
+          const res: string = payload?.resource || grabs[0]?.data?.resource || '';
+          const taken = grabs
+            .filter(e => !res || e.data?.resource === res)
+            .reduce((s, e) => s + (Number(e.data?.amount) || 0), 0);
+          if (res) text = `Played Monopoly on ${RESOURCE_NAMES[res] || res}${taken > 0 ? '' : ' (nothing taken)'}`;
+          if (res && taken > 0) resources = [{ resource: res, amount: taken, sign: '+' }];
+          monopolyLogged = true;
+        } else if (card === 'roadBuilding') {
+          text = 'Played Road Building (2 free roads)';
+        }
         turnSummary.actions.push({
           category: 'dev',
           icon: card,
           devCard: card,
           badge: cardTitle,
-          text: `Played ${cardTitle}`,
+          resources,
+          text,
           timestamp: now
         });
         break;
@@ -565,7 +638,7 @@ export function recordTurnHistory(
 
   // Push consolidated Monopoly
   for (const [res, amt] of Object.entries(monopolyMap)) {
-    if (amt <= 0) continue;
+    if (monopolyLogged || amt <= 0) continue;
     turnSummary.actions.push({
       category: 'dev',
       icon: 'monopoly',
@@ -577,14 +650,32 @@ export function recordTurnHistory(
     });
   }
 
+  const recordedHere = turn.actions.length - actionsBefore;
+
   // If action was endTurn and no other actions happened this turn, log passed turn
-  if ((actionType === 'endTurn' || actionType === 'end_turn') && turnSummary.actions.length === 0) {
-    turnSummary.actions.push({
+  if ((actionType === 'endTurn' || actionType === 'end_turn') && turn.actions.length === 0) {
+    turn.actions.push({
       category: 'roll',
       icon: 'pass',
       badge: 'Pass',
       text: 'Passed turn',
       timestamp: now
     });
+  }
+
+  // Announcements with no event of their own (turn order, tides, a bot taking a seat) join the same stream.
+  // When the action recorded something, its lines say the same thing, so they are dropped. Trade chatter stays out.
+  if (recordedHere === 0 && !TRADE_ACTIONS.has(actionType)) {
+    for (const n of notes) {
+      const text = String(n?.text ?? '').trim();
+      if (!text) continue;
+      turn.actions.push({ category: 'event', icon: 'event', text, timestamp: now });
+    }
+  }
+
+  // A turn that recorded nothing is not a turn (a player only answering a trade, say): do not leave an empty card behind.
+  if (createdTurn && turn.actions.length === 0) {
+    const idx = roundSummary.turns.indexOf(turn);
+    if (idx >= 0) roundSummary.turns.splice(idx, 1);
   }
 }

@@ -195,7 +195,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `icons.ts` | flat resource pictograms, dev card glyphs, UI icons, piece shapes |
 | `main.ts` | client entry point (wires DOM events, camera pan and zoom, and socket messages to the renderers) |
 | `mapmenu.ts` | lobby map menu (summary line, option dropdown drawn from the server's option list, seed line, report, quick start chips) |
-| `pieceModel.ts` | generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips, spots and shapes; no DOM, no socket, no store) |
+| `pieceModel.ts` | generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips with their stacked cost cards, spots and shapes; no DOM, no socket, no store) |
 | `pieceui.ts` | generic piece UI (R8.7: draws the build-bar buttons, the spot layer and the placed shapes of manifest pieces and actions, shows their hints and sends their clicks; the logic is in client/pieceModel) |
 | `presets.ts` | custom map presets (list saved in this browser, preset row in the lobby dock) |
 | `render/index.ts` | renderAll, draws every client panel (board, hand, sidebar, trade, tech, overlays) from the current state |
@@ -278,5 +278,6 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `visualManifest.test.ts` | R8.4 `buildVisualManifest` and the safety checks: empty for base, Tides on gives `flood` and `flood-warn`, sorting, plain JSON, unsafe markup, css, labels and orders refused (`visualProblems`, `overlayProblems`, `manifestProblems`) |
 | `visuals.test.ts` | R8.5 client copy of the manifest (`client/visuals.ts`): empty before it arrives, a late arrival asks for one re-render, a resend asks for none, listeners, reset, junk and malformed entries dropped, own copy |
 | `visualsEvent.test.ts` | R8.4 `visuals` socket event: sent to every player and spectator before `gameState`, once per addon-set key, resent on reconnect or a new spectator, a lobby toggle changes the key, real content when a def has a visual |
-| `turnhistory.test.ts` | Turn history recorder (`recordTurnHistory`): setup placements under round 0, rolls, consolidated production, builds, dev cards, robber and steals, bank trades, discards on a 7, rounds advance |
+| `turnhistory.test.ts` | Turn history recorder (`recordTurnHistory`): setup placements under round 0, rolls, consolidated production, builds, dev cards, robber and steals, bank trades, discards on a 7, rounds advance; trade replies make no empty turn and log on the current player's turn, Monopoly / Knight / Year of Plenty detail, engine log lines folded in once (`takeNewLogLines`) |
+| `tideboundmapdefaults.test.ts` | Turning Tidebound on in the lobby (`applyTideboundMapDefaults`): islands + wide water picks, radius raised to `TIDEBOUND_MAP_RADIUS`, a bigger host radius kept |
 

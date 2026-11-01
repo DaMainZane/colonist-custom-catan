@@ -156,6 +156,26 @@ export function applyRecipeStyle(
   syncSettingsToBoard(room, prevLand);
 }
 
+/** What Tidebound is built for: islands with wide seas between them (the `wide_water` perk), on a board big enough to hold the water. */
+export const TIDEBOUND_MAP_PICKS = ['islands', 'wide_water'];
+export const TIDEBOUND_MAP_RADIUS = 7;
+
+/**
+ * The host just turned Tidebound on: move the map to its home ground. Picks are replaced (an empty list or a continent has no sea to widen),
+ * the radius grows to `TIDEBOUND_MAP_RADIUS` if it is smaller (a bigger one the host chose is kept), and a fresh seed is rolled.
+ * Picks go through the room's DLC-aware registry, so one the pack does not know is dropped, as for any other client message.
+ */
+export function applyTideboundMapDefaults(
+  room: Pick<Room, 'settings' | 'board' | 'mapMeta'> & Partial<Pick<Room, 'lobbyPlayers'>>
+): void {
+  const reg = mapRegistryFor(room.settings);
+  room.settings.mapPicks = resolvePicks(reg, TIDEBOUND_MAP_PICKS).picks;
+  room.settings.mapParams = {};
+  room.settings.boardRadius = Math.max(room.settings.boardRadius, TIDEBOUND_MAP_RADIUS);
+  room.settings.mapSeed = '';
+  refreshMap(room);
+}
+
 /** Everything that decides the lobby map. When this changes the board is rebuilt; other settings leave painted edits alone. */
 export function recipeKey(s: Settings): string {
   const params = s.mapParams ?? {};

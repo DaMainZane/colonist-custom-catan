@@ -4,7 +4,7 @@ import { AVATARS, PLAYER_COLORS } from '../shared';
 import { victimsOnHex } from '../packs/base/robbing';
 import { CITY, ROAD, SETTLEMENT } from '../packs/base/constants';
 import { clearBotTimers, createLobbyPlayer, createRoom, freeAvatar, humanIds, addLobbyLog, rebindPlayerId, rooms } from './rooms';
-import { applyMapStart, applyRecipeStyle, countLandHexes, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap, syncSettingsToBoard } from './lobby';
+import { applyMapStart, applyRecipeStyle, applyTideboundMapDefaults, countLandHexes, isPreset, mergeSettingsDetailed, paintHex, paintPort, recipeKey, recommendedRadius, refreshMap, syncSettingsToBoard } from './lobby';
 import { mapOptionsView } from './mapmenu';
 import { applyLoadedPreset, loadPreset, presetStyle, serializePreset } from './presets';
 import { rematch, runAction, startGame } from './game';
@@ -536,8 +536,11 @@ export function registerSocketHandlers(io: Server): void {
       const { settings: next, dropped } = mergeSettingsDetailed(newSettings, old);
       room.settings = next;
 
-      // The map follows its recipe (seed, radius, picks, params, tile counts). Other settings leave painted edits alone.
-      if (recipeKey(old) !== recipeKey(next)) {
+      // Turning Tidebound on moves the map to islands with wide water on a bigger board. Otherwise the map follows its recipe
+      // (seed, radius, picks, params, tile counts); other settings leave painted edits alone.
+      if (next.dlc?.tidebound && !old.dlc?.tidebound) {
+        applyTideboundMapDefaults(room);
+      } else if (recipeKey(old) !== recipeKey(next)) {
         refreshMap(room);
       }
       syncSettingsToBoard(room, prevLand, prevVp);

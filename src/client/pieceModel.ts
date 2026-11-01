@@ -1,4 +1,4 @@
-// MODULE: generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips, spots and shapes; no DOM, no socket, no store) | DEPENDS ON: client/icons, client/types, shared/visual | USED BY: client/pieceui, client/render/overlay
+// MODULE: generic piece UI model (R8.7: pure functions that turn the visual manifest and a player's `pieces[id]` data into buttons, badges, hints, recipe strips with their stacked cost cards, spots and shapes; no DOM, no socket, no store) | DEPENDS ON: client/icons, client/types, shared/visual | USED BY: client/pieceui, client/render/hand, client/render/overlay, client/render/techpanel
 import { getMiniSvg, shade, uiIcon } from './icons';
 import type { PlayerView, Resources } from './types';
 import type { ManifestEntry, PiecePlayerData } from '../shared/visual';
@@ -176,21 +176,43 @@ export function buttonHtml(model: PieceButtonModel): string {
     + `${iconHtml(model.icon)}<span class="lbl">${escText(model.label)}</span></button>`;
 }
 
-/** The price strip of a recipe popup (the same markup `hand.ts` builds for the hand-written buttons). The server's price already includes any 2x scaling. */
-export function recipeStripHtml(cost: Resources | undefined, hand: Resources | undefined): string {
-  const list: string[] = [];
-  for (const [r, n] of Object.entries(cost ?? {})) {
-    if (!/^[a-z_]+$/i.test(r)) continue;
-    for (let i = 0; i < Math.max(0, Number(n) || 0); i++) list.push(r);
-  }
-  if (list.length === 0) return '';
-  const seen: Record<string, number> = {};
-  const cards = list.map(r => {
-    seen[r] = (seen[r] || 0) + 1;
-    const has = Math.max(0, hand?.[r] || 0) >= seen[r];
-    return `<div class="recipe-mini-card card-${r} ${has ? 'has-res' : 'lacks-res'}">${getMiniSvg(r)}</div>`;
+/** Most cards one stack of a cost shows. A bigger count continues in another stack, like a tally (BUG 5). */
+export const COST_STACK_MAX = 4;
+
+/** Splits a count into stack sizes of at most `max`: 3 gives [3], 6 gives [4, 2], 12 gives [4, 4, 4]. Zero, a negative or a non-number gives none. */
+export function stackSizes(count: number, max: number = COST_STACK_MAX): number[] {
+  const n = Math.floor(Number(count));
+  const cap = Math.max(1, Math.floor(max));
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const out: number[] = [];
+  for (let left = n; left > 0; left -= cap) out.push(Math.min(cap, left));
+  return out;
+}
+
+/**
+ * The cards of one resource in a cost, as overlapped stacks instead of a row (BUG 5). The first card is in front and each card behind it peeks out to the
+ * right and down (`--i` is its layer, `--n` the stack size, read by `.recipe-stack` in styles.css), so the visible edges are the count. A stack holds at most
+ * `COST_STACK_MAX` cards; the rest continue in the next stack. The first `owned` units are lit (`has-res`) and the rest dim, counted across stacks.
+ * Empty for a zero count or a resource name that is not plain (it ends up in a class name). Every place that draws a cost goes through this one function.
+ */
+export function costStackHtml(resource: string, count: number, owned: number): string {
+  if (!/^[a-z_]+$/i.test(resource)) return '';
+  const have = Math.max(0, Math.floor(Number(owned) || 0));
+  let unit = 0;
+  return stackSizes(count).map(size => {
+    const layers = Array.from({ length: size }, (_, i) => {
+      unit++;
+      const lit = have >= unit;
+      return `<div class="recipe-mini-card card-${resource} ${lit ? 'has-res' : 'lacks-res'}" style="--i:${i}">${getMiniSvg(resource)}</div>`;
+    }).join('');
+    return `<div class="recipe-stack" style="--n:${size}">${layers}</div>`;
   }).join('');
-  return `<div class="recipe-cards-strip">${cards}</div>`;
+}
+
+/** The price strip of a recipe popup: one stack per resource (more than four of one continues in another stack). The server's price already includes any 2x scaling. */
+export function recipeStripHtml(cost: Resources | undefined, hand: Resources | undefined): string {
+  const stacks = Object.entries(cost ?? {}).map(([r, n]) => costStackHtml(r, Number(n) || 0, hand?.[r] || 0)).join('');
+  return stacks ? `<div class="recipe-cards-strip">${stacks}</div>` : '';
 }
 
 // ---- Spots -------------------------------------------------------------------------------------------------------------

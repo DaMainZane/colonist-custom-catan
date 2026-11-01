@@ -1,5 +1,28 @@
 # Change Log
 
+## 2026-11-01 (Pass 99: BUG 5 stacked cost cards with a 4-card tally cap; headers, index, typecheck and tests passed when run by the user)
+### Fixed
+- **BUG 5 stacked cost cards (`src/client/pieceModel.ts`, `src/client/render/hand.ts`, `src/client/render/techpanel.ts`, `src/client/styles.css`)**: a cost drew one card per unit in a row. New `costStackHtml(resource, count, owned)` draws one resource as overlapped stacks: the first card in front, each card behind it shifted right and down so the visible edges count the cards. A stack holds at most `COST_STACK_MAX` (4) cards; a bigger count continues in another stack, like a tally (6 is 4 + 2, 12 is 4 + 4 + 4). The first `owned` units are lit and the rest dim, counted across stacks. No number is shown on a stack. `stackSizes` does the split.
+- Callers moved to the helper: `recipeStripHtml` (generated build buttons), `renderRecipeStripHtml` in `hand.ts` (hand-written buttons, the 2x badge stays), and `costStripHtml` in `techpanel.ts` (tech costs, Harbor charters, and the bridge picker that reuses it). The live log chips already show one icon plus an amount and are unchanged.
+- CSS: `.recipe-stack` and `.recipe-stack > .recipe-mini-card`, sized by `--cw`, `--ch`, `--dx`, `--dy` (the tech panel overrides them for its smaller cards); `.recipe-cards-strip` gap and alignment changed so stacks of different heights line up at the top.
+### Tests
+- `tests/pieceModel.test.ts`: 8 new tests (`stackSizes` splits and empty cases, N layers for N, 6 is 4 + 2 and 12 is three stacks, lit and dim counted across stacks, empty for zero or an unsafe name, one group per resource in a strip, 12 wood and 1 sheep is four stacks and 13 cards).
+- `tests/turnhistory.test.ts` (Pass 98's test, flaky not new): "logs an accepted trade on the turn of the player whose turn it is" assumed Alice moves first, but `createGame` randomizes the turn order, so it failed whenever Bob went first. It now takes the mover from `currentPlayer`. No source change.
+### Not verified
+- The commands were run by the user and passed. The look of the stacks (offsets, tech panel sizes, the tooltip below a node) has not been checked in a browser.
+
+## 2026-11-01 (Pass 98: bug list 1 to 4 — merged Live Log, dev card detail, no phantom "Passed turn", Tidebound map defaults; typecheck and tests passed when run before Pass 99)
+### Fixed
+- **BUG 4 phantom "Passed turn" (`src/server/turnHistory.ts`, `src/client/render/sidebar.ts`)**: a player who only answered a trade got an empty turn card, which the client drew as "Passed turn". The recorder now removes a turn it created that stayed empty, the client skips empty cards, and trade replies (`respond_trade`, `counter_trade`) are logged on the turn of the player whose turn it is (an accepted trade now reads from the proposer's side).
+- **BUG 3 dev card detail (`src/server/turnHistory.ts`)**: Monopoly says the resource and how many cards came in (or "nothing taken"), once; Year of Plenty picks read "Year of Plenty: picked X"; a Knight's robber move and steal read "Knight moved Robber..." and "Knight stole from X" (until the next roll).
+- **BUG 2 one stream (`src/server/turnHistory.ts`, `src/server/game.ts`, `src/client/render/sidebar.ts`)**: the "Stream / Recent Feed" block is gone in game. `takeNewLogLines` hands each engine log line to the recorder once; a line is kept as an `event` action only when its action recorded nothing else (turn order, tides, seat changes). Lines written outside an action are picked up at the next action. Trade chatter is not kept.
+- **BUG 1 Tidebound map defaults (`src/server/lobby.ts`, `src/server/socket.ts`)**: turning Tidebound on in `updateSettings` now calls `applyTideboundMapDefaults`: picks `islands` + `wide_water`, radius at least `TIDEBOUND_MAP_RADIUS` (7, a judgement call), fresh seed.
+### Tests
+- `tests/turnhistory.test.ts`: 9 new tests (trade reply creates no turn, accepted trade attribution, Monopoly detail and nothing-taken, Knight move and steal, steal after a roll is not a Knight steal, Year of Plenty picks, log lines folded in or dropped, `takeNewLogLines` once-only).
+- `tests/tideboundmapdefaults.test.ts` (new): 2 tests for the Tidebound lobby defaults (`tests/tideboundlobby.test.ts` is untouched).
+### Not done
+- BUG 5: done in Pass 99.
+
 ## 2026-10-31 (Pass 97: Tidebound T13 — T13a flood/rising-sea vertex scoring, T13b salvage & bridge goals, T13c port/net/fish goals, T13d pirate avoidance & hunting, T13e 9-node tech research, and T13f public-info-only dialogue; typecheck and tests passed)
 ### Added & Changed
 - **T13a Flood & rising-sea exposure in vertex scoring (`src/packs/tidebound/tides.ts`, `src/packs/tidebound/risingSea.ts`, `src/packs/tidebound/index.ts`)**:

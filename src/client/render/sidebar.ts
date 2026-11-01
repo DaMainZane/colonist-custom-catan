@@ -397,6 +397,8 @@ function renderMergedLiveLog(el: HTMLElement): void {
     // Show newest turn first within the current round so live actions appear right at the top of the round
     const orderedTurns = [...rnd.turns].reverse();
     for (const turn of orderedTurns) {
+      // A card with nothing in it (a player who only answered a trade) is not a turn, so it is never drawn as "Passed turn".
+      if (turn.actions.length === 0) continue;
       const filteredActions = turn.actions.filter(act => actionMatchesFilter(act, turn, rnd, logFilter));
       if (logFilter && filteredActions.length === 0) continue;
       matchingActionsCount += filteredActions.length;
@@ -418,7 +420,7 @@ function renderMergedLiveLog(el: HTMLElement): void {
               </div>
             `;
           }).join('')
-        : `<div class="th-action-row th-act-empty"><span class="th-svg-ico">${uiIcon('pass', 13)}</span><span>Passed turn</span></div>`;
+        : '';
 
       const playerKey = `player:${turn.playerName}`;
       const playerActive = logFilter === playerKey;
@@ -463,28 +465,8 @@ function renderMergedLiveLog(el: HTMLElement): void {
     `);
   }
 
-  // Also include recent raw live log lines at the bottom so any non-turn announcements (tides, nemesis, etc.) are visible and filterable
-  const recentRawLogs = logs.slice(-25).filter(l => logLineMatchesFilter(l.text, logFilter));
-  const rawLogsBlock = recentRawLogs.length > 0
-    ? `
-      <div class="th-round-group th-raw-stream">
-        <div class="th-round-header" onclick="toggleRoundCollapse(-1)" title="Click to collapse/expand live stream">
-          <div class="th-round-title-wrap">
-            <span class="th-round-badge">Stream</span>
-            <span class="th-round-title">Recent Feed (${recentRawLogs.length})</span>
-          </div>
-          <div class="th-round-right">
-            <span class="th-chevron">${collapsedRounds.has(-1) ? '▸' : '▾'}</span>
-          </div>
-        </div>
-        ${!collapsedRounds.has(-1) ? `<div class="th-live-lines">${[...recentRawLogs].reverse().map(l => `
-          <div class="log-line" ${l.color ? `style="color:${esc(l.color)}"` : ''}>${formatLogTextWithRsCards(l.text)}</div>
-        `).join('')}</div>` : ''}
-      </div>
-    `
-    : '';
-
-  if (roundBlocks.length === 0 && !rawLogsBlock) {
+  // Announcements (turn order, tides, seat changes) are recorded into the turn cards by the server, so there is no second feed here.
+  if (roundBlocks.length === 0) {
     el.innerHTML = `
       <div class="turn-history-empty">
         <div class="th-empty-title">No matching actions</div>
@@ -494,7 +476,7 @@ function renderMergedLiveLog(el: HTMLElement): void {
     return;
   }
 
-  el.innerHTML = roundBlocks.join('') + rawLogsBlock;
+  el.innerHTML = roundBlocks.join('');
 }
 
 export function renderSidebar(): void {

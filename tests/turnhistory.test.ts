@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { recordTurnHistory } from '../src/server/turnHistory';
-import { createGame } from '../src/shared';
+import { recordTurnHistory, takeNewLogLines } from '../src/server/turnHistory';
+import { createGame, currentPlayer } from '../src/shared';
 import { defaultSettings, rulesFromSettings, gameRegistry } from '../src/server/runtime';
 import type { Room } from '../src/server/types';
 
@@ -151,5 +151,159 @@ describe('Turn History recorder & round summarizer', () => {
     expect(bobTurn.playerId).toBe('p2');
     expect(bobTurn.actions[0].text).toContain('Rolled 7 — Robber activated');
     expect(bobTurn.actions[1].text).toContain('Alice discarded');
+  });
+
+  // BUG 4: a bot that only answers a trade got an empty turn card, which the Live Log drew as "Passed turn".
+  it('does not create a turn for a player who only answers a trade', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'roll', {}, [{ type: 'rolled', data: { sum: 6, d1: 3, d2: 3 } }]);
+    recordTurnHistory(room, 'p2', 'respond_trade', { decision: 'declined' }, [
+      { type: 'tradeResponse', data: { tradeId: 1, playerId: 'p2', decision: 'declined' } }
+    ]);
+
+    const turns = room.turnHistory![0].turns;
+    expect(turns).toHaveLength(1);
+    expect(turns[0].playerId).toBe('p1');
+    expect(turns.every(t => t.actions.length > 0)).toBe(true);
+    expect(turns.some(t => t.actions.some(a => a.text === 'Passed turn'))).toBe(false);
+  });
+
+  it('logs an accepted trade on the turn of the player whose turn it is, from their side', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    // createGame randomizes the turn order, so take whoever's turn it is instead of assuming Alice goes first.
+    const mover = currentPlayer(room.game!)!;
+    const other = room.game!.players.find(p => p.id !== mover.id)!;
+
+    recordTurnHistory(room, mover.id, 'roll', {}, [{ type: 'rolled', data: { sum: 6, d1: 3, d2: 3 } }]);
+    recordTurnHistory(room, other.id, 'respond_trade', { decision: 'accepted' }, [
+      { type: 'transferred', data: { kind: 'playerTrade', from: mover.id, to: other.id, resource: 'wood', amount: 1 } },
+      { type: 'transferred', data: { kind: 'playerTrade', from: other.id, to: mover.id, resource: 'brick', amount: 1 } }
+    ]);
+
+    const turns = room.turnHistory![0].turns;
+    expect(turns).toHaveLength(1);
+    expect(turns[0].playerId).toBe(mover.id);
+    const trade = turns[0].actions.find(a => a.category === 'trade')!;
+    expect(trade.text).toBe(`Traded with ${other.name}`);
+    expect(trade.resources).toEqual([
+      { resource: 'wood', amount: 1, sign: '-' },
+      { resource: 'brick', amount: 1, sign: '+' }
+    ]);
+  });
+
+  // BUG 3: dev card use must say what it did.
+  it('says which resource a Monopoly named and how many cards it took, once', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'play_dev', { card: 'monopoly', resource: 'wheat' }, [
+      { type: 'devPlayed', data: { card: 'monopoly', playerId: 'p1' } },
+      { type: 'transferred', data: { kind: 'monopoly', from: 'p2', to: 'p1', resource: 'wheat', amount: 3 } }
+    ]);
+
+    const dev = room.turnHistory![0].turns[0].actions.filter(a => a.category === 'dev');
+    expect(dev).toHaveLength(1);
+    expect(dev[0].text).toBe('Played Monopoly on Wheat');
+    expect(dev[0].resources).toEqual([{ resource: 'wheat', amount: 3, sign: '+' }]);
+  });
+
+  it('says when a Monopoly took nothing', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'play_dev', { card: 'monopoly', resource: 'ore' }, [
+      { type: 'devPlayed', data: { card: 'monopoly', playerId: 'p1' } }
+    ]);
+
+    expect(room.turnHistory![0].turns[0].actions[0].text).toBe('Played Monopoly on Ore (nothing taken)');
+  });
+
+  it('names the victim of a Knight steal, and the robber move, as the Knight\'s', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'play_dev', { card: 'knight' }, [{ type: 'devPlayed', data: { card: 'knight', playerId: 'p1' } }]);
+    recordTurnHistory(room, 'p1', 'move_robber', { hexId: 5 }, [{ type: 'robberMoved', data: { hexId: 5, playerId: 'p1' } }]);
+    recordTurnHistory(room, 'p1', 'steal', { victimId: 'p2' }, [
+      { type: 'transferred', data: { kind: 'steal', from: 'p2', to: 'p1', amount: 1, secret: true } }
+    ]);
+
+    const texts = room.turnHistory![0].turns[0].actions.map(a => a.text);
+    expect(texts).toEqual(['Played Knight', 'Knight moved Robber to hex #5', 'Knight stole from Bob']);
+  });
+
+  it('does not call a robber steal after a roll a Knight steal', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'play_dev', { card: 'knight' }, [{ type: 'devPlayed', data: { card: 'knight', playerId: 'p1' } }]);
+    recordTurnHistory(room, 'p1', 'roll', {}, [{ type: 'rolled', data: { sum: 7, d1: 3, d2: 4 } }]);
+    recordTurnHistory(room, 'p1', 'steal', { victimId: 'p2' }, [
+      { type: 'transferred', data: { kind: 'steal', from: 'p2', to: 'p1', amount: 1, secret: true } }
+    ]);
+
+    const texts = room.turnHistory![0].turns[0].actions.map(a => a.text);
+    expect(texts[texts.length - 1]).toBe('Robbed from Bob');
+  });
+
+  it('says what a Year of Plenty picked', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'main';
+    room.game!.round = 1;
+    room.game!.turnCount = 1;
+
+    recordTurnHistory(room, 'p1', 'play_dev', { card: 'yearOfPlenty' }, [
+      { type: 'devPlayed', data: { card: 'yearOfPlenty', playerId: 'p1' } }
+    ]);
+    recordTurnHistory(room, 'p1', 'pick', { resource: 'ore' }, [
+      { type: 'transferred', data: { kind: 'pick', from: 'bank', to: 'p1', resource: 'ore', amount: 1 } }
+    ]);
+    recordTurnHistory(room, 'p1', 'pick', { resource: 'sheep' }, [
+      { type: 'transferred', data: { kind: 'pick', from: 'bank', to: 'p1', resource: 'sheep', amount: 1 } }
+    ]);
+
+    const texts = room.turnHistory![0].turns[0].actions.map(a => a.text);
+    expect(texts).toEqual(['Played Year of Plenty', 'Year of Plenty: picked Ore', 'Year of Plenty: picked Sheep']);
+  });
+
+  // BUG 2: one stream. Engine log lines with no event of their own go into the turn cards instead of a second feed.
+  it('folds log lines that no event covers into the turn card, and drops the ones an event already covers', () => {
+    const room = makeMockRoom();
+    room.game!.phase = 'setup_settlement';
+    room.game!.turnCount = 0;
+
+    recordTurnHistory(room, 'p1', 'note', {}, [], [{ text: '🎲 Turn order randomized! Alice goes first!' }]);
+    recordTurnHistory(room, 'p1', 'build', { piece: 'settlement' }, [
+      { type: 'built', data: { piece: 'settlement', vertexId: 10, playerId: 'p1' } }
+    ], [{ text: 'Alice placed a Settlement' }]);
+
+    const acts = room.turnHistory![0].turns[0].actions;
+    expect(acts.map(a => a.text)).toEqual(['🎲 Turn order randomized! Alice goes first!', 'Placed initial Settlement']);
+    expect(acts[0].category).toBe('event');
+  });
+
+  it('hands out each engine log line once', () => {
+    const room = makeMockRoom();
+    room.game!.log.push({ text: 'one', color: null });
+    expect(takeNewLogLines(room).map(l => l.text)).toContain('one');
+    expect(takeNewLogLines(room)).toEqual([]);
+    room.game!.log.push({ text: 'two', color: null });
+    expect(takeNewLogLines(room).map(l => l.text)).toEqual(['two']);
   });
 });

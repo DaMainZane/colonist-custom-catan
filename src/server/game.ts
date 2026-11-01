@@ -1,5 +1,5 @@
 // MODULE: game runner (start/rematch, dispatch one action, turn engine events into client effects) | DEPENDS ON: server/bots/brain, server/bots/dialogue, server/bots/trainingLog, server/lobby, server/rooms, server/runtime, +4 more | USED BY: server/bots/scheduler, server/socket
-import { PLAYER_COLORS, createGame, dispatch } from '../shared';
+import { PLAYER_COLORS, createGame, currentPlayer, dispatch } from '../shared';
 import type { DispatchResult, GameEvent } from '../shared';
 import { emitBotDialogue, emitGameStartDialogue } from './bots/dialogue';
 import { noteBotEvents } from './bots/brain';
@@ -8,7 +8,7 @@ import { refreshMap } from './lobby';
 import { addLobbyLog, clearBotTimers } from './rooms';
 import { gameRegistry, rulesFromSettings, settingsForPlayers } from './runtime';
 import { noteActionCompleted } from './turnClock';
-import { recordTurnHistory } from './turnHistory';
+import { recordTurnHistory, takeNewLogLines } from './turnHistory';
 import type { LobbyPlayer, Room } from './types';
 
 /** Engine events -> the one-shot effects the client animates (productions, card transfers, rolled hexes). */
@@ -84,6 +84,9 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
   const g = room.game;
   if (!g) return { ok: false, error: 'No game in progress' };
   const reg = gameRegistry(g.rules);
+  // Log lines written outside any action since the last one (a disconnect, a spectator, the turn order) join the merged Live Log first.
+  const strays = takeNewLogLines(room);
+  if (strays.length > 0) recordTurnHistory(room, currentPlayer(g)?.id ?? playerId, 'note', {}, [], strays);
   const snap = captureTrainingSnapshot(g, reg, playerId);
   const res = dispatch(g, reg, { type, playerId, payload });
   if (res.ok) {
@@ -92,7 +95,7 @@ export function runAction(room: Room, playerId: string, type: string, payload: a
     noteBotEvents(g, res.events);
     emitBotDialogue(room, playerId, type, res.events);
     noteActionCompleted(room, playerId);
-    recordTurnHistory(room, playerId, type, payload, res.events);
+    recordTurnHistory(room, playerId, type, payload, res.events, takeNewLogLines(room));
   }
   else if (res.error.startsWith('Internal error')) console.error(`[engine] ${type} by ${playerId}: ${res.error}`);
   return res;
