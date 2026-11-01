@@ -642,6 +642,10 @@ export const pirateDriveViewData: ViewDataDef = {
 export const pirateBotGoal: BotGoalDef = {
   id: 'tidebound.pirates',
   goalClass: 'generic',
+  /** Any pirate on the board is a reason to play a knight (knights are what drives it off, and what keeps it away from your cities). */
+  wantsKnight(ctx: Ctx): boolean {
+    return activePirates(ctx.g).length > 0;
+  },
   vertexDelta(ctx: Ctx, pid: Id, vertexId: number): number {
     const { g, reg } = ctx;
     if (!addonOn(reg, 'tidebound.pirates')) return 0;

@@ -1,7 +1,9 @@
-// MODULE: Tidebound tech tree nodes (T11a-T11f: 8 extension nodes across Expansion & Industrial paths, techGate re-export, Grand Causeway 16 VP hook, Harbor Empire ceil(V/2) bank card grant) | DEPENDS ON: packs/base/techEffects, packs/tidebound/bridgeConsts, packs/tidebound/ricketyBridges, shared/index | USED BY: packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/index, packs/tidebound/pirates, packs/tidebound/wrecks
+// MODULE: Tidebound tech tree nodes (T11a-T11f: 8 extension nodes across Expansion & Industrial paths, techGate re-export, Grand Causeway 16 VP hook, Harbor Empire ceil(V/2) bank card grant) | DEPENDS ON: packs/base/constants, packs/base/techEffects, packs/tidebound/bridgeConsts, packs/tidebound/ricketyBridges, shared/index | USED BY: packs/tidebound/bridges, packs/tidebound/fishing, packs/tidebound/harbor, packs/tidebound/index, packs/tidebound/pirates, packs/tidebound/wrecks
 import {
   bankGive,
+  BOT_GOALS,
   createRng,
+  getMarkers,
   getPlayer,
   hasTech,
   rngInt,
@@ -10,6 +12,7 @@ import {
   techGate
 } from '../../shared';
 import type {
+  BotGoalDef,
   Ctx,
   Edge,
   GameState,
@@ -21,6 +24,7 @@ import type {
   TechDef,
   ViewDataDef
 } from '../../shared';
+import { CITY, SETTLEMENT } from '../base/constants';
 import { TECH_HARBOR_CHARTERS } from '../base/techEffects';
 import { BRIDGE, BRIDGE_BASE_LIMIT } from './bridgeConsts';
 import { RICKETY, RICKETY_TECH_CAP_BONUS, syncBridgePool } from './ricketyBridges';
@@ -317,11 +321,101 @@ export const TIDEBOUND_TECH_DEFS: TechDef[] = [
   }
 ];
 
+// ---- Bot hooks: what the Tidebound techs are worth to a bot (the bot brain itself names no Tidebound content) ----------
+
 /**
- * Registers all 8 Tidebound extension tech nodes in `TECH_DEFS` (`replace: true` makes repeated calls across addons idempotent).
+ * Ids that live in other Tidebound files (fishing, harbor, wrecks, pirates). They are spelled out here because those files import this one;
+ * `tests/tideboundbots.test.ts` checks that they still match the real constants.
+ */
+export const BOT_NET_PIECE = 'net';
+export const BOT_FEED_SEA_ACTION = 'feed_sea';
+export const BOT_UPGRADE_HARBOR_ACTION = 'upgrade_harbor';
+export const BOT_WRECK_MARKER = 'wreck';
+export const BOT_PIRATE_MARKER = 'pirate';
+
+/** Bridges and rickety bridges `pid` has on the board. */
+function bridgeEdgeCount(g: GameState, pid: Id): number {
+  return g.board.edges.filter(e => e.piece?.owner === pid && (e.piece.type === BRIDGE || e.piece.type === RICKETY)).length;
+}
+
+/**
+ * Registered with the techs (see `registerTideboundTechs`), so it exists exactly when Tidebound does:
+ * - `techValue`: research value of the 8 nodes, and of Harbor charters while Tidebound builds on it (every tier wants it then).
+ * - `mainPortUpgrades` / `portUpgradeOnSettlement`: Main bots raise ports too, and Fishing nets lets a settlement's port be raised.
+ * Values are the ones `server/bots/brain.ts` used before T13 moved them here, so bot behaviour does not change.
+ */
+export const tideboundTechBotGoal: BotGoalDef = {
+  id: 'tidebound.techs',
+  replace: true,
+  mainPortUpgrades: true,
+  portUpgradeOnSettlement(ctx: Ctx, pid: Id): boolean {
+    return hasTech(ctx.g, pid, TECH_FISHING_NETS);
+  },
+  techValue(ctx: Ctx, pid: Id, techId: string, info): number | undefined {
+    const { g, reg } = ctx;
+    const p = getPlayer(g, pid);
+    if (!p) return undefined;
+    const portTrader = info.personality === 'portTrader';
+    switch (techId) {
+      case TECH_HARBOR_CHARTERS: {
+        const hasGenericPort = g.board.vertices.some(
+          v => v.piece?.owner === pid && v.port && reg.ports.get(v.port)?.resource === null
+        );
+        const hasAnyPort = g.board.vertices.some(v => v.piece?.owner === pid && Boolean(v.port));
+        return (hasGenericPort ? 18 : hasAnyPort ? 16 : 14) + (portTrader ? 6 : 0);
+      }
+      case TECH_RICKETY_BRIDGES: {
+        if (!reg.pieces.has(BRIDGE)) return 0;
+        return 16 + Math.min(4, bridgeEdgeCount(g, pid) * 2) + (info.personality === 'roadHog' ? 5 : 0);
+      }
+      case TECH_FISHING_NETS: {
+        const hasPortSettlement = g.board.vertices.some(
+          v => v.piece?.owner === pid && v.piece.type === SETTLEMENT && v.port && reg.ports.get(v.port)?.resource === null
+        );
+        const netBonus = reg.pieces.has(BOT_NET_PIECE) ? 16 + (portTrader ? 4 : 0) : 12;
+        return netBonus + (hasPortSettlement ? 4 : 0);
+      }
+      case TECH_SALVAGE_CREW: {
+        const wrecksOut = getMarkers(g, { kind: BOT_WRECK_MARKER, target: 'hex' }).length;
+        return 14 + (wrecksOut > 0 ? 6 : 0) + (bridgeEdgeCount(g, pid) > 0 ? 2 : 0);
+      }
+      case TECH_NET_WORKS: {
+        if (!reg.pieces.has(BOT_NET_PIECE)) return 0;
+        const myNets = g.board.vertices.filter(v => v.piece?.owner === pid && v.piece.type === BOT_NET_PIECE).length;
+        return 16 + Math.min(6, myNets * 3);
+      }
+      case TECH_PIRATE_HUNTER: {
+        const piratesOut = getMarkers(g, { kind: BOT_PIRATE_MARKER, target: 'hex' }).length;
+        const knights = (p.stats.knightsPlayed || 0) + p.devCards.filter(c => c === 'knight').length;
+        return (piratesOut > 0 ? 18 : 11) + Math.min(4, knights * 2);
+      }
+      case TECH_HARBOR_MASTER: {
+        if (!reg.actions.has(BOT_UPGRADE_HARBOR_ACTION) && !reg.actions.has(BOT_FEED_SEA_ACTION)) return 0;
+        const portCities = g.board.vertices.filter(
+          v => v.piece?.owner === pid && v.piece.type === CITY && Boolean(v.port)
+        ).length;
+        return 17 + Math.min(6, portCities * 3) + (portTrader ? 3 : 0);
+      }
+      case TECH_GRAND_CAUSEWAY: {
+        if (!reg.pieces.has(BRIDGE)) return 0;
+        const holdingRoad = g.awards.longestRoad === pid;
+        return 22 + ((p.stats.longestRoad || 0) >= 5 ? 8 : 0) + (holdingRoad && bridgeEdgeCount(g, pid) > 0 ? 6 : 0);
+      }
+      case TECH_HARBOR_EMPIRE:
+        return 20 + Math.min(8, techBuildingValue(g, pid));
+      default:
+        return undefined;
+    }
+  }
+};
+
+/**
+ * Registers all 8 Tidebound extension tech nodes in `TECH_DEFS` (`replace: true` makes repeated calls across addons idempotent),
+ * and the bot hooks that say what they are worth (`tideboundTechBotGoal`).
  */
 export function registerTideboundTechs(api: PackApi): void {
   for (const def of TIDEBOUND_TECH_DEFS) {
     api.define(TECH_DEFS, def);
   }
+  api.define(BOT_GOALS, tideboundTechBotGoal);
 }

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   addMarker,
+  BOT_GOALS,
   botGoalEdgeDelta,
   botGoalVertexDelta,
   buildTopology,
   createGame,
+  defsOf,
   dispatch,
   evaluateBotGoals,
   getPlayerTechs,
@@ -43,6 +45,7 @@ import {
   TECH_SALVAGE_CREW,
   UPGRADE_BRIDGE,
   UPGRADE_HARBOR,
+  WRECK_MARKER_KIND,
   drownHex,
   edgesOfHex,
   ensureTides,
@@ -59,6 +62,13 @@ import {
   wreckBotGoal
 } from '../src/packs/tidebound';
 import { chooseBotAction } from '../src/server/bots/brain';
+import {
+  BOT_FEED_SEA_ACTION,
+  BOT_NET_PIECE,
+  BOT_PIRATE_MARKER,
+  BOT_UPGRADE_HARBOR_ACTION,
+  BOT_WRECK_MARKER
+} from '../src/packs/tidebound/tech';
 import { emitBotDialogue } from '../src/server/bots/dialogue';
 import { buildCtx } from '../src/server/bots/dialogue/context';
 import { ALL_LINES } from '../src/server/bots/dialogue/lines';
@@ -482,23 +492,25 @@ describe('T13f: Public-info-only Tidebound dialogue lines', () => {
     }
   });
 
-  it('emits public-info-only bot chat for wreckClaimed, pirateRobbed, pirateDriven, harborBuilt, netBuilt, bridgeCollapsed, and tideFlood', () => {
+  it('emits public-info-only bot chat for wreckClaimed, pirateRobbed, pirateDriven, harborBuilt, netBuilt, bridgeCollapsed, tideFlood and risingSeaDrowned', () => {
     const { g } = makeTideboundGame(1312);
     const landHex = g.board.hexes[0];
     g.board.vertices[landHex.vertexIds[0]].piece = { type: SETTLEMENT, owner: 'p1' };
 
     const triggers: { action: string; ev: any }[] = [
       { action: 'build', ev: { type: 'wreckClaimed', data: { id: 'w1', hexId: 0, playerId: 'p1', resource: 'ore', amount: 4 } } },
-      { action: 'roll', ev: { type: 'pirateRobbed', data: { id: 'pir1', hexId: 0, playerId: 'p1', count: 2, resource: 'wheat' } } },
+      { action: 'roll', ev: { type: 'pirateRobbed', data: { id: 'pir1', hexId: 0, vertexId: 0, victimId: 'p1', amount: 2 } } },
       { action: 'drive_off_pirate', ev: { type: 'pirateDriven', data: { id: 'pir1', hexId: 0, playerId: 'p1', resource: 'brick', amount: 3 } } },
       { action: 'upgrade_harbor', ev: { type: 'portUpgraded', data: { playerId: 'p1', vertexId: 0, level: 2 } } },
       { action: 'build', ev: { type: 'built', data: { playerId: 'p1', piece: 'net', loc: 0 } } },
-      { action: 'roll', ev: { type: 'pieceBroken', data: { playerId: 'p1', piece: 'rickety_bridge', edgeId: 0 } } },
-      { action: 'roll', ev: { type: 'tideChanged', data: { round: 4, spring: false, flooded: [landHex.id], risen: [landHex.id], receded: [] } } }
+      { action: 'roll', ev: { type: 'pieceBroken', data: { target: 'edge', loc: 0, piece: 'rickety_bridge', ownerId: 'p1' } } },
+      { action: 'roll', ev: { type: 'tideChanged', data: { round: 4, spring: false, risen: [landHex.id], fell: [] } } },
+      { action: 'roll', ev: { type: 'risingSeaDrowned', data: { hexId: landHex.id, round: 5 } } }
     ];
 
     let totalPosted = 0;
     for (const trig of triggers) {
+      let posted = 0;
       for (let i = 0; i < 20; i++) {
         const room: Room = {
           code: `TB${i}`,
@@ -511,9 +523,12 @@ describe('T13f: Public-info-only Tidebound dialogue lines', () => {
         emitBotDialogue(room, 'p1', trig.action, [trig.ev]);
         for (const c of room.chats) {
           totalPosted++;
+          posted++;
           expect(c.text).not.toMatch(RESOURCE_WORDS);
         }
       }
+      // Each trigger must post on its own, so one dead handler cannot hide behind the others.
+      expect(posted, `${trig.ev.type} never posted`).toBeGreaterThan(0);
     }
     expect(totalPosted).toBeGreaterThan(20);
   });
@@ -547,5 +562,74 @@ describe('T13 DLC-off invariant', () => {
       game: g
     } as unknown as Room;
     expect(buildCtx(room, { id: 'p1', name: 'Ayla' }).facts.traits).not.toContain('tidebound');
+  });
+});
+
+describe('T13 wreck reach in the salvage goal', () => {
+  it('rewards any corner of a wreck tile, port or not, because a settlement claims it like a road', () => {
+    const { g, reg } = makeTideboundGame(1313);
+    const ctx = makeCtx(g, reg);
+    for (const v of g.board.vertices) v.piece = null;
+    for (const e of g.board.edges) e.piece = null;
+
+    const wreckHex = g.board.hexes[1];
+    spawnWreckAt(ctx, wreckHex.id, { site: 'shore' });
+    const corners = new Set(verticesOfHex(g, reg, wreckHex.id));
+    const plainCorner = [...corners].find(vId => !g.board.vertices[vId].port);
+    expect(plainCorner).toBeDefined();
+    expect(wreckBotGoal.vertexDelta!(ctx, 'p1', plainCorner!)).toBeGreaterThan(0);
+
+    const away = g.board.vertices.find(v => !corners.has(v.id))!;
+    expect(wreckBotGoal.vertexDelta!(ctx, 'p1', away.id)).toBe(0);
+  });
+});
+
+describe('T13 bot brain stays generic', () => {
+  const seededRand = (seed: number) => {
+    let s = seed >>> 0;
+    return () => {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  };
+
+  it('spells the ids it shares with other Tidebound files exactly as they are defined', () => {
+    expect(BOT_NET_PIECE).toBe(NET);
+    expect(BOT_FEED_SEA_ACTION).toBe(FEED_SEA);
+    expect(BOT_UPGRADE_HARBOR_ACTION).toBe(UPGRADE_HARBOR);
+    expect(BOT_WRECK_MARKER).toBe(WRECK_MARKER_KIND);
+    expect(BOT_PIRATE_MARKER).toBe(PIRATE_MARKER_KIND);
+  });
+
+  it('with Tidebound off, chooseBotAction picks the same moves as a registry built without the Tidebound pack', () => {
+    const rules = { techTreeOn: true, dlc: { tidebound: false } };
+    const regOff = registryFor(allPacks, rules);
+    const regNone = registryFor(allPacks.filter(p => p.id !== 'tidebound'), { techTreeOn: true });
+    expect([...defsOf(regOff, BOT_GOALS).keys()].filter(id => id.startsWith('tidebound.'))).toEqual([]);
+
+    const g = createGame(regOff, {
+      seed: 1398,
+      players: [
+        { id: 'p1', name: 'Ayla', color: '#e74c3c', isBot: true, difficulty: 'Overload' },
+        { id: 'p2', name: 'Bram', color: '#3498db', isBot: true, difficulty: 'Secondary' },
+        { id: 'p3', name: 'Cora', color: '#2ecc71', isBot: true, difficulty: 'Main' }
+      ],
+      rules
+    });
+
+    let steps = 0;
+    for (; steps < 120; steps++) {
+      const moves = g.players.map(p => ({
+        pid: p.id,
+        off: chooseBotAction(g, regOff, p.id, seededRand(steps + 7)),
+        none: chooseBotAction(g, regNone, p.id, seededRand(steps + 7))
+      }));
+      for (const m of moves) expect(m.off, `step ${steps}, ${m.pid}`).toEqual(m.none);
+      const next = moves.find(m => m.pid === g.players[g.turn].id && m.off) ?? moves.find(m => m.off);
+      if (!next || !next.off) break;
+      const res = dispatch(g, regOff, { type: next.off.type, playerId: next.pid, payload: next.off.payload });
+      expect(res.ok).toBe(true);
+    }
+    expect(steps).toBeGreaterThan(20);
   });
 });

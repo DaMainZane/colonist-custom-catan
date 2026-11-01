@@ -25,7 +25,6 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | -------------------------- | -------------------------------------------------- |
 | `README.md`                | Overview, quick start, layout                      |
 | `change log.md`            | What changed, pass by pass                         |
-| `Backlog Priority.md`      | Open tasks ordered easiest to hardest              |
 | `Ideas.md`                 | Idea dump                                          |
 | `Development Plan.md`      | Stage 0 build plan (services, order, decisions)    |
 | `Map Generation Design.md` | Map generator design (recipes, stages, validation) |
@@ -33,12 +32,9 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `Bot Dialogue Design.md`   | Bot chat design                                    |
 | `Design UI Philosophy.md`  | Visual direction and design tokens                 |
 | `Tech Tree Design.md`      | Locked spec for the 5 root techs, per-player building-value cost formula, and per-tech hooks |
-| `Handoff - Tech Tree Roots.md` | Handoff guide and step-by-step work order for implementing the 5 tech tree roots |
-| `Modular Rework Plan.md` | Plan R0 to R9 for making the codebase easier to extend and to navigate (headers, boundary tests, router, generic server and client, visual manifest) |
-| `Rework Progress.md` | Checklist and log for the rework plan |
 | `ROUTER.md` | One page: task kind to the files to open and the file to copy as a pattern (read this first before changing code) |
 | `EXTENSION POINTS.md` | One line per `PackApi` method, hook and keyed registry (`COST_MODS`, `BOT_GOALS`, `SEVEN_STEPS`, ...) with signatures and defining files |
-| `Handoff - Modular Rework.md` | Where the rework stands and what to do next (read this first for rework work) |
+| `BUGS/Bug Report Template.md` | The 5-field bug report to paste to the AI (what I saw, expected, actual, repro), the AI's triage rules and its fix-report shape |
 | `RECIPES.md` | Five step-by-step recipes (new piece, action, addon, tech node, client overlay): files to touch in order, the real file to copy, where hand-written glue still is |
 | `CLAUDE.md` | Instructions for Claude Code: read `ROUTER.md` first, never read whole folders, search for a symbol first, layer rules, the commands to run after a change |
 
@@ -258,6 +254,7 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `tideboundpirates.test.ts` | T10a to T10d pirates: DLC/addon off = nothing registered, raid event card, ocean-only spawn within 4 tiles with zero `g.rng` draws, max 2 and no shared tile, passive schedule (round 4, every 4th, none with the Event Deck on), one random step a round, strength growth and cap, loot sizes, knights needed and the touching-piece rule, `drive_off_pirate` (loot paid from the bank, pirate removed, refusals), rob 2 cards (settlement, city, empty hand, every player in contact, cards conserved), flee chance rising and closeness bonus, fleeing away without robbing, keeping 2 tiles clear of stronger players, public view, bot goal |
 | `tideboundtech.test.ts` | T11a to T11f Tidebound tech nodes: 9 nodes across 4 tiers and 2 paths (`expansion` vs `industrial`) in `techpanel` fork layout, 25+ VP cost divisor scaling, `techGate` helper, `rickety_bridges` gate & +4 bridge cap, `fishing_nets` gate & settlement 3:1->2:1 port upgrade, `salvage_crew` +25% wreck loot & `demolish_bridge` refund, `net_works` -1 wood cost, `pirate_hunter` -2 knights & +50% loot, `harbor_master` gating `upgrade_harbor` & `feed_sea`, `grand_causeway` 16 VP Longest Road with a bridge, and `harbor_empire` 2-harbor limit & `ceil(V / 2)` bank card grant with zero `g.rng` draws |
 | `tideboundrisingsea.test.ts` | T12a and T12b Rising sea: DLC/addon off = nothing registered, coast-inward frontier expansion (sea or already-drowned neighbours, fog excluded), lowest elevation first (`1` -> `2` -> `3`), round-clock cadence from round 3 with derived RNG stream (`deriveRisingSeaRng`, zero `g.rng` draws), permanent `drowned` tile state blocking production and robber placement, non-harbor port idleness (`PORT_IDLE_CHECKS`), standalone (`tidebound.tides: false`) and combined (`tidebound.tides: true`) operation, `risingSeaOverlays` client overlays, and `RISING_SEA_LEVELS` (1–5) rate settings & lobby mapping |
+| `tideboundbots.test.ts` | T13a to T13f Tidebound bots and dialogue: flood and rising-sea exposure in vertex scoring (`tidesBotGoal`, `risingSeaBotGoal`), salvage goals (1-step claim, 2-step approach, `demolish_bridge`, rickety upgrade), harbor, net and `feed_sea` placement and scores, pirate avoidance and hunting (intercept, `drive_off_pirate`, knights), research across the 9 nodes, public-info-only Tidebound chat lines (no resource words, each trigger must post), DLC off = no goals, no RNG draws, no `tidebound` trait |
 | `golden.test.ts` | Golden baseline: seeded bot games hashed against `golden.snapshot.json` |
 | `rounds.test.ts` | Round clock: `g.round`, round hooks, `everyNRounds` |
 | `score.test.ts` | `score()`, `publicVP()`, score modes, `checkWinner` |
@@ -276,4 +273,10 @@ What every file does. Paths are relative to the repo root. Every source file sta
 | `socketAct.test.ts` | R6 generic `act` socket event: runs one engine action for the socket player, sends the engine reason when refused, ignores malformed envelopes, never answers "Internal error" to junk payloads for the nine moved actions, and (until R6.4 deletes each legacy handler) gives the same answer as the legacy event |
 | `piecesView.test.ts` | R8.6 generic per-player piece and action view data (`base.pieces_view`): `undefined` in base game, spot/cost/left parity with `netSpots`/`feedSpots`/`harborSpots`, `rickety_bridge` ocean edge build validation, absent keys when `available` is false, `spots: null` for other/spectator/off-turn/gameover and `[]` when broke, ascending spots, JSON round-trip and zero `g.rng` draws |
 | `lantern.test.ts` | R9 proof piece (`_template/lantern.ts`, one file): Rule of Two audit, nothing registered when off, visual manifest entry is safe plain JSON, `pieces[id]` from `base.pieces_view` (supply, price, spots next to your own road, no spots for other viewers, absent when off), generic `build` (1 VP, supply, zero `g.rng` draws, spot gone after building), refusal away from your roads, bot goal and the brain building it |
+| `viewState.test.ts` | R7a client state builder (`makeStateBuilder`): snapshot (`view.snapshot.json`) of what the turn player, another player and a spectator get, with Tidebound on and off; addon off, tech missing and lobby cases for the VIEW_DATA fields |
+| `visual.test.ts` | R8.3 `visual` on `PieceDef` and `ActionDef` and the `OVERLAY_KINDS` registry: defs with and without a visual register, plain JSON, a duplicate overlay id throws unless `replace`, nothing registered when the DLC or addon is off |
+| `visualManifest.test.ts` | R8.4 `buildVisualManifest` and the safety checks: empty for base, Tides on gives `flood` and `flood-warn`, sorting, plain JSON, unsafe markup, css, labels and orders refused (`visualProblems`, `overlayProblems`, `manifestProblems`) |
+| `visuals.test.ts` | R8.5 client copy of the manifest (`client/visuals.ts`): empty before it arrives, a late arrival asks for one re-render, a resend asks for none, listeners, reset, junk and malformed entries dropped, own copy |
+| `visualsEvent.test.ts` | R8.4 `visuals` socket event: sent to every player and spectator before `gameState`, once per addon-set key, resent on reconnect or a new spectator, a lobby toggle changes the key, real content when a def has a visual |
+| `turnhistory.test.ts` | Turn history recorder (`recordTurnHistory`): setup placements under round 0, rolls, consolidated production, builds, dev cards, robber and steals, bank trades, discards on a 7, rounds advance |
 

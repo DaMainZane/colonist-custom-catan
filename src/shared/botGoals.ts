@@ -29,8 +29,25 @@ export interface BotGoalItem {
   needsTags?: string[];
 }
 
+/** What the bot brain tells a `techValue` hook about the bot asking (the hook already has the game through `ctx`). */
+export interface BotTechInfo {
+  tierId: BotGoalTier;
+  /** The bot's personality id (`roadHog`, `portTrader`, ...). A plain string so shared does not depend on the server's tier list. */
+  personality: string;
+}
+
+/** Extra edge pieces a bot may lay besides roads (bridges), as the reach check sees them. */
+export interface BotEdgeReach {
+  /** How many of these pieces the bot can still place (adds to its road count). */
+  steps: number;
+  /** True for an empty edge these pieces can cross but roads cannot. */
+  crosses: (edgeId: number) => boolean;
+}
+
 export interface BotGoalDef {
   id: string;
+  /** Several addons of one pack may register the same shared def; `replace: true` makes the repeat harmless (same as the other registries). */
+  replace?: boolean;
   /** Defaults to `'basic'` (visible to `secondary` and `overload`). Set `'generic'` to include `main`, or `'advanced'` for `overload` only. */
   goalClass?: BotGoalClass;
   /** Returns active resource/build goals for player `pid`. */
@@ -43,6 +60,19 @@ export interface BotGoalDef {
   actionScore?: (ctx: Ctx, pid: Id, action: { type: string; payload: any }) => number;
   /** Threat weight delta added to `targetPid` when `pid` evaluates robber placement or trade blocking. */
   threatDelta?: (ctx: Ctx, pid: Id, targetPid: Id) => number;
+
+  // ---- Tier-free hooks: read from every registered def, whatever its `goalClass`, because they describe content, not a tier's taste. ----
+
+  /** How much the bot wants to research `techId` (same scale as the base tech values). Return `undefined` for techs this def does not know; the first number wins. */
+  techValue?: (ctx: Ctx, pid: Id, techId: string, info: BotTechInfo) => number | undefined;
+  /** True when content on the board is reason enough for `pid` to play a knight now (an active pirate, say). */
+  wantsKnight?: (ctx: Ctx, pid: Id) => boolean;
+  /** True when Main-tier bots should also upgrade ports (base: Secondary and Overload only). */
+  mainPortUpgrades?: boolean;
+  /** True when `pid` may raise a port that carries a settlement, not only a city (a tech unlocks it). */
+  portUpgradeOnSettlement?: (ctx: Ctx, pid: Id) => boolean;
+  /** Edge pieces besides roads that `pid` can still lay, for the "boxed in?" check (`null` when none). */
+  edgeReach?: (ctx: Ctx, pid: Id) => BotEdgeReach | null;
 }
 
 export function hasBotGoals(reg: Registry): boolean {
@@ -125,4 +155,47 @@ export function botGoalThreatDelta(ctx: Ctx, pid: Id, targetPid: Id, tierId: Bot
     if (def.threatDelta) delta += def.threatDelta(ctx, pid, targetPid);
   }
   return delta;
+}
+
+// ---- Tier-free hooks (every registered def counts, so Main sees them too) ----------------------------------------------
+
+function allBotGoalDefs(reg: Registry): BotGoalDef[] {
+  return [...defsOf<BotGoalDef>(reg, BOT_GOALS).values()];
+}
+
+/** Research value from the first def that knows `techId`, or `undefined` when none does (the brain then uses its own base values). */
+export function botGoalTechValue(ctx: Ctx, pid: Id, techId: string, info: BotTechInfo): number | undefined {
+  for (const def of allBotGoalDefs(ctx.reg)) {
+    const v = def.techValue?.(ctx, pid, techId, info);
+    if (typeof v === 'number') return v;
+  }
+  return undefined;
+}
+
+/** Does any registered content give `pid` a reason to play a knight now? */
+export function botGoalWantsKnight(ctx: Ctx, pid: Id): boolean {
+  return allBotGoalDefs(ctx.reg).some(def => def.wantsKnight?.(ctx, pid) === true);
+}
+
+/** Should Main-tier bots upgrade ports in this game? */
+export function botGoalMainPortUpgrades(reg: Registry): boolean {
+  return allBotGoalDefs(reg).some(def => def.mainPortUpgrades === true);
+}
+
+/** May `pid` raise a port that carries a settlement (not only a city)? */
+export function botGoalPortUpgradeOnSettlement(ctx: Ctx, pid: Id): boolean {
+  return allBotGoalDefs(ctx.reg).some(def => def.portUpgradeOnSettlement?.(ctx, pid) === true);
+}
+
+/** Combined reach of all extra edge pieces: how many `pid` can still lay, and which empty edges they can cross that roads cannot. */
+export function botGoalEdgeReach(ctx: Ctx, pid: Id): BotEdgeReach {
+  const parts: BotEdgeReach[] = [];
+  for (const def of allBotGoalDefs(ctx.reg)) {
+    const r = def.edgeReach?.(ctx, pid);
+    if (r && r.steps > 0) parts.push(r);
+  }
+  return {
+    steps: parts.reduce((s, r) => s + r.steps, 0),
+    crosses: (edgeId: number) => parts.some(r => r.crosses(edgeId))
+  };
 }

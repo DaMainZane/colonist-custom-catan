@@ -150,7 +150,7 @@ export function emitBotDialogue(room: Room, actorId: string, actionType: string,
         }
 
         case 'pieceBroken': {
-          if (d.piece === 'rickety_bridge') say(botById(d.playerId), 'bridgeCollapsed');
+          if (d.piece === 'rickety_bridge') say(botById(d.ownerId), 'bridgeCollapsed');
           break;
         }
 
@@ -184,8 +184,8 @@ export function emitBotDialogue(room: Room, actorId: string, actionType: string,
         }
 
         case 'pirateRobbed': {
-          // Only the raided player is read; stolen resources are never read.
-          say(botById(d.playerId), 'pirateRaid');
+          // Only the raided player (victimId) is read; stolen resources are never read.
+          say(botById(d.victimId), 'pirateRaid');
           break;
         }
 

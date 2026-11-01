@@ -771,7 +771,7 @@ function isDeadEndBridge(g: GameState, pid: Id, edgeId: number): boolean {
 
 /**
  * T13b salvage bot goal:
- * - `vertexDelta`: rewards port vertices that immediately claim an active wreck when settled.
+ * - `vertexDelta`: rewards the corners of a wreck's tile. A settlement or city there claims the wreck like a road does (`playerTouchesWreck`), port or not.
  * - `edgeDelta`: scores 1-step claiming edges and 2-step approach edges weighted by expected loot and countdown urgency.
  * - `goals`: emits salvage build goals (1-step claim even when trading is needed, or 2-step approach when affordable).
  * - `actionScore`: scores `demolish_bridge` (`TECH_SALVAGE_CREW`) only on safe dead-end bridges when cards or cap slots are needed.
@@ -783,7 +783,7 @@ export const wreckBotGoal: BotGoalDef = {
     const { g, reg } = ctx;
     if (!addonOn(reg, 'tidebound.wrecks')) return 0;
     const v = g.board.vertices[vertexId];
-    if (!v || !v.port) return 0;
+    if (!v) return 0;
     const wrecks = activeWrecks(g);
     if (wrecks.length === 0) return 0;
 
@@ -845,7 +845,6 @@ export const wreckBotGoal: BotGoalDef = {
         const def = reg.pieces.get(pieceId)!;
         const cost = priceOf(g, reg, p, def);
         const costCards = Object.values(cost).reduce((s, n) => s + (Number(n) || 0), 0);
-        const affordable = validateBuild(ctx, pid, { piece: pieceId, loc: g.board.edges[0]?.id ?? 0 }) !== 'Not enough resources';
         const expected = expectedWreckLootValue(g, pid, site, costCards);
         const netGain = expected - costCards;
 
@@ -866,7 +865,7 @@ export const wreckBotGoal: BotGoalDef = {
                 needsTags: ['sea', 'economy']
               }
             });
-          } else if (countdown >= 2 && affordable && edgeStepsTowardWreck(g, reg, pid, e.id, hexId)) {
+          } else if (countdown >= 2 && edgeStepsTowardWreck(g, reg, pid, e.id, hexId)) {
             const canBuildNow = validateBuild(ctx, pid, { piece: pieceId, loc: e.id }) === null;
             if (!canBuildNow) continue;
             const priority = Math.round((site === 'sea' ? 48 : 38) + netGain * 2);

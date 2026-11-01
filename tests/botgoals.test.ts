@@ -4,8 +4,13 @@ import {
   BOT_GOALS,
   botGoalActionScore,
   botGoalEdgeDelta,
+  botGoalEdgeReach,
+  botGoalMainPortUpgrades,
+  botGoalPortUpgradeOnSettlement,
+  botGoalTechValue,
   botGoalThreatDelta,
   botGoalVertexDelta,
+  botGoalWantsKnight,
   createGame,
   createRegistry,
   evaluateBotGoals,
@@ -104,6 +109,55 @@ describe('S0.14 Bot goal registry (Service 18)', () => {
     expect(botGoalEdgeDelta(ctx, 'b1', 0, 'overload')).toBe(11);
     expect(botGoalActionScore(ctx, 'b1', { type: 'x', payload: {} }, 'overload')).toBe(35);
     expect(botGoalThreatDelta(ctx, 'b1', 'b2', 'overload')).toBe(7);
+  });
+
+  it('tier-free hooks (techValue, wantsKnight, port upgrade policy, edge reach) read every def, even an advanced one, so Main sees them too', () => {
+    const hooksDef: BotGoalDef = {
+      id: 'adv_hooks',
+      goalClass: 'advanced',
+      techValue: (_ctx, _pid, techId) => (techId === 'x.tech' ? 7 : undefined),
+      wantsKnight: () => true,
+      mainPortUpgrades: true,
+      portUpgradeOnSettlement: () => true,
+      edgeReach: () => ({ steps: 2, crosses: edgeId => edgeId === 3 })
+    };
+    const pack: Pack = {
+      id: 'hooks_pack',
+      name: 'Hooks Pack',
+      register(api) {
+        api.define(BOT_GOALS, hooksDef);
+      }
+    };
+    const reg = createRegistry([basePack, pack]);
+    const g = createGame(reg, {
+      players: [
+        { id: 'b1', name: 'Bot1', isBot: true, difficulty: 'Main' },
+        { id: 'b2', name: 'Bot2', isBot: true, difficulty: 'Main' }
+      ],
+      rules: rulesFromSettings(defaultSettings()),
+      seed: 303
+    });
+    const ctx = makeCtx(g, reg);
+    const info = { tierId: 'main' as const, personality: 'builder' };
+
+    expect(botGoalTechValue(ctx, 'b1', 'x.tech', info)).toBe(7);
+    expect(botGoalTechValue(ctx, 'b1', 'other.tech', info)).toBeUndefined();
+    expect(botGoalWantsKnight(ctx, 'b1')).toBe(true);
+    expect(botGoalMainPortUpgrades(reg)).toBe(true);
+    expect(botGoalPortUpgradeOnSettlement(ctx, 'b1')).toBe(true);
+    const reach = botGoalEdgeReach(ctx, 'b1');
+    expect(reach.steps).toBe(2);
+    expect(reach.crosses(3)).toBe(true);
+    expect(reach.crosses(4)).toBe(false);
+
+    // A registry with no such hooks answers "nothing".
+    const plain = createRegistry([basePack]);
+    const plainCtx = makeCtx(createGame(plain, { players: [{ id: 'b1', name: 'Bot1', isBot: true, difficulty: 'Main' }, { id: 'b2', name: 'Bot2', isBot: true, difficulty: 'Main' }], rules: rulesFromSettings(defaultSettings()), seed: 304 }), plain);
+    expect(botGoalTechValue(plainCtx, 'b1', 'x.tech', info)).toBeUndefined();
+    expect(botGoalWantsKnight(plainCtx, 'b1')).toBe(false);
+    expect(botGoalMainPortUpgrades(plain)).toBe(false);
+    expect(botGoalPortUpgradeOnSettlement(plainCtx, 'b1')).toBe(false);
+    expect(botGoalEdgeReach(plainCtx, 'b1')).toMatchObject({ steps: 0 });
   });
 
   it('brain integration: missing resources from BOT_GOALS feed gold pick and ready goals execute custom action', () => {

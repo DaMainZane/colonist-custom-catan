@@ -59,6 +59,11 @@ export const bridgePiece: PieceDef = {
 export const bridgeBotGoal: BotGoalDef = {
   id: 'tidebound.bridges',
   goalClass: 'generic',
+  /** The bot's "boxed in?" check counts bridges as extra steps, and they cross exactly the ocean edges roads cannot. */
+  edgeReach(ctx: Ctx, pid: Id) {
+    const left = getPlayer(ctx.g, pid)?.pieces[BRIDGE] ?? 0;
+    return left > 0 ? { steps: left, crosses: (edgeId: number) => isOceanEdge(ctx, edgeId) } : null;
+  },
   goals(ctx: Ctx, pid: Id): BotGoalItem[] {
     const p = getPlayer(ctx.g, pid);
     if (!p || (p.pieces[BRIDGE] ?? 0) <= 0) return [];

@@ -359,4 +359,5 @@ Parallel tracks that do not block the main line: the bot dialogue lines (grow ea
 
 ## Unprocessed Ideas:
 - Boss fight: dragon that spit fireball every 2 turns (first turn up to the sky outside of render, 2nd turn drop down onto a random tile). Random tile is destroyed, similar to volcano explosion (same mechanic port over) (1 tiles only) (does not give resources until volcano)
+- Rework leftovers (from the closed Rework Codebase Progress.md): (1) base pieces (road, settlement, city) stay hard-coded and only DLC pieces use the visual manifest; revisit now that the manifest exists. (2) Move the 22 base game events to `act` (old R6.6, skipped on purpose); traps: `discardCards` renames `discards` to `cards`, `playDevCard` renames `cardType` to `card` and `monopolyResource` to `resource`, and six events (`rollDice`, `endTurn`, `buyDevCard`, `clickHex`, `stealFromPlayer`, `discardCards`) are silent on refusal today, so `act` would show error toasts unless an `ActionDef.silent` flag is added.
 
